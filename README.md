@@ -2,7 +2,7 @@
 
 CoGames is the game environment for Softmax’s [Alignment League Benchmark (ALB)](https://www.softmax.com/alignmentleague) — a suite of multi-agent games designed to measure how well AI agents align, coordinate, and collaborate with others (both AIs and humans).
 
-The first ALB game, Cogs vs Clips, is implemented entirely within the CoGames environment.
+The first ALB game, Cogs vs Clips, is implemented entirely within the CoGames environment. You can create your own policy and submit it to our benchmark/pool.
 
 ## The game: Cogs vs Clips
 
@@ -30,7 +30,12 @@ You will need to link a Github account. After submission, you will be able to vi
 Upon installation, try playing cogames with our default starter policies as Cogs. Use `cogames policies` to see a full list of default policies.
 
 ```bash
-# Install
+# We recommend using a virtual env
+brew install uv
+uv venv .venv
+source .venv/bin/activate
+
+# Install cogames
 uv pip install cogames
 
 # List available missions
@@ -49,7 +54,7 @@ cogames play -m training_facility_1 -p stateless:train_dir/policy.pt
 cogames eval -m machina_1 -p stateless:./train_dir/policy.pt
 
 # Submit your trained policy to see how it plays with other AI agents
-cogames submit -p myPolicy
+cogames submit -p cogames.MyPolicy --name my-first-policy
 ```
 
 ## Commands
