@@ -63,13 +63,13 @@ Most commands are of the form `cogames <command> -m [MISSION] -p [POLICY] [OPTIO
 
 To specify a `MISSION`, you can:
 
-- Use a mission name from the registry given by `cogames missions`, e.g. `training_facility_1`
-- Use a path to a mission configuration file, e.g. path/to/mission.yaml"
+- Use a mission name from the registry given by `cogames missions`, e.g. `training_facility_1`.
+- Use a path to a mission configuration file, e.g. `path/to/mission.yaml`.
+- Alternatively, specify a set of missions with `-set` or `-S`.
 
 To specify a `POLICY`, provide an argument with up to three parts `CLASS[:DATA][:PROPORTION]`:
 
-- `CLASS`: Policy shorthand (`noop`, `random`, `lstm`, `stateless`) or fully qualified class path like
-  `cogames.policy.random.RandomPolicy`. Use `cogames policies` to see a full list of default policies.
+- `CLASS`: Use a policy shorthand or full path from the registry given by `cogames policies`, e.g. `lstm` or `cogames.policy.random.RandomPolicy`.
 - `DATA`: Optional path to a weights file or directory. When omitted, defaults to the policy's built-in weights.
 - `PROPORTION`: Optional positive float specifying the relative share of agents that use this policy (default: 1.0).
 
@@ -190,7 +190,9 @@ for step in range(1000):
 
 ### `cogames eval -m [MISSION] [-m MISSION...] -p POLICY [-p POLICY...]`
 
-Evaluate one or more policies on one or more missions.
+Evaluate one or more policies on one or more missions. 
+
+We provide a set of eval missions which you can use instead of missions `-m`. Specify `-set` or `-S` among: `eval_missions`, `integrated_evals`, `spanning_evals`, `diagnostic_evals`, `all`.
 
 You can provide multiple `-p POLICY` arguments if you want to run evaluations on mixed-policy populations.
 
