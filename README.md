@@ -79,6 +79,22 @@ Lists all missions and their high-level specs.
 
 If a mission is provided, describes a specific mission in detail.
 
+### `cogames variants`
+
+Lists available variants for modifying missions
+
+### `cogames evals`
+
+Lists all missions used as evals for analyzing the behaviour of agents
+
+### `cogames policies`
+
+Shows a list of default policies available to you, and the shorthands with which you can use them.
+
+### `cogames version`
+
+Show version info for mettagrid, pufferlib-core, and cogames.
+
 ### `cogames play -m [MISSION] -p [POLICY]`
 
 Play an episode of the specified mission.
@@ -234,13 +250,6 @@ modifications.
 
 You will be able to provide your specified `--output` path as the `MISSION` argument to other `cogames` commmands.
 
-### `cogames version`
-
-Show version info for mettagrid, pufferlib-core, and cogames.
-
-### `cogames policies`
-
-Shows a list of default policies available to you, and the shorthands with which you can use them.
 
 ## Citation
 
