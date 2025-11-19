@@ -222,6 +222,9 @@ You can provide multiple `-p POLICY` arguments if you want to run evaluations on
 # Evaluate a single trained policy checkpoint
 cogames eval -m machina_1 -p stateless:train_dir/model.pt
 
+# Evaluate a single trained policy across a mission set with multiple agents
+cogames eval -set integrated_evals -p stateless:train_dir/model.pt
+
 # Mix two policies: 3 parts your policy, 5 parts random policy
 cogames eval -m machina_1 -p stateless:train_dir/model.pt:3 -p random::5
 ```
@@ -250,16 +253,30 @@ modifications.
 
 You will be able to provide your specified `--output` path as the `MISSION` argument to other `cogames` commmands.
 
+## Policy Submission
+### `cogames login`
+
+Make sure you have authenticated before submitting a policy.
+
+### `cogames submit -p [POLICY] -n [NAME]`
+
+**Options:**
+- `--include-files`: Can be specified multiple times, such as --include-files file1.py --include-files dir1/
+- `–-dry-run`: Validates the policy works for submission without uploading it
+
+When a new policy is submitted, it is queued up for evals with other policies, both randomly selected and designated policies for the Alignment League Benchmark.
+
+Visit the [ALB](https://www.softmax.com/alignmentleague) page and log in to see how your policies perform!
 
 ## Citation
 
 If you use CoGames in your research, please cite:
 
 ```bibtex
-@software{cogames2024,
+@software{cogames2025,
   title={CoGames: Multi-Agent Cooperative Game Environments},
   author={Metta AI},
-  year={2024},
+  year={2025},
   url={https://github.com/metta-ai/metta}
 }
 ```
