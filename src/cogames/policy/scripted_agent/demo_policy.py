@@ -1,6 +1,7 @@
 import random
 
 from mettagrid.policy.policy import MultiAgentPolicy, StatefulAgentPolicy, StatefulPolicyImpl
+from mettagrid.simulator import Action
 from mettagrid.simulator.interface import AgentObservation
 
 from .types import BaselineHyperparameters, CellType, SimpleAgentState
@@ -24,7 +25,7 @@ class DemoPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         self._agent_id = agent_id
         self._hyperparams = hyperparams
         self._policy_env_info = policy_env_info
-        self._actions = policy_env_info.actions
+        self._action_names = policy_env_info.action_names
         self._move_deltas = {"north": (-1, 0), "south": (1, 0), "east": (0, 1), "west": (0, -1)}
 
         self._obs_hr = policy_env_info.obs_height // 2
@@ -74,8 +75,8 @@ class DemoPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
             dr, dc = self._move_deltas[d]
             nr, nc = s.row + dr, s.col + dc
             if (nr, nc) not in blocked:
-                return self._actions.move.Move(d)
-        return self._actions.noop.Noop()
+                return Action(name=f"move_{d}")
+        return Action(name="noop")
 
     def _step_towards(self, s, target, parsed):
         """Single-step greedy pursuit, else random."""
@@ -119,7 +120,7 @@ class DemoPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
             dr, dc = self._move_deltas[d]
             nr, nc = r + dr, c + dc
             if (nr, nc) not in blocked:
-                return self._actions.move.Move(d)
+                return Action(name=f"move_{d}")
 
         return self._random_step(s, parsed)
 
@@ -164,12 +165,12 @@ class DemoPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         if s.heart_recipe is None:
             if s.current_glyph != "heart_a":
                 s.current_glyph = "heart_a"
-                return change_vibe_action("heart_a", actions=self._actions), s
+                return change_vibe_action("heart_a", action_names=self._action_names), s
 
             assembler = self._closest(s, parsed, lambda o: is_station(o.name.lower(), "assembler"))
             if assembler:
                 if self._adjacent(s, assembler):
-                    return use_object_at(s, assembler, actions=self._actions, move_deltas=self._move_deltas), s
+                    return use_object_at(s, assembler), s
                 return self._step_towards(s, assembler, parsed), s
 
             return self._random_step(s, parsed), s
@@ -182,9 +183,9 @@ class DemoPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
             if chest:
                 if s.current_glyph != "default":
                     s.current_glyph = "default"
-                    return change_vibe_action("default", actions=self._actions), s
+                    return change_vibe_action("default", action_names=self._action_names), s
                 if self._adjacent(s, chest):
-                    return use_object_at(s, chest, actions=self._actions, move_deltas=self._move_deltas), s
+                    return use_object_at(s, chest), s
                 return self._step_towards(s, chest, parsed), s
 
         # Assemble
@@ -198,9 +199,9 @@ class DemoPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
             if assembler:
                 if s.current_glyph != "heart_a":
                     s.current_glyph = "heart_a"
-                    return change_vibe_action("heart_a", actions=self._actions), s
+                    return change_vibe_action("heart_a", action_names=self._action_names), s
                 if self._adjacent(s, assembler):
-                    return use_object_at(s, assembler, actions=self._actions, move_deltas=self._move_deltas), s
+                    return use_object_at(s, assembler), s
                 return self._step_towards(s, assembler, parsed), s
 
         # Gather needed resources
@@ -218,7 +219,7 @@ class DemoPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         if needed:
             pos, obj, r = min(needed, key=lambda x: manhattan((s.row, s.col), x[0]))
             if self._adjacent(s, pos):
-                return use_object_at(s, pos, actions=self._actions, move_deltas=self._move_deltas), s
+                return use_object_at(s, pos), s
             return self._step_towards(s, pos, parsed), s
 
         # Otherwise wander

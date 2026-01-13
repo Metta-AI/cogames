@@ -73,7 +73,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         self._obs_wr = policy_env_info.obs_width // 2  # Egocentric observation half-radius (cols)
 
         # Action lookup
-        self._actions = policy_env_info.actions
+        self._action_names = policy_env_info.action_names
         self._move_deltas = {
             "north": (-1, 0),
             "south": (1, 0),
@@ -166,7 +166,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         if s.current_glyph != desired_vibe:
             s.current_glyph = desired_vibe
             # Return vibe change action this step
-            action = utils_change_vibe_action(desired_vibe, actions=self._actions)
+            action = utils_change_vibe_action(desired_vibe, action_names=self._action_names)
             s.last_action = action
             return action, s
 
@@ -217,7 +217,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
             if (nr, nc) in s.agent_occupancy:
                 continue
 
-            return self._actions.move.Move(direction)
+            return Action(name=f"move_{direction}")
         return None
 
     def _clear_stuck_state(self, s: SimpleAgentState) -> None:
@@ -231,7 +231,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
 
         action = self._try_random_direction(s)
         self._clear_stuck_state(s)
-        return action if action else self._actions.noop.Noop()
+        return action if action else Action(name="noop")
 
     def _update_occupancy_and_discover(self, s: SimpleAgentState, parsed: ParsedObservation) -> None:
         """Update occupancy map and discover objects from parsed observation."""
@@ -480,7 +480,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
             return self._do_recharge(s)
         elif s.phase == Phase.UNCLIP:
             return self._do_unclip(s)
-        return self._actions.noop.Noop()
+        return Action(name="noop")
 
     def _explore_directional(self, s: SimpleAgentState) -> Action:
         """
@@ -493,7 +493,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         to escape, then continues exploring.
         """
         if s.row < 0:
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         # Check if we're in escape mode (navigating to assembler)
         if s.exploration_escape_until_step > 0:
@@ -557,7 +557,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
                     action = self._move_towards(s, (next_r, next_c))
 
                     # If move_towards returned noop (blocked), pick a new direction
-                    if action == self._actions.noop.Noop():
+                    if action == Action(name="noop"):
                         # Fall through to pick new direction
                         pass
                     else:
@@ -587,7 +587,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
 
         # No valid moves, use try_random_direction (which also checks agent collisions)
         random_action = self._try_random_direction(s)
-        return random_action if random_action else self._actions.noop.Noop()
+        return random_action if random_action else Action(name="noop")
 
     def _explore_until(
         self, s: SimpleAgentState, condition: Callable[[], bool], reason: str = "Exploring"
@@ -677,7 +677,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
             self._clear_waiting_state(s)
             return None  # Let _do_gather try again immediately
 
-        return self._actions.noop.Noop()
+        return Action(name="noop")
 
     def _navigate_to_adjacent(
         self, s: SimpleAgentState, target_pos: tuple[int, int], target_name: str = "target"
@@ -693,7 +693,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
 
         # Move towards target
         action = self._move_towards(s, target_pos, reach_adjacent=True)
-        if action == self._actions.noop.Noop():
+        if action == Action(name="noop"):
             return self._explore(s)
         return action
 
@@ -704,12 +704,12 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         if extractor.cooldown_remaining > 0:
             s.waiting_at_extractor = extractor.position
             s.wait_steps += 1
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         # Skip if depleted/clipped
         if extractor.remaining_uses == 0 or extractor.clipped:
             self._clear_waiting_state(s)
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         # Use it! Track pre-use inventory and activate
         old_amount = getattr(s, resource_type, 0)
@@ -719,13 +719,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         s.pending_use_amount = old_amount
         s.waiting_at_extractor = extractor.position
 
-        return utils_use_object_at(
-            s,
-            extractor.position,
-            actions=self._actions,
-            move_deltas=self._move_deltas,
-            using_for=f"{resource_type}_extractor",
-        )
+        return utils_use_object_at(s, extractor.position)
 
     def _do_gather(self, s: SimpleAgentState) -> Action:
         """
@@ -742,7 +736,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
 
         if all(d <= 0 for d in deficits.values()):
             self._clear_waiting_state(s)
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         # Explore until we find an extractor for a needed resource
 
@@ -792,9 +786,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
             return nav_action
 
         # Adjacent - use it
-        return utils_use_object_at(
-            s, assembler, actions=self._actions, move_deltas=self._move_deltas, using_for="assembler"
-        )
+        return utils_use_object_at(s, assembler)
 
     def _do_deliver(self, s: SimpleAgentState) -> Action:
         """Deliver hearts to chest."""
@@ -813,7 +805,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
             return nav_action
 
         # Adjacent - use it
-        return utils_use_object_at(s, chest, actions=self._actions, move_deltas=self._move_deltas, using_for="chest")
+        return utils_use_object_at(s, chest)
 
     def _do_recharge(self, s: SimpleAgentState) -> Action:
         """Recharge at charger."""
@@ -834,14 +826,12 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
             return nav_action
 
         # Adjacent - use it
-        return utils_use_object_at(
-            s, charger, actions=self._actions, move_deltas=self._move_deltas, using_for="charger"
-        )
+        return utils_use_object_at(s, charger)
 
     def _do_unclip(self, s: SimpleAgentState) -> Action:
         """Unclip extractors - this is implemented in the UnclippingAgent."""
         s.phase = Phase.GATHER
-        return self._actions.noop.Noop()
+        return Action(name="noop")
 
     def _find_nearest_extractor(self, s: SimpleAgentState, resource_type: str) -> Optional[ExtractorInfo]:
         """Find the nearest AVAILABLE extractor of the given type."""
@@ -879,11 +869,11 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
 
         start = (s.row, s.col)
         if start == target and not reach_adjacent:
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         goal_cells = compute_goal_cells(s, target, reach_adjacent, CellType)
         if not goal_cells:
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         # Check if we can reuse cached path
         path = None
@@ -912,7 +902,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         if not path:
             # No path found - try a random direction to escape
             random_action = self._try_random_direction(s)
-            return random_action if random_action else self._actions.noop.Noop()
+            return random_action if random_action else Action(name="noop")
 
         # Get next step from path
         next_pos = path[0]
@@ -943,7 +933,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         elif dr == 0 and dc == -1:
             action = "west"
         else:
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         # Check for agent collision and try alternative direction if blocked
         if self._is_agent_at_obs_location(s, target_obs_r, target_obs_c):
@@ -954,9 +944,9 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
                 s.cached_path_target = None
                 return random_action
             # No valid moves, just noop
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
-        return self._actions.move.Move(action)
+        return Action(name=f"move_{action}")
 
     def _is_agent_at_obs_location(self, s: SimpleAgentState, obs_r: int, obs_c: int) -> bool:
         """Check if there's an agent at the given observation coordinates.
@@ -986,7 +976,7 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         """
         tr, tc = target
         if s.row == tr and s.col == tc:
-            return self._actions.noop.Noop()
+            return Action(name="noop")
         dr = tr - s.row
         dc = tc - s.col
 
@@ -994,16 +984,16 @@ class BaselineAgentPolicyImpl(StatefulPolicyImpl[SimpleAgentState]):
         if (tr, tc) in s.agent_occupancy:
             # Another agent is blocking the target, wait or try alternative
             random_action = self._try_random_direction(s)
-            return random_action if random_action else self._actions.noop.Noop()
+            return random_action if random_action else Action(name="noop")
 
         if dr == -1:
-            return self._actions.move.Move("north")
+            return Action(name="move_north")
         if dr == 1:
-            return self._actions.move.Move("south")
+            return Action(name="move_south")
         if dc == 1:
-            return self._actions.move.Move("east")
+            return Action(name="move_east")
         if dc == -1:
-            return self._actions.move.Move("west")
+            return Action(name="move_west")
         # Fallback to pathfinder if offsets unexpected
         return self._move_towards(s, target, allow_goal_block=True)
 
