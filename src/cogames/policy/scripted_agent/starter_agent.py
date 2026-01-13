@@ -47,7 +47,7 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         self._policy_env_info = policy_env_info
 
         # Action lookup
-        self._actions = policy_env_info.actions
+        self._action_names = policy_env_info.action_names
 
     def _parse_observation(self, obs: AgentObservation, state: StarterCogState) -> StarterCogState:
         """Parse the observation and update the state."""

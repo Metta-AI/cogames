@@ -6,7 +6,7 @@ Pure/stateless helper functions that can be reused across different agents.
 
 from __future__ import annotations
 
-from typing import Any, Union
+from typing import Union
 
 from mettagrid.simulator import Action
 from mettagrid.simulator.interface import AgentObservation
@@ -278,7 +278,7 @@ def parse_observation(
 def change_vibe_action(
     vibe_name: str,
     *,
-    actions: Any,  # PolicyEnvInterface.actions
+    action_names: list[str],
 ) -> Action:
     """
     Return a safe vibe-change action.
@@ -286,20 +286,13 @@ def change_vibe_action(
     """
     from mettagrid.config.vibes import VIBE_BY_NAME
 
-    change_vibe_cfg = getattr(actions, "change_vibe", None)
-    if change_vibe_cfg is None:
-        return actions.noop.Noop()
-    if not getattr(change_vibe_cfg, "enabled", True):
-        return actions.noop.Noop()
-    num_vibes = len(getattr(change_vibe_cfg, "vibes", []))
-    if num_vibes <= 1:
-        return actions.noop.Noop()
-    # Raise loudly if the requested vibe isn't registered instead of silently
-    # falling back to noop; otherwise config issues become very hard to spot.
+    change_vibe_actions = [a for a in action_names if a.startswith("change_vibe_")]
+    if len(change_vibe_actions) <= 1:
+        return Action(name="noop")
     vibe = VIBE_BY_NAME.get(vibe_name)
     if vibe is None:
         raise Exception(f"No valid vibes called {vibe_name}")
-    return actions.change_vibe.ChangeVibe(vibe)
+    return Action(name=f"change_vibe_{vibe_name}")
 
 
 def update_agent_position(
@@ -331,17 +324,12 @@ def update_agent_position(
 def use_object_at(
     state: SimpleAgentState,
     target_pos: tuple[int, int],
-    *,
-    actions: Any,  # PolicyEnvInterface.actions
-    move_deltas: dict[str, tuple[int, int]],
-    using_for: str = "",
 ) -> Action:
     """Use an object by moving into its cell. Sets a flag so position tracking knows not to update.
 
     This is the generic "move into to use" action for extractors, assemblers, chests, chargers, etc.
-    The 'using_for' parameter is used for tracking what we're using (e.g., 'extractor', 'assembler').
     """
-    action = move_into_cell(state, target_pos, actions=actions, move_deltas=move_deltas)
+    action = move_into_cell(state, target_pos)
 
     # Mark that we're using an object so position tracking doesn't update
     state.using_object_this_step = True
@@ -352,18 +340,14 @@ def use_object_at(
 def move_into_cell(
     state: SimpleAgentState,
     target: tuple[int, int],
-    *,
-    actions: Any,  # PolicyEnvInterface.actions
-    move_deltas: dict[str, tuple[int, int]],
 ) -> Action:
     """Return the action that attempts to step into the target cell.
 
     Checks for agent occupancy before moving to avoid collisions.
     """
-
     tr, tc = target
     if state.row == tr and state.col == tc:
-        return actions.noop.Noop()
+        return Action(name="noop")
     dr = tr - state.row
     dc = tc - state.col
 
@@ -371,15 +355,15 @@ def move_into_cell(
     if (tr, tc) in state.agent_occupancy:
         # Another agent is blocking the target, wait or try alternative
         # For a simple fallback, return noop (caller can handle random direction if needed)
-        return actions.noop.Noop()
+        return Action(name="noop")
 
     if dr == -1:
-        return actions.move.Move("north")
+        return Action(name="move_north")
     if dr == 1:
-        return actions.move.Move("south")
+        return Action(name="move_south")
     if dc == 1:
-        return actions.move.Move("east")
+        return Action(name="move_east")
     if dc == -1:
-        return actions.move.Move("west")
+        return Action(name="move_west")
     # Fallback to noop if offsets unexpected
-    return actions.noop.Noop()
+    return Action(name="noop")

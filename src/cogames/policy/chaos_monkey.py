@@ -15,7 +15,7 @@ class _ChaosMonkeyAgent(AgentPolicy):
         self._fail_probability = fail_probability
         self._step = 0
         self._failed = False
-        self._noop = policy_env_info.actions.noop.Noop()
+        self._noop = Action(name="noop")
 
     def reset(self, simulation: Optional[Simulation] = None) -> None:
         self._step = 0

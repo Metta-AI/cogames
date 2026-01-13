@@ -351,7 +351,7 @@ class UnclippingAgentPolicyImpl(BaselineAgentPolicyImpl):
         if info is None:
             self._clear_unclip_state(s)
             s.phase = Phase.GATHER
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         item_name, craft_recipe = info
 
@@ -359,7 +359,7 @@ class UnclippingAgentPolicyImpl(BaselineAgentPolicyImpl):
         if craft_recipe and not all(getattr(s, res, 0) >= amt for res, amt in craft_recipe.items()):
             # Need to gather craft resources first
             s.phase = Phase.GATHER
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         # Explore until we find assembler
         explore_action = self._explore_until(
@@ -372,7 +372,7 @@ class UnclippingAgentPolicyImpl(BaselineAgentPolicyImpl):
 
         assembler = s.stations.get("assembler")
         if assembler is None:
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         ar, ac = assembler
         dr = abs(s.row - ar)
@@ -380,9 +380,7 @@ class UnclippingAgentPolicyImpl(BaselineAgentPolicyImpl):
         is_adjacent = (dr == 1 and dc == 0) or (dr == 0 and dc == 1)
 
         if is_adjacent:
-            return use_object_at(
-                s, assembler, actions=self._actions, move_deltas=self._move_deltas, using_for=f"craft_{item_name}"
-            )
+            return use_object_at(s, assembler)
 
         return self._move_towards(s, assembler, reach_adjacent=True)
 
@@ -391,20 +389,20 @@ class UnclippingAgentPolicyImpl(BaselineAgentPolicyImpl):
         if s.blocked_by_clipped_extractor is None:
             s.phase = Phase.GATHER
             self._clear_unclip_state(s)
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         info = self._get_unclip_info(s, s.unclip_target_resource)
         if info is None:
             self._clear_unclip_state(s)
             s.phase = Phase.GATHER
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         item_name, _ = info
         if getattr(s, item_name, 0) <= 0:
             # Lost the item before reaching extractor
             self._clear_unclip_state(s)
             s.phase = Phase.GATHER
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         # Navigate to clipped extractor
         target = s.blocked_by_clipped_extractor
@@ -417,17 +415,11 @@ class UnclippingAgentPolicyImpl(BaselineAgentPolicyImpl):
         if is_at_target:
             # Already on the extractor - it should be unclipped now
             # Wait for next step to verify and clear state
-            return self._actions.noop.Noop()
+            return Action(name="noop")
 
         if is_adjacent:
             # Adjacent to clipped extractor - use it to unclip (like using any other object)
-            action = use_object_at(
-                s,
-                target,
-                actions=self._actions,
-                move_deltas=self._move_deltas,
-                using_for=f"unclip_{s.unclip_target_resource}",
-            )
+            action = use_object_at(s, target)
             # Don't clear unclip state yet - wait until next step to verify it worked
             # The state will be cleared in _update_phase when we see the extractor is unclipped
             return action
