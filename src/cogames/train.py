@@ -286,6 +286,7 @@ def train(
         vtrace_c_clip=1.0,
         prio_alpha=0.8,
         prio_beta0=0.2,
+        min_lr_ratio=0.0,
     )
 
     trainer = pufferl.PuffeRL(train_args, vecenv, policy.network())
