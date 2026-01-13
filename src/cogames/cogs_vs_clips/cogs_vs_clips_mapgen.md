@@ -221,15 +221,13 @@ CLI variants are composed in order, so `cogames play -m machina_procedural.open_
 - `MapGen.Config.seed` (`env.game.map_builder.seed`) controls **map layout**.
 - If the mission sets a MapGen seed, all commands use it unless you pass `--map-seed`.
 - `--map-seed` overrides the MapGen seed for procedural maps.
-- `--seed` controls simulator/policy RNG (and is used for training map derivation when `--map-seed` is unset).
-- `train`: with `--map-seed`, map seed = `--map-seed + env_seed`; without `--map-seed` (and no mission seed), map seed =
-  `--seed + env_seed` (reproducible variety).
-- `play`/`eval`: with `--map-seed`, the map layout is fixed; without `--map-seed` (and no mission seed), the map layout
-  is random.
+- `--seed` sets the simulator/policy RNG for the run (sim dynamics, policy sampling, assignment shuffles).
+- When a MapGen seed is set (`--map-seed` or mission seed), the map layout follows a deterministic per-episode seed
+  sequence. If `maps_cache_size` is set, the sequence repeats every `maps_cache_size` episodes; otherwise it increases
+  monotonically.
+- When no MapGen seed is set, the map layout is random. With caching enabled, you see up to `maps_cache_size` distinct
+  layouts; with caching disabled (`maps_cache_size=None`), you get a fresh layout each episode.
 - For fully reproducible play/eval runs, set **both** `--seed` and `--map-seed`.
-- Recipe `maps_cache_size` controls how many distinct procedural maps are cached when the MapGen seed is unset (no
-  `--map-seed` and mission seed is `None`); set it to `None` to disable caching (more diversity, slower) or `1` for a
-  single cached map.
 
 Example programmatic override using the shared `MapSeedVariant` helper:
 
@@ -297,11 +295,11 @@ mission = Mission(
       --seed 12345
   ```
 
-- Reproduce a procedural seed:
+- Reproduce a procedural layout:
   ```bash
-  cogames play -m machina_procedural.open_world --variant city --seed 24601
+  cogames play -m machina_procedural.open_world --variant city --map-seed 24601 --seed 24601
   ```
-  (Assuming the mission/variant combination sets or respects `procedural_overrides["seed"]`.)
+  (Use `--map-seed` for layout determinism; include `--seed` to reproduce simulator/policy RNG.)
 
 ---
 
