@@ -1,0 +1,56 @@
+# DX QA CI Container
+#
+# Purpose: True isolation for release gate. Runs in GitHub Actions after build,
+# blocks publish on failure. Self-contained - no external dependencies at runtime.
+#
+# Usage (from packages/cogames/):
+#   docker build -f devops/dx-qa/Dockerfile.dx-qa -t cogames-dx-qa devops/dx-qa/
+#   docker run -v $(pwd)/dist:/dist cogames-dx-qa
+#
+FROM python:3.12-slim
+
+# System dependencies (documented!)
+# - build-essential: for any native extensions in deps
+# - libgomp1: OpenMP runtime (numpy/torch)
+# - libx11-6, libxrender1, libxext6: X11 libs (needed even for headless pygame/rendering)
+# - bc: for timing calculations in BATS
+# - git: for BATS helper installation during build
+# - curl: for potential health checks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libgomp1 \
+    libx11-6 \
+    libxrender1 \
+    libxext6 \
+    bc \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install BATS and helpers (self-contained, no external deps at runtime)
+# Pin to specific commits for reproducibility
+RUN git clone https://github.com/bats-core/bats-core.git /opt/bats-core && \
+    cd /opt/bats-core && git checkout v1.11.0 && \
+    /opt/bats-core/install.sh /usr/local && \
+    git clone https://github.com/bats-core/bats-support.git /opt/bats-support && \
+    cd /opt/bats-support && git checkout v0.3.0 && \
+    git clone https://github.com/bats-core/bats-assert.git /opt/bats-assert && \
+    cd /opt/bats-assert && git checkout v2.1.0
+
+# BATS load path for helpers
+ENV BATS_LIB_PATH=/opt
+
+# Create test directory
+WORKDIR /dx-qa
+
+# Copy BATS test file
+COPY dx-qa-test.bats /dx-qa/dx-qa-test.bats
+
+# Wheel gets mounted at /dist by CI job
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Health check - verify BATS is installed
+RUN bats --version
+
+ENTRYPOINT ["/entrypoint.sh"]
