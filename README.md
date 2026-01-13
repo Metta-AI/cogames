@@ -295,7 +295,7 @@ cogames run -m machina_1 -p ./train_dir/my_run:v5,proportion=3 -p class=random,p
 
 When multiple policies are provided, `cogames run` fixes the number of agents each policy will control, but randomizes
 their assignments each episode.
-
+``
 ### `cogames make-mission -m [BASE_MISSION]`
 
 Create a custom mission configuration. In this case, the mission provided is the template mission to which you'll apply
