@@ -16,7 +16,7 @@ from __future__ import annotations
 import random
 from typing import Callable, Optional
 
-from mettagrid.config.mettagrid_config import CardinalDirection, CardinalDirections
+from mettagrid.config.action_config import CardinalDirection, CardinalDirections
 from mettagrid.policy.policy import MultiAgentPolicy, StatefulAgentPolicy, StatefulPolicyImpl
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Action
