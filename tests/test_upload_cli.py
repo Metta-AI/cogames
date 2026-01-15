@@ -9,25 +9,19 @@ import zipfile
 from pathlib import Path
 
 import pytest
-import yaml
 from pytest_httpserver import HTTPServer
 from werkzeug import Response
 
+from cogames.auth import AuthConfigReaderWriter
+
 
 @pytest.fixture
-def fake_home(tmp_path: Path) -> Path:
+def fake_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create a fake HOME directory with a pre-configured auth token."""
-    metta_dir = tmp_path / ".metta"
-    metta_dir.mkdir()
+    monkeypatch.setenv("HOME", str(tmp_path))
 
-    # The token is keyed by the login server URL, but for our test we'll use
-    # a fake login server URL that matches what we pass to --login-server
-    config = {
-        "login_tokens": {
-            "http://fake-login-server": "test-token-12345",
-        }
-    }
-    (metta_dir / "cogames.yaml").write_text(yaml.dump(config))
+    writer = AuthConfigReaderWriter("cogames.yaml", "login_tokens")
+    writer.save_token("test-token-12345", "http://fake-login-server")
 
     return tmp_path
 
