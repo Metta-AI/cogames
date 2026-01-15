@@ -36,7 +36,7 @@ def _make_simulation(num_agents: int = 4, ascii_map: list[list[str]] = ASCII_MAP
     cfg = MettaGridConfig.EmptyRoom(num_agents=num_agents, with_walls=True)
     cfg.game.resource_names = RESOURCES
     cfg.game.agent.inventory.default_limit = 255
-    cfg.game.agent.inventory.limits = {name: ResourceLimitsConfig(limit=255, resources=[name]) for name in RESOURCES}
+    cfg.game.agent.inventory.limits = {name: ResourceLimitsConfig(min=255, resources=[name]) for name in RESOURCES}
     cfg.game.agent.inventory.initial = {name: 0 for name in RESOURCES}
 
     cfg.game.actions.noop.enabled = True

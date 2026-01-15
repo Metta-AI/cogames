@@ -3,6 +3,11 @@ from __future__ import annotations
 from pydantic import Field
 
 from mettagrid.base_config import Config
+from mettagrid.config.mettagrid_config import (
+    AgentConfig,
+    InventoryConfig,
+    ResourceLimitsConfig,
+)
 
 
 class CogConfig(Config):
@@ -33,3 +38,34 @@ class CogConfig(Config):
 
     # Movement cost
     move_energy_cost: int = Field(default=3)
+
+    def agent_config(self, gear: list[str], elements: list[str]) -> AgentConfig:
+        """Create an AgentConfig for this cog configuration."""
+        return AgentConfig(
+            collective="cogs",
+            inventory=InventoryConfig(
+                limits={
+                    "hp": ResourceLimitsConfig(min=self.hp_limit, resources=["hp"], modifiers=self.hp_modifiers),
+                    # when hp == 0, the cog can't hold gear or hearts
+                    "gear": ResourceLimitsConfig(max=self.gear_limit, resources=gear, modifiers={"hp": 100}),
+                    "heart": ResourceLimitsConfig(max=self.heart_limit, resources=["heart"], modifiers={"hp": 100}),
+                    "energy": ResourceLimitsConfig(
+                        min=self.energy_limit, resources=["energy"], modifiers=self.energy_modifiers
+                    ),
+                    "cargo": ResourceLimitsConfig(
+                        min=self.cargo_limit, resources=elements, modifiers=self.cargo_modifiers
+                    ),
+                    "influence": ResourceLimitsConfig(
+                        min=self.influence_limit, resources=["influence"], modifiers=self.influence_modifiers
+                    ),
+                },
+                initial={"energy": self.initial_energy, "hp": self.initial_hp},
+                regen_amounts={
+                    "default": {
+                        "energy": self.energy_regen,
+                        "hp": self.hp_regen,
+                        "influence": self.influence_regen,
+                    },
+                },
+            ),
+        )
