@@ -357,8 +357,8 @@ class InventoryHeartTuneVariant(MissionVariant):
             agent_cfg = env.game.agent
             hearts_limit = agent_cfg.inventory.limits.get("heart")
             if hearts_limit is None:
-                hearts_limit = ResourceLimitsConfig(limit=self.heart_capacity, resources=["heart"])
-            hearts_limit.limit = max(int(hearts_limit.limit), int(self.heart_capacity))
+                hearts_limit = ResourceLimitsConfig(min=self.heart_capacity, resources=["heart"])
+            hearts_limit.min = max(int(hearts_limit.min), int(self.heart_capacity))
             agent_cfg.inventory.limits["heart"] = hearts_limit
 
 

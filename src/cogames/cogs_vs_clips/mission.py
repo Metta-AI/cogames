@@ -199,13 +199,13 @@ class Mission(Config):
             agent=AgentConfig(
                 inventory=InventoryConfig(
                     limits={
-                        "heart": ResourceLimitsConfig(limit=self.heart_capacity, resources=["heart"]),
-                        "energy": ResourceLimitsConfig(limit=self.energy_capacity, resources=["energy"]),
+                        "heart": ResourceLimitsConfig(min=self.heart_capacity, resources=["heart"]),
+                        "energy": ResourceLimitsConfig(min=self.energy_capacity, resources=["energy"]),
                         "cargo": ResourceLimitsConfig(
-                            limit=self.cargo_capacity, resources=["carbon", "oxygen", "germanium", "silicon"]
+                            min=self.cargo_capacity, resources=["carbon", "oxygen", "germanium", "silicon"]
                         ),
                         "gear": ResourceLimitsConfig(
-                            limit=self.gear_capacity, resources=["scrambler", "modulator", "decoder", "resonator"]
+                            min=self.gear_capacity, resources=["scrambler", "modulator", "decoder", "resonator"]
                         ),
                     },
                     initial={"energy": self.energy_capacity},
@@ -371,41 +371,14 @@ class CogsGuardMission(Config):
                 noop=NoopActionConfig(),
                 change_vibe=ChangeVibeActionConfig(vibes=COGSGUARD_VIBES),
             ),
-            agent=AgentConfig(
-                collective="cogs",
-                inventory=InventoryConfig(
-                    limits={
-                        "gear": ResourceLimitsConfig(limit=self.cog.gear_limit, resources=gear),
-                        "hp": ResourceLimitsConfig(
-                            limit=self.cog.hp_limit, resources=["hp"], modifiers=self.cog.hp_modifiers
-                        ),
-                        "heart": ResourceLimitsConfig(limit=self.cog.heart_limit, resources=["heart"]),
-                        "energy": ResourceLimitsConfig(
-                            limit=self.cog.energy_limit, resources=["energy"], modifiers=self.cog.energy_modifiers
-                        ),
-                        "cargo": ResourceLimitsConfig(
-                            limit=self.cog.cargo_limit, resources=elements, modifiers=self.cog.cargo_modifiers
-                        ),
-                        "influence": ResourceLimitsConfig(
-                            limit=self.cog.influence_limit,
-                            resources=["influence"],
-                            modifiers=self.cog.influence_modifiers,
-                        ),
-                    },
-                    initial={"energy": self.cog.initial_energy, "hp": self.cog.initial_hp},
-                    regen_amounts={
-                        "default": {
-                            "energy": self.cog.energy_regen,
-                            "hp": self.cog.hp_regen,
-                            "influence": self.cog.influence_regen,
+            agent=self.cog.agent_config(gear=gear, elements=elements).model_copy(
+                update={
+                    "rewards": AgentRewards(
+                        collective_stats={
+                            "aligned.junction.held": 1.0 / self.max_steps,
                         },
-                    },
-                ),
-                rewards=AgentRewards(
-                    collective_stats={
-                        "aligned.junction.held": 1.0 / self.max_steps,
-                    },
-                ),
+                    ),
+                }
             ),
             inventory_regen_interval=self.inventory_regen_interval,
             objects={
@@ -420,8 +393,8 @@ class CogsGuardMission(Config):
                 "cogs": CollectiveConfig(
                     inventory=InventoryConfig(
                         limits={
-                            "resources": ResourceLimitsConfig(limit=10000, resources=elements),
-                            "hearts": ResourceLimitsConfig(limit=65535, resources=["heart"]),
+                            "resources": ResourceLimitsConfig(min=10000, resources=elements),
+                            "hearts": ResourceLimitsConfig(min=65535, resources=["heart"]),
                         },
                         initial={
                             "carbon": self.collective_initial_carbon,
