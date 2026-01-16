@@ -1,18 +1,16 @@
 """Game playing functionality for CoGames."""
 
 import logging
+import uuid
 from pathlib import Path
 from typing import Optional
 
 from rich.console import Console
 
+from alo.rollout import run_single_episode
 from mettagrid import MettaGridConfig
-from mettagrid.policy.loader import initialize_or_load_policy
 from mettagrid.policy.policy import PolicySpec
-from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.renderer.renderer import RenderMode
-from mettagrid.simulator.replay_log_writer import ReplayLogWriter
-from mettagrid.simulator.rollout import Rollout
 
 logger = logging.getLogger("cogames.play")
 
@@ -41,41 +39,34 @@ def play(
 
     logger.debug("Starting play session", extra={"game_name": game_name})
 
-    policy_env_info = PolicyEnvInterface.from_mg_cfg(env_cfg)
-    policy = initialize_or_load_policy(policy_env_info, policy_spec)
-    agent_policies = [policy.agent_policy(agent_id) for agent_id in range(env_cfg.game.num_agents)]
-
-    # Set up replay writer if requested
-    event_handlers = []
-    replay_writer = None
+    replay_path = None
     if save_replay:
-        replay_writer = ReplayLogWriter(str(save_replay))
-        event_handlers.append(replay_writer)
+        save_replay.mkdir(parents=True, exist_ok=True)
+        replay_path = save_replay / f"{uuid.uuid4()}.json.z"
 
-    # Create simulator and renderer
-    rollout = Rollout(
-        env_cfg,
-        agent_policies,
-        render_mode=render_mode,
-        seed=seed,
-        event_handlers=event_handlers,
-    )
     try:
-        rollout.run_until_done()
+        results, _replay = run_single_episode(
+            policy_specs=[policy_spec],
+            assignments=[0] * env_cfg.game.num_agents,
+            env=env_cfg,
+            results_uri=None,
+            replay_uri=str(replay_path) if replay_path else None,
+            seed=seed,
+            device="cpu",
+            render_mode=render_mode,
+        )
     except KeyboardInterrupt:
         logger.info("Interrupted; ending episode early.")
-        rollout._sim.end_episode()
         return
 
     # Print summary
     console.print("\n[bold green]Episode Complete![/bold green]")
-    console.print(f"Steps: {rollout._sim.current_step}")
-    console.print(f"Total Rewards: {rollout._sim.episode_rewards}")
-    console.print(f"Final Reward Sum: {float(sum(rollout._sim.episode_rewards)):.2f}")
+    console.print(f"Steps: {results.steps}")
+    console.print(f"Total Rewards: {results.rewards}")
+    console.print(f"Final Reward Sum: {float(sum(results.rewards)):.2f}")
 
     # Print replay command if replay was saved
-    if replay_writer:
-        for replay_path in replay_writer.get_written_replay_paths():
-            console.print("\n[bold cyan]Replay saved![/bold cyan]")
-            console.print("To watch the replay, run:")
-            console.print(f"[bold green]cogames replay {replay_path}[/bold green]")
+    if replay_path:
+        console.print("\n[bold cyan]Replay saved![/bold cyan]")
+        console.print("To watch the replay, run:")
+        console.print(f"[bold green]cogames replay {replay_path}[/bold green]")

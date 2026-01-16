@@ -71,6 +71,9 @@ cogames play -m training_facility.harvest -p class=baseline
 # Try the scripted policy on a set of eval missions
 cogames run -S integrated_evals -p class=baseline
 
+# Evaluate a candidate policy against a fixed pool (VOR)
+cogames pickup -p ./train_dir/my_run:v5 --pool class=baseline --pool class=ladybug
+
 # Train with an LSTM policy on training_facility.harvest
 cogames tutorial train -m training_facility.harvest -p class=lstm
 ```
@@ -94,6 +97,9 @@ cogames variants
 
 # List all missions used as evals for analyzing the behaviour of agents
 cogames evals
+
+# Evaluate a candidate policy against a fixed pool (VOR)
+cogames pickup -p POLICY --pool POOL_POLICY --pool POOL_POLICY
 
 # Shows all policies available and their shorthands
 cogames policies
@@ -295,6 +301,16 @@ cogames run -m machina_1 -p ./train_dir/my_run:v5,proportion=3 -p class=random,p
 
 When multiple policies are provided, `cogames run` fixes the number of agents each policy will control, but randomizes
 their assignments each episode.
+
+### `cogames pickup -p [POLICY] --pool [POOL_POLICY]...`
+
+Evaluate a candidate policy against a fixed pool of replacement policies and compute value-over-replacement (VOR).
+
+**Example:**
+
+```bash
+cogames pickup -p ./train_dir/my_run:v5 --pool class=baseline --pool class=ladybug
+```
 
 ### `cogames make-mission -m [BASE_MISSION]`
 

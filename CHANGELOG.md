@@ -9,6 +9,7 @@
 - `cogames submissions` - View your uploaded policies and tournament submissions
 - `cogames leaderboard --season <name>` - View the leaderboard for a season
 - `cogames seasons` - List available tournament seasons
+- `cogames pickup` - Evaluate a candidate policy against a fixed pool and compute VOR
 
 ## Dec 16, 2025
 

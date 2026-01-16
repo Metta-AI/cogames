@@ -33,6 +33,7 @@ import cogames.policy.scripted_agent.starter_agent as starter_agent
 import cogames.policy.trainable_policy_template as trainable_policy_template
 from cogames import evaluate as evaluate_module
 from cogames import game, verbose
+from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import train as train_module
 from cogames.cli.base import console
@@ -53,8 +54,10 @@ from cogames.cli.mission import (
     list_variants,
 )
 from cogames.cli.policy import (
+    _translate_error,
     get_policy_spec,
     get_policy_specs_with_proportions,
+    parse_policy_spec,
     policy_arg_example,
     policy_arg_w_proportion_example,
 )
@@ -773,6 +776,86 @@ def run_cmd(
     )
 
 
+@app.command(
+    name="pickup",
+    help="Evaluate a candidate policy against a fixed pool and compute VOR",
+)
+def pickup_cmd(
+    ctx: typer.Context,
+    policy: Optional[str] = typer.Option(
+        None,
+        "--policy",
+        "-p",
+        help="Candidate policy: URI or class=...",
+    ),
+    pool: Optional[list[str]] = typer.Option(  # noqa: B008
+        None,
+        "--pool",
+        help="Pool policies (repeatable): URI or class=...",
+    ),
+    cogs: int = typer.Option(4, "--cogs", "-c", help="Number of cogs (agents)", min=1),
+    episodes: int = typer.Option(1, "--episodes", "-e", help="Episodes per scenario", min=1),
+    action_timeout_ms: int = typer.Option(
+        250,
+        "--action-timeout-ms",
+        help="Max milliseconds afforded to generate each action before noop is used by default",
+        min=1,
+    ),
+    steps: Optional[int] = typer.Option(1000, "--steps", "-s", help="Max steps per episode", min=1),
+    seed: int = typer.Option(50, "--seed", help="Base random seed for evaluation", min=0),
+    map_seed: Optional[int] = typer.Option(
+        None,
+        "--map-seed",
+        help="Override MapGen seed for procedural maps (defaults to --seed if not set)",
+        min=0,
+    ),
+    save_replay_dir: Optional[Path] = typer.Option(  # noqa: B008
+        None,
+        "--save-replay-dir",
+        help=(
+            "Directory to save replays. Directory will be created if it doesn't exist. "
+            "Each replay will be saved with a unique UUID-based filename."
+        ),
+    ),
+) -> None:
+    import httpx
+
+    if policy is None:
+        console.print(ctx.get_help())
+        console.print("[yellow]Missing: --policy / -p[/yellow]\n")
+        raise typer.Exit(1)
+
+    if not pool:
+        console.print(ctx.get_help())
+        console.print("[yellow]Supply at least one: --pool[/yellow]\n")
+        raise typer.Exit(1)
+
+    candidate_label = policy
+    pool_labels = pool
+    candidate_spec = get_policy_spec(ctx, policy)
+    try:
+        pool_specs = [parse_policy_spec(spec).to_policy_spec() for spec in pool]
+    except (ValueError, ModuleNotFoundError, httpx.HTTPError) as exc:
+        translated = _translate_error(exc)
+        console.print(f"[yellow]Error parsing pool policy: {translated}[/yellow]\n")
+        raise typer.Exit(1) from exc
+
+    pickup_module.pickup(
+        console,
+        candidate_spec,
+        pool_specs,
+        num_cogs=cogs,
+        episodes=episodes,
+        seed=seed,
+        map_seed=map_seed,
+        steps=steps,
+        action_timeout_ms=action_timeout_ms,
+        save_replay_dir=save_replay_dir,
+        candidate_label=candidate_label,
+        pool_labels=pool_labels,
+    )
+
+
 @app.command(name="version", help="Show version information")
 def version_cmd() -> None:
     def public_version(dist_name: str) -> str:
@@ -864,7 +947,14 @@ def diagnose_cmd(
         ...,
         help=f"Policy specification: {policy_arg_example}",
     ),
-    mission_set: Literal["diagnostic_evals", "integrated_evals", "spanning_evals", "tournament", "all"] = typer.Option(
+    mission_set: Literal[
+        "diagnostic_evals",
+        "integrated_evals",
+        "spanning_evals",
+        "thinky_evals",
+        "tournament",
+        "all",
+    ] = typer.Option(
         "diagnostic_evals",
         "--mission-set",
         "-S",

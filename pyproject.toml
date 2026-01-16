@@ -8,6 +8,7 @@ description = "Multi-agent cooperative games"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+  "alo",
   "heavyball>=2.0.0",
   "mettagrid==0.2.0.58",
   "packaging>=24.0.0",
@@ -54,6 +55,7 @@ source = ["cogames"]
 
 [tool.uv.sources]
 mettagrid = { workspace = true }
+alo = { workspace = true }
 
 [tool.uv]
 cache-keys = [
