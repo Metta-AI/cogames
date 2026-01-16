@@ -26,23 +26,25 @@ from cogames.cogs_vs_clips.stations import (
 )
 from mettagrid.base_config import Config
 from mettagrid.config import vibes
-from mettagrid.config.mettagrid_config import (
+from mettagrid.config.action_config import (
     ActionsConfig,
+    ChangeVibeActionConfig,
+    MoveActionConfig,
+    NoopActionConfig,
+    TransferActionConfig,
+    VibeTransfer,
+)
+from mettagrid.config.mettagrid_config import (
     AgentConfig,
     AgentRewards,
-    ChangeVibeActionConfig,
     ClipperConfig,
     CollectiveConfig,
     GameConfig,
     GlobalObsConfig,
     InventoryConfig,
     MettaGridConfig,
-    MoveActionConfig,
-    NoopActionConfig,
     ProtocolConfig,
     ResourceLimitsConfig,
-    TransferActionConfig,
-    VibeTransfer,
 )
 from mettagrid.config.vibes import Vibe
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig

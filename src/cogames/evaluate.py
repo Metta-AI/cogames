@@ -13,11 +13,11 @@ from pydantic import BaseModel, ConfigDict
 from rich.console import Console
 from rich.table import Table
 
+from alo.rollout import run_multi_episode_rollout
+from alo.scoring import allocate_counts, validate_proportions
 from mettagrid import MettaGridConfig
-from mettagrid.policy.loader import initialize_or_load_policy
-from mettagrid.policy.policy import MultiAgentPolicy, PolicySpec
-from mettagrid.policy.policy_env_interface import PolicyEnvInterface
-from mettagrid.simulator.multi_episode.rollout import MultiEpisodeRolloutResult, multi_episode_rollout
+from mettagrid.policy.policy import PolicySpec
+from mettagrid.simulator.multi_episode.rollout import MultiEpisodeRolloutResult
 from mettagrid.simulator.multi_episode.summary import MultiEpisodeRolloutSummary, build_multi_episode_rollout_summaries
 
 MissionResultsSummary: TypeAlias = list[MultiEpisodeRolloutSummary]
@@ -53,6 +53,7 @@ def evaluate(
         raise ValueError("At least one mission must be provided for evaluation.")
     if not policy_specs:
         raise ValueError("At least one policy specification must be provided for evaluation.")
+    validate_proportions(proportions, len(policy_specs))
 
     mission_names = [mission_name for mission_name, _ in missions]
     if len(missions) == 1:
@@ -68,40 +69,27 @@ def evaluate(
     mission_results: list[MultiEpisodeRolloutResult] = []
     all_replay_paths: list[str] = []
     for mission_name, env_cfg in missions:
-        env_interface = PolicyEnvInterface.from_mg_cfg(env_cfg)
-        policy_instances: list[MultiAgentPolicy] = [
-            initialize_or_load_policy(env_interface, spec) for spec in policy_specs
-        ]
+        counts = allocate_counts(env_cfg.game.num_agents, proportions)
+        assignments = np.repeat(np.arange(len(counts), dtype=int), counts)
 
         progress_label = f"Simulating ({mission_name})"
-        progress_iterable = range(episodes)
-        with typer.progressbar(progress_iterable, label=progress_label) as progress:
-            iterator = iter(progress)
-
-            def _progress_callback(_: int, progress_iter=iterator) -> None:
-                try:
-                    next(progress_iter)
-                except StopIteration:
-                    pass
-
-            rollout_payload = multi_episode_rollout(
+        with typer.progressbar(length=episodes, label=progress_label) as progress:
+            rollout, replay_paths = run_multi_episode_rollout(
+                policy_specs=policy_specs,
+                assignments=assignments,
                 env_cfg=env_cfg,
-                policies=policy_instances,
-                proportions=proportions,
                 episodes=episodes,
-                max_action_time_ms=action_timeout_ms,
                 seed=seed,
-                progress_callback=_progress_callback,
-                save_replay=save_replay,
+                max_action_time_ms=action_timeout_ms,
+                replay_dir=save_replay,
+                create_replay_dir=save_replay is not None,
+                on_progress=lambda _episode_idx, _result: progress.update(1),
             )
-        mission_results.append(rollout_payload)
-        # Collect replay paths from this mission
-        for episode in rollout_payload.episodes:
-            if episode.replay_path:
-                all_replay_paths.append(episode.replay_path)
+
+        mission_results.append(rollout)
+        all_replay_paths.extend(replay_paths)
 
     summaries = build_multi_episode_rollout_summaries(mission_results, num_policies=len(policy_specs))
-    mission_names = [mission_name for mission_name, _ in missions]
     _output_results(console, policy_specs, mission_names, summaries, output_format)
 
     # Print replay commands if replays were saved

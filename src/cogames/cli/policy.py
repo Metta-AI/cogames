@@ -142,9 +142,14 @@ def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
             raise ValueError("Policy proportion must be a positive number.")
         return fraction
 
+    def is_path_like(value: str) -> bool:
+        if value.startswith((".", "/", "~")):
+            return True
+        return len(value) >= 3 and value[0].isalpha() and value[1] == ":" and value[2] in ("/", "\\")
+
     fraction = 1.0
     first = entries[0]
-    if parse_uri(first, allow_none=True, default_scheme=None):
+    if "=" not in first and (parse_uri(first, allow_none=True, default_scheme=None) or is_path_like(first)):
         policy = policy_spec_from_uri(first)
         for entry in entries[1:]:
             key, value = parse_key_value(entry)
