@@ -670,6 +670,10 @@ app.command(name="train", hidden=True)(train_cmd)
     name="run",
     help="Evaluate one or more policies on one or more missions",
 )
+@app.command(
+    name="scrimmage",
+    help="Evaluate a single policy controlling all agents (alias of run/eval)",
+)
 @app.command("eval", hidden=True)
 @app.command("evaluate", hidden=True)
 def run_cmd(
@@ -758,6 +762,14 @@ def run_cmd(
                 map_builder.seed = map_seed
 
     policy_specs = get_policy_specs_with_proportions(ctx, policies)
+
+    if ctx.info_name == "scrimmage":
+        if len(policy_specs) != 1:
+            console.print("[red]Error: scrimmage accepts exactly one --policy / -p value.[/red]")
+            raise typer.Exit(1)
+        if policy_specs[0].proportion != 1.0:
+            console.print("[red]Error: scrimmage does not support policy proportions.[/red]")
+            raise typer.Exit(1)
 
     console.print(
         f"[cyan]Preparing evaluation for {len(policy_specs)} policies across {len(selected_missions)} mission(s)[/cyan]"
