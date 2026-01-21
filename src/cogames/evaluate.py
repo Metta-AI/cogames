@@ -9,12 +9,12 @@ from typing import Literal, Optional, TypeAlias
 import numpy as np
 import typer
 import yaml  # type: ignore[import]
+from metta_alo.rollout import run_multi_episode_rollout
+from metta_alo.scoring import allocate_counts, validate_proportions
 from pydantic import BaseModel, ConfigDict
 from rich.console import Console
 from rich.table import Table
 
-from alo.rollout import run_multi_episode_rollout
-from alo.scoring import allocate_counts, validate_proportions
 from mettagrid import MettaGridConfig
 from mettagrid.policy.policy import PolicySpec
 from mettagrid.simulator.multi_episode.rollout import MultiEpisodeRolloutResult

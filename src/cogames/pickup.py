@@ -6,17 +6,17 @@ from typing import Optional
 
 import numpy as np
 import typer
-from rich.console import Console
-from rich.table import Table
-
-from alo.rollout import run_multi_episode_rollout
-from alo.scoring import (
+from metta_alo.rollout import run_multi_episode_rollout
+from metta_alo.scoring import (
     VorTotals,
     allocate_counts,
     overall_value_over_replacement,
     summarize_vor_scenario,
     value_over_replacement,
 )
+from rich.console import Console
+from rich.table import Table
+
 from cogames.cogs_vs_clips.missions import Machina1OpenWorldMission
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.policy import PolicySpec
