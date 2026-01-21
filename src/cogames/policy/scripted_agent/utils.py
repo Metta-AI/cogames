@@ -6,7 +6,7 @@ Pure/stateless helper functions that can be reused across different agents.
 
 from __future__ import annotations
 
-from typing import Union
+from typing import Any, cast
 
 from mettagrid.simulator import Action
 from mettagrid.simulator.interface import AgentObservation
@@ -54,6 +54,24 @@ def is_station(obj_name: str, station: str) -> bool:
     return station in obj_name
 
 
+def add_inventory_token(
+    inventory: dict[str, int],
+    feature_name: str,
+    value: int,
+    *,
+    token_value_base: int,
+) -> None:
+    """Add inventory token value, reconstructing multi-token amounts."""
+    suffix = feature_name[4:]
+    if ":p" in suffix:
+        resource_name, power_str = suffix.rsplit(":p", 1)
+        power = int(power_str)
+    else:
+        resource_name = suffix
+        power = 0
+    inventory[resource_name] = inventory.get(resource_name, 0) + value * (token_value_base**power)
+
+
 def position_to_direction(from_pos: tuple[int, int], to_pos: tuple[int, int]) -> str | None:
     """
     Convert adjacent positions to a cardinal direction name.
@@ -75,7 +93,7 @@ def position_to_direction(from_pos: tuple[int, int], to_pos: tuple[int, int]) ->
 
 
 def process_feature_at_position(
-    position_features: dict[tuple[int, int], dict[str, Union[int, list[int], dict[str, int]]]],
+    position_features: dict[tuple[int, int], dict[str, Any]],
     pos: tuple[int, int],
     feature_name: str,
     value: int,
@@ -88,43 +106,50 @@ def process_feature_at_position(
     """Process a single observation feature and add it to position_features."""
     if pos not in position_features:
         position_features[pos] = {}
+    position_entry = position_features[pos]
 
     # Handle spatial features (tag, cooldown, etc.)
     if feature_name in spatial_feature_names:
         # Tag: collect all tags as a list (objects can have multiple tags)
         if feature_name == "tag":
-            tags = position_features[pos].setdefault("tags", [])
-            if isinstance(tags, list):
-                tags.append(value)
+            tags_value = position_entry.get("tags")
+            if not isinstance(tags_value, list):
+                tags_value = []
+                position_entry["tags"] = tags_value
+            cast(list[int], tags_value).append(value)
             return
         # Other spatial features are single values
-        position_features[pos][feature_name] = value
+        position_entry[feature_name] = value
         return
 
     # Handle agent features (agent:group -> agent_group, etc.)
     agent_feature_key = agent_feature_key_by_name.get(feature_name)
     if agent_feature_key is not None:
-        position_features[pos][agent_feature_key] = value
+        position_entry[agent_feature_key] = value
         return
 
     # Handle protocol features (recipes)
     if feature_name.startswith(protocol_input_prefix):
         resource = feature_name[len(protocol_input_prefix) :]
-        inputs = position_features[pos].setdefault("protocol_inputs", {})
-        if isinstance(inputs, dict):
-            inputs[resource] = value
+        inputs_value = position_entry.get("protocol_inputs")
+        if not isinstance(inputs_value, dict):
+            inputs_value = {}
+            position_entry["protocol_inputs"] = inputs_value
+        cast(dict[str, int], inputs_value)[resource] = value
         return
 
     if feature_name.startswith(protocol_output_prefix):
         resource = feature_name[len(protocol_output_prefix) :]
-        outputs = position_features[pos].setdefault("protocol_outputs", {})
-        if isinstance(outputs, dict):
-            outputs[resource] = value
+        outputs_value = position_entry.get("protocol_outputs")
+        if not isinstance(outputs_value, dict):
+            outputs_value = {}
+            position_entry["protocol_outputs"] = outputs_value
+        cast(dict[str, int], outputs_value)[resource] = value
         return
 
 
 def create_object_state(
-    features: dict[str, Union[int, list[int], dict[str, int]]],
+    features: dict[str, Any],
     *,
     tag_names: dict[int, str],
 ) -> ObjectState:
@@ -164,6 +189,7 @@ def create_object_state(
         cooldown_remaining=get_int("cooldown_remaining", 0),
         clipped=get_int("clipped", 0),
         remaining_uses=get_int("remaining_uses", 999),
+        inventory=get_dict("inventory"),
         protocol_inputs=get_dict("protocol_inputs"),
         protocol_outputs=get_dict("protocol_outputs"),
         agent_group=get_int("agent_group", -1),
@@ -180,13 +206,15 @@ def read_inventory_from_obs(
 ) -> None:
     """Read inventory from observation tokens at center cell and update state."""
     inv = {}
+    token_value_base = None
     center_r, center_c = obs_hr, obs_wr
     for tok in obs.tokens:
         if tok.location == (center_r, center_c):
             feature_name = tok.feature.name
             if feature_name.startswith("inv:"):
-                resource_name = feature_name[4:]  # Remove "inv:" prefix
-                inv[resource_name] = tok.value
+                if token_value_base is None:
+                    token_value_base = int(tok.feature.normalization)
+                add_inventory_token(inv, feature_name, tok.value, token_value_base=token_value_base)
 
     state.energy = inv.get("energy", 0)
     state.carbon = inv.get("carbon", 0)
@@ -216,14 +244,15 @@ def parse_observation(
     """Parse token-based observation into structured format.
 
     AgentObservation with tokens (ObservationToken list)
-    - Inventory is obtained via agent.inventory (not parsed here)
-    - Only spatial features are parsed from observations
+    - Agent inventory is obtained via agent.inventory (not parsed here)
+    - Spatial features are parsed from observations, including object inventories
 
     Converts egocentric spatial coordinates to world coordinates using agent position.
     Agent position (agent_row, agent_col) comes from simulation.grid_objects().
     """
     # First pass: collect all spatial features by position
-    position_features: dict[tuple[int, int], dict[str, Union[int, list[int], dict[str, int]]]] = {}
+    position_features: dict[tuple[int, int], dict[str, Any]] = {}
+    token_value_base = None
 
     for tok in obs.tokens:
         obs_r, obs_c = tok.location
@@ -240,6 +269,21 @@ def parse_observation(
             c = obs_c - obs_wr + state.col
 
             if 0 <= r < state.map_height and 0 <= c < state.map_width:
+                if feature_name.startswith("inv:"):
+                    if token_value_base is None:
+                        token_value_base = int(tok.feature.normalization)
+                    position_entry = position_features.setdefault((r, c), {})
+                    inventory_value = position_entry.get("inventory")
+                    if not isinstance(inventory_value, dict):
+                        inventory_value = {}
+                        position_entry["inventory"] = inventory_value
+                    add_inventory_token(
+                        cast(dict[str, int], inventory_value),
+                        feature_name,
+                        value,
+                        token_value_base=token_value_base,
+                    )
+                    continue
                 process_feature_at_position(
                     position_features,
                     (r, c),
@@ -284,15 +328,14 @@ def change_vibe_action(
     Return a safe vibe-change action.
     Guard against disabled or single-vibe configurations before issuing the action.
     """
-    from mettagrid.config.vibes import VIBE_BY_NAME
-
     change_vibe_actions = [a for a in action_names if a.startswith("change_vibe_")]
     if len(change_vibe_actions) <= 1:
         return Action(name="noop")
-    vibe = VIBE_BY_NAME.get(vibe_name)
-    if vibe is None:
-        raise Exception(f"No valid vibes called {vibe_name}")
-    return Action(name=f"change_vibe_{vibe_name}")
+    action_name = f"change_vibe_{vibe_name}"
+    if action_name in action_names:
+        return Action(name=action_name)
+    available = [a[len("change_vibe_") :] for a in change_vibe_actions]
+    raise Exception(f"No valid vibe called '{vibe_name}'. Available vibes: {available}")
 
 
 def update_agent_position(
