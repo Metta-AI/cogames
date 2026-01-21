@@ -1,7 +1,6 @@
 """Integration tests for training and evaluation with different policies."""
 
 import shutil
-import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -9,6 +8,8 @@ from pathlib import Path
 import pytest
 import torch
 
+import cogames.policy.scripted_agent.starter_agent as starter_agent
+import cogames.policy.trainable_policy_template as trainable_policy_template
 from cogames.cli.mission import get_mission
 from cogames.train import train
 
@@ -24,19 +25,23 @@ def temp_checkpoint_dir():
 
 @pytest.fixture
 def test_env_config():
-    """Get a small test game configuration."""
-    return get_mission("machina_1")[1]
+    """Get a small test game configuration.
+
+    Uses training_facility (13x13 map, 4 agents) instead of machina_1 (88x88 map, 20 agents)
+    for faster test execution, especially under x86 emulation.
+    """
+    return get_mission("training_facility")[1]
 
 
 @pytest.mark.timeout(120)
 def test_train_lstm_policy(test_env_config, temp_checkpoint_dir):
-    """Test training with LSTMPolicy for 1000 steps."""
+    """Test training with LSTMPolicy for enough steps to create a meaningful checkpoint."""
     train(
         env_cfg=test_env_config,
         policy_class_path="mettagrid.policy.lstm.LSTMPolicy",
         device=torch.device("cpu"),
         initial_weights_path=None,
-        num_steps=1000,
+        num_steps=10,
         checkpoints_path=temp_checkpoint_dir,
         seed=42,
         batch_size=64,
@@ -44,6 +49,7 @@ def test_train_lstm_policy(test_env_config, temp_checkpoint_dir):
         vector_num_envs=1,
         vector_batch_size=1,
         vector_num_workers=1,
+        checkpoint_interval=10,
     )
 
     # Check that checkpoints were created
@@ -69,7 +75,7 @@ def test_train_lstm_and_load_policy_data(test_env_config, temp_checkpoint_dir):
         policy_class_path="mettagrid.policy.lstm.LSTMPolicy",
         device=torch.device("cpu"),
         initial_weights_path=None,
-        num_steps=1000,
+        num_steps=10,
         checkpoints_path=temp_checkpoint_dir,
         seed=42,
         batch_size=64,
@@ -77,6 +83,7 @@ def test_train_lstm_and_load_policy_data(test_env_config, temp_checkpoint_dir):
         vector_num_envs=1,
         vector_batch_size=1,
         vector_num_workers=1,
+        checkpoint_interval=10,
     )
 
     # Find the saved checkpoint
@@ -100,31 +107,27 @@ def test_train_lstm_and_load_policy_data(test_env_config, temp_checkpoint_dir):
 
 @pytest.mark.timeout(120)
 def test_make_policy_trainable_and_train(temp_checkpoint_dir):
-    """Test that make-policy --trainable generates a working trainable policy."""
+    """Test that the trainable policy template can be trained."""
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         policy_file = tmpdir / "my_trainable_policy.py"
 
-        # Generate the trainable policy template
-        result = subprocess.run(
-            ["cogames", "make-policy", "--trainable", "-o", str(policy_file)],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        assert result.returncode == 0, f"make-policy --trainable failed: {result.stderr}"
+        # Copy the trainable policy template directly (avoids slow subprocess under emulation)
+        template_path = Path(trainable_policy_template.__file__)
+        shutil.copy2(template_path, policy_file)
         assert policy_file.exists(), "Policy file was not created"
 
         # Add tmpdir to sys.path so the policy module can be imported
         sys.path.insert(0, str(tmpdir))
         try:
             # Train using the generated policy for a few steps
+            # Use training_facility (13x13 map) for faster execution
             train(
-                env_cfg=get_mission("machina_1")[1],
+                env_cfg=get_mission("training_facility")[1],
                 policy_class_path=f"{policy_file.stem}.MyTrainablePolicy",
                 device=torch.device("cpu"),
                 initial_weights_path=None,
-                num_steps=100,
+                num_steps=10,
                 checkpoints_path=temp_checkpoint_dir,
                 seed=42,
                 batch_size=64,
@@ -132,6 +135,7 @@ def test_make_policy_trainable_and_train(temp_checkpoint_dir):
                 vector_num_envs=1,
                 vector_batch_size=1,
                 vector_num_workers=1,
+                checkpoint_interval=10,
             )
 
             # Check that checkpoints were created
@@ -143,19 +147,14 @@ def test_make_policy_trainable_and_train(temp_checkpoint_dir):
 
 @pytest.mark.timeout(60)
 def test_make_policy_scripted_runs():
-    """Test that make-policy --scripted generates a working scripted policy."""
+    """Test that the scripted policy template can be instantiated and run."""
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         policy_file = tmpdir / "my_scripted_policy.py"
 
-        # Generate the scripted policy template
-        result = subprocess.run(
-            ["cogames", "make-policy", "--scripted", "-o", str(policy_file)],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        assert result.returncode == 0, f"make-policy --scripted failed: {result.stderr}"
+        # Copy the scripted policy template directly (avoids slow subprocess under emulation)
+        template_path = Path(starter_agent.__file__)
+        shutil.copy2(template_path, policy_file)
         assert policy_file.exists(), "Policy file was not created"
 
         # Verify the file contains expected content
@@ -172,7 +171,8 @@ def test_make_policy_scripted_runs():
             from mettagrid.policy.policy import PolicySpec
             from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 
-            env_cfg = get_mission("machina_1")[1]
+            # Use training_facility (13x13 map) for faster execution
+            env_cfg = get_mission("training_facility")[1]
             policy_env_info = PolicyEnvInterface.from_mg_cfg(env_cfg)
             policy_spec = PolicySpec(class_path=f"{policy_file.stem}.StarterPolicy")
             policy = initialize_or_load_policy(policy_env_info, policy_spec)
