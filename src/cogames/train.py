@@ -93,6 +93,7 @@ def train(
     vector_num_workers: Optional[int] = None,
     env_cfg_supplier: Optional[Callable[[], MettaGridConfig]] = None,
     log_outputs: bool = False,
+    checkpoint_interval: int = 200,
 ) -> None:
     console = Console()
 
@@ -251,7 +252,6 @@ def train(
             effective_timesteps,
         )
 
-    checkpoint_interval = 200
     train_args = dict(
         env=env_name,
         device=device.type,
