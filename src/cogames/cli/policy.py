@@ -147,9 +147,13 @@ def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
             return True
         return len(value) >= 3 and value[0].isalpha() and value[1] == ":" and value[2] in ("/", "\\")
 
+    def is_uri(value: str) -> bool:
+        # Check for URI schemes before checking for '=' to handle query strings
+        return parse_uri(value, allow_none=True, default_scheme=None) is not None
+
     fraction = 1.0
     first = entries[0]
-    if "=" not in first and (parse_uri(first, allow_none=True, default_scheme=None) or is_path_like(first)):
+    if is_uri(first) or ("=" not in first and is_path_like(first)):
         policy = policy_spec_from_uri(first)
         for entry in entries[1:]:
             key, value = parse_key_value(entry)
