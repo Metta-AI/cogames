@@ -24,7 +24,7 @@ from mettagrid.policy.loader import (
 )
 from mettagrid.policy.policy import PolicySpec
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
-from mettagrid.policy.submission import POLICY_SPEC_FILENAME
+from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec, write_submission_policy_spec
 from mettagrid.simulator import Simulator
 from mettagrid.util.stats_writer import NoopStatsWriter
 from pufferlib import pufferl
@@ -356,13 +356,17 @@ def train(
             )
             console.print("=" * 80, style="bold green")
 
-        checkpoints = sorted(
-            {path.parent for path in checkpoints_path.rglob(POLICY_SPEC_FILENAME)},
-            key=lambda path: path.stat().st_mtime,
-        )
+        run_dir = checkpoints_path / trainer.logger.run_id
+        checkpoints = sorted(run_dir.glob("model_*.pt"), key=lambda path: path.stat().st_mtime)
 
         if checkpoints and not training_diverged:
             final_checkpoint = checkpoints[-1]
+            spec = SubmissionPolicySpec(
+                class_path=policy_class_path,
+                data_path=final_checkpoint.name,
+            )
+            write_submission_policy_spec(run_dir / POLICY_SPEC_FILENAME, spec)
+
             console.print()
             console.print(f"Final checkpoint: [cyan]{final_checkpoint}[/cyan]")
             if trainer.epoch < checkpoint_interval:
