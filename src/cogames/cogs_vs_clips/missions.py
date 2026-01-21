@@ -6,8 +6,6 @@ from cogames.cogs_vs_clips.sites import HELLO_WORLD, MACHINA_1, TRAINING_FACILIT
 from cogames.cogs_vs_clips.variants import (
     AssemblerDrawsFromChestsVariant,
     BalancedCornersVariant,
-    ClipHubStationsVariant,
-    ClipPeriodOnVariant,
     EmptyBaseVariant,
     ExtractorHeartTuneVariant,
     HeartChorusVariant,
@@ -46,8 +44,6 @@ RepairMission = Mission(
         InventoryHeartTuneVariant(hearts=1),
         ExtractorHeartTuneVariant(hearts=10),
         LonelyHeartVariant(),
-        ClipPeriodOnVariant(),
-        ClipHubStationsVariant(),
     ],
 )  # If you get only two hearts you failed.
 
@@ -117,15 +113,6 @@ Machina1OpenWorldSharedRewardsMission = Mission(
 )
 
 
-HelloWorldUnclipMission = Mission(
-    name="hello_world_unclip",
-    description="Stabilize clipped extractors scattered across the hello_world sector.",
-    site=HELLO_WORLD,
-    num_cogs=4,
-    variants=[ClipPeriodOnVariant(), InventoryHeartTuneVariant(hearts=1), ClipHubStationsVariant()],
-)
-
-
 # CogsGuard Missions
 
 
@@ -146,7 +133,6 @@ _CORE_MISSIONS: list[Mission] = [
     RepairMission,
     EasyHeartsTrainingMission,
     EasyHeartsHelloWorldMission,
-    HelloWorldUnclipMission,
     HelloWorldOpenWorldMission,
     Machina1OpenWorldMission,
     Machina1OpenWorldWithChestsMission,

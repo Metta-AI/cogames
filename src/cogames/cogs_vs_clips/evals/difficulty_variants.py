@@ -83,13 +83,6 @@ class DifficultyLevel(MissionVariant):
     cargo_capacity_override: int | None = Field(default=None)
     max_steps_override: int | None = Field(default=None)
 
-    # Clipping configuration
-    clip_period: int = Field(default=0, description="Approximate period of time between clips")
-    clip_target: str | None = Field(
-        default=None, description="Specific extractor to clip (carbon/oxygen/germanium/silicon/charger)"
-    )
-    clip_immune_extractor: str | None = Field(default=None, description="Extractor that stays immune to clipping")
-
     @override
     def modify_mission(self, mission: Mission):
         """Apply a difficulty level to a mission instance.
@@ -154,39 +147,10 @@ class DifficultyLevel(MissionVariant):
         if self.cargo_capacity_override is not None:
             mission.cargo_capacity = self.cargo_capacity_override
 
-        # Set clip_period on mission
-        if self.clip_period > 0:
-            mission.clip_period = self.clip_period
-
-        # Apply clipping configuration
-        clip_target = self.clip_target
-
-        # Set the specific station to start clipped
-        if clip_target == "carbon":
-            mission.carbon_extractor.start_clipped = True
-            logger.info("Set carbon_extractor.start_clipped = True")
-        elif clip_target == "oxygen":
-            mission.oxygen_extractor.start_clipped = True
-            logger.info(
-                f"Set oxygen_extractor.start_clipped = True (current value: {mission.oxygen_extractor.start_clipped})"
-            )
-        elif clip_target == "germanium":
-            mission.germanium_extractor.start_clipped = True
-            logger.info("Set germanium_extractor.start_clipped = True")
-        elif clip_target == "silicon":
-            mission.silicon_extractor.start_clipped = True
-            logger.info("Set silicon_extractor.start_clipped = True")
-        elif clip_target == "charger":
-            mission.charger.start_clipped = True
-            logger.info("Set charger.start_clipped = True")
-
     @override
     def modify_env(self, mission: Mission, env: MettaGridConfig):
         if self.max_steps_override is not None:
             env.game.max_steps = self.max_steps_override
-
-        # Apply clipping first (before agent scaling)
-        self._apply_clipping(env)
 
         if not self.allow_agent_scaling:
             return
@@ -212,83 +176,6 @@ class DifficultyLevel(MissionVariant):
             if "default" not in env.game.agent.inventory.regen_amounts:
                 env.game.agent.inventory.regen_amounts["default"] = {}
             env.game.agent.inventory.regen_amounts["default"]["energy"] = max(ENERGY_REGEN_FLOOR, current_regen)
-
-    def _apply_clipping(self, cfg: MettaGridConfig) -> None:
-        target = self.clip_target
-
-        # Determine gear and resource mapping for unclipping
-        gear_by_target: dict[str, tuple[str, str]] = {
-            "carbon": ("modulator", "oxygen"),
-            "oxygen": ("decoder", "carbon"),
-            "germanium": ("resonator", "silicon"),
-            "silicon": ("scrambler", "germanium"),
-        }
-
-        if target not in gear_by_target:
-            return
-
-        required_gear, resource_for_gear = gear_by_target[target]
-
-        def _filter_unclip() -> None:
-            """Filter unclipping protocols to only the required gear."""
-            if cfg.game.clipper is None:
-                logger.warning("_filter_unclip: clipper is None, skipping")
-                return
-
-            original_count = len(cfg.game.clipper.unclipping_protocols)
-            cfg.game.clipper.unclipping_protocols = [
-                r for r in cfg.game.clipper.unclipping_protocols if r.input_resources == {required_gear: 1}
-            ]
-            new_count = len(cfg.game.clipper.unclipping_protocols)
-            logger.info(
-                f"_filter_unclip: filtered unclipping protocols from {original_count} to {new_count} "
-                f"(keeping {required_gear})"
-            )
-
-        def _add_gear_protocol() -> None:
-            """Add generic ['gear'] protocol to assembler for this specific clipping variant.
-
-            C++ only allows ONE protocol per unique vibe list, so we add just the one needed.
-            """
-            from mettagrid.config.mettagrid_config import AssemblerConfig, ProtocolConfig
-
-            asm = cfg.game.objects.get("assembler")
-            if asm is None or not isinstance(asm, AssemblerConfig):
-                return
-
-            # Check if ['gear'] protocol already exists
-            if any(p.vibes == ["gear"] for p in asm.protocols):
-                return  # Already added
-
-            # Add the ONE generic gear protocol for this variant
-            protocol = ProtocolConfig(
-                vibes=["gear"], input_resources={resource_for_gear: 1}, output_resources={required_gear: 1}
-            )
-            asm.protocols.append(protocol)
-
-        def _ensure_gear_resource_immune() -> None:
-            """Make the extractor for the gear resource immune to clipping."""
-            immune_extractor_name = self.clip_immune_extractor or f"{resource_for_gear}_extractor"
-            obj = cfg.game.objects.get(immune_extractor_name)
-            if not isinstance(obj, AssemblerConfig):
-                return
-            obj.clip_immune = True
-            obj.start_clipped = False
-
-        def _ensure_critical_stations_immune() -> None:
-            """Make charger, assembler, and chest immune to clipping."""
-            for station_name in ["charger", "assembler", "chest"]:
-                obj = cfg.game.objects.get(station_name)
-                if not isinstance(obj, AssemblerConfig):
-                    continue
-                obj.clip_immune = True
-                obj.start_clipped = False
-
-        # Apply clipping modifiers
-        _filter_unclip()
-        _add_gear_protocol()
-        _ensure_gear_resource_immune()
-        _ensure_critical_stations_immune()
 
 
 # =============================================================================
@@ -355,54 +242,6 @@ ENERGY_CRISIS = DifficultyLevel(
     allow_agent_scaling=False,
 )
 
-# =============================================================================
-# Clipping Difficulty Variants
-# =============================================================================
-
-CLIPPED_OXYGEN = DifficultyLevel(
-    name="clipped_oxygen",
-    description="Oxygen extractor starts clipped - craft decoder from carbon to unclip",
-    clip_period=0,
-    clip_target="oxygen",
-    clip_immune_extractor="carbon_extractor",
-    allow_agent_scaling=False,
-)
-
-CLIPPED_CARBON = DifficultyLevel(
-    name="clipped_carbon",
-    description="Carbon extractor starts clipped - craft modulator from oxygen to unclip",
-    clip_period=0,
-    clip_target="carbon",
-    clip_immune_extractor="oxygen_extractor",
-    allow_agent_scaling=False,
-)
-
-CLIPPED_GERMANIUM = DifficultyLevel(
-    name="clipped_germanium",
-    description="Germanium extractor starts clipped - craft resonator from silicon to unclip",
-    clip_period=0,
-    clip_target="germanium",
-    clip_immune_extractor="silicon_extractor",
-    allow_agent_scaling=False,
-)
-
-CLIPPED_SILICON = DifficultyLevel(
-    name="clipped_silicon",
-    description="Silicon extractor starts clipped - craft scrambler from germanium to unclip",
-    clip_period=0,
-    clip_target="silicon",
-    clip_immune_extractor="germanium_extractor",
-    allow_agent_scaling=False,
-)
-
-CLIPPING_CHAOS = DifficultyLevel(
-    name="clipping_chaos",
-    description="Random extractors clip over time - must craft unclip items reactively",
-    clip_period=7,
-    clip_target=None,
-    allow_agent_scaling=False,
-)
-
 # Export variants for use with --variant CLI flag.
 # Ordered in canonical difficulty order.
 DIFFICULTY_VARIANTS: list[DifficultyLevel] = [
@@ -411,11 +250,6 @@ DIFFICULTY_VARIANTS: list[DifficultyLevel] = [
     SINGLE_USE,
     SPEED_RUN,
     ENERGY_CRISIS,
-    CLIPPED_OXYGEN,
-    CLIPPED_CARBON,
-    CLIPPED_GERMANIUM,
-    CLIPPED_SILICON,
-    CLIPPING_CHAOS,
 ]
 
 

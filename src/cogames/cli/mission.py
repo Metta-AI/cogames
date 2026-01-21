@@ -523,10 +523,6 @@ def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cf
         f"  • Regen interval: {game_config.game.inventory_regen_interval}, "
         f"Move energy cost: {game_config.game.actions.move.consumed_resources.get('energy', 0)}"
     )
-    # Clipping info
-    clip_period = getattr(game_config.game.clipper, "clip_period", 0)
-    if clip_period:
-        console.print(f"  • Clip period: {clip_period}")
 
     # Display available actions
     console.print("\n[bold]Available Actions:[/bold]")

@@ -72,7 +72,6 @@ class _DiagnosticMissionBase(Mission):
     inventory_seed: Dict[str, int] = Field(default_factory=dict)
     communal_chest_hearts: int | None = Field(default=None)
     resource_chest_stock: Dict[str, int] = Field(default_factory=dict)
-    clip_extractors: set[str] = Field(default_factory=set)
     extractor_max_uses: Dict[str, int] = Field(default_factory=dict)
     assembler_heart_chorus: int = Field(default=1)
     # If True, set assembler heart chorus to the number of agents in the environment
@@ -190,8 +189,6 @@ class _DiagnosticMissionBase(Mission):
             extractor = cfg.game.objects.get(f"{resource}_extractor")
             if not isinstance(extractor, AssemblerConfig):
                 continue
-            if resource in self.clip_extractors:
-                extractor.start_clipped = True
             if resource in self.extractor_max_uses:
                 extractor.max_uses = self.extractor_max_uses[resource]
 
@@ -219,7 +216,7 @@ class _DiagnosticMissionBase(Mission):
         assembler.protocols = updated
 
     def _zero_all_protocol_cooldowns(self, cfg: MettaGridConfig) -> None:
-        # Zero cooldowns on assembler/extractor protocols and unclipping protocols
+        # Zero cooldowns on assembler/extractor protocols
         for _name, obj in list(cfg.game.objects.items()):
             if not isinstance(obj, AssemblerConfig):
                 continue
@@ -227,11 +224,6 @@ class _DiagnosticMissionBase(Mission):
             for proto in obj.protocols:
                 updated.append(proto.model_copy(update={"cooldown": 0}))
             obj.protocols = updated
-        if cfg.game.clipper is not None:
-            new_up: list[ProtocolConfig] = []
-            for proto in cfg.game.clipper.unclipping_protocols:
-                new_up.append(proto.model_copy(update={"cooldown": 0}))
-            cfg.game.clipper.unclipping_protocols = new_up
 
     def _apply_heart_reward_cap(self, cfg: MettaGridConfig) -> None:
         """Normalize diagnostics so a single deposited heart yields at most 1 reward per episode.
@@ -406,81 +398,6 @@ class DiagnosticExtractMissingSilicon(_DiagnosticMissionBase):
     map_name: str = "evals/diagnostic_extract_lab.map"
     inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"carbon": 2, "oxygen": 2, "germanium": 1})
     max_steps: int = Field(default=130)
-
-
-class _UnclipBase(_DiagnosticMissionBase):
-    map_name: str = "evals/diagnostic_unclip.map"
-    dynamic_assembler_chorus: bool = True
-
-    def configure_env(self, cfg: MettaGridConfig) -> None:
-        # Determine how many extractors to clip based on number of agents (1..4)
-        num_agents = max(1, int(cfg.game.num_agents))
-        resources = list(RESOURCE_NAMES)
-        to_clip = resources[: min(num_agents, len(resources))]
-        # Clip the chosen extractors
-        for res in to_clip:
-            station = cfg.game.objects.get(f"{res}_extractor")
-            if isinstance(station, AssemblerConfig):
-                station.start_clipped = True
-        # Configure unclipping to require the other three resources of the clipped station (no gear)
-        unclipping_protos: list[ProtocolConfig] = []
-        for res in to_clip:
-            others = {r: 1 for r in resources if r != res}
-            unclipping_protos.append(ProtocolConfig(input_resources=others, cooldown=0))
-        if cfg.game.clipper is not None:
-            cfg.game.clipper.unclipping_protocols = unclipping_protos
-
-        non_clipped = [res for res in resources if res not in to_clip]
-
-        assembler = cfg.game.objects.get("assembler")
-        if isinstance(assembler, AssemblerConfig):
-            updated_protocols: list[ProtocolConfig] = []
-            for proto in assembler.protocols:
-                if proto.output_resources.get("decoder", 0) > 0:
-                    inputs = {res: 1 for res in non_clipped}
-                    updated_proto = proto.model_copy(update={"vibes": ["gear"], "input_resources": inputs})
-                    updated_protocols.append(updated_proto)
-                else:
-                    updated_protocols.append(proto)
-            assembler.protocols = updated_protocols
-
-        agent_cfg = cfg.game.agent
-        inventory = dict(agent_cfg.inventory.initial)
-        for res in resources:
-            inventory.pop(res, None)
-
-        base_amount = 2 if num_agents > 1 else 1
-        for res in non_clipped:
-            inventory[res] = max(inventory.get(res, 0), base_amount)
-        for res in to_clip:
-            inventory.pop(res, None)
-
-        if num_agents > 1:
-            inventory["decoder"] = max(inventory.get("decoder", 0), len(to_clip))
-        else:
-            inventory.pop("decoder", None)
-
-        agent_cfg.inventory.initial = inventory
-
-
-class DiagnosticUnclipCraft(_UnclipBase):
-    name: str = "diagnostic_unclip_craft"
-    description: str = "Craft to unclip extractors and complete a heart chorus."
-    # No preseeded tools; agents have only basic resources below
-    inventory_seed: Dict[str, int] = Field(
-        default_factory=lambda: {"carbon": 1, "oxygen": 1, "germanium": 1, "silicon": 1}
-    )
-    max_steps: int = Field(default=250)
-
-
-class DiagnosticUnclipPreseed(_UnclipBase):
-    name: str = "diagnostic_unclip_preseed"
-    description: str = "Preseeded for unclipping; number of clipped extractors equals number of agents."
-    # Preseed with a mix of resources to allow immediate unclipping
-    inventory_seed: Dict[str, int] = Field(
-        default_factory=lambda: {"carbon": 2, "oxygen": 2, "germanium": 2, "silicon": 2}
-    )
-    max_steps: int = Field(default=250)
 
 
 class DiagnosticChargeUp(_DiagnosticMissionBase):
@@ -710,8 +627,6 @@ DIAGNOSTIC_EVALS: list[type[_DiagnosticMissionBase]] = [
     DiagnosticExtractMissingOxygen,
     DiagnosticExtractMissingGermanium,
     DiagnosticExtractMissingSilicon,
-    DiagnosticUnclipCraft,
-    DiagnosticUnclipPreseed,
     DiagnosticAgile,
     DiagnosticRadial,
     # Hard versions

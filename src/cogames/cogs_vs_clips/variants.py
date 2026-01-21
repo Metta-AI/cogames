@@ -189,22 +189,6 @@ class ResourceBottleneckVariant(MissionVariant):
             extractor.efficiency = max(1, int(extractor.efficiency) - 50)
 
 
-class SingleToolUnclipVariant(MissionVariant):
-    name: str = "single_tool_unclip"
-    description: str = "Only one tool is available: the decoder."
-    resource: str = "carbon"
-
-    @override
-    def modify_env(self, mission, env):
-        # Restrict assembler to a single generic gear recipe: carbon -> decoder (no vibes required)
-        # Since the protocol doesn't require vibes, agents won't need to change vibes
-        assembler = env.game.objects.get("assembler")
-        if isinstance(assembler, AssemblerConfig):
-            assembler.protocols = [
-                ProtocolConfig(vibes=[], input_resources={self.resource: 1}, output_resources={"decoder": 1})
-            ]
-
-
 class CompassVariant(MissionVariant):
     name: str = "compass"
     description: str = "Enable compass observation pointing toward the assembler."
@@ -419,46 +403,6 @@ class ExtractorHeartTuneVariant(MissionVariant):
 
         # Germanium: fixed one use producing all required
         mission.germanium_extractor.efficiency = int(one_heart["germanium"] * hearts)
-
-
-class CyclicalUnclipVariant(MissionVariant):
-    name: str = "cyclical_unclip"
-    description: str = "Required resources for unclipping recipes are cyclical. \
-                        So Germanium extractors require silicon-based unclipping recipes."
-
-    @override
-    def modify_env(self, mission, env):
-        if env.game.clipper is not None:
-            env.game.clipper.unclipping_protocols = [
-                ProtocolConfig(input_resources={"scrambler": 1}, cooldown=1),
-                ProtocolConfig(input_resources={"resonator": 1}, cooldown=1),
-                ProtocolConfig(input_resources={"modulator": 1}, cooldown=1),
-                ProtocolConfig(input_resources={"decoder": 1}, cooldown=1),
-            ]
-
-
-class ClipHubStationsVariant(MissionVariant):
-    name: str = "clip_hub_stations"
-    description: str = "Clip the specified base stations (by name)."
-    # Valid names: "carbon_extractor", "oxygen_extractor", "germanium_extractor", "silicon_extractor", "charger"
-    clip: list[str] = ["carbon_extractor", "oxygen_extractor", "germanium_extractor", "silicon_extractor", "charger"]
-
-    @override
-    def modify_mission(self, mission):
-        for station_name in self.clip:
-            station = getattr(mission, station_name, None)
-            if station is not None:
-                station.start_clipped = True
-
-
-class ClipPeriodOnVariant(MissionVariant):
-    name: str = "clip_period_on"
-    description: str = "Enable global clipping with a small non-zero clip period."
-    clip_period: int = 50
-
-    @override
-    def modify_mission(self, mission):
-        mission.clip_period = self.clip_period
 
 
 # Biome variants (weather) for procedural maps
@@ -717,10 +661,7 @@ VARIANTS: list[MissionVariant] = [
     CavesVariant(),
     ChestHeartTuneVariant(),
     CityVariant(),
-    ClipHubStationsVariant(),
-    ClipPeriodOnVariant(),
     CompassVariant(),
-    CyclicalUnclipVariant(),
     DarkSideVariant(),
     DesertVariant(),
     EmptyBaseVariant(),
@@ -737,7 +678,6 @@ VARIANTS: list[MissionVariant] = [
     RoughTerrainVariant(),
     SharedRewardsVariant(),
     SingleResourceUniformVariant(),
-    SingleToolUnclipVariant(),
     Small50Variant(),
     SolarFlareVariant(),
     SuperChargedVariant(),
