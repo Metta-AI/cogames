@@ -73,9 +73,6 @@ def _neg(recipe: dict[str, int]) -> dict[str, int]:
 
 
 class CvCStationConfig(Config):
-    start_clipped: bool = Field(default=False)
-    clip_immune: bool = Field(default=False)
-
     def station_cfg(self) -> GridObjectConfig:
         raise NotImplementedError("Subclasses must implement this method")
 
@@ -117,9 +114,6 @@ class ChargerConfig(ExtractorConfig):
                 )
                 for additional_agents in range(4)
             ],
-            # Clipping
-            start_clipped=self.start_clipped,
-            clip_immune=self.clip_immune,
         )
 
 
@@ -141,9 +135,6 @@ class CarbonExtractorConfig(ExtractorConfig):
                 )
                 for additional_agents in range(4)
             ],
-            # Clipping
-            start_clipped=self.start_clipped,
-            clip_immune=self.clip_immune,
         )
 
 
@@ -167,9 +158,6 @@ class OxygenExtractorConfig(ExtractorConfig):
                 )
                 for additional_agents in range(4)
             ],
-            # Clipping
-            start_clipped=self.start_clipped,
-            clip_immune=self.clip_immune,
         )
 
 
@@ -193,9 +181,6 @@ class GermaniumExtractorConfig(ExtractorConfig):
                 )
                 for additional_agents in range(4)
             ],
-            # Clipping
-            start_clipped=self.start_clipped,
-            clip_immune=self.clip_immune,
         )
 
 
@@ -217,9 +202,6 @@ class SiliconExtractorConfig(ExtractorConfig):
                 )
                 for additional_agents in range(4)
             ],
-            # Clipping
-            start_clipped=self.start_clipped,
-            clip_immune=self.clip_immune,
         )
 
 
@@ -258,7 +240,6 @@ class CvCAssemblerConfig(CvCStationConfig):
         return AssemblerConfig(
             name="assembler",
             render_symbol=vibes.VIBE_BY_NAME["assembler"].symbol,
-            clip_immune=True,
             protocols=[
                 ProtocolConfig(
                     vibes=["heart_a"] * (i + 1),
@@ -282,8 +263,6 @@ class CvCAssemblerConfig(CvCStationConfig):
                 )
                 for i in range(len(gear))
             ],
-            # Note: Generic ['gear'] protocol is added dynamically by clipping variants
-            # C++ only allows ONE protocol per unique vibe list, so we can't pre-add all 4 here
         )
 
 

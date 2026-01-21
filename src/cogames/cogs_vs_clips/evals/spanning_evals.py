@@ -9,23 +9,18 @@ from cogames.cogs_vs_clips.mission import Mission, Site
 from cogames.cogs_vs_clips.procedural import MachinaArena
 from cogames.cogs_vs_clips.sites import HELLO_WORLD, TRAINING_FACILITY
 from cogames.cogs_vs_clips.variants import (
-    ClipHubStationsVariant,
-    ClipPeriodOnVariant,
     CompassVariant,
-    CyclicalUnclipVariant,
     DarkSideVariant,
     DistantResourcesVariant,
     EmptyBaseVariant,
     EnergizedVariant,
     ExtractorHeartTuneVariant,
-    InventoryHeartTuneVariant,
     LonelyHeartVariant,
     PackRatVariant,
     QuadrantBuildingsVariant,
     ResourceBottleneckVariant,
     RoughTerrainVariant,
     SingleResourceUniformVariant,
-    SingleToolUnclipVariant,
     SingleUseSwarmVariant,
     SuperChargedVariant,
     VibeCheckMin2Variant,
@@ -67,55 +62,6 @@ OxygenBottleneck = Mission(
         EmptyBaseVariant(missing=["oxygen_extractor"]),
         ResourceBottleneckVariant(resource=["oxygen"]),
         SingleResourceUniformVariant(building_name="oxygen_extractor"),
-        PackRatVariant(),
-    ],
-)
-
-# Unclipping missions (agents must craft gear to unclip oxygen and proceed)
-UnclippingEasy = Mission(
-    name="unclipping_easy",
-    description="World grows increasingly clipped over time; agents must craft gear to unclip and proceed.",
-    site=HELLO_WORLD,
-    variants=[
-        ClipPeriodOnVariant(clip_period=50),
-        PackRatVariant(),
-        SingleToolUnclipVariant(),
-        ClipHubStationsVariant(clip=["oxygen_extractor", "germanium_extractor", "silicon_extractor"]),
-    ],
-)
-
-UnclippingStandard = Mission(
-    name="unclipping_standard",
-    description="Standard unclipping; periodic clips and multiple stations clipped at start.",
-    site=HELLO_WORLD,
-    variants=[
-        ClipPeriodOnVariant(clip_period=25),
-        ClipHubStationsVariant(clip=["oxygen_extractor", "germanium_extractor", "silicon_extractor"]),
-        CyclicalUnclipVariant(),
-    ],
-)
-
-UnclippingHard = Mission(
-    name="unclipping_hard",
-    description="Hard unclipping; oxygen starts clipped with tight extractor budgets.",
-    site=HELLO_WORLD,
-    variants=[
-        ClipPeriodOnVariant(clip_period=10),
-        PackRatVariant(),
-        ClipHubStationsVariant(clip=["oxygen_extractor", "germanium_extractor", "silicon_extractor"]),
-        CyclicalUnclipVariant(),
-    ],
-)
-
-ClippedEasyHearts = Mission(
-    name="clipped_easy_hearts",
-    description="Easy hearts with clipping and tool making.",
-    site=HELLO_WORLD,
-    variants=[
-        ClipPeriodOnVariant(),
-        ClipHubStationsVariant(),
-        InventoryHeartTuneVariant(hearts=1),
-        LonelyHeartVariant(),
         PackRatVariant(),
     ],
 )
@@ -424,10 +370,6 @@ EVAL_MISSIONS: list[Mission] = [
     EnergyStarvedEasy,
     EnergyStarvedStandard,
     EnergyStarvedHard,
-    # Unclipping tiers
-    UnclippingEasy,
-    UnclippingStandard,
-    UnclippingHard,
     # Distant resources tiers
     DistantResourcesEasy,
     DistantResourcesStandard,

@@ -37,13 +37,11 @@ from mettagrid.config.action_config import (
 from mettagrid.config.mettagrid_config import (
     AgentConfig,
     AgentRewards,
-    ClipperConfig,
     CollectiveConfig,
     GameConfig,
     GlobalObsConfig,
     InventoryConfig,
     MettaGridConfig,
-    ProtocolConfig,
     ResourceLimitsConfig,
 )
 from mettagrid.config.vibes import Vibe
@@ -138,7 +136,6 @@ class Mission(Config):
     wall: CvCWallConfig = Field(default_factory=CvCWallConfig)
     assembler: CvCAssemblerConfig = Field(default_factory=CvCAssemblerConfig)
 
-    clip_period: int = Field(default=0)
     cargo_capacity: int = Field(default=100)
     energy_capacity: int = Field(default=100)
     energy_regen_amount: int = Field(default=1)
@@ -220,27 +217,6 @@ class Mission(Config):
                 diversity_tracked_resources=["energy", "carbon", "oxygen", "germanium", "silicon", "heart"],
             ),
             inventory_regen_interval=self.inventory_regen_interval,
-            clipper=ClipperConfig(
-                unclipping_protocols=[
-                    ProtocolConfig(
-                        input_resources={"decoder": 1},
-                        cooldown=1,
-                    ),
-                    ProtocolConfig(
-                        input_resources={"modulator": 1},
-                        cooldown=1,
-                    ),
-                    ProtocolConfig(
-                        input_resources={"scrambler": 1},
-                        cooldown=1,
-                    ),
-                    ProtocolConfig(
-                        input_resources={"resonator": 1},
-                        cooldown=1,
-                    ),
-                ],
-                clip_period=self.clip_period,
-            ),
             objects={
                 "wall": self.wall.station_cfg(),
                 "assembler": self.assembler.station_cfg(),
@@ -276,20 +252,6 @@ class Mission(Config):
                         "vibe_transfers": {"default": {"silicon": 255}},
                     }
                 ),
-                # Clipped variants with unique map_names so they don't conflict with regular extractors
-                # These are used by maps that explicitly place clipped extractors
-                "clipped_carbon_extractor": self.carbon_extractor.model_copy(update={"start_clipped": True})
-                .station_cfg()
-                .model_copy(update={"map_name": "clipped_carbon_extractor"}),
-                "clipped_oxygen_extractor": self.oxygen_extractor.model_copy(update={"start_clipped": True})
-                .station_cfg()
-                .model_copy(update={"map_name": "clipped_oxygen_extractor"}),
-                "clipped_germanium_extractor": self.germanium_extractor.model_copy(update={"start_clipped": True})
-                .station_cfg()
-                .model_copy(update={"map_name": "clipped_germanium_extractor"}),
-                "clipped_silicon_extractor": self.silicon_extractor.model_copy(update={"start_clipped": True})
-                .station_cfg()
-                .model_copy(update={"map_name": "clipped_silicon_extractor"}),
             },
         )
 
