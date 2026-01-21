@@ -29,6 +29,23 @@ def test_parse_policy_spec_with_data_proportion_and_kwargs(tmp_path: Path):
     assert spec.init_kwargs == {"alpha": "0.1", "beta": "value", "with_hyphen": "ok"}
 
 
+def test_parse_policy_spec_with_metta_uri_query_params():
+    """metta:// URIs with query params should parse correctly."""
+    spec = parse_policy_spec("metta://policy/random?vibe_action_p=0.01")
+
+    assert spec.class_path == resolve_policy_class_path("random")
+    assert spec.init_kwargs == {"vibe_action_p": "0.01"}
+
+
+def test_parse_policy_spec_with_metta_uri_and_proportion():
+    """metta:// URIs can be combined with proportion."""
+    spec = parse_policy_spec("metta://policy/random?vibe_action_p=0.5,proportion=0.25")
+
+    assert spec.class_path == resolve_policy_class_path("random")
+    assert spec.init_kwargs == {"vibe_action_p": "0.5"}
+    assert spec.proportion == 0.25
+
+
 @pytest.mark.parametrize(
     "raw_spec",
     [
