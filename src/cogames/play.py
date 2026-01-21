@@ -5,9 +5,9 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
+from metta_alo.rollout import run_single_episode
 from rich.console import Console
 
-from alo.rollout import run_single_episode
 from mettagrid import MettaGridConfig
 from mettagrid.policy.policy import PolicySpec
 from mettagrid.renderer.renderer import RenderMode
