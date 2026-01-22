@@ -39,11 +39,11 @@ from mettagrid.config.mettagrid_config import (
     AgentRewards,
     CollectiveConfig,
     GameConfig,
-    GlobalObsConfig,
     InventoryConfig,
     MettaGridConfig,
     ResourceLimitsConfig,
 )
+from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
 from mettagrid.config.vibes import Vibe
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
 
@@ -179,7 +179,7 @@ class Mission(Config):
             num_agents=num_cogs,
             resource_names=resources,
             vibe_names=[vibe.name for vibe in vibes.VIBES],
-            global_obs=GlobalObsConfig(compass=self.compass_enabled, goal_obs=True),
+            obs=ObsConfig(global_obs=GlobalObsConfig(compass=self.compass_enabled, goal_obs=True)),
             actions=ActionsConfig(
                 move=MoveActionConfig(consumed_resources={"energy": self.move_energy_cost}),
                 noop=NoopActionConfig(),
@@ -329,7 +329,7 @@ class CogsGuardMission(Config):
             num_agents=num_cogs,
             resource_names=resources_list,
             vibe_names=vibe_names,
-            global_obs=GlobalObsConfig(),
+            obs=ObsConfig(global_obs=GlobalObsConfig()),
             actions=ActionsConfig(
                 move=MoveActionConfig(consumed_resources={"energy": self.cog.move_energy_cost}),
                 noop=NoopActionConfig(),
