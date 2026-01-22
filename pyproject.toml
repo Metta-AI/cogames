@@ -24,6 +24,9 @@ dependencies = [
 ]
 dynamic = ["version"]
 
+[project.optional-dependencies]
+agents = ["cogames-agents>=0.0.1"]
+
 [project.scripts]
 cogames = "cogames.main:app"
 
