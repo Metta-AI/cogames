@@ -167,12 +167,8 @@ def create_object_state(
     else:
         tag_ids = []
 
-    # Use first tag as primary object name
-    if tag_ids:
-        primary_tag_id = tag_ids[0]
-        obj_name = tag_names.get(primary_tag_id, f"unknown_tag_{primary_tag_id}")
-    else:
-        obj_name = "unknown"
+    tag_labels = [tag_names.get(tag_id, f"unknown_tag_{tag_id}") for tag_id in tag_ids]
+    obj_name = tag_labels[0] if tag_labels else "unknown"
 
     # Helper to safely extract int values
     def get_int(key: str, default: int) -> int:
@@ -186,6 +182,7 @@ def create_object_state(
 
     return ObjectState(
         name=obj_name,
+        tags=tag_labels,
         cooldown_remaining=get_int("cooldown_remaining", 0),
         clipped=get_int("clipped", 0),
         remaining_uses=get_int("remaining_uses", 999),

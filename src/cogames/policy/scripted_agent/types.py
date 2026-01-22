@@ -115,6 +115,7 @@ class ObjectState:
     """State of a single object at a position."""
 
     name: str
+    tags: list[str] = field(default_factory=list)
 
     # Extractor/station features
     cooldown_remaining: int = 0
