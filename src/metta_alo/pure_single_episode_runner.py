@@ -32,6 +32,7 @@ class PureSingleEpisodeJob(BaseModel):
     # For now, this only supports file:// scheme. Will eventually support https:// to send to s3
     results_uri: str | None  # Contains EpisodeRolloutResult
     replay_uri: str | None  # Where to place replay file. If missing, do not generate a replay
+    debug_dir: str | None = None  # Directory for observability outputs (trace.json, etc.)
 
     # There's no way to ask us to generate a seed; the caller has to pick one
     seed: int = 0
@@ -40,7 +41,7 @@ class PureSingleEpisodeJob(BaseModel):
     episode_tags: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def validate_replay_uri(self) -> "PureSingleEpisodeJob":
+    def validate_output_uris(self) -> "PureSingleEpisodeJob":
         for uri in (self.replay_uri, self.results_uri):
             if uri is None:
                 continue
