@@ -23,6 +23,7 @@ from mettagrid.simulator.multi_episode.rollout import EpisodeRolloutResult, Mult
 from mettagrid.simulator.replay_log_writer import EpisodeReplay, InMemoryReplayWriter
 from mettagrid.simulator.rollout import Rollout
 from mettagrid.util.file import write_data
+from mettagrid.util.tracer import Tracer
 from mettagrid.util.uri_resolvers.schemes import parse_uri, policy_spec_from_uri
 
 
@@ -115,6 +116,7 @@ def _run_pure_episode(
     device: Optional[str],
     render_mode: RenderMode,
     capture_replay: bool,
+    trace_path: Optional[Path] = None,
 ) -> tuple[PureSingleEpisodeResult, Optional[EpisodeReplay]]:
     env_interface = PolicyEnvInterface.from_mg_cfg(env)
     agent_policies: list[AgentPolicy] = [
@@ -129,6 +131,10 @@ def _run_pure_episode(
     if capture_replay:
         replay_writer = InMemoryReplayWriter()
 
+    tracer: Optional[Tracer] = None
+    if trace_path:
+        tracer = Tracer(trace_path)
+
     rollout = Rollout(
         env,
         agent_policies,
@@ -136,6 +142,7 @@ def _run_pure_episode(
         render_mode=render_mode,
         seed=seed,
         event_handlers=[replay_writer] if replay_writer is not None else None,
+        tracer=tracer,
     )
     rollout.run_until_done()
 
@@ -179,6 +186,12 @@ def run_single_episode(
     if replay_uri is not None and not replay_uri.endswith((".json.z", ".json.gz")):
         raise ValueError("Replay URI must end with .json.z or .json.gz")
 
+    trace_path: Optional[Path] = None
+    if debug_dir is not None:
+        debug_path = Path(debug_dir)
+        debug_path.mkdir(parents=True, exist_ok=True)
+        trace_path = debug_path / "trace.json"
+
     with (_no_python_sockets if not allow_network else nullcontext)():
         results, replay = _run_pure_episode(
             policy_specs,
@@ -189,6 +202,7 @@ def run_single_episode(
             device=device,
             render_mode=render_mode or "none",
             capture_replay=replay_uri is not None,
+            trace_path=trace_path,
         )
 
     _write_outputs(results, replay, results_uri=results_uri, replay_uri=replay_uri)
