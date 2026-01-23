@@ -37,13 +37,13 @@ from mettagrid.util.uri_resolvers.schemes import policy_spec_from_uri
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from metta_alo.rollout import run_single_episode_rollout
 from safetensors.torch import load_file as load_safetensors_file
 
 from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
 from cogames.cogs_vs_clips.mission import Mission, MissionVariant, NumCogsVariant
 from cogames.cogs_vs_clips.missions import MISSIONS as ALL_MISSIONS
 from cogames.cogs_vs_clips.variants import VARIANTS
+from metta_alo.rollout import run_single_episode_rollout
 from mettagrid.policy.policy import PolicySpec
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -513,7 +513,15 @@ def _bar_plot(
             vals = [v if v is not None else 0.0 for v in vals]
             offset = width * (i - len(series_labels) / 2 + 0.5)
             bars.extend(
-                ax.bar(x + offset, vals, width, label=str(series), color=colors[i], alpha=0.8, edgecolor="black")
+                ax.bar(
+                    x + offset,
+                    vals,
+                    width,
+                    label=str(series),
+                    color=colors[i],
+                    alpha=0.8,
+                    edgecolor="black",
+                )
             )
         ax.legend(fontsize=11)
 
@@ -582,7 +590,11 @@ def _heatmap(
 
     # Set rotation for x-axis labels
     if x_rotation != 0:
-        plt.setp(ax.get_xticklabels(), rotation=x_rotation, ha="right" if x_rotation > 45 else "center")
+        plt.setp(
+            ax.get_xticklabels(),
+            rotation=x_rotation,
+            ha="right" if x_rotation > 45 else "center",
+        )
     else:
         plt.setp(ax.get_xticklabels(), rotation=0, ha="center")
 
@@ -595,7 +607,16 @@ def _heatmap(
 
     for i, _y in enumerate(y_labels):
         for j, _x in enumerate(x_labels):
-            ax.text(j, i, f"{matrix[i, j]:.1f}", ha="center", va="center", color="black", fontsize=9, fontweight="bold")
+            ax.text(
+                j,
+                i,
+                f"{matrix[i, j]:.1f}",
+                ha="center",
+                va="center",
+                color="black",
+                fontsize=9,
+                fontweight="bold",
+            )
 
     ax.set_title(title, fontsize=14, fontweight="bold", pad=20)
     ax.set_xlabel(xlabel, fontsize=12, fontweight="bold")
@@ -643,7 +664,13 @@ def create_plots(results: List[EvalResult], output_dir: str = "eval_plots") -> N
     variants = sorted(set(r.difficulty for r in results))  # Only variants with actual results
     num_cogs_list = sorted(set(r.num_cogs for r in results))  # Only agent counts with actual results
 
-    def lookup(agent: str | None, exp: str | None, diff: str | None, num_cogs: int | None, field: str):
+    def lookup(
+        agent: str | None,
+        exp: str | None,
+        diff: str | None,
+        num_cogs: int | None,
+        field: str,
+    ):
         """Lookup aggregated value. Returns None if no data exists, 0.0 if data exists but is zero."""
         vals: List[float] = [
             float(v[field])
@@ -690,7 +717,10 @@ def create_plots(results: List[EvalResult], output_dir: str = "eval_plots") -> N
             "series": ["value"],
             "fn": lambda _s, a: lookup(a, None, None, None, "avg_reward_per_agent"),
             "rotation": 45,
-            "figsize": (max(12, len(agents) * 1.2), 6),  # Wider figure for rotated labels
+            "figsize": (
+                max(12, len(agents) * 1.2),
+                6,
+            ),  # Wider figure for rotated labels
         },
         {
             "filename": "total_reward_by_agent.png",
@@ -701,7 +731,10 @@ def create_plots(results: List[EvalResult], output_dir: str = "eval_plots") -> N
             "series": ["value"],
             "fn": lambda _s, a: lookup(a, None, None, None, "avg_total_reward"),
             "rotation": 45,
-            "figsize": (max(12, len(agents) * 1.2), 6),  # Wider figure for rotated labels
+            "figsize": (
+                max(12, len(agents) * 1.2),
+                6,
+            ),  # Wider figure for rotated labels
         },
         {
             "filename": "reward_by_num_cogs.png",
@@ -733,7 +766,10 @@ def create_plots(results: List[EvalResult], output_dir: str = "eval_plots") -> N
             "series": agents,
             "fn": lambda agent, exp: lookup(agent, exp, None, None, "avg_reward_per_agent"),
             "figsize": (
-                max(16, len(filter_comparison_environments(experiments, "avg_reward_per_agent")) * 0.4),
+                max(
+                    16,
+                    len(filter_comparison_environments(experiments, "avg_reward_per_agent")) * 0.4,
+                ),
                 7,
             ),
             "rotation": 90,  # Vertical labels to prevent overlap
@@ -749,7 +785,10 @@ def create_plots(results: List[EvalResult], output_dir: str = "eval_plots") -> N
             "series": agents,
             "fn": lambda agent, exp: lookup(agent, exp, None, None, "avg_total_reward"),
             "figsize": (
-                max(16, len(filter_comparison_environments(experiments, "avg_total_reward")) * 0.4),
+                max(
+                    16,
+                    len(filter_comparison_environments(experiments, "avg_total_reward")) * 0.4,
+                ),
                 7,
             ),
             "rotation": 90,  # Vertical labels to prevent overlap
@@ -792,7 +831,10 @@ def create_plots(results: List[EvalResult], output_dir: str = "eval_plots") -> N
             "series": ["value"],
             "fn": lambda _s, a: lookup(a, None, None, None, "avg_heart_gained_per_agent"),
             "rotation": 45,
-            "figsize": (max(12, len(agents) * 1.2), 6),  # Wider figure for rotated labels
+            "figsize": (
+                max(12, len(agents) * 1.2),
+                6,
+            ),  # Wider figure for rotated labels
         },
         {
             "filename": "total_heart_gained_by_agent.png",
@@ -803,7 +845,10 @@ def create_plots(results: List[EvalResult], output_dir: str = "eval_plots") -> N
             "series": ["value"],
             "fn": lambda _s, a: lookup(a, None, None, None, "avg_heart_gained"),
             "rotation": 45,
-            "figsize": (max(12, len(agents) * 1.2), 6),  # Wider figure for rotated labels
+            "figsize": (
+                max(12, len(agents) * 1.2),
+                6,
+            ),  # Wider figure for rotated labels
         },
         {
             "filename": "heart_gained_by_num_cogs.png",
@@ -835,7 +880,10 @@ def create_plots(results: List[EvalResult], output_dir: str = "eval_plots") -> N
             "series": agents,
             "fn": lambda agent, exp: lookup(agent, exp, None, None, "avg_heart_gained_per_agent"),
             "figsize": (
-                max(16, len(filter_comparison_environments(experiments, "avg_heart_gained_per_agent")) * 0.4),
+                max(
+                    16,
+                    len(filter_comparison_environments(experiments, "avg_heart_gained_per_agent")) * 0.4,
+                ),
                 7,
             ),
             "rotation": 90,  # Vertical labels to prevent overlap
@@ -851,7 +899,10 @@ def create_plots(results: List[EvalResult], output_dir: str = "eval_plots") -> N
             "series": agents,
             "fn": lambda agent, exp: lookup(agent, exp, None, None, "avg_heart_gained"),
             "figsize": (
-                max(16, len(filter_comparison_environments(experiments, "avg_heart_gained")) * 0.4),
+                max(
+                    16,
+                    len(filter_comparison_environments(experiments, "avg_heart_gained")) * 0.4,
+                ),
                 7,
             ),
             "rotation": 90,  # Vertical labels to prevent overlap
@@ -1099,7 +1150,11 @@ def main():
         choices=["integrated_evals", "spanning_evals", "diagnostic_evals", "thinky_evals", "tournament", "all"],
         default="all",
     )
-    parser.add_argument("--diagnostic", action="store_true", help="Shortcut for --mission-set diagnostic_evals")
+    parser.add_argument(
+        "--diagnostic",
+        action="store_true",
+        help="Shortcut for --mission-set diagnostic_evals",
+    )
     parser.add_argument(
         "--tournament",
         action="store_true",
