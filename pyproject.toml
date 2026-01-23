@@ -17,6 +17,7 @@ dependencies = [
   "scipy>=1.15.3",
   "typer>=0.19.2",
   "rich>=13.7.0",
+  "questionary>=2.1.0",
   "fastapi>=0.115.0",
   "uvicorn>=0.34.0",
   "httpx>=0.28.1",
@@ -72,6 +73,8 @@ cache-keys = [
 extend = "../../.ruff.toml"
 
 [tool.ruff.lint.per-file-ignores]
-# Notebook .py files can have long lines from cell content; E501 is rule about long lines.
-"README.py" = ["E501"]
-"tutorials/*.py" = ["E501"]
+# Ignoring:
+# - E501 Line too long (notebook .py files can have long lines from cell content)
+# - E402 Module level import not at top of file (cells can have imports even when not the first cell)
+"README.py" = ["E501", "E402"]
+"tutorials/*.py" = ["E501", "E402"]
