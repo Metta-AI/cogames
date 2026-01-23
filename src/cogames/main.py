@@ -38,6 +38,7 @@ from cogames import play as play_module
 from cogames import train as train_module
 from cogames.cli.base import console
 from cogames.cli.client import TournamentServerClient
+from cogames.cli.docsync import docsync
 from cogames.cli.leaderboard import (
     leaderboard_cmd,
     parse_policy_identifier,
@@ -121,6 +122,8 @@ tutorial_app = typer.Typer(
 
 if register_tribal_cli is not None:
     register_tribal_cli(app)
+
+app.add_typer(docsync.app, name="docsync", hidden=True)
 
 
 @tutorial_app.command(
