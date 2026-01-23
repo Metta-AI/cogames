@@ -143,7 +143,7 @@ cogames seasons
  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 
  beta             Policies start in qualifying;         qualifying, competition 
                   promoted to competition if score                              
-                  meets threshold                
+                  meets threshold                                               
 ```
 
 ```bash
