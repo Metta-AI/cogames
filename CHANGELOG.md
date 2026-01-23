@@ -1,6 +1,20 @@
 # Changelog
 
-## Jan 2026
+## Jan 23, 2026
+
+**CLI Flag Updates**
+
+Breaking changes to command-line arguments for improved consistency:
+
+- `cogames submissions` - replaced `policy_name` with an optional `--policy/-p` flag instead of a positional argument
+- `cogames diagnose` - removed `-m` short form for `--experiments`
+- `cogames diagnose` - replaced `--repeats` with `--episodes/-e`
+- `cogames make-mission` - removed `-h` and `-w` short form for `--height` and `--width`
+- `cogames login` - replaced `--server/-s` with `--login-server`
+- `cogames pickup` - added `--mission/-m` and `--variant/-v` flags (previously hardcoded to `machina_1.open_world`)
+- `cogames validate-policy` - replaced `policy` positional argument with `--policy/-p` flag
+
+## Jan 7, 2026
 
 **Tournament CLI Updates**
 

@@ -17,7 +17,7 @@ from metta_alo.scoring import (
 from rich.console import Console
 from rich.table import Table
 
-from cogames.cogs_vs_clips.missions import Machina1OpenWorldMission
+from mettagrid import MettaGridConfig
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.policy import PolicySpec
 
@@ -41,22 +41,17 @@ def pickup(
     candidate_spec: PolicySpec,
     pool_specs: list[PolicySpec],
     *,
-    num_cogs: int,
+    env_cfg: MettaGridConfig,
+    mission_name: str,
     episodes: int,
     seed: int,
     map_seed: Optional[int],
-    steps: Optional[int],
     action_timeout_ms: int,
     save_replay_dir: Optional[Path],
     candidate_label: Optional[str] = None,
     pool_labels: Optional[list[str]] = None,
 ) -> None:
-    mission = Machina1OpenWorldMission.model_copy(deep=True)
-    mission.num_cogs = num_cogs
-    env_cfg = mission.make_env()
-    if steps is not None:
-        env_cfg.game.max_steps = steps
-
+    num_cogs = env_cfg.game.num_agents
     effective_map_seed = map_seed if map_seed is not None else seed
     if effective_map_seed is not None:
         map_builder = getattr(env_cfg.game, "map_builder", None)
@@ -73,7 +68,7 @@ def pickup(
     ]
 
     console.print("[bold cyan]Pickup Evaluation[/bold cyan]")
-    console.print(f"[dim]Mission: machina_1.open_world | cogs={num_cogs} | episodes={episodes} | seed={seed}[/dim]")
+    console.print(f"[dim]Mission: {mission_name} | cogs={num_cogs} | episodes={episodes} | seed={seed}[/dim]")
     candidate_display = candidate_label or candidate_spec.name
     pool_display = pool_labels or [spec.name for spec in pool_specs]
 
@@ -123,7 +118,8 @@ def pickup(
     for result in results:
         scenario = result.scenario
         pool_mix = "/".join(str(count) for count in scenario.pool_counts)
-        scenario_name = f"machina1-c{scenario.candidate_count}-r{sum(scenario.pool_counts)}"
+        short_mission = mission_name.split(".")[-1] if "." in mission_name else mission_name
+        scenario_name = f"{short_mission}-c{scenario.candidate_count}-r{sum(scenario.pool_counts)}"
         if scenario.candidate_count == 0:
             score = result.replacement_mean
         else:
