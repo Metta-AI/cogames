@@ -64,40 +64,60 @@ def _get_client(login_server: str, server: str) -> TournamentServerClient | None
     return TournamentServerClient.from_login(server_url=server, login_server=login_server)
 
 
+def _help_callback(ctx: typer.Context, value: bool) -> None:
+    """Callback for custom help option."""
+    if value:
+        console.print(ctx.get_help())
+        raise typer.Exit()
+
+
 def submissions_cmd(
-    policy_name: Optional[str] = typer.Argument(
+    policy_name: Optional[str] = typer.Option(
         None,
-        help="Policy name to filter (e.g., 'my-policy' or 'my-policy:v3')",
+        "--policy",
+        "-p",
+        metavar="POLICY",
+        help="Filter by policy name (e.g., 'my-policy' or 'my-policy:v3')",
+        rich_help_panel="Filter",
     ),
     season: Optional[str] = typer.Option(
         None,
         "--season",
+        metavar="SEASON",
         help="Filter by tournament season",
+        rich_help_panel="Filter",
     ),
     login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
-        help="Login/authentication server URL",
+        metavar="URL",
+        help="Authentication server URL",
+        rich_help_panel="Server",
     ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
         "-s",
-        help="Observatory API base URL",
+        metavar="URL",
+        help="Tournament server URL",
+        rich_help_panel="Server",
     ),
     json_output: bool = typer.Option(
         False,
         "--json",
-        help="Print the raw JSON response instead of a table",
+        help="Print raw JSON instead of table",
+        rich_help_panel="Output",
+    ),
+    _help: bool = typer.Option(
+        False,
+        "--help",
+        "-h",
+        help="Show this message and exit",
+        is_eager=True,
+        callback=_help_callback,
+        rich_help_panel="Other",
     ),
 ) -> None:
-    """Show your uploaded policies and tournament submissions.
-
-    Examples:
-      cogames submissions                    # All uploads
-      cogames submissions --season beta      # Submissions in beta season
-      cogames submissions my-policy          # Info on a specific policy
-    """
     client = _get_client(login_server, server)
     if not client:
         return
@@ -221,30 +241,41 @@ def leaderboard_cmd(
     season: str = typer.Option(
         ...,
         "--season",
-        help="Tournament season name (required)",
+        metavar="SEASON",
+        help="Tournament season name",
+        rich_help_panel="Tournament",
     ),
     login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
-        help="Login/authentication server URL",
+        metavar="URL",
+        help="Authentication server URL",
+        rich_help_panel="Server",
     ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
         "-s",
-        help="Observatory API base URL",
+        metavar="URL",
+        help="Tournament server URL",
+        rich_help_panel="Server",
     ),
     json_output: bool = typer.Option(
         False,
         "--json",
-        help="Print the raw JSON response instead of a table",
+        help="Print raw JSON instead of table",
+        rich_help_panel="Output",
+    ),
+    _help: bool = typer.Option(
+        False,
+        "--help",
+        "-h",
+        help="Show this message and exit",
+        is_eager=True,
+        callback=_help_callback,
+        rich_help_panel="Other",
     ),
 ) -> None:
-    """Display the tournament leaderboard for a season.
-
-    Example:
-      cogames leaderboard --season beta
-    """
     client = _get_client(login_server, server)
     if not client:
         return
@@ -293,21 +324,34 @@ def seasons_cmd(
     login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
-        help="Login/authentication server URL",
+        metavar="URL",
+        help="Authentication server URL",
+        rich_help_panel="Server",
     ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
         "-s",
-        help="Observatory API base URL",
+        metavar="URL",
+        help="Tournament server URL",
+        rich_help_panel="Server",
     ),
     json_output: bool = typer.Option(
         False,
         "--json",
-        help="Print the raw JSON response instead of a table",
+        help="Print raw JSON instead of table",
+        rich_help_panel="Output",
+    ),
+    _help: bool = typer.Option(
+        False,
+        "--help",
+        "-h",
+        help="Show this message and exit",
+        is_eager=True,
+        callback=_help_callback,
+        rich_help_panel="Other",
     ),
 ) -> None:
-    """List available tournament seasons."""
     client = _get_client(login_server, server)
     if not client:
         return
