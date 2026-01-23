@@ -211,10 +211,6 @@ class HeartChorusVariant(MissionVariant):
                 "assembler.heart.created": 1.0,
                 "chest.heart.deposited_by_agent": 1.0,
                 "chest.heart.withdrawn_by_agent": -1.0,
-                "inventory.diversity.ge.2": 0.17,
-                "inventory.diversity.ge.3": 0.18,
-                "inventory.diversity.ge.4": 0.60,
-                "inventory.diversity.ge.5": 0.97,
             }
         )
         env.game.agent.rewards.stats = rewards
