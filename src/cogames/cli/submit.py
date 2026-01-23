@@ -29,6 +29,10 @@ from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySp
 DEFAULT_SUBMIT_SERVER = "https://api.observatory.softmax-research.net"
 
 
+def results_url_for_season(_server: str, _season: str) -> str:
+    return "https://www.softmax.com/alignmentleague"
+
+
 @dataclass
 class UploadResult:
     policy_version_id: uuid.UUID

@@ -62,7 +62,7 @@ from cogames.cli.policy import (
     policy_arg_example,
     policy_arg_w_proportion_example,
 )
-from cogames.cli.submit import DEFAULT_SUBMIT_SERVER, upload_policy, validate_policy_spec
+from cogames.cli.submit import DEFAULT_SUBMIT_SERVER, results_url_for_season, upload_policy, validate_policy_spec
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
 from mettagrid.mapgen.mapgen import MapGen
@@ -2000,6 +2000,8 @@ def submit_cmd(
     console.print(f"\n[bold green]Submitted to season '{season}'[/bold green]")
     if result.pools:
         console.print(f"[dim]Pools: {', '.join(result.pools)}[/dim]")
+    console.print(f"[dim]Results:[/dim] {results_url_for_season(server, season)}")
+    console.print(f"[dim]CLI:[/dim] cogames leaderboard --season {season}")
 
 
 @app.command(
