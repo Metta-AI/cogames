@@ -6,6 +6,9 @@ from typing import Optional
 
 import numpy as np
 import typer
+from rich.console import Console
+from rich.table import Table
+
 from metta_alo.rollout import run_multi_episode_rollout
 from metta_alo.scoring import (
     VorTotals,
@@ -14,9 +17,6 @@ from metta_alo.scoring import (
     summarize_vor_scenario,
     value_over_replacement,
 )
-from rich.console import Console
-from rich.table import Table
-
 from mettagrid import MettaGridConfig
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.policy import PolicySpec

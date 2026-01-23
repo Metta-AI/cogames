@@ -2,6 +2,7 @@ from typing import Optional
 
 import numpy as np
 import pytest
+
 from metta_alo.rollout import write_replay
 from metta_alo.scoring import (
     VorScenarioSummary,
@@ -9,7 +10,6 @@ from metta_alo.scoring import (
     allocate_counts,
     summarize_vor_scenario,
 )
-
 from mettagrid.simulator.multi_episode.rollout import EpisodeRolloutResult, MultiEpisodeRolloutResult
 from mettagrid.types import EpisodeStats
 

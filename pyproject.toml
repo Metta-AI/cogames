@@ -68,3 +68,11 @@ cache-keys = [
   { file = "src/cogames/policy/nim_agents/thinky_agents.nim" },
   { file = "src/cogames/policy/nim_agents/racecar_agents.nim" },
 ]
+
+[tool.ruff]
+extend = "../../.ruff.toml"
+
+[tool.ruff.lint.per-file-ignores]
+# Notebook .py files can have long lines from cell content; E501 is rule about long lines.
+"README.py" = ["E501"]
+"tutorials/*.py" = ["E501"]
