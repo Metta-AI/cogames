@@ -7,6 +7,7 @@ name = "cogames"
 description = "Multi-agent cooperative games"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
+classifiers = ["Programming Language :: Python :: 3", "Programming Language :: Python :: 3.12"]
 dependencies = [
   "mettagrid==0.2.0.58",
   "packaging>=24.0.0",
