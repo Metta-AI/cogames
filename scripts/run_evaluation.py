@@ -195,8 +195,8 @@ def _run_case(
             if env_config.game.actions:
                 if env_config.game.actions.change_vibe:
                     env_config.game.actions.change_vibe.vibes = [vibes_module.VIBE_BY_NAME[name] for name in vibe_names]
-                    if env_config.game.agent.initial_vibe >= len(vibe_names):
-                        env_config.game.agent.initial_vibe = 0
+                    if env_config.game.agent.vibe >= len(vibe_names):
+                        env_config.game.agent.vibe = 0
                 if env_config.game.actions.attack:
                     env_config.game.actions.attack.enabled = False
 
