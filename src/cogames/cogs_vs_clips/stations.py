@@ -5,23 +5,23 @@ from pydantic import Field
 from mettagrid.base_config import Config
 from mettagrid.config import vibes
 from mettagrid.config.handler_config import (
-    ActorCollectiveHas,
-    ActorHas,
-    Align,
     AOEEffectConfig,
     ClearInventoryMutation,
-    CollectiveDeposit,
-    CollectiveWithdraw,
     EntityTarget,
     Handler,
-    RemoveAlignment,
-    TargetCollectiveHas,
-    TargetCollectiveUpdate,
-    UpdateActor,
-    Withdraw,
-    isAligned,
+    actorCollectiveHas,
+    actorHas,
+    alignToActor,
+    collectiveDeposit,
+    collectiveWithdraw,
+    isAlignedToActor,
     isEnemy,
     isNeutral,
+    removeAlignment,
+    targetCollectiveHas,
+    updateActor,
+    updateTargetCollective,
+    withdraw,
 )
 from mettagrid.config.mettagrid_config import (
     AssemblerConfig,
@@ -287,12 +287,12 @@ class SimpleExtractorConfig(CvCStationConfig):
             on_use_handlers={
                 # Order matters: miner first so agents with miner gear get the bonus
                 "miner": Handler(
-                    filters=[ActorHas({"miner": 1})],
-                    mutations=[Withdraw({self.resource: self.large_amount})],
+                    filters=[actorHas({"miner": 1})],
+                    mutations=[withdraw({self.resource: self.large_amount})],
                 ),
                 "extract": Handler(
                     filters=[],
-                    mutations=[Withdraw({self.resource: self.small_amount})],
+                    mutations=[withdraw({self.resource: self.small_amount})],
                 ),
             },
             inventory=InventoryConfig(initial={self.resource: self.initial_amount}),
@@ -318,21 +318,23 @@ class JunctionConfig(CvCStationConfig):
             render_symbol="📦",
             collective=self.team,
             aoes=[
-                AOEEffectConfig(range=self.aoe_range, resource_deltas=self.influence_deltas, filters=[isAligned()]),
+                AOEEffectConfig(
+                    range=self.aoe_range, resource_deltas=self.influence_deltas, filters=[isAlignedToActor()]
+                ),
                 AOEEffectConfig(range=self.aoe_range, resource_deltas=self.attack_deltas, filters=[isEnemy()]),
             ],
             on_use_handlers={
                 "deposit": Handler(
-                    filters=[isAligned()],
-                    mutations=[CollectiveDeposit({resource: 100 for resource in self.elements})],
+                    filters=[isAlignedToActor()],
+                    mutations=[collectiveDeposit({resource: 100 for resource in self.elements})],
                 ),
                 "align": Handler(
-                    filters=[isNeutral(), ActorHas({"aligner": 1, "influence": 1, **self.align_cost})],
-                    mutations=[UpdateActor(_neg(self.align_cost)), Align()],
+                    filters=[isNeutral(), actorHas({"aligner": 1, "influence": 1, **self.align_cost})],
+                    mutations=[updateActor(_neg(self.align_cost)), alignToActor()],
                 ),
                 "scramble": Handler(
-                    filters=[isEnemy(), ActorHas({"scrambler": 1, **self.scramble_cost})],
-                    mutations=[RemoveAlignment(), UpdateActor(_neg(self.scramble_cost))],
+                    filters=[isEnemy(), actorHas({"scrambler": 1, **self.scramble_cost})],
+                    mutations=[removeAlignment(), updateActor(_neg(self.scramble_cost))],
                 ),
             },
         )
@@ -348,13 +350,15 @@ class HubConfig(JunctionConfig):
             render_symbol="📦",
             collective=self.team,
             aoes=[
-                AOEEffectConfig(range=self.aoe_range, resource_deltas=self.influence_deltas, filters=[isAligned()]),
+                AOEEffectConfig(
+                    range=self.aoe_range, resource_deltas=self.influence_deltas, filters=[isAlignedToActor()]
+                ),
                 AOEEffectConfig(range=self.aoe_range, resource_deltas=self.attack_deltas, filters=[isEnemy()]),
             ],
             on_use_handlers={
                 "deposit": Handler(
-                    filters=[isAligned()],
-                    mutations=[CollectiveDeposit({resource: 100 for resource in self.elements})],
+                    filters=[isAlignedToActor()],
+                    mutations=[collectiveDeposit({resource: 100 for resource in self.elements})],
                 ),
             },
         )
@@ -374,14 +378,14 @@ class CogsGuardChestConfig(CvCStationConfig):
             collective=self.collective,
             on_use_handlers={
                 "get_heart": Handler(
-                    filters=[isAligned(), TargetCollectiveHas({"heart": 1})],
-                    mutations=[CollectiveWithdraw({"heart": 1})],
+                    filters=[isAlignedToActor(), targetCollectiveHas({"heart": 1})],
+                    mutations=[collectiveWithdraw({"heart": 1})],
                 ),
                 "make_heart": Handler(
-                    filters=[isAligned(), TargetCollectiveHas(self.heart_cost)],
+                    filters=[isAlignedToActor(), targetCollectiveHas(self.heart_cost)],
                     mutations=[
-                        TargetCollectiveUpdate(_neg(self.heart_cost)),
-                        UpdateActor({"heart": 1}),
+                        updateTargetCollective(_neg(self.heart_cost)),
+                        updateActor({"heart": 1}),
                     ],
                 ),
             },
@@ -404,15 +408,15 @@ class GearStationConfig(CvCStationConfig):
             collective=self.collective,
             on_use_handlers={
                 "keep_gear": Handler(
-                    filters=[isAligned(), ActorHas({self.gear_type: 1})],
+                    filters=[isAlignedToActor(), actorHas({self.gear_type: 1})],
                     mutations=[],
                 ),
                 "change_gear": Handler(
-                    filters=[isAligned(), ActorCollectiveHas(cost)],
+                    filters=[isAlignedToActor(), actorCollectiveHas(cost)],
                     mutations=[
                         ClearInventoryMutation(target=EntityTarget.ACTOR, limit_name="gear"),
-                        TargetCollectiveUpdate(_neg(cost)),
-                        UpdateActor({self.gear_type: 1}),
+                        updateTargetCollective(_neg(cost)),
+                        updateActor({self.gear_type: 1}),
                     ],
                 ),
             },
