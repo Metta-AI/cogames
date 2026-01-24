@@ -47,6 +47,7 @@ class SingleEpisodeJob(BaseModel):
     env: MettaGridConfig
     results_uri: Optional[str] = None
     replay_uri: Optional[str] = None
+    debug_uri: Optional[str] = None  # Presigned URL for uploading debug zip (traces, profiles, etc.)
     seed: int = 0
     max_action_time_ms: int = 10000
     episode_tags: dict[str, str] = Field(default_factory=dict)
