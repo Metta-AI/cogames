@@ -76,6 +76,25 @@ def _resolve_vector_counts(
     return num_envs, num_workers
 
 
+def _align_minibatch_size(minibatch_size: int, batch_size: int, bptt_horizon: int) -> int:
+    if bptt_horizon <= 1:
+        return minibatch_size
+
+    if minibatch_size < bptt_horizon:
+        return bptt_horizon
+
+    remainder = minibatch_size % bptt_horizon
+    if remainder == 0:
+        return minibatch_size
+
+    rounded_up = minibatch_size + (bptt_horizon - remainder)
+    if rounded_up <= batch_size:
+        return rounded_up
+
+    rounded_down = minibatch_size - remainder
+    return max(bptt_horizon, rounded_down)
+
+
 def train(
     env_cfg: Optional[MettaGridConfig],
     policy_class_path: str,
@@ -243,6 +262,16 @@ def train(
             minibatch_size,
             amended_minibatch_size,
         )
+
+    aligned_minibatch_size = _align_minibatch_size(amended_minibatch_size, amended_batch_size, bptt_horizon)
+    if aligned_minibatch_size != amended_minibatch_size:
+        logger.info(
+            "Adjusting minibatch_size from %s to %s to align with bptt_horizon=%s",
+            amended_minibatch_size,
+            aligned_minibatch_size,
+            bptt_horizon,
+        )
+        amended_minibatch_size = aligned_minibatch_size
 
     effective_timesteps = max(num_steps, amended_batch_size)
     if effective_timesteps != num_steps:

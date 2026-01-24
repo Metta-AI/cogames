@@ -1,6 +1,6 @@
 """Tests for automatic alignment of vectorized environment configuration."""
 
-from cogames.train import _resolve_vector_counts
+from cogames.train import _align_minibatch_size, _resolve_vector_counts
 
 
 def test_align_defaults_prefers_divisor_reduction() -> None:
@@ -61,3 +61,15 @@ def test_align_leaves_underfilled_worker_pair() -> None:
 
     assert aligned_envs == 4
     assert aligned_workers == 8
+
+
+def test_align_minibatch_size_minimum_bptt() -> None:
+    assert _align_minibatch_size(4, 64, 64) == 64
+
+
+def test_align_minibatch_size_rounds_up_when_possible() -> None:
+    assert _align_minibatch_size(70, 128, 64) == 128
+
+
+def test_align_minibatch_size_rounds_down_when_needed() -> None:
+    assert _align_minibatch_size(70, 96, 64) == 64
