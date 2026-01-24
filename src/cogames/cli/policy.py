@@ -119,9 +119,6 @@ def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
     - NAME (short name) or class=...[,data=...][,proportion=1.0][,kw.<key>=<value>]
     - URI: metta://policy/xxx[,proportion=1.0]
     """
-    entries = [part.strip() for part in spec.split(",") if part.strip()]
-    if not entries:
-        raise ValueError("Policy specification cannot be empty.")
 
     def parse_key_value(entry: str) -> tuple[str, str]:
         if "=" not in entry:
@@ -152,6 +149,29 @@ def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
         if value.startswith("metta://"):
             return True
         return parse_uri(value, allow_none=True, default_scheme=None) is not None
+
+    # For metta:// URIs, we need to handle commas in query strings specially.
+    # Split on ",proportion=" to separate the URI from the proportion suffix.
+    if spec.startswith("metta://"):
+        proportion_marker = ",proportion="
+        if proportion_marker in spec:
+            uri_part, proportion_value = spec.split(proportion_marker, 1)
+            fraction = parse_proportion(proportion_value.strip())
+        else:
+            uri_part = spec
+            fraction = 1.0
+
+        policy = policy_spec_from_uri(uri_part.strip())
+        return PolicySpecWithProportion(
+            class_path=policy.class_path,
+            data_path=policy.data_path,
+            proportion=fraction,
+            init_kwargs=policy.init_kwargs,
+        )
+
+    entries = [part.strip() for part in spec.split(",") if part.strip()]
+    if not entries:
+        raise ValueError("Policy specification cannot be empty.")
 
     fraction = 1.0
     first = entries[0]

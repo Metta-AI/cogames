@@ -167,6 +167,7 @@ def test_make_policy_scripted_runs():
         # Ensure the copied template doesn't collide with the built-in starter policy.
         if 'short_names = ["starter"]' in content:
             policy_file.write_text(content.replace('short_names = ["starter"]', 'short_names = ["starter_template"]'))
+
         # Verify policy can be instantiated
         sys.path.insert(0, str(tmpdir))
         try:

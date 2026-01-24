@@ -120,6 +120,8 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
 
 
 class StarterPolicy(MultiAgentPolicy):
+    short_names = ["starter"]
+
     def __init__(self, policy_env_info: PolicyEnvInterface, device: str = "cpu"):
         super().__init__(policy_env_info, device=device)
         self._agent_policies: dict[int, StatefulAgentPolicy[StarterCogState]] = {}
