@@ -68,7 +68,7 @@ uv run cogames play --mission evals.diagnostic_extract_missing_oxygen --cogs 2
 uv run cogames play --mission evals.diagnostic_radial_hard --cogs 1
 
 # With policy
-uv run cogames play --mission evals.diagnostic_unclip_craft -p scripted_baseline --cogs 1
+uv run cogames play --mission evals.diagnostic_unclip_craft -p baseline --cogs 1
 ```
 
 ---
@@ -192,7 +192,7 @@ uv run cogames play --mission hello_world.oxygen_bottleneck --cogs 2 --variant c
 uv run cogames play --mission hello_world.energy_starved --cogs 2 --variant compass --variant small_50
 
 # With policy
-uv run cogames play --mission hello_world.single_use_swarm --cogs 4 -p scripted_baseline
+uv run cogames play --mission hello_world.single_use_swarm --cogs 4 -p baseline
 ```
 
 ---
