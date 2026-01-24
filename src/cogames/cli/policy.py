@@ -149,6 +149,8 @@ def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
 
     def is_uri(value: str) -> bool:
         # Check for URI schemes before checking for '=' to handle query strings
+        if value.startswith("metta://"):
+            return True
         return parse_uri(value, allow_none=True, default_scheme=None) is not None
 
     fraction = 1.0
