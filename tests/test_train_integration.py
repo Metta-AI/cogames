@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import torch
 
-import cogames.policy.scripted_agent.starter_agent as starter_agent
+import cogames.policy.starter_agent as starter_agent
 import cogames.policy.trainable_policy_template as trainable_policy_template
 from cogames.cli.mission import get_mission
 from cogames.train import train
@@ -163,6 +163,10 @@ def test_make_policy_scripted_runs():
         assert "class StarterCogPolicyImpl" in content
         assert "def step_with_state" in content
         assert "MultiAgentPolicy" in content
+
+        # Ensure the copied template doesn't collide with the built-in starter policy.
+        if 'short_names = ["starter"]' in content:
+            policy_file.write_text(content.replace('short_names = ["starter"]', 'short_names = ["starter_template"]'))
 
         # Verify policy can be instantiated
         sys.path.insert(0, str(tmpdir))

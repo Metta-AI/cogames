@@ -29,7 +29,7 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
-import cogames.policy.scripted_agent.starter_agent as starter_agent
+import cogames.policy.starter_agent as starter_agent
 import cogames.policy.trainable_policy_template as trainable_policy_template
 from cogames import evaluate as evaluate_module
 from cogames import game, verbose
@@ -104,13 +104,17 @@ def _resolve_mettascope_script() -> Path:
     )
 
 
+def _register_policies() -> None:
+    discover_and_register_policies()
+
+
 app = typer.Typer(
     help="CoGames - Multi-agent cooperative and competitive games",
     context_settings={"help_option_names": ["-h", "--help"]},
     no_args_is_help=True,
     rich_markup_mode="rich",
     pretty_exceptions_show_locals=False,
-    callback=lambda: discover_and_register_policies("cogames.policy"),
+    callback=_register_policies,
 )
 
 tutorial_app = typer.Typer(
@@ -2039,7 +2043,7 @@ def docs_cmd(
         "mission": (package_root / "MISSION.md", "Mission briefing for Machina VII Deployment"),
         "technical_manual": (package_root / "TECHNICAL_MANUAL.md", "Technical manual for Cogames"),
         "scripted_agent": (
-            Path(__file__).parent / "policy" / "scripted_agent" / "README.md",
+            Path(__file__).parent / "docs" / "SCRIPTED_AGENT.md",
             "Scripted agent policy documentation",
         ),
         "evals": (

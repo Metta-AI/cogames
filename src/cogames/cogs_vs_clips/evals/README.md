@@ -206,14 +206,14 @@ For systematic evaluation across multiple missions and configurations:
 ```bash
 # Evaluate on integrated eval suite
 uv run python packages/cogames/scripts/run_evaluation.py \
-  --policy class=thinky \
+  --policy thinky \
   --mission-set integrated_evals \
   --cogs 4 \
   --repeats 2
 
 # Evaluate specific agent
 uv run python packages/cogames/scripts/run_evaluation.py \
-  --policy class=baseline \
+  --policy baseline \
   --steps 1000 \
   --output eval_baseline.json
 ```
