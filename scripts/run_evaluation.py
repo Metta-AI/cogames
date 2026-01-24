@@ -5,7 +5,6 @@ Evaluation Script for Policies
 Supports:
 - Policy specs via --policy / -p (same format as cogames CLI, repeatable)
 - Checkpoint bundle URIs (s3:// or file://) with policy_spec.json bundles
-- Built-in scripted agents via --agent (legacy; `--agent all` runs all)
 
 Usage snippets:
   uv run python packages/cogames/scripts/run_evaluation.py --policy ladybug
@@ -15,7 +14,6 @@ Usage snippets:
       --policy s3://bucket/path/checkpoints/run:v5 --cogs 1
   uv run python packages/cogames/scripts/run_evaluation.py \
       --policy file://./train_dir/run:v5 --mission-set diagnostic_evals --cogs 1
-  uv run python packages/cogames/scripts/run_evaluation.py --agent all  # legacy
 """
 
 import argparse
@@ -31,20 +29,19 @@ from typing import Any, Dict, List, Optional, cast
 
 import matplotlib
 
-from cogames.cli.policy import parse_policy_spec
-from mettagrid.util.uri_resolvers.schemes import policy_spec_from_uri
-
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from safetensors.torch import load_file as load_safetensors_file
 
+from cogames.cli.policy import parse_policy_spec
 from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
 from cogames.cogs_vs_clips.mission import Mission, MissionVariant, NumCogsVariant
 from cogames.cogs_vs_clips.missions import MISSIONS as ALL_MISSIONS
 from cogames.cogs_vs_clips.variants import VARIANTS
 from metta_alo.rollout import run_single_episode_rollout
 from mettagrid.policy.policy import PolicySpec
+from mettagrid.util.uri_resolvers.schemes import policy_spec_from_uri
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -86,34 +83,6 @@ class AgentConfig:
 def is_s3_uri(path: str) -> bool:
     return path.startswith("s3://") if path else False
 
-
-AGENT_CONFIGS: Dict[str, AgentConfig] = {
-    "baseline": AgentConfig(
-        key="baseline",
-        label="Baseline",
-        policy_path="cogames_agents.policy.scripted_agent.baseline_agent.BaselinePolicy",
-    ),
-    "ladybug": AgentConfig(
-        key="ladybug",
-        label="Ladybug",
-        policy_path="cogames_agents.policy.scripted_agent.unclipping_agent.UnclippingPolicy",
-    ),
-    "thinky": AgentConfig(
-        key="thinky",
-        label="Thinky",
-        policy_path="cogames_agents.policy.nim_agents.agents.ThinkyAgentsMultiPolicy",
-    ),
-    "racecar": AgentConfig(
-        key="racecar",
-        label="RaceCar",
-        policy_path="cogames_agents.policy.nim_agents.agents.RaceCarAgentsMultiPolicy",
-    ),
-    "starter": AgentConfig(
-        key="starter",
-        label="Starter",
-        policy_path="cogames.policy.starter_agent.StarterPolicy",
-    ),
-}
 
 EXPERIMENT_MAP: Dict[str, Mission] = {}
 VARIANT_LOOKUP: Dict[str, MissionVariant] = {v.name: v for v in VARIANTS}
@@ -220,7 +189,7 @@ def _run_case(
         env_config.game.agent.rewards.stats_max[resource_stat] = 0.0
 
     actual_max_steps = env_config.game.max_steps
-    if is_s3_uri(agent_config.policy_path):
+    if "://" in agent_config.policy_path:
         resolved_spec = policy_spec_from_uri(agent_config.policy_path)
         if agent_config.init_kwargs:
             resolved_spec = resolved_spec.model_copy(
@@ -1116,25 +1085,13 @@ def create_plots(results: List[EvalResult], output_dir: str = "eval_plots") -> N
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate scripted or custom agents.")
+    parser = argparse.ArgumentParser(description="Evaluate policies via short names or URI specs.")
     parser.add_argument(
         "--policy",
         "-p",
         action="append",
         default=None,
         help="Policy specification (same format as cogames CLI policy args). Repeat to evaluate multiple policies.",
-    )
-    parser.add_argument(
-        "--agent",
-        nargs="*",
-        default=None,
-        help="Legacy: agent key, class path, or S3 URI (prefer --policy)",
-    )
-    parser.add_argument(
-        "--checkpoint",
-        type=str,
-        default=None,
-        help="Legacy: checkpoint path for --agent (prefer --policy class=...,data=...)",
     )
     parser.add_argument("--experiments", "-m", nargs="*", default=None, help="Experiments to run")
     parser.add_argument("--variants", nargs="*", default=None, help="Variants to apply")
@@ -1204,60 +1161,24 @@ def main():
     EXPERIMENT_MAP = experiment_map
 
     configs: List[AgentConfig] = []
-    if args.policy:
-        if args.agent:
-            logger.warning("Ignoring --agent because --policy was provided.")
-        if args.checkpoint:
-            logger.warning("Ignoring --checkpoint because --policy was provided.")
+    if not args.policy:
+        parser.error("At least one --policy is required.")
 
-        for policy_arg in args.policy:
-            try:
-                policy_spec = parse_policy_spec(policy_arg).to_policy_spec()
-            except (ValueError, ModuleNotFoundError) as exc:
-                parser.error(f"Invalid --policy '{policy_arg}': {exc}")
-            configs.append(
-                AgentConfig(
-                    key="custom",
-                    label=policy_spec.name,
-                    policy_path=policy_spec.class_path,
-                    data_path=policy_spec.data_path,
-                    init_kwargs=policy_spec.init_kwargs,
-                    source=policy_arg,
-                )
+    for policy_arg in args.policy:
+        try:
+            policy_spec = parse_policy_spec(policy_arg).to_policy_spec()
+        except (ValueError, ModuleNotFoundError) as exc:
+            parser.error(f"Invalid --policy '{policy_arg}': {exc}")
+        configs.append(
+            AgentConfig(
+                key="custom",
+                label=policy_spec.name,
+                policy_path=policy_spec.class_path,
+                data_path=policy_spec.data_path,
+                init_kwargs=policy_spec.init_kwargs,
+                source=policy_arg,
             )
-    else:
-        if args.agent:
-            logger.warning("--agent is deprecated; use --policy instead.")
-        if args.checkpoint and args.agent:
-            logger.warning("--checkpoint is deprecated; use --policy class=...,data=... instead.")
-
-        agent_keys = args.agent if args.agent else ["ladybug"]
-        for agent_key in agent_keys:
-            if agent_key == "all":
-                configs.extend(list(AGENT_CONFIGS.values()))
-            elif agent_key in AGENT_CONFIGS:
-                configs.append(AGENT_CONFIGS[agent_key])
-            elif is_s3_uri(agent_key):
-                label = Path(agent_key).stem if "/" in agent_key else agent_key
-                configs.append(
-                    AgentConfig(
-                        key="custom",
-                        label=f"s3_{label}",
-                        policy_path=agent_key,
-                        data_path=None,
-                        source=agent_key,
-                    )
-                )
-            else:
-                label = agent_key.rsplit(".", 1)[-1] if "." in agent_key else agent_key
-                configs.append(
-                    AgentConfig(
-                        key="custom",
-                        label=label,
-                        policy_path=agent_key,
-                        data_path=args.checkpoint,
-                    )
-                )
+        )
 
     experiments = args.experiments if args.experiments else list(experiment_map.keys())
 

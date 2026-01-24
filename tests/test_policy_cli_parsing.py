@@ -28,9 +28,7 @@ def test_parse_policy_spec_with_data_proportion_and_kwargs(tmp_path: Path):
     checkpoint = tmp_path / "weights.pt"
     checkpoint.write_text("dummy")
 
-    spec = parse_policy_spec(
-        f"class=random,data={checkpoint},proportion=0.5,kw.alpha=0.1,kw.beta=value,kw.with-hyphen=ok"
-    )
+    spec = parse_policy_spec(f"random,data={checkpoint},proportion=0.5,kw.alpha=0.1,kw.beta=value,kw.with-hyphen=ok")
 
     assert spec.class_path == resolve_policy_class_path("random")
     assert spec.data_path == str(checkpoint.resolve())
@@ -44,6 +42,14 @@ def test_parse_policy_spec_with_metta_uri_query_params():
 
     assert spec.class_path == resolve_policy_class_path("random")
     assert spec.init_kwargs == {"vibe_action_p": "0.01"}
+
+
+def test_parse_policy_spec_with_metta_uri_query_commas():
+    """metta:// URIs should allow commas inside query values."""
+    spec = parse_policy_spec("metta://policy/random?role_vibes=miner,scout")
+
+    assert spec.class_path == resolve_policy_class_path("random")
+    assert spec.init_kwargs == {"role_vibes": "miner,scout"}
 
 
 def test_parse_policy_spec_with_metta_uri_and_proportion():
@@ -61,7 +67,7 @@ def test_parse_policy_spec_with_metta_uri_and_proportion():
         "",
         "data=only",
         "random:train_dir/model.pt",
-        "class=random,proportion=-1",
+        "random,proportion=-1",
     ],
 )
 def test_parse_policy_spec_rejects_invalid_input(raw_spec: str):

@@ -425,7 +425,10 @@ def _upload_policy_bundle(
     try:
         if init_kwargs or include_files or setup_script:
             console.print("[red]Error:[/red] Extra files/kwargs are not supported when uploading a bundle URI.")
-            console.print("Upload the bundle as-is, or use class=... with local files to build a new submission zip.")
+            console.print(
+                "Upload the bundle as-is, or use a short policy name or URI with local files to "
+                "build a new submission zip."
+            )
             return None
 
         if not skip_validation:
