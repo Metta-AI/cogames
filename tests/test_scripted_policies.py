@@ -58,6 +58,16 @@ POLICIES_UNDER_TEST: tuple[PolicyUnderTest, ...] = (
         requires_nim=True,
         supports_supervisor=True,
     ),
+    PolicyUnderTest(
+        "cogames_agents.policy.nim_agents.agents.CogsguardAgentsMultiPolicy",
+        requires_nim=True,
+        supports_supervisor=True,
+    ),
+    PolicyUnderTest(
+        "cogames_agents.policy.cogsguard_teacher.CogsguardTeacherPolicy",
+        requires_nim=True,
+        supports_supervisor=True,
+    ),
     PolicyUnderTest("cogames_agents.policy.scripted_agent.baseline_agent.BaselinePolicy"),
     PolicyUnderTest("cogames.policy.starter_agent.StarterPolicy"),
     PolicyUnderTest("cogames_agents.policy.scripted_agent.unclipping_agent.UnclippingPolicy"),
