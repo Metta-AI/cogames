@@ -41,7 +41,7 @@ def test_upload_command_sends_correct_requests(
             "cogames",
             "upload",
             "--policy",
-            "class=cogames.policy.scripted_agent.starter_agent.StarterAgent",
+            "class=cogames.policy.starter_agent.StarterPolicy",
             "--name",
             "my-test-policy",
             "--server",
@@ -74,7 +74,7 @@ def test_upload_command_sends_correct_requests(
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         spec = json.loads(zf.read("policy_spec.json"))
-        assert spec["class_path"] == "cogames.policy.scripted_agent.starter_agent.StarterAgent"
+        assert spec["class_path"] == "cogames.policy.starter_agent.StarterPolicy"
 
     # 3. Complete request should have correct upload_id and name
     complete_req, _ = httpserver.log[2]
@@ -94,7 +94,7 @@ def test_upload_command_fails_without_auth(
             "cogames",
             "upload",
             "--policy",
-            "class=cogames.policy.scripted_agent.starter_agent.StarterAgent",
+            "class=cogames.policy.starter_agent.StarterPolicy",
             "--name",
             "my-test-policy",
             "--server",

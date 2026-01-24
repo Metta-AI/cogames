@@ -1,14 +1,14 @@
 # Scripted Agent Policies
 
-Three teaching-friendly scripted agent implementations for CoGames evaluation and ablation studies.
+Two teaching-friendly scripted agent implementations for CoGames evaluation and ablation studies, plus a tiny demo
+policy.
 
 ## Overview
 
-This package provides three progressively capable scripted agents:
+This package provides two progressively capable scripted agents and one tiny demo policy:
 
 1. **BaselineAgent** - Core functionality: exploration, resource gathering, heart assembly (single/multi-agent)
 2. **UnclippingAgent** - Extends BaselineAgent with extractor unclipping capability
-3. **StarterAgent** - Lightweight, tutorial-friendly flow for README and quick demos
 
 ## Architecture
 
@@ -18,7 +18,7 @@ This package provides three progressively capable scripted agents:
 scripted_agent/
 ├── baseline_agent.py            # Base agent + BaselinePolicy wrapper
 ├── unclipping_agent.py          # Unclipping extension + UnclippingPolicy wrapper
-├── starter_agent.py             # Minimal if/else agent for docs and demos
+├── demo_policy.py               # Tiny demo policy (short name: tiny_baseline)
 ├── pathfinding.py               # Pathfinding utilities (shared)
 └── README.md                    # This file
 ```
@@ -60,7 +60,7 @@ These agents are designed for **ablation studies** and **baseline evaluation**:
 **Usage**:
 
 ```python
-from cogames.policy.scripted_agent.baseline_agent import BaselinePolicy
+from cogames_agents.policy.scripted_agent.baseline_agent import BaselinePolicy
 from mettagrid import MettaGridEnv
 
 env = MettaGridEnv(env_config)
@@ -77,10 +77,10 @@ action = agent.step(obs[0])
 
 ```bash
 # Single agent
-uv run cogames play --mission evals.diagnostic_radial -p scripted_baseline --cogs 1
+uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 1
 
 # Multi-agent
-uv run cogames play --mission evals.diagnostic_radial -p scripted_baseline --cogs 4
+uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 4
 ```
 
 ### 2. UnclippingAgent
@@ -111,7 +111,7 @@ oxygen | gear | | Germanium | resonator | silicon | gear | | Silicon | scrambler
 **Usage**:
 
 ```python
-from cogames.policy.scripted_agent.unclipping_agent import UnclippingPolicy
+from cogames_agents.policy.scripted_agent.unclipping_agent import UnclippingPolicy
 
 policy = UnclippingPolicy(env)
 # ... same as BaselinePolicy
@@ -121,13 +121,19 @@ policy = UnclippingPolicy(env)
 
 ```bash
 # Test with unclipping diagnostic (single agent)
-uv run cogames play --mission evals.diagnostic_unclip_craft -p scripted_unclipping --cogs 1
+uv run cogames play --mission evals.diagnostic_unclip_craft -p ladybug --cogs 1
 
 # Test with unclipping diagnostic (multi-agent)
-uv run cogames play --mission evals.diagnostic_unclip_craft -p scripted_unclipping --cogs 2
+uv run cogames play --mission evals.diagnostic_unclip_craft -p ladybug --cogs 2
 ```
 
-### 3. StarterAgent
+### 3. TinyBaseline (demo policy)
+
+**Purpose**: Minimal, readable demo policy used for quick experiments.
+
+**Short name**: `tiny_baseline` (defined in `demo_policy.py`).
+
+## StarterAgent
 
 **Purpose**: Intro-friendly agent that mirrors the high-level flow described in docs.
 
@@ -140,6 +146,9 @@ uv run cogames play --mission evals.diagnostic_unclip_craft -p scripted_unclippi
 
 **Why it exists**: Shows the simplest possible if/else controller that still completes missions, ideal for external
 readers who want a tiny, readable starting point before diving into the full Baseline/Unclipping logic.
+
+**Location**: The starter policy lives in the core `cogames` package at `cogames.policy.starter_agent` so it is always
+available without installing `cogames-agents`.
 
 ## Shared Components
 
@@ -194,36 +203,36 @@ class ExtractorInfo:
 
 ```bash
 # Basic diagnostic (single agent)
-uv run cogames play --mission evals.diagnostic_radial -p scripted_baseline --cogs 1 --steps 1000
+uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 1 --steps 1000
 
 # Chest navigation
-uv run cogames play --mission evals.diagnostic_chest_navigation1 -p scripted_baseline --cogs 1 --steps 1000
+uv run cogames play --mission evals.diagnostic_chest_navigation1 -p baseline --cogs 1 --steps 1000
 
 # Resource extraction
-uv run cogames play --mission evals.diagnostic_extract_missing_oxygen -p scripted_baseline --cogs 1 --steps 1000
+uv run cogames play --mission evals.diagnostic_extract_missing_oxygen -p baseline --cogs 1 --steps 1000
 
 # Hard version
-uv run cogames play --mission evals.diagnostic_radial_hard -p scripted_baseline --cogs 1 --steps 2000
+uv run cogames play --mission evals.diagnostic_radial_hard -p baseline --cogs 1 --steps 2000
 
 # Multi-agent (2, 4 agents)
-uv run cogames play --mission evals.diagnostic_radial -p scripted_baseline --cogs 2 --steps 1500
-uv run cogames play --mission evals.diagnostic_radial -p scripted_baseline --cogs 4 --steps 2000
+uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 2 --steps 1500
+uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 4 --steps 2000
 
 # Assembly test
-uv run cogames play --mission evals.diagnostic_assembler_search -p scripted_baseline --cogs 1 --steps 1000
+uv run cogames play --mission evals.diagnostic_assembler_search -p baseline --cogs 1 --steps 1000
 ```
 
 #### UnclippingAgent (Unclipping Diagnostics)
 
 ```bash
 # Unclipping craft diagnostic
-uv run cogames play --mission evals.diagnostic_unclip_craft -p scripted_unclipping --cogs 1 --steps 2000
+uv run cogames play --mission evals.diagnostic_unclip_craft -p ladybug --cogs 1 --steps 2000
 
 # Unclipping with pre-seeded inventory
-uv run cogames play --mission evals.diagnostic_unclip_preseed -p scripted_unclipping --cogs 1 --steps 2000
+uv run cogames play --mission evals.diagnostic_unclip_preseed -p ladybug --cogs 1 --steps 2000
 
 # Multi-agent unclipping
-uv run cogames play --mission evals.diagnostic_unclip_craft -p scripted_unclipping --cogs 2 --steps 2000
+uv run cogames play --mission evals.diagnostic_unclip_craft -p ladybug --cogs 2 --steps 2000
 
 # Note: For testing clipping variants on procedural maps, use training_facility or hello_world sites
 # Example with variants:
@@ -237,8 +246,8 @@ uv run cogames play --mission training_facility.harvest --variant clip_hub_stati
 uv run python packages/cogames/scripts/run_evaluation.py
 
 # Evaluate specific agent
-uv run python packages/cogames/scripts/run_evaluation.py --policy class=baseline
-uv run python packages/cogames/scripts/run_evaluation.py --policy class=ladybug
+uv run python packages/cogames/scripts/run_evaluation.py --policy baseline
+uv run python packages/cogames/scripts/run_evaluation.py --policy ladybug
 ```
 
 ## Evaluation Results
@@ -304,7 +313,7 @@ class MyPolicy:
 4. **Register in `__init__.py`**:
 
 ```python
-from cogames.policy.scripted_agent.my_agent import MyPolicy
+from cogames_agents.policy.scripted_agent.my_agent import MyPolicy
 
 __all__ = [..., "MyPolicy"]
 ```

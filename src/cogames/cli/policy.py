@@ -19,8 +19,8 @@ ParsedPolicies = list[PolicySpec]
 
 default_checkpoint_dir = Path("train_dir")
 
-policy_arg_example = "URI (bundle dir or .zip) or class=NAME[,data=FILE][,kw.x=val]"
-policy_arg_w_proportion_example = "URI[,proportion=N] or class=NAME[,data=FILE][,proportion=N]"
+policy_arg_example = "URI (bundle dir or .zip) or NAME or class=NAME[,data=FILE][,kw.x=val]"
+policy_arg_w_proportion_example = "URI[,proportion=N] or NAME or class=NAME[,data=FILE][,proportion=N]"
 
 
 class PolicySpecWithProportion(PolicySpec):
@@ -116,7 +116,7 @@ def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
     """Parse a policy CLI option into its components.
 
     Supports two formats:
-    - class=...[,data=...][,proportion=1.0][,kw.<key>=<value>]
+    - NAME (short name) or class=...[,data=...][,proportion=1.0][,kw.<key>=<value>]
     - URI: metta://policy/xxx[,proportion=1.0]
     """
     entries = [part.strip() for part in spec.split(",") if part.strip()]
@@ -167,6 +167,11 @@ def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
             proportion=fraction,
             init_kwargs=policy.init_kwargs,
         )
+
+    if "=" not in first:
+        if ":" in first:
+            raise ValueError("Policy shorthand cannot include ':'; use class=... or a supported URI instead.")
+        entries[0] = f"class={first}"
 
     class_path: str | None = None
     data_path: str | None = None

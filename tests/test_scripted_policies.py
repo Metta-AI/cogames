@@ -23,6 +23,7 @@ from mettagrid.policy.policy import PolicySpec
 from mettagrid.simulator import Simulator
 
 discover_and_register_policies("cogames.policy")
+discover_and_register_policies("cogames_agents.policy")
 
 
 @dataclass(frozen=True)
@@ -35,25 +36,31 @@ class PolicyUnderTest:
 @cache
 def _nim_bindings_available() -> bool:
     try:
-        import cogames.policy.nim_agents.agents as _  # noqa: F401
+        import cogames_agents.policy.nim_agents.agents as _  # noqa: F401
     except ModuleNotFoundError:
         return False
     return True
 
 
 POLICIES_UNDER_TEST: tuple[PolicyUnderTest, ...] = (
-    PolicyUnderTest("thinky", requires_nim=True, supports_supervisor=True),
-    PolicyUnderTest("nim_random", requires_nim=True, supports_supervisor=True),
-    PolicyUnderTest("race_car", requires_nim=True, supports_supervisor=True),
-    PolicyUnderTest("scripted_baseline"),
-    PolicyUnderTest("ladybug"),
     PolicyUnderTest(
-        "cogames.policy.nim_agents.agents.ThinkyAgentsMultiPolicy",
+        "cogames_agents.policy.nim_agents.agents.ThinkyAgentsMultiPolicy",
         requires_nim=True,
         supports_supervisor=True,
     ),
-    PolicyUnderTest("cogames.policy.scripted_agent.baseline_agent.BaselinePolicy"),
-    PolicyUnderTest("cogames.policy.scripted_agent.starter_agent.StarterPolicy"),
+    PolicyUnderTest(
+        "cogames_agents.policy.nim_agents.agents.RandomAgentsMultiPolicy",
+        requires_nim=True,
+        supports_supervisor=True,
+    ),
+    PolicyUnderTest(
+        "cogames_agents.policy.nim_agents.agents.RaceCarAgentsMultiPolicy",
+        requires_nim=True,
+        supports_supervisor=True,
+    ),
+    PolicyUnderTest("cogames_agents.policy.scripted_agent.baseline_agent.BaselinePolicy"),
+    PolicyUnderTest("cogames.policy.starter_agent.StarterPolicy"),
+    PolicyUnderTest("cogames_agents.policy.scripted_agent.unclipping_agent.UnclippingPolicy"),
 )
 
 SUPERVISOR_POLICIES: tuple[PolicyUnderTest, ...] = tuple(p for p in POLICIES_UNDER_TEST if p.supports_supervisor)
@@ -62,8 +69,11 @@ SUPERVISOR_POLICIES: tuple[PolicyUnderTest, ...] = tuple(p for p in POLICIES_UND
 def _policy_param(policy: PolicyUnderTest):  # -> pytest.ParameterSet
     marks = ()
     if policy.requires_nim and not _nim_bindings_available():
-        marks = pytest.mark.skip("Nim bindings missing. Run `nim c nim_agents.nim` to build them.")
-    policy_id = policy.reference.replace("cogames.policy.", "").replace(".", "_")
+        marks = pytest.mark.skip(
+            "Nim bindings missing. Run `nim c nim_agents.nim` in "
+            "packages/cogames-agents/src/cogames_agents/policy/nim_agents."
+        )
+    policy_id = policy.reference.replace("cogames.policy.", "").replace("cogames_agents.policy.", "").replace(".", "_")
     return pytest.param(policy, id=policy_id, marks=marks)
 
 

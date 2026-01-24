@@ -8,9 +8,9 @@ Supports:
 - Built-in scripted agents via --agent (legacy; `--agent all` runs all)
 
 Usage snippets:
-  uv run python packages/cogames/scripts/run_evaluation.py --policy class=ladybug
+  uv run python packages/cogames/scripts/run_evaluation.py --policy ladybug
   uv run python packages/cogames/scripts/run_evaluation.py \
-      --policy class=ladybug --experiments oxygen_bottleneck --cogs 1
+      --policy ladybug --experiments oxygen_bottleneck --cogs 1
   uv run python packages/cogames/scripts/run_evaluation.py \
       --policy s3://bucket/path/checkpoints/run:v5 --cogs 1
   uv run python packages/cogames/scripts/run_evaluation.py \
@@ -91,27 +91,27 @@ AGENT_CONFIGS: Dict[str, AgentConfig] = {
     "baseline": AgentConfig(
         key="baseline",
         label="Baseline",
-        policy_path="cogames.policy.scripted_agent.baseline_agent.BaselinePolicy",
+        policy_path="cogames_agents.policy.scripted_agent.baseline_agent.BaselinePolicy",
     ),
     "ladybug": AgentConfig(
         key="ladybug",
         label="Ladybug",
-        policy_path="cogames.policy.scripted_agent.unclipping_agent.UnclippingPolicy",
+        policy_path="cogames_agents.policy.scripted_agent.unclipping_agent.UnclippingPolicy",
     ),
     "thinky": AgentConfig(
         key="thinky",
         label="Thinky",
-        policy_path="cogames.policy.nim_agents.agents.ThinkyAgentsMultiPolicy",
+        policy_path="cogames_agents.policy.nim_agents.agents.ThinkyAgentsMultiPolicy",
     ),
     "racecar": AgentConfig(
         key="racecar",
         label="RaceCar",
-        policy_path="cogames.policy.nim_agents.agents.RaceCarAgentsMultiPolicy",
+        policy_path="cogames_agents.policy.nim_agents.agents.RaceCarAgentsMultiPolicy",
     ),
     "starter": AgentConfig(
         key="starter",
         label="Starter",
-        policy_path="cogames.policy.scripted_agent.starter_agent.StarterPolicy",
+        policy_path="cogames.policy.starter_agent.StarterPolicy",
     ),
 }
 
@@ -281,7 +281,7 @@ def _run_case(
 
 
 def _load_thinky_eval_cases() -> list[tuple[str, int]]:
-    from cogames.policy.nim_agents.thinky_eval import EVALS as THINKY_EVALS
+    from cogames_agents.policy.nim_agents.thinky_eval import EVALS as THINKY_EVALS
 
     return [(exp_name, num_cogs) for exp_name, _tag, num_cogs in THINKY_EVALS]
 
