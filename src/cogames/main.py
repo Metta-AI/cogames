@@ -390,7 +390,12 @@ def games_cmd(
         list_missions(site)
         return
 
-    resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(ctx, mission, variant, cogs)
+    try:
+        resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(ctx, mission, variant, cogs)
+    except typer.Exit as exc:
+        if exc.exit_code != 1:
+            raise
+        return
 
     if print_cvc_config or print_mg_config:
         try:

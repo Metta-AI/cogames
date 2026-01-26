@@ -153,13 +153,14 @@ def get_mission_name_and_config(
         try:
             return get_mission(mission_arg, variants_arg, cogs)
         except ValueError as e:
-            console.print(f"[yellow]{e}[/yellow]\n")
+            console.print(f"[red]Mission '{mission_arg}' not found.[/red]")
+            console.print("[dim]Run: cogames missions (or cogames missions <site>) to list options.[/dim]\n")
+            raise typer.Exit(1) from e
     list_missions()
 
-    if mission_arg is not None:
-        console.print("\n" + ctx.get_usage())
+    console.print("\n" + ctx.get_usage())
     console.print("\n")
-    raise typer.Exit(0)
+    raise typer.Exit(1)
 
 
 def get_mission_names_and_configs(
@@ -196,13 +197,14 @@ def get_mission_names_and_configs(
 
             return deduped
         except ValueError as e:
-            console.print(f"[yellow]{e}[/yellow]\n")
+            console.print(f"[red]{e}[/red]")
+            console.print("[dim]Run: cogames missions (or cogames missions <site>) to list options.[/dim]\n")
+            raise typer.Exit(1) from e
     list_missions()
 
-    if missions_arg is not None:
-        console.print("\n" + ctx.get_usage())
+    console.print("\n" + ctx.get_usage())
     console.print("\n")
-    raise typer.Exit(0)
+    raise typer.Exit(1)
 
 
 def _get_missions_by_possible_wildcard(
