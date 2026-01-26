@@ -47,11 +47,11 @@ POLICIES_UNDER_TEST: tuple[PolicyUnderTest, ...] = (
     PolicyUnderTest("nim_random", requires_nim=True, supports_supervisor=True),
     PolicyUnderTest("race_car", requires_nim=True, supports_supervisor=True),
     PolicyUnderTest("ladybug", requires_nim=True, supports_supervisor=True),
-    PolicyUnderTest("cogsguard", requires_nim=True, supports_supervisor=True),
+    PolicyUnderTest("role", requires_nim=True, supports_supervisor=True),
     PolicyUnderTest("teacher", requires_nim=True, supports_supervisor=True),
     PolicyUnderTest("baseline"),
     PolicyUnderTest("ladybug_py"),
-    PolicyUnderTest("cogsguard_py"),
+    PolicyUnderTest("role_py"),
     PolicyUnderTest("starter"),
     PolicyUnderTest(
         "cogames_agents.policy.nim_agents.agents.ThinkyAgentsMultiPolicy",
