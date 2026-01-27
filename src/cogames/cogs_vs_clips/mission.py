@@ -308,14 +308,14 @@ class CogsGuardMission(Config):
 
     # Clips Behavior - scramble cogs junctions to neutral
     # Note: must start after initial_clips fires at timestep 10 (events fire alphabetically)
-    clips_scramble_start: int = Field(default=11)
-    clips_scramble_interval: int = Field(default=100)
-    clips_scramble_radius: int = Field(default=10)
+    clips_scramble_start: int = Field(default=100)
+    clips_scramble_interval: int = Field(default=300)
+    clips_scramble_radius: int = Field(default=25)
 
     # Clips Behavior - align neutral junctions to clips
-    clips_align_start: int = Field(default=2000)
-    clips_align_interval: int = Field(default=100)
-    clips_align_radius: int = Field(default=10)
+    clips_align_start: int = Field(default=300)
+    clips_align_interval: int = Field(default=300)
+    clips_align_radius: int = Field(default=25)
 
     # Station configs
     wall: CvCWallConfig = Field(default_factory=CvCWallConfig)
@@ -360,7 +360,7 @@ class CogsGuardMission(Config):
                 update={
                     "rewards": AgentRewards(
                         collective_stats={
-                            "aligned.junction.held": 1.0 / self.max_steps,
+                            "aligned.junction.held": 1.0 / self.max_steps / num_cogs,
                         },
                     ),
                 }
@@ -414,7 +414,6 @@ class CogsGuardMission(Config):
                     ],
                     mutations=[alignTo(None)],
                     max_targets=1,
-                    fallback="initial_clips",
                 ),
                 "neutral_to_clips": EventConfig(
                     name="neutral_to_clips",
@@ -431,6 +430,22 @@ class CogsGuardMission(Config):
                     mutations=[alignTo("clips")],
                     max_targets=1,
                     fallback="cogs_to_neutral",
+                ),
+                # If the Clips can't find any junctions near them, align a random junction
+                "presence_check": EventConfig(
+                    name="presence_check",
+                    target_tag=typeTag("junction"),
+                    timesteps=periodic(
+                        start=self.clips_scramble_start,
+                        period=self.clips_scramble_interval,
+                        end=self.max_steps,
+                    ),
+                    filters=[
+                        isNear(typeTag("junction"), [isAlignedTo("clips")], radius=self.clips_scramble_radius),
+                    ],
+                    mutations=[],
+                    max_targets=1,
+                    fallback="initial_clips",
                 ),
             },
         )
