@@ -116,6 +116,7 @@ def _run_pure_episode(
     max_action_time_ms: int,
     device: Optional[str],
     render_mode: RenderMode,
+    autostart: bool,
     capture_replay: bool,
     trace_path: Optional[Path] = None,
 ) -> tuple[PureSingleEpisodeResult, Optional[EpisodeReplay]]:
@@ -141,6 +142,7 @@ def _run_pure_episode(
         agent_policies,
         max_action_time_ms=max_action_time_ms,
         render_mode=render_mode,
+        autostart=autostart,
         seed=seed,
         event_handlers=[replay_writer] if replay_writer is not None else None,
         tracer=tracer,
@@ -175,6 +177,7 @@ def run_single_episode(
     max_action_time_ms: int = 10000,
     device: Optional[str] = None,
     render_mode: Optional[RenderMode] = None,
+    autostart: bool = False,
     allow_network: bool = True,
 ) -> tuple[PureSingleEpisodeResult, Optional[EpisodeReplay]]:
     _validate_assignments(assignments, env.game.num_agents, len(policy_specs))
@@ -202,6 +205,7 @@ def run_single_episode(
             max_action_time_ms=max_action_time_ms,
             device=device,
             render_mode=render_mode or "none",
+            autostart=autostart,
             capture_replay=replay_uri is not None,
             trace_path=trace_path,
         )
