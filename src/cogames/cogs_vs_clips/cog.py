@@ -17,7 +17,7 @@ class CogConfig(Config):
     gear_limit: int = Field(default=1)
     hp_limit: int = Field(default=100)
     heart_limit: int = Field(default=10)
-    energy_limit: int = Field(default=10)
+    energy_limit: int = Field(default=20)
     cargo_limit: int = Field(default=4)
     influence_limit: int = Field(default=0)
 
