@@ -27,7 +27,6 @@ def test_make_cogs_vs_clips_scenario():
     # # Check objects configuration
     # assert config.game.objects is not None
     # assert "wall" in config.game.objects
-    # assert config.game.objects["wall"].type_id == 1
 
     # # Check map builder configuration
     # assert config.game.map_builder is not None
