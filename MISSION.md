@@ -1,3 +1,6 @@
+<!-- TODO (cogsguard migration): Update this document to describe CogsGuard game mechanics -->
+<!-- This document describes the legacy Escape from Machina game. CogsGuard has different mechanics. -->
+
 # MISSION BRIEFING: Machina VII Deployment
 
 ## Holon Enabled Agent Replication Templates (HEART) Infrastructure Team

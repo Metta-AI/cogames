@@ -290,6 +290,7 @@ class CogsGuardMission(Config):
     description: str
     site: Site
     num_cogs: int | None = None
+    variants: list[MissionVariant] = Field(default_factory=list)
 
     # Game parameters
     max_steps: int = Field(default=1000)
@@ -321,6 +322,12 @@ class CogsGuardMission(Config):
 
     def full_name(self) -> str:
         return f"{self.site.name}{MAP_MISSION_DELIMITER}{self.name}"
+
+    def with_variants(self, variants: list[MissionVariant]) -> CogsGuardMission:
+        """Apply variants to the mission. Currently a no-op for CogsGuard."""
+        if variants:
+            raise NotImplementedError("CogsGuard missions do not support variants yet")
+        return self
 
     def make_env(self) -> MettaGridConfig:
         """Create a MettaGridConfig from this mission."""
@@ -433,3 +440,6 @@ class CogsGuardMission(Config):
         env.label = self.full_name()
 
         return env
+
+
+AnyMission = Mission | CogsGuardMission

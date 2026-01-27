@@ -136,6 +136,7 @@ app.add_typer(docsync.app, name="docsync", hidden=True)
 def tutorial_cmd(
     ctx: typer.Context,
 ) -> None:
+    # TODO (cogsguard migration): Update tutorial to use CogsGuard game mechanics and missions
     """Run the CoGames tutorial."""
     # Suppress logs during tutorial to keep instructions visible
     logging.getLogger().setLevel(logging.ERROR)
@@ -298,7 +299,7 @@ This command has three modes:
 
 [bold]1. List sites:[/bold] Run with no arguments to see all available sites.
 
-[bold]2. List missions at a site:[/bold] Pass a site name (e.g., 'training_facility') to see its missions.
+[bold]2. List missions at a site:[/bold] Pass a site name (e.g., 'cogsguard_arena') to see its missions.
 
 [bold]3. Describe a mission:[/bold] Use -m to describe a specific mission. Only in this mode do \
 --cogs, --variant, --format, and --save have any effect.""",
@@ -307,9 +308,9 @@ This command has three modes:
 
   [cyan]cogames missions[/cyan]                                    List all sites
 
-  [cyan]cogames missions training_facility[/cyan]                  List missions at site
+  [cyan]cogames missions cogsguard_arena[/cyan]                     List missions at site
 
-  [cyan]cogames missions -m hello_world.open_world[/cyan]          Describe a mission
+  [cyan]cogames missions -m cogsguard_arena.basic[/cyan]           Describe a mission
 
   [cyan]cogames missions -m arena --format json[/cyan]             Output as JSON""",
     add_help_option=False,
@@ -322,7 +323,7 @@ def games_cmd(
     site: Optional[str] = typer.Argument(
         None,
         metavar="SITE",
-        help="Filter by site (e.g., training_facility)",
+        help="Filter by site (e.g., cogsguard_arena)",
     ),
     # --- Describe (requires -m) ---
     mission: Optional[str] = typer.Option(
@@ -505,13 +506,13 @@ Log mode is non-interactive and doesn't support manual control.
 """,
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames play -m training_facility.harvest[/cyan]                    Interactive
+[cyan]cogames play -m cogsguard_arena.basic[/cyan]                        Interactive
 
-[cyan]cogames play -m training_facility.harvest -p class=random[/cyan]    Random policy
+[cyan]cogames play -m cogsguard_arena.basic -p class=random[/cyan]        Random policy
 
-[cyan]cogames play -m machina_1.open_world -c 4 -p class=baseline[/cyan]  Baseline, 4 cogs
+[cyan]cogames play -m cogsguard_arena.basic -c 4 -p class=baseline[/cyan] Baseline, 4 cogs
 
-[cyan]cogames play -m hello_world -r unicode[/cyan]                       Terminal mode""",
+[cyan]cogames play -m cogsguard_arena -r unicode[/cyan]                   Terminal mode""",
     add_help_option=False,
 )
 def play_cmd(
@@ -806,6 +807,7 @@ def make_mission(
         raise typer.Exit(1) from exc
 
 
+# TODO (cogsguard migration): Verify make-policy templates work with CogsGuard game mechanics
 @tutorial_app.command(
     name="make-policy",
     help="Create a new policy from a template. Requires --trainable or --scripted.",
@@ -882,13 +884,12 @@ def make_policy(
 
         if trainable:
             console.print(
-                "[dim]Train with: cogames tutorial train -m training_facility.harvest -p class="
+                "[dim]Train with: cogames tutorial train -m cogsguard_arena.basic -p class="
                 f"{dest_path.stem}.{policy_class}[/dim]"
             )
         else:
             console.print(
-                "[dim]Play with: cogames play -m training_facility.harvest -p class="
-                f"{dest_path.stem}.{policy_class}[/dim]"
+                f"[dim]Play with: cogames play -m cogsguard_arena.basic -p class={dest_path.stem}.{policy_class}[/dim]"
             )
 
     except Exception as exc:  # pragma: no cover - user input
@@ -915,9 +916,9 @@ Use wildcards (*) in mission names to match multiple missions at once.""",
     rich_help_panel="Tutorial",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames tutorial train -m training_facility.harvest[/cyan]              Basic training
+[cyan]cogames tutorial train -m cogsguard_arena.basic[/cyan]                   Basic training
 
-[cyan]cogames tutorial train -m training_facility.harvest -p class=baseline[/cyan]
+[cyan]cogames tutorial train -m cogsguard_arena.basic -p class=baseline[/cyan]
                                                                  Train baseline policy
 
 [cyan]cogames tutorial train -p ./train_dir/my_run:v5[/cyan]                  Continue from checkpoint
@@ -1131,15 +1132,15 @@ With one policy, this command is equivalent to `cogames scrimmage`.
     rich_help_panel="Evaluate",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames run -m training_facility.harvest -p lstm[/cyan]            Evaluate single policy
+[cyan]cogames run -m cogsguard_arena.basic -p lstm[/cyan]               Evaluate single policy
 
-[cyan]cogames run -m machina_1 -p ./train_dir/my_run:v5[/cyan]           Evaluate a checkpoint bundle
+[cyan]cogames run -m cogsguard_arena -p ./train_dir/my_run:v5[/cyan]     Evaluate a checkpoint bundle
 
 [cyan]cogames run -S integrated_evals -p ./train_dir/my_run:v5[/cyan]    Evaluate on mission set
 
 [cyan]cogames run -m 'arena.*' -p lstm -p random -e 20[/cyan]            Evaluate multiple policies together
 
-[cyan]cogames run -m machina_1 -p ./train_dir/my_run:v5,proportion=3 -p class=random,proportion=5[/cyan]
+[cyan]cogames run -m cogsguard_arena -p ./train_dir/my_run:v5,proportion=3 -p class=random,proportion=5[/cyan]
                                                              Evaluate policies in 3:5 mix""",
     add_help_option=False,
 )
@@ -1340,7 +1341,7 @@ def pickup_cmd(
     ctx: typer.Context,
     # --- Mission ---
     mission: str = typer.Option(
-        "machina_1.open_world",
+        "cogsguard_arena.basic",
         "--mission",
         "-m",
         metavar="MISSION",
@@ -1605,7 +1606,7 @@ app.command(
 
 [cyan]cogames submissions[/cyan]                         All your uploads
 
-[cyan]cogames submissions --season beta[/cyan]           Submissions in a season
+[cyan]cogames submissions --season beta-cogsguard[/cyan]           Submissions in a season
 
 [cyan]cogames submissions -p my-policy[/cyan]            Info on a specific policy""",
     add_help_option=False,
@@ -1624,7 +1625,7 @@ app.command(
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames leaderboard --season beta[/cyan]           View rankings""",
+[cyan]cogames leaderboard --season beta-cogsguard[/cyan]           View rankings""",
     add_help_option=False,
 )(leaderboard_cmd)
 
@@ -1753,6 +1754,13 @@ def validate_policy_cmd(
         help="Path to a Python setup script to run before loading the policy",
         rich_help_panel="Policy",
     ),
+    season: str = typer.Option(
+        "beta-cogsguard",
+        "--season",
+        metavar="SEASON",
+        help="Tournament season (determines which game to validate against)",
+        rich_help_panel="Tournament",
+    ),
     _help: bool = typer.Option(
         False,
         "--help",
@@ -1786,7 +1794,7 @@ def validate_policy_cmd(
         console.print("[green]Setup script completed[/green]")
 
     policy_spec = get_policy_spec(ctx, policy)
-    validate_policy_spec(policy_spec)
+    validate_policy_spec(policy_spec, season)
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
 
@@ -1857,6 +1865,13 @@ def upload_cmd(
         rich_help_panel="Files",
     ),
     # --- Validation ---
+    season: str = typer.Option(
+        "beta-cogsguard",
+        "--season",
+        metavar="SEASON",
+        help="Tournament season (determines which game to validate against)",
+        rich_help_panel="Validation",
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -1912,6 +1927,7 @@ def upload_cmd(
         skip_validation=skip_validation,
         init_kwargs=init_kwargs if init_kwargs else None,
         setup_script=setup_script,
+        season=season,
     )
 
     if result:
@@ -1925,9 +1941,9 @@ def upload_cmd(
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames submit my-policy --season beta[/cyan]          Submit latest version
+[cyan]cogames submit my-policy --season beta-cogsguard[/cyan]          Submit latest version
 
-[cyan]cogames submit my-policy:v3 --season beta[/cyan]       Submit specific version""",
+[cyan]cogames submit my-policy:v3 --season beta-cogsguard[/cyan]       Submit specific version""",
     add_help_option=False,
 )
 def submit_cmd(
@@ -1937,7 +1953,7 @@ def submit_cmd(
         help="Policy name (e.g., 'my-policy' or 'my-policy:v3' for specific version)",
     ),
     season: str = typer.Option(
-        ...,
+        "beta-cogsguard",
         "--season",
         metavar="SEASON",
         help="Tournament season name",
