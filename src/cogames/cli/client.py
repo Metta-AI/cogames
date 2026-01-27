@@ -147,8 +147,12 @@ class TournamentServerClient:
     def get_seasons(self) -> list[SeasonInfo]:
         return self._get("/tournament/seasons", list[SeasonInfo])
 
-    def get_leaderboard(self, season_name: str) -> list[LeaderboardEntry]:
-        return self._get(f"/tournament/seasons/{season_name}/leaderboard", list[LeaderboardEntry])
+    def get_leaderboard(self, season_name: str, include_hidden_seasons: bool = False) -> list[LeaderboardEntry]:
+        return self._get(
+            f"/tournament/seasons/{season_name}/leaderboard",
+            list[LeaderboardEntry],
+            params={"include_hidden": "true"} if include_hidden_seasons else None,
+        )
 
     def get_my_policy_versions(
         self,
@@ -182,11 +186,19 @@ class TournamentServerClient:
             json={"policy_version_id": str(policy_version_id)},
         )
 
-    def get_season_policies(self, season_name: str, mine: bool = False) -> list[SeasonPolicyEntry]:
+    def get_season_policies(
+        self, season_name: str, mine: bool = False, include_hidden_seasons: bool = False
+    ) -> list[SeasonPolicyEntry]:
+        params: dict[str, str] = {}
+        if mine:
+            params["mine"] = "true"
+        if include_hidden_seasons:
+            params["include_hidden"] = "true"
+
         return self._get(
             f"/tournament/seasons/{season_name}/policies",
             list[SeasonPolicyEntry],
-            params={"mine": "true"} if mine else None,
+            params=params if params else None,
         )
 
     def get_presigned_upload_url(self) -> dict[str, Any]:

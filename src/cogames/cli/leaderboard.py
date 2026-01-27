@@ -187,7 +187,7 @@ def _show_season_submissions(
 ) -> None:
     """Show submissions for a specific season."""
     try:
-        entries = client.get_season_policies(season, mine=True)
+        entries = client.get_season_policies(season, mine=True, include_hidden_seasons=True)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
             console.print(f"[red]Season '{season}' not found[/red]")
@@ -282,7 +282,7 @@ def leaderboard_cmd(
 
     try:
         with client:
-            entries = client.get_leaderboard(season)
+            entries = client.get_leaderboard(season, include_hidden_seasons=True)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
             console.print(f"[red]Season '{season}' not found[/red]")
