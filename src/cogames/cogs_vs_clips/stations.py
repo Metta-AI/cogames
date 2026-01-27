@@ -5,7 +5,7 @@ from pydantic import Field
 from mettagrid.base_config import Config
 from mettagrid.config import vibes
 from mettagrid.config.handler_config import (
-    AOEEffectConfig,
+    AOEConfig,
     ClearInventoryMutation,
     EntityTarget,
     Handler,
@@ -20,6 +20,7 @@ from mettagrid.config.handler_config import (
     removeAlignment,
     targetCollectiveHas,
     updateActor,
+    updateTarget,
     updateTargetCollective,
     withdraw,
 )
@@ -317,12 +318,18 @@ class JunctionConfig(CvCStationConfig):
             map_name=self.map_name,
             render_symbol="📦",
             collective=self.team,
-            aoes=[
-                AOEEffectConfig(
-                    range=self.aoe_range, resource_deltas=self.influence_deltas, filters=[isAlignedToActor()]
+            aoes={
+                "influence": AOEConfig(
+                    radius=self.aoe_range,
+                    filters=[isAlignedToActor()],
+                    mutations=[updateTarget(self.influence_deltas)],
                 ),
-                AOEEffectConfig(range=self.aoe_range, resource_deltas=self.attack_deltas, filters=[isEnemy()]),
-            ],
+                "attack": AOEConfig(
+                    radius=self.aoe_range,
+                    filters=[isEnemy()],
+                    mutations=[updateTarget(self.attack_deltas)],
+                ),
+            },
             on_use_handlers={
                 "deposit": Handler(
                     filters=[isAlignedToActor()],
@@ -349,12 +356,18 @@ class HubConfig(JunctionConfig):
             map_name=self.map_name,
             render_symbol="📦",
             collective=self.team,
-            aoes=[
-                AOEEffectConfig(
-                    range=self.aoe_range, resource_deltas=self.influence_deltas, filters=[isAlignedToActor()]
+            aoes={
+                "influence": AOEConfig(
+                    radius=self.aoe_range,
+                    filters=[isAlignedToActor()],
+                    mutations=[updateTarget(self.influence_deltas)],
                 ),
-                AOEEffectConfig(range=self.aoe_range, resource_deltas=self.attack_deltas, filters=[isEnemy()]),
-            ],
+                "attack": AOEConfig(
+                    radius=self.aoe_range,
+                    filters=[isEnemy()],
+                    mutations=[updateTarget(self.attack_deltas)],
+                ),
+            },
             on_use_handlers={
                 "deposit": Handler(
                     filters=[isAlignedToActor()],
