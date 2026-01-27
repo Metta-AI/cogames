@@ -131,7 +131,7 @@
 # 4. Submit the policy to one of the running seasons.
 #
 #     ```bash
-#     cogames submit "$USER.README-quickstart-starter-policy:v1" --season beta
+#     cogames submit "$USER.README-quickstart-starter-policy:v1" --season beta-cogsguard
 #     ```
 
 # %% [markdown]
@@ -147,6 +147,9 @@
 
 # %% [markdown]
 # # About the game
+#
+# <!-- TODO (cogsguard migration): Update this section to describe CogsGuard game mechanics -->
+# <!-- This section describes the legacy Escape from Machina game. CogsGuard has different mechanics. -->
 #
 # Cogs vs Clips is a cooperative production-and-survival game. Teams of AI agents ("Cogs") work together on the
 # to produce and protect hearts by:
@@ -211,7 +214,7 @@
 # To check your submission status and match results:
 # ```bash
 # cogames submissions
-# cogames leaderboard --season beta
+# cogames leaderboard --season beta-cogsguard
 # ```
 
 # %% [markdown]

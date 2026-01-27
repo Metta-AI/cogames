@@ -8,7 +8,14 @@ from rich import box
 from rich.table import Table
 
 from cogames.cli.base import console
-from cogames.cogs_vs_clips.mission import MAP_MISSION_DELIMITER, Mission, MissionVariant, NumCogsVariant, Site
+from cogames.cogs_vs_clips.mission import (
+    MAP_MISSION_DELIMITER,
+    AnyMission,
+    Mission,
+    MissionVariant,
+    NumCogsVariant,
+    Site,
+)
 from cogames.cogs_vs_clips.procedural import MachinaArena
 from cogames.cogs_vs_clips.sites import SITES
 from cogames.cogs_vs_clips.variants import HIDDEN_VARIANTS, VARIANTS
@@ -19,10 +26,17 @@ from mettagrid.mapgen.mapgen import MapGen
 
 
 @lru_cache(maxsize=1)
-def _get_core_missions() -> list[Mission]:
+def _get_core_missions() -> list[AnyMission]:
     from cogames.cogs_vs_clips.missions import get_core_missions
 
     return get_core_missions()
+
+
+@lru_cache(maxsize=1)
+def _get_legacy_missions() -> list[Mission]:
+    from cogames.cogs_vs_clips.missions import get_legacy_missions
+
+    return get_legacy_missions()
 
 
 @lru_cache(maxsize=1)
@@ -38,7 +52,7 @@ def _get_eval_missions_all() -> list[Mission]:
     return missions
 
 
-def load_mission_set(mission_set: str) -> list[Mission]:
+def load_mission_set(mission_set: str) -> list[AnyMission]:
     """Load a predefined set of evaluation missions.
 
     Args:
@@ -54,6 +68,7 @@ def load_mission_set(mission_set: str) -> list[Mission]:
     Raises:
         ValueError: If mission_set name is unknown
     """
+    missions_list: list[AnyMission]
     if mission_set == "all":
         # All missions: eval missions + integrated + spanning + diagnostic + core missions
         missions_list = list(_get_eval_missions_all())
@@ -67,7 +82,7 @@ def load_mission_set(mission_set: str) -> list[Mission]:
     elif mission_set == "diagnostic_evals":
         from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
 
-        missions_list: list[Mission] = [mission_cls() for mission_cls in DIAGNOSTIC_EVALS]  # type: ignore[call-arg]
+        missions_list = [mission_cls() for mission_cls in DIAGNOSTIC_EVALS]  # type: ignore[call-arg]
     elif mission_set == "integrated_evals":
         from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS
 
@@ -145,7 +160,7 @@ def get_site_by_name(site_name: str) -> Site:
 
 def get_mission_name_and_config(
     ctx: typer.Context, mission_arg: Optional[str], variants_arg: Optional[list[str]] = None, cogs: Optional[int] = None
-) -> tuple[str, MettaGridConfig, Optional[Mission]]:
+) -> tuple[str, MettaGridConfig, Optional[AnyMission]]:
     if not mission_arg:
         console.print(ctx.get_help())
         console.print("[yellow]Missing: --mission / -m[/yellow]\n")
@@ -231,10 +246,13 @@ def find_mission(
     mission_name: str | None = None,  # None means first mission on the site
     *,
     include_evals: bool = False,
-) -> Mission:
-    missions = _get_core_missions()
+    include_legacy: bool = False,
+) -> AnyMission:
+    missions: list[AnyMission] = list(_get_core_missions())
     if include_evals:
         missions = [*missions, *_get_eval_missions_all()]
+    if include_legacy:
+        missions = [*missions, *_get_legacy_missions()]
 
     found_site = False
     for mission in missions:
@@ -260,14 +278,18 @@ def find_mission(
 
 
 def get_mission(
-    mission_arg: str, variants_arg: Optional[list[str]] = None, cogs: Optional[int] = None
-) -> tuple[str, MettaGridConfig, Optional[Mission]]:
+    mission_arg: str,
+    variants_arg: Optional[list[str]] = None,
+    cogs: Optional[int] = None,
+    include_legacy: bool = False,
+) -> tuple[str, MettaGridConfig, Optional[AnyMission]]:
     """Get a specific mission configuration by name or file path.
 
     Args:
         mission_arg: Name of the map or path to config file (.yaml, .json, or .py)
         variants_arg: List of variant names like ["solar_flare", "dark_side"]
         cogs: Number of cogs (agents) to use, overrides the default from the mission
+        include_legacy: Whether to include legacy (pre-CogsGuard) missions
 
     Returns:
         Tuple of (mission name, MettaGridConfig, Mission or None)
@@ -302,12 +324,25 @@ def get_mission(
     else:
         site_name, mission_name = mission_arg.split(MAP_MISSION_DELIMITER)
 
-    mission = find_mission(site_name, mission_name, include_evals=True)
-    # Apply variants
-    mission = mission.with_variants(variants)
+    mission: AnyMission = find_mission(site_name, mission_name, include_evals=True, include_legacy=include_legacy)
 
-    if cogs is not None:
-        mission = mission.with_variants([NumCogsVariant(num_cogs=cogs)])
+    # Apply variants only if the mission supports them (Mission has with_variants, CogsGuardMission doesn't)
+    if isinstance(mission, Mission):
+        if variants:
+            mission = mission.with_variants(variants)
+        if cogs is not None:
+            mission = mission.with_variants([NumCogsVariant(num_cogs=cogs)])
+    else:
+        if variants:
+            console.print(f"[yellow]Warning: Variants not supported for {mission.site.name} missions[/yellow]")
+        if cogs is not None:
+            if cogs < mission.site.min_cogs or cogs > mission.site.max_cogs:
+                raise ValueError(
+                    f"Invalid number of cogs for {mission.site.name}: {cogs}. "
+                    f"Must be between {mission.site.min_cogs} and {mission.site.max_cogs}"
+                )
+            mission = mission.model_copy(deep=True)
+            mission.num_cogs = cogs
 
     return (
         mission.full_name(),
@@ -405,22 +440,17 @@ def list_missions(site_filter: Optional[str] = None) -> None:
     console.print(table)
 
     console.print("\nTo set [bold blue]-m[/bold blue]:")
-    console.print("  • Use [blue]<site>.<mission>[/blue] (e.g., training_facility.harvest)")
+    console.print("  • Use [blue]<site>.<mission>[/blue] (e.g., cogsguard_arena.basic)")
     console.print("  • Or pass a mission config file path")
-    console.print("  • List a site's missions: [blue]cogames missions training_facility[/blue]")
-    console.print("\nVariants:")
-    console.print("  • Repeat [yellow]--variant <name>[/yellow] (e.g., --variant solar_flare)")
+    console.print("  • List a site's missions: [blue]cogames missions cogsguard_arena[/blue]")
     console.print("\nCogs:")
     console.print("  • [green]--cogs N[/green] or [green]-c N[/green]")
     console.print("\n[bold green]Examples:[/bold green]")
     console.print("  cogames missions")
-    console.print("  cogames missions training_facility")
-    console.print("  cogames play --mission [blue]training_facility.harvest[/blue]")
-    console.print(
-        "  cogames play --mission [blue]machina_1.open_world[/blue] "
-        "--variant [yellow]solar_flare[/yellow] --variant [yellow]rough_terrain[/yellow] --cogs [green]8[/green]"
-    )
-    console.print("  cogames train --mission [blue]<site>.<mission>[/blue] --cogs [green]4[/green]")
+    console.print("  cogames missions cogsguard_arena")
+    console.print("  cogames play --mission [blue]cogsguard_arena.basic[/blue]")
+    console.print("  cogames play --mission [blue]cogsguard_arena.basic[/blue] --cogs [green]8[/green]")
+    console.print("  cogames train --mission [blue]cogsguard_arena.basic[/blue] --cogs [green]4[/green]")
 
 
 def list_evals() -> None:
@@ -483,7 +513,7 @@ def list_evals() -> None:
     console.print("  [bold]cogames play[/bold] --mission [blue]evals.divide_and_conquer[/blue]")
 
 
-def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cfg: Mission | None = None) -> None:
+def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cfg: AnyMission | None = None) -> None:
     """Print detailed information about a specific mission.
 
     Args:
@@ -499,8 +529,8 @@ def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cf
         console.print("[bold]Description:[/bold]")
         console.print(f"  {mission_cfg.description}\n")
 
-        # Variants applied
-        if mission_cfg.variants:
+        # Variants applied (only Mission type has variants, CogsGuardMission doesn't)
+        if isinstance(mission_cfg, Mission) and mission_cfg.variants:
             console.print("[bold]Variants Applied:[/bold]")
             for v in mission_cfg.variants:
                 desc = f" - {v.description}" if getattr(v, "description", "") else ""

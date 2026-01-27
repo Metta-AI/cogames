@@ -1,5 +1,22 @@
 # Changelog
 
+## Jan 26, 2026
+
+**CogsGuard is the New Default Game**
+
+- `cogames missions` now shows CogsGuard (`cogsguard_arena`) as the default and only visible game
+- Legacy missions (training_facility, hello_world, machina_1) are hidden from the CLI but remain available for internal
+  use
+- Default season changed to `beta-cogsguard`
+
+**Season-Aware Policy Validation**
+
+- `cogames upload` and `cogames validate-policy` now accept `--season` to validate against the correct game for that
+  season
+- Validation uses the game appropriate for the target season (e.g., `beta` season validates against
+  `training_facility.harvest`, `beta-cogsguard` validates against `cogsguard_arena.basic`)
+- This ensures policies are validated against the same game they'll compete in
+
 ## Jan 23, 2026
 
 **CLI Flag Updates**

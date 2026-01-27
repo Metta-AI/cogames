@@ -52,13 +52,13 @@
 # Checkpoint bundles are written under `./train_dir/<run>/checkpoints/<run>:vX`.
 #
 # ```bash
-# cogames tutorial train -m training_facility.harvest -p class=lstm --steps 2000
+# cogames tutorial train -m cogsguard_arena.basic -p class=lstm --steps 2000
 # ```
 
 # %% [markdown]
 # Expected terminal output (example):
 # ```
-# Training on mission: training_facility.harvest
+# Training on mission: cogsguard_arena.basic
 # ...progress logs...
 # Training complete. Checkpoints saved to: ./train_dir
 # Checkpoint saved to: ./train_dir/<run_id>/model_000001.pt
@@ -92,14 +92,14 @@
 # %% [markdown]
 # Then run:
 # ```bash
-# cogames tutorial train -m training_facility.harvest -p class=my_trainable_policy.MyTrainablePolicy --steps 2000
+# cogames tutorial train -m cogsguard_arena.basic -p class=my_trainable_policy.MyTrainablePolicy --steps 2000
 # ````
 
 
 # %% [markdown]
 # Expected terminal output (example):
 # ```
-# Training on mission: training_facility.harvest
+# Training on mission: cogsguard_arena.basic
 # ...progress logs...
 # Training complete. Checkpoints saved to: ./train_dir
 # Final checkpoint: train_dir/<run>/checkpoints/<run>:vX
@@ -111,9 +111,9 @@
 # %% [markdown]
 # ## What to do next
 # - Play using the saved checkpoint bundle:
-#   `cogames play -m training_facility.harvest -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
+#   `cogames play -m cogsguard_arena.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
 # - Evaluate using the same bundle:
-#   `cogames eval -m training_facility.harvest -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
+#   `cogames eval -m cogsguard_arena.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
 #
 # Note: tutorial train writes `model_*.pt` under `./train_dir/<run_id>/`. Use `class=...` + `data=...` to run it.
 #

@@ -1,8 +1,14 @@
 from functools import lru_cache
 
-from cogames.cogs_vs_clips.mission import CogsGuardMission, Mission
+from cogames.cogs_vs_clips.mission import AnyMission, CogsGuardMission, Mission
 from cogames.cogs_vs_clips.mission_utils import get_map
-from cogames.cogs_vs_clips.sites import HELLO_WORLD, MACHINA_1, TRAINING_FACILITY, make_cogsguard_arena_site
+from cogames.cogs_vs_clips.sites import (
+    COGSGUARD_ARENA,
+    HELLO_WORLD,
+    MACHINA_1,
+    TRAINING_FACILITY,
+    make_cogsguard_arena_site,
+)
 from cogames.cogs_vs_clips.variants import (
     AssemblerDrawsFromChestsVariant,
     BalancedCornersVariant,
@@ -127,7 +133,21 @@ def make_cogsguard_mission(num_agents: int = 10, max_steps: int = 10000) -> Cogs
     )
 
 
-_CORE_MISSIONS: list[Mission] = [
+CogsGuardBasicMission = CogsGuardMission(
+    name="basic",
+    description="CogsGuard arena - compete to control junctions with gear abilities.",
+    site=COGSGUARD_ARENA,
+    num_cogs=10,
+    max_steps=1000,
+)
+
+
+# Feature flag: Set to True to include legacy (pre-CogsGuard) missions in the CLI.
+# This controls whether old missions like machina_1.open_world, training_facility.harvest, etc.
+# are visible in `cogames missions` and available for play/train commands.
+_INCLUDE_LEGACY_MISSIONS = False
+
+_LEGACY_MISSIONS: list[Mission] = [
     HarvestMission,
     VibeCheckMission,
     RepairMission,
@@ -140,9 +160,23 @@ _CORE_MISSIONS: list[Mission] = [
     Machina1OpenWorldSharedRewardsMission,
 ]
 
+_CORE_MISSIONS: list[AnyMission] = [
+    CogsGuardBasicMission,
+    *(_LEGACY_MISSIONS if _INCLUDE_LEGACY_MISSIONS else []),
+]
 
-def get_core_missions() -> list[Mission]:
+
+def get_core_missions() -> list[AnyMission]:
     return list(_CORE_MISSIONS)
+
+
+def get_legacy_missions() -> list[Mission]:
+    """Get legacy (pre-CogsGuard) missions for backward compatibility.
+
+    These missions are hidden from the CLI but can still be used by recipes
+    and internal tooling that reference them explicitly.
+    """
+    return list(_LEGACY_MISSIONS)
 
 
 def _build_eval_missions() -> list[Mission]:
@@ -156,11 +190,11 @@ def _build_eval_missions() -> list[Mission]:
 
 
 @lru_cache(maxsize=1)
-def get_missions() -> list[Mission]:
+def get_missions() -> list[AnyMission]:
     return [*_CORE_MISSIONS, *_build_eval_missions()]
 
 
-def __getattr__(name: str) -> list[Mission]:
+def __getattr__(name: str) -> list[AnyMission]:
     if name == "MISSIONS":
         missions = get_missions()
         globals()["MISSIONS"] = missions

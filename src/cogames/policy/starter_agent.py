@@ -1,6 +1,10 @@
 """
 Sample Policy for the Cogames environment.
 
+TODO (cogsguard migration): Update this starter policy to work with CogsGuard game mechanics.
+This policy is designed for the legacy Escape from Machina game (carbon extractors, chests).
+CogsGuard has different mechanics (junctions, gears, stations).
+
 Helps a Cog move carbon from an extractor to a chest.
 
 Note to users of this policy:

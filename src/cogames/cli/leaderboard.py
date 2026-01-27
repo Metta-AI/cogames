@@ -239,7 +239,7 @@ def _show_season_submissions(
 
 def leaderboard_cmd(
     season: str = typer.Option(
-        ...,
+        "beta-cogsguard",
         "--season",
         metavar="SEASON",
         help="Tournament season name",

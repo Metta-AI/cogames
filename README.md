@@ -109,7 +109,7 @@ The game will open in a new window, and the terminal will give you instructions 
 4. Submit the policy to one of the running seasons.
 
     ```bash
-    cogames submit "$USER.README-quickstart-starter-policy:v1" --season beta
+    cogames submit "$USER.README-quickstart-starter-policy:v1" --season beta-cogsguard
     ```
 
 # Tutorials
@@ -124,6 +124,9 @@ If you want help, or to share your experience, join [the Discord](https://discor
 
 # About the game
 
+<!-- TODO (cogsguard migration): Update this section to describe CogsGuard game mechanics -->
+<!-- This section describes the legacy Escape from Machina game. CogsGuard has different mechanics. -->
+
 Cogs vs Clips is a cooperative production-and-survival game. Teams of AI agents ("Cogs") work together on the
 to produce and protect hearts by:
 
@@ -132,7 +135,7 @@ to produce and protect hearts by:
 * depositing hearts into the "community chest"
 * protecting extractors and assemblers from adversarial agents called "Clips"
 
-Read [MISSION.md](MISSION.md) for a thorough description of the game mechanics. 
+Read [MISSION.md](MISSION.md) for a thorough description of the game mechanics.
 
 <p align="center">
   <img src="assets/cvc-reel.gif" alt="Cogs vs Clips reel">
@@ -154,39 +157,39 @@ Overall, Cogs vs Clips aims to present rich environments with:
 
 ## How seasons work
 
-The ALB leaderboard runs in seasons. Each season has two pools:                                                                                
-                                                                                                                                                 
-- **Qualifying pool**: Where new submissions start. Your policy plays matches against other policies in the pool.                                  
-- **Competition pool**: Policies that score above a threshold in qualifying get promoted here.                                                     
-                                                                                                                                                
-To see active seasons and their pools:                                                                                                         
-```bash
-cogames seasons                                                                                                                                
-```
-                                                                                                                                                
-## How scoring works                                                                                                                              
-                                                                                                                                                
-When you submit a policy, it gets queued for matches against other policies in its pool. Our focal metric is VORP (Value Over Replacement Policy), which estimates how much your agent improves team performance compared to a baseline.                                                 
-                                                                                                                                                
-VORP is calculated by comparing:                                                                                                               
+The ALB leaderboard runs in seasons. Each season has two pools:
 
-- Replacement mean: The average score when only other pool policies play (no candidate)                                                        
-- Candidate score: The score when your policy plays                                                                                            
-                                                                                                                                                
-The difference tells us how much value your policy adds to a team. A positive VORP means your policy makes teams better; a negative VORP means teams perform worse with your policy than without it.                                                                                          
-                                                                                                                                                
+- **Qualifying pool**: Where new submissions start. Your policy plays matches against other policies in the pool.
+- **Competition pool**: Policies that score above a threshold in qualifying get promoted here.
+
+To see active seasons and their pools:
+```bash
+cogames seasons
+```
+
+## How scoring works
+
+When you submit a policy, it gets queued for matches against other policies in its pool. Our focal metric is VORP (Value Over Replacement Policy), which estimates how much your agent improves team performance compared to a baseline.
+
+VORP is calculated by comparing:
+
+- Replacement mean: The average score when only other pool policies play (no candidate)
+- Candidate score: The score when your policy plays
+
+The difference tells us how much value your policy adds to a team. A positive VORP means your policy makes teams better; a negative VORP means teams perform worse with your policy than without it.
+
 You can evaluate VOR locally before submitting:
 
 ```bash
-cogames pickup --policy <YOUR_POLICY> --pool <POOL_POLICY>                                                                                     
+cogames pickup --policy <YOUR_POLICY> --pool <POOL_POLICY>
 ```
-                                                                                                                                                
-## Viewing results                                                                                                                                
-                                                                                                                                                
-To check your submission status and match results:                                                                                                
+
+## Viewing results
+
+To check your submission status and match results:
 ```bash
-cogames submissions                                                                                                                            
-cogames leaderboard --season beta                                                         
+cogames submissions
+cogames leaderboard --season beta-cogsguard
 ```
 
 # Command Reference
@@ -247,7 +250,7 @@ cogames [COMMAND] --help
 
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f; font-weight: bold">1. List sites:</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> Run with no arguments to see all available sites.</span>                                                  
 
- <span style="color: #7f7f7f; text-decoration-color: #7f7f7f; font-weight: bold">2. List missions at a site:</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> Pass a site name (e.g., 'training_facility') to see its missions.</span>                     
+ <span style="color: #7f7f7f; text-decoration-color: #7f7f7f; font-weight: bold">2. List missions at a site:</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> Pass a site name (e.g., 'cogsguard_arena') to see its missions.</span>                       
 
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f; font-weight: bold">3. Describe a mission:</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> Use </span><span style="color: #7fbf7f; text-decoration-color: #7fbf7f; font-weight: bold">-m</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> to describe a specific mission. Only in this mode do </span><span style="color: #7fbfbf; text-decoration-color: #7fbfbf; font-weight: bold">--cogs</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">, </span><span style="color: #7fbfbf; text-decoration-color: #7fbfbf; font-weight: bold">--variant</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">, </span><span style="color: #7fbfbf; text-decoration-color: #7fbfbf; font-weight: bold">--format</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">, </span>  
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">and </span><span style="color: #7fbfbf; text-decoration-color: #7fbfbf; font-weight: bold">--save</span><span style="color: #7f7f7f; text-decoration-color: #7f7f7f"> have any effect.</span>                                                                                       
@@ -258,7 +261,7 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>   site      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Filter by site (e.g., training_facility)                                                      <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>   site      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Filter by site (e.g., cogsguard_arena)                                                        <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
 </pre>
 
@@ -288,8 +291,8 @@ cogames [COMMAND] --help
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
  <span style="color: #008080; text-decoration-color: #008080">cogames missions</span>                                    List all sites                                                
- <span style="color: #008080; text-decoration-color: #008080">cogames missions training_facility</span>                  List missions at site                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames missions </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> hello_world.open_world</span>          Describe a mission                                            
+ <span style="color: #008080; text-decoration-color: #008080">cogames missions cogsguard_arena</span>                     List missions at site                                        
+ <span style="color: #008080; text-decoration-color: #008080">cogames missions </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> cogsguard_arena.basic</span>           Describe a mission                                            
  <span style="color: #008080; text-decoration-color: #008080">cogames missions </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> arena </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--format</span><span style="color: #008080; text-decoration-color: #008080"> json</span>             Output as JSON                                                
 
 </pre>
@@ -564,10 +567,10 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> training_facility.harvest</span>                    Interactive                                          
- <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> training_facility.harvest </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=random</span>    Random policy                                        
- <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> machina_1.open_world </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-c</span><span style="color: #008080; text-decoration-color: #008080"> 4 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=baseline</span>  Baseline, 4 cogs                                     
- <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> hello_world </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-r</span><span style="color: #008080; text-decoration-color: #008080"> unicode</span>                       Terminal mode                                        
+ <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> cogsguard_arena.basic</span>                        Interactive                                          
+ <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> cogsguard_arena.basic </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=random</span>        Random policy                                        
+ <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> cogsguard_arena.basic </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-c</span><span style="color: #008080; text-decoration-color: #008080"> 4 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=baseline</span> Baseline, 4 cogs                                     
+ <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> cogsguard_arena </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-r</span><span style="color: #008080; text-decoration-color: #008080"> unicode</span>                   Terminal mode                                        
 
 </pre>
 
@@ -788,11 +791,11 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> training_facility.harvest </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> lstm</span>            Evaluate single policy                                
- <span style="color: #008080; text-decoration-color: #008080">cogames run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> machina_1 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./train_dir/my_run:v5</span>           Evaluate a checkpoint bundle                          
+ <span style="color: #008080; text-decoration-color: #008080">cogames run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> cogsguard_arena.basic </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> lstm</span>               Evaluate single policy                                 
+ <span style="color: #008080; text-decoration-color: #008080">cogames run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> cogsguard_arena </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./train_dir/my_run:v5</span>     Evaluate a checkpoint bundle                          
  <span style="color: #008080; text-decoration-color: #008080">cogames run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-S</span><span style="color: #008080; text-decoration-color: #008080"> integrated_evals </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./train_dir/my_run:v5</span>    Evaluate on mission set                               
  <span style="color: #008080; text-decoration-color: #008080">cogames run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> 'arena.*' </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> lstm </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> random </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-e</span><span style="color: #008080; text-decoration-color: #008080"> 20</span>            Evaluate multiple policies together                   
- <span style="color: #008080; text-decoration-color: #008080">cogames run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> machina_1 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./train_dir/my_run:v5,proportion=3 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=random,proportion=5</span>                       
+ <span style="color: #008080; text-decoration-color: #008080">cogames run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> cogsguard_arena </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./train_dir/my_run:v5,proportion=3 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=random,proportion=5</span>                 
  Evaluate policies in 3:5 mix                                                                                      
 
 </pre>
@@ -823,7 +826,7 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Mission ───────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--mission</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">MISSION </span>  Mission to evaluate on <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: machina_1.open_world]</span>                             <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--mission</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">MISSION </span>  Mission to evaluate on <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: cogsguard_arena.basic]</span>                            <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--cogs</span>     <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-c</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=1</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span>  Number of cogs (agents) <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 4]</span>                                               <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--variant</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-v</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">VARIANT </span>  Mission variant (repeatable)                                                       <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
@@ -1109,6 +1112,14 @@ cogames [COMMAND] --help
 
 
 
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Tournament ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">SEASON</span>  Tournament season (determines which game to validate against) <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: beta-cogsguard]</span> <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
+</pre>
+
+
+
+
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Other ─────────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--help</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-h</span>        Show this message and exit                                                                    <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
@@ -1237,7 +1248,7 @@ cogames [COMMAND] --help
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
  <span style="color: #008080; text-decoration-color: #008080">cogames submissions</span>                         All your uploads                                                      
- <span style="color: #008080; text-decoration-color: #008080">cogames submissions </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta</span>           Submissions in a season                                               
+ <span style="color: #008080; text-decoration-color: #008080">cogames submissions </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta-cogsguard</span>           Submissions in a season                                     
  <span style="color: #008080; text-decoration-color: #008080">cogames submissions </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> my-policy</span>            Info on a specific policy                                             
 
 </pre>
@@ -1315,7 +1326,7 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Tournament ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #800000; text-decoration-color: #800000">*</span>  <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">SEASON</span>  Tournament season name <span style="color: #bf7f7f; text-decoration-color: #bf7f7f">[required]</span>                                                    <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">SEASON</span>  Tournament season name <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: beta-cogsguard]</span>                                        <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
 </pre>
 
@@ -1349,7 +1360,7 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames leaderboard </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta</span>           View rankings                                                         
+ <span style="color: #008080; text-decoration-color: #008080">cogames leaderboard </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta-cogsguard</span>           View rankings                                               
 
 </pre>
 
@@ -1407,8 +1418,10 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Validation ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>                  Run validation only without uploading                                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--skip-validation</span>          Skip policy validation in isolated environment                                       <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span>                 <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">SEASON</span>  Tournament season (determines which game to validate against)                  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: beta-cogsguard]                                    </span>                  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>                <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">      </span>  Run validation only without uploading                                          <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--skip-validation</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">      </span>  Skip policy validation in isolated environment                                 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
 </pre>
 
@@ -1474,7 +1487,7 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Tournament ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #800000; text-decoration-color: #800000">*</span>  <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">SEASON</span>  Tournament season name <span style="color: #bf7f7f; text-decoration-color: #bf7f7f">[required]</span>                                                    <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">SEASON</span>  Tournament season name <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: beta-cogsguard]</span>                                        <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
 </pre>
 
@@ -1500,8 +1513,8 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames submit my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta</span>          Submit latest version                                             
- <span style="color: #008080; text-decoration-color: #008080">cogames submit my-policy:v3 </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta</span>       Submit specific version                                           
+ <span style="color: #008080; text-decoration-color: #008080">cogames submit my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta-cogsguard</span>          Submit latest version                                   
+ <span style="color: #008080; text-decoration-color: #008080">cogames submit my-policy:v3 </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta-cogsguard</span>       Submit specific version                                 
 
 </pre>
 
@@ -1700,8 +1713,8 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames tutorial train </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> training_facility.harvest</span>              Basic training                                   
- <span style="color: #008080; text-decoration-color: #008080">cogames tutorial train </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> training_facility.harvest </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=baseline</span>                                             
+ <span style="color: #008080; text-decoration-color: #008080">cogames tutorial train </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> cogsguard_arena.basic</span>                   Basic training                                  
+ <span style="color: #008080; text-decoration-color: #008080">cogames tutorial train </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> cogsguard_arena.basic </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=baseline</span>                                                 
  Train baseline policy                                                                                             
  <span style="color: #008080; text-decoration-color: #008080">cogames tutorial train </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./train_dir/my_run:v5</span>                  Continue from checkpoint                         
  <span style="color: #008080; text-decoration-color: #008080">cogames tutorial train </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=lstm,data=./weights.safetensors</span>  Load weights into class                          

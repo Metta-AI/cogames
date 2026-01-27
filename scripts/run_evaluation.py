@@ -36,7 +36,7 @@ from safetensors.torch import load_file as load_safetensors_file
 
 from cogames.cli.policy import parse_policy_spec
 from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
-from cogames.cogs_vs_clips.mission import Mission, MissionVariant, NumCogsVariant
+from cogames.cogs_vs_clips.mission import AnyMission, Mission, MissionVariant, NumCogsVariant
 from cogames.cogs_vs_clips.missions import MISSIONS as ALL_MISSIONS
 from cogames.cogs_vs_clips.variants import VARIANTS
 from metta_alo.rollout import run_single_episode_rollout
@@ -84,7 +84,7 @@ def is_s3_uri(path: str) -> bool:
     return path.startswith("s3://") if path else False
 
 
-EXPERIMENT_MAP: Dict[str, Mission] = {}
+EXPERIMENT_MAP: Dict[str, AnyMission] = {}
 VARIANT_LOOKUP: Dict[str, MissionVariant] = {v.name: v for v in VARIANTS}
 
 
@@ -100,7 +100,7 @@ def _run_case(
     exp_name: str,
     variant_name: Optional[str],
     num_cogs: int,
-    base_mission: Mission,
+    base_mission: AnyMission,
     variant: Optional[MissionVariant],
     clip_period: int,
     max_steps: int,
@@ -264,7 +264,7 @@ def run_evaluation(
     seed: int = 42,
     repeats: int = 3,
     jobs: int = 0,
-    experiment_map: Optional[Dict[str, Mission]] = None,
+    experiment_map: Optional[Dict[str, AnyMission]] = None,
     cases_override: Optional[List[tuple[str, Optional[str], int]]] = None,
 ) -> List[EvalResult]:
     results: List[EvalResult] = []
@@ -279,7 +279,7 @@ def run_evaluation(
     logger.info(f"Agent counts: {cogs_list}")
     logger.info(f"{'=' * 80}\n")
 
-    cases: List[tuple[str, Optional[str], int, Mission, Optional[MissionVariant], int]] = []
+    cases: List[tuple[str, Optional[str], int, AnyMission, Optional[MissionVariant], int]] = []
     if cases_override is not None:
         for exp_name, variant_name, num_cogs in cases_override:
             base_mission = experiment_lookup.get(exp_name)
@@ -1154,7 +1154,7 @@ def main():
     else:
         raise ValueError(f"Unknown mission set: {args.mission_set}")
 
-    experiment_map = {mission.name: mission for mission in missions_list}
+    experiment_map: Dict[str, AnyMission] = {mission.name: mission for mission in missions_list}
     for mission in ALL_MISSIONS:
         experiment_map.setdefault(mission.name, mission)
     global EXPERIMENT_MAP

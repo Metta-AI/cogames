@@ -89,14 +89,48 @@ def make_cogsguard_arena_site(num_agents: int = 10) -> Site:
     )
 
 
-# Default CogsGuard arena site
-COGSGUARD_ARENA = make_cogsguard_arena_site(num_agents=10)
+# Default CogsGuard arena site with flexible agent count
+COGSGUARD_ARENA = Site(
+    name="cogsguard_arena",
+    description="CogsGuard arena - compete to control junctions with gear abilities.",
+    map_builder=MapGen.Config(
+        width=50,
+        height=50,
+        instance=MachinaArena.Config(
+            spawn_count=20,
+            building_coverage=0.1,
+            hub=BaseHubConfig(
+                corner_bundle="extractors",
+                cross_bundle="none",
+                cross_distance=7,
+                stations=[
+                    "aligner_station",
+                    "scrambler_station",
+                    "miner_station",
+                    "scout_station",
+                    "chest",
+                ],
+            ),
+        ),
+    ),
+    min_cogs=1,
+    max_cogs=20,
+)
 
 
-SITES = [
+# Feature flag: Set to True to include legacy (pre-CogsGuard) sites in the CLI.
+# To enable, add TRAINING_FACILITY, HELLO_WORLD, MACHINA_1 to SITES below.
+# Also set _INCLUDE_LEGACY_MISSIONS = True in missions.py.
+_INCLUDE_LEGACY_SITES = False
+
+_LEGACY_SITES = [
     TRAINING_FACILITY,
     HELLO_WORLD,
     MACHINA_1,
-    EVALS,
+]
+
+SITES = [
     COGSGUARD_ARENA,
+    EVALS,
+    *(_LEGACY_SITES if _INCLUDE_LEGACY_SITES else []),
 ]
