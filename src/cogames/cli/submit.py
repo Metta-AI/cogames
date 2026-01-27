@@ -121,7 +121,7 @@ def validate_bundle_in_isolation(policy_zip: Path, console: Console, season: str
         env["UV_NO_CACHE"] = "1"
 
         res = subprocess.run(
-            ["uv", "run", "cogames", "validate-policy", f"file://./{bundle_name}"],
+            ["uv", "run", "cogames", "validate-policy", "--policy", f"file://./{bundle_name}"],
             cwd=temp_dir,
             capture_output=True,
             text=True,
@@ -295,6 +295,7 @@ def validate_policy_in_isolation(
             "run",
             "cogames",
             "validate-policy",
+            "--policy",
             policy_arg,
         ]
         if setup_script:
