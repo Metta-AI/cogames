@@ -136,15 +136,14 @@ app.add_typer(docsync.app, name="docsync", hidden=True)
 def tutorial_cmd(
     ctx: typer.Context,
 ) -> None:
-    # TODO (cogsguard migration): Update tutorial to use CogsGuard game mechanics and missions
     """Run the CoGames tutorial."""
     # Suppress logs during tutorial to keep instructions visible
     logging.getLogger().setLevel(logging.ERROR)
 
     console.print(
         Panel.fit(
-            "[bold cyan]MISSION BRIEFING: Tutorial Sector[/bold cyan]\n\n"
-            "Welcome, Cognitive. This simulation mirrors frontline HEART ops.\n"
+            "[bold cyan]MISSION BRIEFING: CogsGuard Training Sector[/bold cyan]\n\n"
+            "Welcome, Cognitive. This simulation mirrors frontline CogsGuard ops.\n"
             "We will launch the Mettascope visual interface now.\n\n"
             "When you are ready to deploy, press Enter below and then return here to receive instructions.",
             title="Mission Briefing",
@@ -155,13 +154,11 @@ def tutorial_cmd(
     Prompt.ask("[dim]Press Enter to launch simulation[/dim]", default="", show_default=False)
     console.print("[dim]Initializing Mettascope...[/dim]")
 
-    # Load tutorial mission
-    from cogames.cogs_vs_clips.tutorial_missions import TutorialMission
+    # Load tutorial mission (CogsGuard)
+    from cogames.cogs_vs_clips.missions import make_cogsguard_mission
 
     # Create environment config
-    env_cfg = TutorialMission.make_env()
-    # Force 1 agent for tutorial
-    env_cfg.game.num_agents = 1
+    env_cfg = make_cogsguard_mission(num_agents=1, max_steps=1000).make_env()
 
     stop_event = threading.Event()
 
@@ -187,7 +184,7 @@ def tutorial_cmd(
                     "Right Pane (Vibe Deck): Select icons here to change your Cog's broadcast resonance.",
                     "Zoom/Pan: Scroll or pinch to zoom the arena; drag to pan.",
                     "Click various buildings to view their details in the Left Pane.",
-                    "Look for the Chest, Assembler, Charger, and Extractor stations.",
+                    "Look for the Hub (Assembler), Junctions, Gear Stations, and Extractors.",
                     "Click your Cog to assume control.",
                 ),
             },
@@ -195,46 +192,46 @@ def tutorial_cmd(
                 "title": "Step 2 — Movement & Energy",
                 "lines": (
                     "Use WASD or Arrow Keys to move your Cog.",
-                    "Every move costs Energy, every time step recovers Energy.",
+                    "Every move costs Energy, and aligned hubs/junctions recharge you.",
                     "Watch your battery bar on the Cog or in the HUD.",
-                    "If low, rest (skip turn), lean against a wall (walk into it), vibe, or",
-                    "find a Charger [yellow]+[/yellow].",
+                    "If low, rest (skip turn), lean against a wall (walk into it), or",
+                    "stand near the Hub or an aligned Junction.",
                 ),
             },
             {
-                "title": "Step 3 — Extraction",
+                "title": "Step 3 — Gear Up",
                 "lines": (
                     "Primary interaction mode is WALKING INTO things.",
-                    "Locate an Extractor station:",
+                    "Locate a Gear Station and walk into it to equip a role:",
+                    "  [yellow]⛏ Miner[/yellow], [yellow]🔭 Scout[/yellow],",
+                    "  [yellow]🔗 Aligner[/yellow], [yellow]🌀 Scrambler[/yellow].",
+                    "Gear costs are paid from the team commons.",
+                ),
+            },
+            {
+                "title": "Step 4 — Resources & Hearts",
+                "lines": (
+                    "Find an Extractor station to gather elements:",
                     "  [yellow]C[/yellow] (Carbon), [yellow]O[/yellow] (Oxygen),",
                     "  [yellow]G[/yellow] (Germanium), [yellow]S[/yellow] (Silicon).",
-                    "Walk into it to extract resources.",
-                    "Note: Silicon ([yellow]S[/yellow]) costs 20 energy!",
+                    "Visit the Chest to assemble or withdraw Hearts from the commons.",
                 ),
             },
             {
-                "title": "Step 4 — Crafting (Assembler)",
+                "title": "Step 5 — Junction Control",
                 "lines": (
-                    "Click the central Assembler [yellow]&[/yellow] to see the HEART recipe in the Left Pane.",
-                    "Set your Vibe (Right Pane) to match the requirement (usually [red]heart_a[/red]).",
-                    "Walk into the Assembler to craft. Inputs are taken from your inventory instantly.",
-                ),
-            },
-            {
-                "title": "Step 5 — Deposit (Chest)",
-                "lines": (
-                    "Go to the Chest [yellow]C[/yellow] (usually near the center).",
-                    "Switch your Vibe to [red]heart_b[/red] (Deposit Mode).",
-                    "Walk into the Chest to deposit the HEART and complete the objective.",
-                    "Note: To pull resources out of the Chest, you must vibe the matching resource *_a protocol.",
+                    "Junctions (chargers) can be aligned to your team.",
+                    "As an Aligner: get Influence (stand near the Hub) + a Heart, then bump a neutral junction.",
+                    "As a Scrambler: get a Heart, then bump an enemy-aligned junction to neutralize it.",
+                    "Aligned junctions recharge energy for your team.",
                 ),
             },
             {
                 "title": "Step 6 — Objective Complete",
                 "lines": (
                     "[bold green]🎉 Congratulations![/bold green] You have completed the tutorial.",
-                    "You've mastered extraction, crafting, and resource management.",
-                    "[bold cyan]You're now ready to tackle the full mission![/bold cyan]",
+                    "You've mastered movement, gear, resources, and junction control.",
+                    "[bold cyan]You're now ready to tackle the full CogsGuard arena![/bold cyan]",
                 ),
             },
         )
