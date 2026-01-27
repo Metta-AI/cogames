@@ -1,8 +1,8 @@
 """
 Trainable Policy Template for the CoGames environment.
 
-TODO (cogsguard migration): Verify this trainable template works with CogsGuard game mechanics.
-This template should be tested with CogsGuard missions to ensure it learns effectively.
+This template is compatible with CogsGuard missions. It uses only the observation and action
+spaces provided by the environment and makes no game-specific assumptions.
 
 This template provides a minimal trainable neural network policy that can be used with
 `cogames tutorial train`. It demonstrates the key interfaces required for training:
