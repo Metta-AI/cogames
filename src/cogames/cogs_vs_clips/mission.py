@@ -407,6 +407,7 @@ class CogsGuardMission(Config):
                     ],
                     mutations=[alignTo(None)],
                     max_targets=1,
+                    fallback="initial_clips",
                 ),
                 "neutral_to_clips": EventConfig(
                     name="neutral_to_clips",
@@ -422,6 +423,7 @@ class CogsGuardMission(Config):
                     ],
                     mutations=[alignTo("clips")],
                     max_targets=1,
+                    fallback="cogs_to_neutral",
                 ),
             },
         )
