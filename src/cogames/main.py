@@ -1174,7 +1174,7 @@ def run_cmd(
         "--mission-set",
         "-S",
         metavar="SET",
-        help="Predefined set: eval_missions, integrated_evals, spanning_evals, diagnostic_evals, all",
+        help="Predefined set: integrated_evals, spanning_evals, diagnostic_evals, all",
         rich_help_panel="Mission",
     ),
     cogs: Optional[int] = typer.Option(

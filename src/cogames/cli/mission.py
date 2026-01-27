@@ -92,7 +92,7 @@ def load_mission_set(mission_set: str) -> list[AnyMission]:
 
         missions_list = list(SPANNING_EVAL_MISSIONS)
     else:
-        available = "eval_missions, integrated_evals, spanning_evals, diagnostic_evals, all"
+        available = "integrated_evals, spanning_evals, diagnostic_evals, all"
         raise ValueError(f"Unknown mission set: {mission_set}\nAvailable sets: {available}")
 
     return missions_list
