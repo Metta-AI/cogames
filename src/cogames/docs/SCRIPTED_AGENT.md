@@ -1,14 +1,16 @@
 # Scripted Agent Policies
 
-Two teaching-friendly scripted agent implementations for CoGames evaluation and ablation studies, plus a tiny demo
-policy.
+Teaching-friendly scripted agents for CoGames evaluation and ablation studies, plus a tiny demo policy and the CogsGuard
+team-play scripted policy.
 
 ## Overview
 
-This package provides two progressively capable scripted agents and one tiny demo policy:
+This package provides the CogsGuard team-play policy, two progressively capable scripted agents, and one tiny demo
+policy:
 
-1. **BaselineAgent** - Core functionality: exploration, resource gathering, heart assembly (single/multi-agent)
-2. **UnclippingAgent** - Extends BaselineAgent with extractor unclipping capability
+1. **CogsGuard** - Vibe-based multi-role policy for the CogsGuard arena
+2. **BaselineAgent** - Core functionality: exploration, resource gathering, heart assembly (single/multi-agent)
+3. **UnclippingAgent** - Extends BaselineAgent with extractor unclipping capability
 
 ## Architecture
 
@@ -16,11 +18,11 @@ This package provides two progressively capable scripted agents and one tiny dem
 
 ```
 scripted_agent/
+├── cogsguard/                   # CogsGuard scripted policy (vibe-based roles)
 ├── baseline_agent.py            # Base agent + BaselinePolicy wrapper
 ├── unclipping_agent.py          # Unclipping extension + UnclippingPolicy wrapper
 ├── demo_policy.py               # Tiny demo policy (short name: tiny_baseline)
-├── pathfinding.py               # Pathfinding utilities (shared)
-└── README.md                    # This file
+└── pathfinding.py               # Pathfinding utilities (shared)
 ```
 
 Each agent file contains:
@@ -38,7 +40,49 @@ These agents are designed for **ablation studies** and **baseline evaluation**:
 
 ## Agents
 
-### 1. BaselineAgent
+### 1. CogsGuard Scripted Agent
+
+CogsGuard is the team-play focus for scripted policies. Agents are controlled by **vibes** that map to roles and gear
+acquisition.
+
+**Vibes**:
+
+| Vibe        | Behavior                                 |
+| ----------- | ---------------------------------------- |
+| `default`   | Idle (noop)                              |
+| `heart`     | Idle (noop)                              |
+| `gear`      | Smart role selection                     |
+| `miner`     | Gather and deposit resources             |
+| `scout`     | Explore and discover structures          |
+| `aligner`   | Align neutral supply depots to cogs      |
+| `scrambler` | Scramble clips-aligned depots to neutral |
+
+**Gear costs** (paid from cogs commons):
+
+| Gear      | Cost                                       | Bonus                |
+| --------- | ------------------------------------------ | -------------------- |
+| Miner     | 3 carbon, 1 oxygen, 1 germanium, 1 silicon | +40 cargo            |
+| Scout     | 1 carbon, 1 oxygen, 1 germanium, 3 silicon | +100 energy, +400 HP |
+| Aligner   | 3 carbon, 1 oxygen, 1 germanium, 1 silicon | +20 influence        |
+| Scrambler | 1 carbon, 3 oxygen, 1 germanium, 1 silicon | +200 HP              |
+
+**Supply depots** start clips-aligned. Scramblers neutralize them; aligners convert neutral depots to cogs for AOE
+energy regen.
+
+**Usage**:
+
+```bash
+# Default role distribution (1 scrambler, 4 miners, rest smart-gear)
+./tools/run.py recipes.experiment.cogsguard.play policy_uri=metta://policy/role
+
+# Custom role counts
+./tools/run.py recipes.experiment.cogsguard.play \
+    policy_uri="metta://policy/role?miner=3&scout=2&aligner=2&scrambler=3"
+```
+
+**Full documentation**: `packages/cogames-agents/src/cogames_agents/policy/scripted_agent/cogsguard/README.md`
+
+### 2. BaselineAgent
 
 **Purpose**: Minimal working agent for single/multi-agent missions
 
@@ -83,7 +127,7 @@ uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 1
 uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 4
 ```
 
-### 2. UnclippingAgent
+### 3. UnclippingAgent
 
 **Purpose**: Handle missions with clipped extractors
 
@@ -117,17 +161,7 @@ policy = UnclippingPolicy(env)
 # ... same as BaselinePolicy
 ```
 
-**CLI**:
-
-```bash
-# Test with unclipping diagnostic (single agent)
-uv run cogames play --mission evals.diagnostic_unclip_craft -p ladybug --cogs 1
-
-# Test with unclipping diagnostic (multi-agent)
-uv run cogames play --mission evals.diagnostic_unclip_craft -p ladybug --cogs 2
-```
-
-### 3. TinyBaseline (demo policy)
+### 4. TinyBaseline (demo policy)
 
 **Purpose**: Minimal, readable demo policy used for quick experiments.
 
@@ -219,24 +253,7 @@ uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 2 --ste
 uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 4 --steps 2000
 
 # Assembly test
-uv run cogames play --mission evals.diagnostic_assembler_search -p baseline --cogs 1 --steps 1000
-```
-
-#### UnclippingAgent (Unclipping Diagnostics)
-
-```bash
-# Unclipping craft diagnostic
-uv run cogames play --mission evals.diagnostic_unclip_craft -p ladybug --cogs 1 --steps 2000
-
-# Unclipping with pre-seeded inventory
-uv run cogames play --mission evals.diagnostic_unclip_preseed -p ladybug --cogs 1 --steps 2000
-
-# Multi-agent unclipping
-uv run cogames play --mission evals.diagnostic_unclip_craft -p ladybug --cogs 2 --steps 2000
-
-# Note: For testing clipping variants on procedural maps, use training_facility or hello_world sites
-# Example with variants:
-uv run cogames play --mission training_facility.harvest --variant clip_hub_stations --cogs 1 --steps 2000
+uv run cogames play --mission evals.diagnostic_assemble_seeded_search -p baseline --cogs 1 --steps 1000
 ```
 
 ### Comprehensive Evaluation
@@ -252,13 +269,10 @@ uv run python packages/cogames/scripts/run_evaluation.py --policy ladybug
 
 ## Evaluation Results
 
-See `experiments/SCRIPTED_AGENT_EVALUATION.md` for comprehensive evaluation results across all missions and difficulty
-variants.
-
 **Summary**:
 
-- **BaselineAgent**: 33.8% success rate across 1-8 agents, best for non-clipped missions
-- **UnclippingAgent**: 38.6% success rate, best overall performance, handles clipping well
+- **BaselineAgent**: Works best for non-clipped missions with straightforward resource gathering
+- **UnclippingAgent**: Best overall performance, handles clipping scenarios well
 
 ## Extending
 

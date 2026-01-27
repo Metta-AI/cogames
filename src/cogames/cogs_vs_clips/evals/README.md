@@ -19,9 +19,8 @@ Diagnostic missions test specific skills in isolation with controlled, repeatabl
 #### Navigation & Delivery
 
 - `diagnostic_chest_navigation1/2/3` - Navigate to chest and deposit hearts (varying difficulty)
-- `diagnostic_chest_near` - Chest nearby, test deposit mechanics
-- `diagnostic_chest_search` - Find chest through exploration
-- `diagnostic_chest_deposit_near/search` - Combined navigation and deposit tests
+- `diagnostic_chest_deposit_near` - Chest nearby, test deposit mechanics
+- `diagnostic_chest_deposit_search` - Find chest through exploration
 
 #### Resource Extraction
 
@@ -32,17 +31,12 @@ Diagnostic missions test specific skills in isolation with controlled, repeatabl
 
 #### Assembly
 
-- `diagnostic_assembler_near` - Assemble hearts at nearby assembler
-- `diagnostic_assembler_search` - Find assembler and craft hearts
+- `diagnostic_assemble_seeded_near` - Agents pre-seeded with resources, assemble hearts at nearby assembler
+- `diagnostic_assemble_seeded_search` - Agents pre-seeded, find assembler and craft hearts
 
 #### Energy Management
 
 - `diagnostic_charge_up` - Test charging mechanics and energy management
-
-#### Unclipping
-
-- `diagnostic_unclip_craft` - Craft unclip items to restore clipped extractors
-- `diagnostic_unclip_preseed` - Unclip with pre-seeded inventory
 
 #### Complex Scenarios
 
@@ -68,7 +62,7 @@ uv run cogames play --mission evals.diagnostic_extract_missing_oxygen --cogs 2
 uv run cogames play --mission evals.diagnostic_radial_hard --cogs 1
 
 # With policy
-uv run cogames play --mission evals.diagnostic_unclip_craft -p baseline --cogs 1
+uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 1
 ```
 
 ---
