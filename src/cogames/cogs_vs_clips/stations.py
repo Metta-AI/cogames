@@ -354,6 +354,7 @@ class HubConfig(JunctionConfig):
         return GridObjectConfig(
             name="hub",
             map_name=self.map_name,
+            render_name="assembler",
             render_symbol="📦",
             collective=self.team,
             aoes={
