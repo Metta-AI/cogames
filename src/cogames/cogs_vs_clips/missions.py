@@ -116,7 +116,7 @@ Machina1OpenWorldSharedRewardsMission = Mission(
 # CogsGuard Missions
 
 
-def make_cogsguard_mission(num_agents: int = 10, max_steps: int = 1000) -> CogsGuardMission:
+def make_cogsguard_mission(num_agents: int = 10, max_steps: int = 10000) -> CogsGuardMission:
     """Create a CogsGuard mission with configurable parameters."""
     return CogsGuardMission(
         name="basic",

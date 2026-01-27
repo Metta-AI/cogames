@@ -34,6 +34,9 @@ from mettagrid.config.action_config import (
     TransferActionConfig,
     VibeTransfer,
 )
+from mettagrid.config.event_config import EventConfig, periodic
+from mettagrid.config.filter import isAlignedTo, isNear
+from mettagrid.config.filter.tag_filter import typeTag
 from mettagrid.config.mettagrid_config import (
     AgentConfig,
     AgentRewards,
@@ -43,6 +46,7 @@ from mettagrid.config.mettagrid_config import (
     MettaGridConfig,
     ResourceLimitsConfig,
 )
+from mettagrid.config.mutation import alignTo
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
 from mettagrid.config.vibes import Vibe
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
@@ -301,6 +305,17 @@ class CogsGuardMission(Config):
     collective_initial_silicon: int = Field(default=10)
     collective_initial_heart: int = Field(default=5)
 
+    # Clips Behavior - scramble cogs junctions to neutral
+    # Note: must start after initial_clips fires at timestep 10 (events fire alphabetically)
+    clips_scramble_start: int = Field(default=11)
+    clips_scramble_interval: int = Field(default=100)
+    clips_scramble_radius: int = Field(default=10)
+
+    # Clips Behavior - align neutral junctions to clips
+    clips_align_start: int = Field(default=2000)
+    clips_align_interval: int = Field(default=100)
+    clips_align_radius: int = Field(default=10)
+
     # Station configs
     wall: CvCWallConfig = Field(default_factory=CvCWallConfig)
 
@@ -347,7 +362,7 @@ class CogsGuardMission(Config):
             objects={
                 "wall": self.wall.station_cfg(),
                 "assembler": HubConfig(map_name="assembler", team="cogs").station_cfg(),
-                "junction": JunctionConfig(map_name="charger", team="clips").station_cfg(),
+                "junction": JunctionConfig(map_name="charger", team="cogs").station_cfg(),
                 "chest": CogsGuardChestConfig().station_cfg(),
                 **extractor_objects,
                 **gear_objects,
@@ -369,6 +384,45 @@ class CogsGuardMission(Config):
                     ),
                 ),
                 "clips": CollectiveConfig(),
+            },
+            events={
+                "initial_clips": EventConfig(
+                    name="initial_clips",
+                    target_tag=typeTag("junction"),
+                    timesteps=[10],
+                    mutations=[alignTo("clips")],
+                    max_targets=1,
+                ),
+                "cogs_to_neutral": EventConfig(
+                    name="cogs_to_neutral",
+                    target_tag=typeTag("junction"),
+                    timesteps=periodic(
+                        start=self.clips_scramble_start,
+                        period=self.clips_scramble_interval,
+                        end=self.max_steps,
+                    ),
+                    filters=[
+                        isNear(typeTag("junction"), [isAlignedTo("clips")], radius=self.clips_scramble_radius),
+                        isAlignedTo("cogs"),
+                    ],
+                    mutations=[alignTo(None)],
+                    max_targets=1,
+                ),
+                "neutral_to_clips": EventConfig(
+                    name="neutral_to_clips",
+                    target_tag=typeTag("junction"),
+                    timesteps=periodic(
+                        start=self.clips_align_start,
+                        period=self.clips_align_interval,
+                        end=self.max_steps,
+                    ),
+                    filters=[
+                        isNear(typeTag("junction"), [isAlignedTo("clips")], radius=self.clips_align_radius),
+                        isAlignedTo(None),
+                    ],
+                    mutations=[alignTo("clips")],
+                    max_targets=1,
+                ),
             },
         )
 
