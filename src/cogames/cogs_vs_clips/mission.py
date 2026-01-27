@@ -36,7 +36,6 @@ from mettagrid.config.action_config import (
 )
 from mettagrid.config.event_config import EventConfig, periodic
 from mettagrid.config.filter import isAlignedTo, isNear
-from mettagrid.config.filter.tag_filter import typeTag
 from mettagrid.config.mettagrid_config import (
     AgentConfig,
     AgentRewards,
@@ -48,6 +47,7 @@ from mettagrid.config.mettagrid_config import (
 )
 from mettagrid.config.mutation import alignTo
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
+from mettagrid.config.tag import typeTag
 from mettagrid.config.vibes import Vibe
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
 

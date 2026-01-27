@@ -56,8 +56,8 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
     def _parse_observation(self, obs: AgentObservation, state: StarterCogState) -> StarterCogState:
         """Parse the observation and update the state."""
 
-        extractor_tag_value = self._policy_env_info.tags.index(f"{state.resource_to_collect}_extractor")
-        chest_tag_value = self._policy_env_info.tags.index("chest")
+        extractor_tag_value = self._policy_env_info.tags.index(f"type:{state.resource_to_collect}_extractor")
+        chest_tag_value = self._policy_env_info.tags.index("type:chest")
         state.have_inventory = False
         for token in obs.tokens:
             if token.feature.name == "last_action":
