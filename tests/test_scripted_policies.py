@@ -74,7 +74,7 @@ POLICIES_UNDER_TEST: tuple[PolicyUnderTest, ...] = (
         supports_supervisor=True,
     ),
     PolicyUnderTest(
-        "cogames_agents.policy.cogsguard_teacher.CogsguardTeacherPolicy",
+        "cogames_agents.policy.scripted_agent.cogsguard.teacher.CogsguardTeacherPolicy",
         requires_nim=True,
         supports_supervisor=True,
     ),
