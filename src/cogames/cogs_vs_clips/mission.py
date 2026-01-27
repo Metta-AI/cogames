@@ -368,8 +368,8 @@ class CogsGuardMission(Config):
             inventory_regen_interval=self.inventory_regen_interval,
             objects={
                 "wall": self.wall.station_cfg(),
-                "assembler": HubConfig(map_name="assembler", team="cogs").station_cfg(),
-                "junction": JunctionConfig(map_name="charger", team="cogs").station_cfg(),
+                "hub": HubConfig(map_name="assembler", team="cogs").station_cfg(),
+                "junction": JunctionConfig(map_name="charger").station_cfg(),
                 "chest": CogsGuardChestConfig().station_cfg(),
                 **extractor_objects,
                 **gear_objects,
