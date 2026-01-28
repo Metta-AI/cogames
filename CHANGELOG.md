@@ -14,7 +14,7 @@
 - `cogames upload` and `cogames validate-policy` now accept `--season` to validate against the correct game for that
   season
 - Validation uses the game appropriate for the target season (e.g., `beta` season validates against
-  `training_facility.harvest`, `beta-cogsguard` validates against `cogsguard_arena.basic`)
+  `training_facility.harvest`, `beta-cogsguard` validates against `cogsguard_arena.basic` using the Machina1 map)
 - This ensures policies are validated against the same game they'll compete in
 
 ## Jan 23, 2026
