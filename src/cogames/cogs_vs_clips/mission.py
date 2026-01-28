@@ -46,7 +46,7 @@ from mettagrid.config.mettagrid_config import (
     ResourceLimitsConfig,
 )
 from mettagrid.config.mutation import alignTo
-from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
+from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig, StatsSource, StatsValue
 from mettagrid.config.tag import typeTag
 from mettagrid.config.vibes import Vibe
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
@@ -299,6 +299,8 @@ class CogsGuardMission(Config):
     # Agent configuration
     cog: CogConfig = Field(default_factory=CogConfig)
 
+    wealth: int = Field(default=1)
+
     # Collective initial resources
     collective_initial_carbon: int = Field(default=10)
     collective_initial_oxygen: int = Field(default=10)
@@ -344,13 +346,19 @@ class CogsGuardMission(Config):
         }
         gear_objects = {f"{g}_station": GearStationConfig(gear_type=g).station_cfg() for g in gear}
 
+        # Create stats observations for collective resources
+        collective_stats_obs = [
+            StatsValue(name=f"collective.{resource}.amount", source=StatsSource.COLLECTIVE, delta=False)
+            for resource in elements
+        ]
+
         game = GameConfig(
             map_builder=map_builder,
             max_steps=self.max_steps,
             num_agents=num_cogs,
             resource_names=resources_list,
             vibe_names=vibe_names,
-            obs=ObsConfig(global_obs=GlobalObsConfig()),
+            obs=ObsConfig(global_obs=GlobalObsConfig(stats_obs=collective_stats_obs)),
             actions=ActionsConfig(
                 move=MoveActionConfig(consumed_resources={"energy": self.cog.move_energy_cost}),
                 noop=NoopActionConfig(),
@@ -382,11 +390,11 @@ class CogsGuardMission(Config):
                             "hearts": ResourceLimitsConfig(min=65535, resources=["heart"]),
                         },
                         initial={
-                            "carbon": self.collective_initial_carbon,
-                            "oxygen": self.collective_initial_oxygen,
-                            "germanium": self.collective_initial_germanium,
-                            "silicon": self.collective_initial_silicon,
-                            "heart": self.collective_initial_heart,
+                            "carbon": self.collective_initial_carbon * self.wealth,
+                            "oxygen": self.collective_initial_oxygen * self.wealth,
+                            "germanium": self.collective_initial_germanium * self.wealth,
+                            "silicon": self.collective_initial_silicon * self.wealth,
+                            "heart": self.collective_initial_heart * self.wealth,
                         },
                     ),
                 ),
