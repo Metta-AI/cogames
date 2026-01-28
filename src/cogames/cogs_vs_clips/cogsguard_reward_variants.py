@@ -1,7 +1,8 @@
 """Reward preset wiring for the CogsGuard (Cogs vs Clips) mission.
 
 The mission has a single "true" objective signal, plus optional shaping variants.
-These variants are mutually exclusive and are intended for different stages of learning.
+Reward variants are stackable; each one adds additional shaping signals on top of the
+mission's default objective rewards.
 """
 
 from __future__ import annotations
@@ -11,9 +12,11 @@ from typing import Literal, Sequence, cast
 from mettagrid.config.mettagrid_config import AgentRewards, MettaGridConfig
 from mettagrid.mapgen.mapgen import MapGenConfig
 
-CogsGuardRewardVariant = Literal["credit", "milestones", "objective"]
+CogsGuardRewardVariant = Literal["credit", "milestones", "no_objective", "objective"]
 
-AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = ("objective", "milestones", "credit")
+AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = ("objective", "no_objective", "milestones", "credit")
+
+_OBJECTIVE_STAT_KEY = "aligned.junction.held"
 
 
 def _default_max_junctions(env: MettaGridConfig) -> int:
@@ -47,33 +50,8 @@ def _default_max_junctions(env: MettaGridConfig) -> int:
     return min(max_possible, max(1, desired))
 
 
-def _objective_rewards(*, max_steps: int) -> AgentRewards:
-    """Objective-only rewards.
-
-    Encourages holding as many junctions as possible for as long as possible via
-    the per-tick stat `aligned.junction.held` (which increments by the number of
-    currently-aligned junctions each timestep).
-    """
-    return AgentRewards(
-        collective_stats={
-            "aligned.junction.held": 1.0 / max_steps,
-        },
-    )
-
-
-def _milestone_rewards(*, max_steps: int, max_junctions: int) -> AgentRewards:
-    """Milestone rewards (objective + alignment milestones).
-
-    Adds shaping aligned with the high-level task:
-    - `aligned.junction`: state-based reward for the current count of cogs-aligned junctions
-      (automatic penalty if the count drops when junctions flip away).
-    - `junction.aligned_by_agent` / `junction.scrambled_by_agent`: event credit for the agent
-      that performed the align/scramble action.
-
-    Caps are proportional to `max_junctions` to keep total episode returns stable as maps scale.
-    """
-    rewards = _objective_rewards(max_steps=max_steps)
-
+def _apply_milestones(rewards: AgentRewards, *, max_junctions: int) -> None:
+    """Add milestone shaping rewards onto an existing baseline."""
     w_junction_aligned = 1.0
     w_scramble_act = 0.5
     w_align_act = 1.0
@@ -81,30 +59,14 @@ def _milestone_rewards(*, max_steps: int, max_junctions: int) -> AgentRewards:
     rewards.collective_stats["aligned.junction"] = w_junction_aligned
     rewards.collective_stats_max["aligned.junction"] = w_junction_aligned * max_junctions
 
-    rewards.stats = {
-        "junction.scrambled_by_agent": w_scramble_act,
-        "junction.aligned_by_agent": w_align_act,
-    }
-    rewards.stats_max = {
-        "junction.scrambled_by_agent": w_scramble_act * max_junctions,
-        "junction.aligned_by_agent": w_align_act * max_junctions,
-    }
-
-    return rewards
+    rewards.stats["junction.scrambled_by_agent"] = w_scramble_act
+    rewards.stats["junction.aligned_by_agent"] = w_align_act
+    rewards.stats_max["junction.scrambled_by_agent"] = w_scramble_act * max_junctions
+    rewards.stats_max["junction.aligned_by_agent"] = w_align_act * max_junctions
 
 
-def _credit_rewards(*, max_steps: int, max_junctions: int) -> AgentRewards:
-    """Credit-assignment rewards (milestones + dense precursor shaping).
-
-    Extends `milestones` with small, capped "early learning" signals:
-    - resource and heart acquisition (`*.gained`)
-    - acquiring key gear like `aligner` / `scrambler`
-    - depositing elements into the collective (`collective.*.deposited`)
-
-    This is meant to help exploration and teach sub-skills that lead to junction alignment.
-    """
-    rewards = _milestone_rewards(max_steps=max_steps, max_junctions=max_junctions)
-
+def _apply_credit(rewards: AgentRewards, *, max_junctions: int) -> None:
+    """Add dense precursor shaping rewards onto an existing baseline."""
     w_heart = 0.05
     cap_heart = 0.5
     w_align_gear = 0.2
@@ -144,18 +106,15 @@ def _credit_rewards(*, max_steps: int, max_junctions: int) -> AgentRewards:
         rewards.collective_stats[stat] = w_deposit
         rewards.collective_stats_max[stat] = cap_deposit
 
-    return rewards
-
 
 def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str] | None = None) -> None:
-    """Apply one of the CogsGuard reward presets to `env`.
+    """Apply CogsGuard reward variants to `env`.
 
-    Presets:
-    - `objective`: only the core objective (`aligned.junction.held`).
-    - `milestones`: objective + shaped rewards for aligning/scrambling junctions and holding more junctions.
-    - `credit`: milestones + additional dense shaping for precursor behaviors (resources/gear/deposits).
-
-    Note: presets are mutually exclusive; pass exactly one.
+    Variants are stackable:
+    - `objective`: no-op marker; keeps the mission's default objective reward wiring.
+    - `no_objective`: disables the objective stat reward (`aligned.junction.held`).
+    - `milestones`: adds shaped rewards for aligning/scrambling junctions and holding more junctions.
+    - `credit`: adds additional dense shaping for precursor behaviors (resources/gear/deposits).
     """
     if not variants:
         return
@@ -164,28 +123,35 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
 
     reward_variants: list[CogsGuardRewardVariant] = []
     for variant_name in variant_names:
-        if variant_name in reward_variants:
-            continue
         if variant_name not in AVAILABLE_REWARD_VARIANTS:
             available = ", ".join(AVAILABLE_REWARD_VARIANTS)
             raise ValueError(f"Unknown Cogsguard reward variant '{variant_name}'. Available: {available}")
-        reward_variants.append(cast(CogsGuardRewardVariant, variant_name))
+        variant = cast(CogsGuardRewardVariant, variant_name)
+        if variant in reward_variants:
+            continue
+        reward_variants.append(variant)
 
-    if len(reward_variants) > 1:
-        available = ", ".join(AVAILABLE_REWARD_VARIANTS)
-        raise ValueError(
-            f"Cogsguard reward variants are mutually exclusive. Got {reward_variants}. Choose one of: {available}"
-        )
-
-    reward_variant = reward_variants[0]
-    if reward_variant == "objective":
+    enabled = set(reward_variants)
+    if enabled <= {"objective"}:
         return
 
-    max_steps = env.game.max_steps
     max_junctions = _default_max_junctions(env)
-    if reward_variant == "milestones":
-        env.game.agent.rewards = _milestone_rewards(max_steps=max_steps, max_junctions=max_junctions)
-    elif reward_variant == "credit":
-        env.game.agent.rewards = _credit_rewards(max_steps=max_steps, max_junctions=max_junctions)
 
-    env.label += f".{reward_variant}"
+    # Start from the mission's existing objective baseline to preserve its scaling.
+    rewards = env.game.agent.rewards.model_copy(deep=True)
+    if "no_objective" in enabled:
+        rewards.collective_stats.pop(_OBJECTIVE_STAT_KEY, None)
+        rewards.collective_stats_max.pop(_OBJECTIVE_STAT_KEY, None)
+    if "milestones" in enabled:
+        _apply_milestones(rewards, max_junctions=max_junctions)
+    if "credit" in enabled:
+        _apply_credit(rewards, max_junctions=max_junctions)
+
+    env.game.agent.rewards = rewards
+
+    # Deterministic label suffix order (exclude "objective").
+    for variant in AVAILABLE_REWARD_VARIANTS:
+        if variant == "objective":
+            continue
+        if variant in enabled:
+            env.label += f".{variant}"
