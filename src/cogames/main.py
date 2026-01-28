@@ -879,6 +879,12 @@ def make_policy(
         shutil.copy2(template_path, dest_path)
         console.print(f"[green]{policy_type} policy template copied to: {dest_path}[/green]")
 
+        if not trainable:
+            content = dest_path.read_text()
+            lines = content.splitlines()
+            lines = [line for line in lines if not line.strip().startswith("short_names =")]
+            dest_path.write_text("\n".join(lines) + "\n")
+
         if trainable:
             console.print(
                 "[dim]Train with: cogames tutorial train -m cogsguard_arena.basic -p class="
