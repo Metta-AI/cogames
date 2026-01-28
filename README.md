@@ -124,34 +124,31 @@ If you want help, or to share your experience, join [the Discord](https://discor
 
 # About the game
 
-<!-- TODO (cogsguard migration): Update this section to describe CogsGuard game mechanics -->
-<!-- This section describes the legacy Escape from Machina game. CogsGuard has different mechanics. -->
+CogsGuard is a cooperative territory-control game. Teams of AI agents ("Cogs") work together to capture and defend
+junctions against automated opponents ("Clips") by:
 
-Cogs vs Clips is a cooperative production-and-survival game. Teams of AI agents ("Cogs") work together on the
-to produce and protect hearts by:
-
-* gathering resources from "extractors"
-* exchanging resources for hearts at "assemblers"
-* depositing hearts into the "community chest"
-* protecting extractors and assemblers from adversarial agents called "Clips"
+* gathering resources and depositing them at controlled junctions
+* acquiring specialized roles (Miner, Aligner, Scrambler, Scout) at gear stations
+* capturing neutral junctions using Aligners (costs 1 heart + 1 influence)
+* disrupting enemy junctions using Scramblers (costs 1 heart)
+* defending territory from Clips expansion
 
 Read [MISSION.md](MISSION.md) for a thorough description of the game mechanics.
 
 <p align="center">
-  <img src="assets/cvc-reel.gif" alt="Cogs vs Clips reel">
+  <img src="assets/cvc-reel.gif" alt="CogsGuard reel">
 <br>
 
-There are many mission configurations available, with different map sizes, resources, station layouts, and game rules.
+There are many mission configurations available, with different map sizes, junction layouts, and game rules.
 
-Overall, Cogs vs Clips aims to present rich environments with:
+Overall, CogsGuard aims to present rich environments with:
 
-- **Resource management**: Energy, materials (carbon, oxygen, germanium, silicon), and crafted components
-- **Station-based interactions**: Different stations provide unique capabilities (extractors, assemblers, chargers,
-  chests)
-- **Sparse rewards**: Agents receive rewards only upon successfully crafting target items (hearts)
+- **Territory control**: Capture and defend junctions to score points each tick
+- **Role specialization**: Four roles (Miner, Aligner, Scrambler, Scout) with distinct capabilities and dependencies
+- **Dense rewards**: Agents receive reward every tick proportional to territory controlled
 - **Partial observability**: Agents have limited visibility of the environment
-- **Required multi-agent cooperation**: Agents must coordinate to efficiently use shared resources and stations, while
-  only communicating through movement and emotes (❤️, 🔄, 💯, etc.)
+- **Required multi-agent cooperation**: No single role can succeed alone; Miners need Aligners to capture junctions,
+  Aligners need Miners for resources, Scramblers must clear enemy territory for Aligners to advance
 
 # About the tournament
 
