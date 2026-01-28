@@ -358,7 +358,7 @@ class CogsGuardMission(Config):
             num_agents=num_cogs,
             resource_names=resources_list,
             vibe_names=vibe_names,
-            obs=ObsConfig(global_obs=GlobalObsConfig(stats_obs=collective_stats_obs)),
+            obs=ObsConfig(global_obs=GlobalObsConfig(stats_obs=collective_stats_obs, local_position=True)),
             actions=ActionsConfig(
                 move=MoveActionConfig(consumed_resources={"energy": self.cog.move_energy_cost}),
                 noop=NoopActionConfig(),
