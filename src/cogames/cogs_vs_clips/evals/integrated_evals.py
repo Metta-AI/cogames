@@ -11,7 +11,6 @@ from cogames.cogs_vs_clips.variants import (
     EmptyBaseVariant,
     ExtractorHeartTuneVariant,
     HeartChorusVariant,
-    LonelyHeartVariant,
     PackRatVariant,
     QuadrantBuildingsVariant,
     ResourceBottleneckVariant,
@@ -127,7 +126,6 @@ EasyHeartsMission = Mission(
     description="Simplified heart crafting with generous caps and extractor base.",
     site=HELLO_WORLD,
     variants=[
-        LonelyHeartVariant(),
         HeartChorusVariant(),
         PackRatVariant(),
     ],

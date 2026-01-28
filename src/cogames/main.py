@@ -251,7 +251,7 @@ def tutorial_cmd(
 
         console.print(
             "[bold green]REFERENCE DOSSIERS[/bold green]\n"
-            "- [link=packages/cogames/MISSION.md]MISSION.md[/link]: Machina VII deployment orders.\n"
+            "- [link=packages/cogames/MISSION.md]MISSION.md[/link]: CogsGuard deployment orders.\n"
             "- [link=packages/cogames/README.md]README.md[/link]: System overview and CLI quick start.\n"
             "- [link=packages/cogames/TECHNICAL_MANUAL.md]TECHNICAL_MANUAL.md[/link]: FACE sensor/command schematics."
         )
@@ -2058,7 +2058,7 @@ def docs_cmd(
     package_root = Path(__file__).parent.parent.parent
     docs_map: dict[str, tuple[Path, str]] = {
         "readme": (package_root / "README.md", "CoGames overview and documentation"),
-        "mission": (package_root / "MISSION.md", "Mission briefing for Machina VII Deployment"),
+        "mission": (package_root / "MISSION.md", "Mission briefing for CogsGuard Deployment"),
         "technical_manual": (package_root / "TECHNICAL_MANUAL.md", "Technical manual for Cogames"),
         "scripted_agent": (
             Path(__file__).parent / "docs" / "SCRIPTED_AGENT.md",
