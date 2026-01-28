@@ -368,7 +368,7 @@ class CogsGuardMission(Config):
                 update={
                     "rewards": AgentRewards(
                         collective_stats={
-                            "aligned.junction.held": 1.0 / self.max_steps / num_cogs,
+                            "aligned.junction.held": 1.0 / self.max_steps,
                         },
                     ),
                 }
