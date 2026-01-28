@@ -37,6 +37,7 @@ class ScoredMatchLike(Protocol):
     assignments: list[int]
     policy_version_ids: list[UUID]
     policy_scores: dict[UUID, float]
+    policy_agent_counts: Mapping[UUID, int]
 
 
 class Scorer(Protocol):
@@ -45,18 +46,6 @@ class Scorer(Protocol):
         policy_version_ids: Sequence[UUID],
         matches: Sequence[ScoredMatchLike],
     ) -> dict[UUID, float]: ...
-
-
-def _count_policy_agents(
-    assignments: Sequence[int],
-    policy_version_ids: Sequence[UUID],
-) -> dict[UUID, int]:
-    counts: dict[UUID, int] = {}
-    for policy_idx in assignments:
-        if policy_idx < len(policy_version_ids):
-            pv = policy_version_ids[policy_idx]
-            counts[pv] = counts.get(pv, 0) + 1
-    return counts
 
 
 def compute_weighted_scores(
@@ -73,14 +62,10 @@ def compute_weighted_scores(
     weight_totals: dict[UUID, float] = {pv: 0.0 for pv in policy_version_ids}
 
     for match in matches:
-        total_agents = len(match.assignments)
+        policy_agent_counts = match.policy_agent_counts
+        total_agents = sum(policy_agent_counts.values())
         if total_agents == 0:
             continue
-
-        policy_agent_counts = _count_policy_agents(
-            match.assignments,
-            match.policy_version_ids,
-        )
 
         for pv, score in match.policy_scores.items():
             if pv not in weighted_sums:
@@ -104,10 +89,8 @@ class WeightedScorer:
 
 def compute_average_scores_per_agent(
     total_scores: Mapping[UUID, float],
-    assignments: Sequence[int],
-    policy_version_ids: Sequence[UUID],
+    agent_counts: Mapping[UUID, int],
 ) -> dict[UUID, float]:
-    agent_counts = _count_policy_agents(assignments, policy_version_ids)
     return {pv: total_score / max(agent_counts.get(pv, 0), 1) for pv, total_score in total_scores.items()}
 
 
