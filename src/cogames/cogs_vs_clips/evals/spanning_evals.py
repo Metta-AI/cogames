@@ -15,7 +15,6 @@ from cogames.cogs_vs_clips.variants import (
     EmptyBaseVariant,
     EnergizedVariant,
     ExtractorHeartTuneVariant,
-    LonelyHeartVariant,
     PackRatVariant,
     QuadrantBuildingsVariant,
     ResourceBottleneckVariant,
@@ -297,7 +296,6 @@ VibeCheckEasy = Mission(
     variants=[
         EmptyBaseVariant(),
         VibeCheckMin2Variant(),
-        LonelyHeartVariant(),
     ],
 )
 
@@ -326,7 +324,6 @@ EasyHeartsTraining = Mission(
     description="Simplified heart crafting with generous caps and extractor base.",
     site=TRAINING_FACILITY,
     variants=[
-        LonelyHeartVariant(),
         PackRatVariant(),
     ],
 )
@@ -336,7 +333,6 @@ EasyHeartsSmallWorld = Mission(
     description="Simplified heart crafting with generous caps and extractor base.",
     site=SMALL_HELLO_WORLD,
     variants=[
-        LonelyHeartVariant(),
         PackRatVariant(),
     ],
 )
@@ -346,7 +342,6 @@ EasyHeartsMediumWorld = Mission(
     description="Simplified heart crafting with generous caps and extractor base.",
     site=MEDIUM_HELLO_WORLD,
     variants=[
-        LonelyHeartVariant(),
         PackRatVariant(),
     ],
 )
@@ -356,7 +351,6 @@ EasyHeartsLargeWorld = Mission(
     description="Simplified heart crafting with generous caps and extractor base.",
     site=LARGE_HELLO_WORLD,
     variants=[
-        LonelyHeartVariant(),
         PackRatVariant(),
     ],
 )

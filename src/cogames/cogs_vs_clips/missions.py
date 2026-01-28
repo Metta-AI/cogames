@@ -16,7 +16,6 @@ from cogames.cogs_vs_clips.variants import (
     ExtractorHeartTuneVariant,
     HeartChorusVariant,
     InventoryHeartTuneVariant,
-    LonelyHeartVariant,
     PackRatVariant,
     SharedRewardsVariant,
     VibeCheckMin2Variant,
@@ -29,7 +28,7 @@ HarvestMission = Mission(
     name="harvest",
     description="Collect resources, assemble hearts, and deposit them in the chest. Make sure to stay charged!",
     site=TRAINING_FACILITY,
-    variants=[ExtractorHeartTuneVariant(hearts=10), PackRatVariant(), LonelyHeartVariant()],
+    variants=[ExtractorHeartTuneVariant(hearts=10), PackRatVariant()],
 )
 
 VibeCheckMission = Mission(
@@ -49,7 +48,6 @@ RepairMission = Mission(
     variants=[
         InventoryHeartTuneVariant(hearts=1),
         ExtractorHeartTuneVariant(hearts=10),
-        LonelyHeartVariant(),
     ],
 )  # If you get only two hearts you failed.
 
@@ -60,7 +58,6 @@ EasyHeartsTrainingMission = Mission(
     description="Simplified heart crafting with generous caps and extractor base.",
     site=TRAINING_FACILITY,
     variants=[
-        LonelyHeartVariant(),
         HeartChorusVariant(),
         PackRatVariant(),
     ],
@@ -72,7 +69,6 @@ EasyHeartsHelloWorldMission = Mission(
     description="Simplified heart crafting with generous caps and extractor base.",
     site=HELLO_WORLD,
     variants=[
-        LonelyHeartVariant(),
         HeartChorusVariant(),
         PackRatVariant(),
     ],

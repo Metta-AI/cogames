@@ -32,47 +32,6 @@ class DarkSideVariant(MissionVariant):
         mission.energy_regen_amount = 0
 
 
-class LonelyHeartVariant(MissionVariant):
-    name: str = "lonely_heart"
-    description: str = "Making hearts for one agent is easy."
-
-    @override
-    def modify_mission(self, mission):
-        mission.assembler.first_heart_cost = 1
-        mission.assembler.additional_heart_cost = 0
-        mission.heart_capacity = max(mission.heart_capacity, 255)
-
-    @override
-    def modify_env(self, mission, env):
-        simplified_inputs = {"carbon": 1, "oxygen": 1, "germanium": 1, "silicon": 1, "energy": 1}
-
-        assembler = env.game.objects["assembler"]
-        if not isinstance(assembler, AssemblerConfig):
-            raise TypeError("Expected 'assembler' to be AssemblerConfig")
-
-        for idx, proto in enumerate(assembler.protocols):
-            if proto.output_resources.get("heart", 0) == 0:
-                continue
-            updated = proto.model_copy(deep=True)
-            updated.input_resources = dict(simplified_inputs)
-            assembler.protocols[idx] = updated
-
-        germanium = env.game.objects["germanium_extractor"]
-        if not isinstance(germanium, AssemblerConfig):
-            raise TypeError("Expected 'germanium_extractor' to be AssemblerConfig")
-        germanium.max_uses = 0
-        updated_protocols: list[ProtocolConfig] = []
-        for proto in germanium.protocols:
-            new_proto = proto.model_copy(deep=True)
-            output = dict(new_proto.output_resources)
-            output["germanium"] = max(output.get("germanium", 0), 1)
-            new_proto.output_resources = output
-            new_proto.cooldown = max(new_proto.cooldown, 1)
-            updated_protocols.append(new_proto)
-        if updated_protocols:
-            germanium.protocols = updated_protocols
-
-
 class SuperChargedVariant(MissionVariant):
     name: str = "super_charged"
     description: str = "The sun is shining on you. You recharge faster."
@@ -666,7 +625,6 @@ VARIANTS: list[MissionVariant] = [
     ForestVariant(),
     HeartChorusVariant(),
     InventoryHeartTuneVariant(),
-    LonelyHeartVariant(),
     MinedOutVariant(),
     PackRatVariant(),
     QuadrantBuildingsVariant(),

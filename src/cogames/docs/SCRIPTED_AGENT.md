@@ -9,8 +9,9 @@ This package provides the CogsGuard team-play policy, two progressively capable 
 policy:
 
 1. **CogsGuard** - Vibe-based multi-role policy for the CogsGuard arena
-2. **BaselineAgent** - Core functionality: exploration, resource gathering, heart assembly (single/multi-agent)
-3. **UnclippingAgent** - Extends BaselineAgent with extractor unclipping capability
+2. **BaselineAgent** - Core functionality for legacy heart-production game: exploration, resource gathering, heart
+   assembly
+3. **UnclippingAgent** - Extends BaselineAgent with extractor unclipping capability (legacy game)
 
 ## Architecture
 
