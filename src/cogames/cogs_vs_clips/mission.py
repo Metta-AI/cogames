@@ -294,7 +294,7 @@ class CogsGuardMission(Config):
     variants: list[MissionVariant] = Field(default_factory=list)
 
     # Game parameters
-    max_steps: int = Field(default=1000)
+    max_steps: int = Field(default=10000)
     inventory_regen_interval: int = Field(default=1)
 
     # Agent configuration
@@ -311,13 +311,13 @@ class CogsGuardMission(Config):
 
     # Clips Behavior - scramble cogs junctions to neutral
     # Note: must start after initial_clips fires at timestep 10 (events fire alphabetically)
-    clips_scramble_start: int = Field(default=100)
-    clips_scramble_interval: int = Field(default=300)
+    clips_scramble_start: int = Field(default=50)
+    clips_scramble_interval: int = Field(default=100)
     clips_scramble_radius: int = Field(default=25)
 
     # Clips Behavior - align neutral junctions to clips
-    clips_align_start: int = Field(default=300)
-    clips_align_interval: int = Field(default=300)
+    clips_align_start: int = Field(default=100)
+    clips_align_interval: int = Field(default=100)
     clips_align_radius: int = Field(default=25)
 
     # Station configs
@@ -371,7 +371,7 @@ class CogsGuardMission(Config):
                         "aligned.junction.held": statReward(
                             "aligned.junction.held",
                             source=StatsSource.COLLECTIVE,
-                            weight=1.0 / self.max_steps,
+                            weight=100.0 / self.max_steps,
                             denoms=[numObjects("junction")],
                         ),
                     },
@@ -418,6 +418,7 @@ class CogsGuardMission(Config):
                     timesteps=periodic(
                         start=self.clips_scramble_start,
                         period=self.clips_scramble_interval,
+                        end_period=self.clips_scramble_interval // 5,
                         end=self.max_steps,
                     ),
                     filters=[
@@ -433,6 +434,7 @@ class CogsGuardMission(Config):
                     timesteps=periodic(
                         start=self.clips_align_start,
                         period=self.clips_align_interval,
+                        end_period=self.clips_align_interval // 5,
                         end=self.max_steps,
                     ),
                     filters=[
