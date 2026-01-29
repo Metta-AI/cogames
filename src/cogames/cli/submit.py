@@ -196,6 +196,7 @@ def copy_files_maintaining_structure(files: list[Path], dest_dir: Path) -> None:
 _SEASON_VALIDATION_MISSIONS: dict[str, str] = {
     "beta": "training_facility.harvest",
     "beta-cogsguard": "cogsguard_arena.basic",
+    "beta-cvc": "machina_1.open_world",
 }
 _DEFAULT_VALIDATION_MISSION = "cogsguard_arena.basic"
 
