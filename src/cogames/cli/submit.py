@@ -198,7 +198,7 @@ _SEASON_VALIDATION_MISSIONS: dict[str, str] = {
     "beta-cogsguard": "cogsguard_arena.basic",
     "beta-cvc": "machina_1.open_world",
 }
-_DEFAULT_VALIDATION_MISSION = "cogsguard_arena.basic"
+_DEFAULT_VALIDATION_MISSION = "cogsguard_machina_1.basic"
 
 
 def get_validation_mission_for_season(season: str | None = None) -> str:

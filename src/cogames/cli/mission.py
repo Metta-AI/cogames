@@ -440,17 +440,17 @@ def list_missions(site_filter: Optional[str] = None) -> None:
     console.print(table)
 
     console.print("\nTo set [bold blue]-m[/bold blue]:")
-    console.print("  • Use [blue]<site>.<mission>[/blue] (e.g., cogsguard_arena.basic)")
+    console.print("  • Use [blue]<site>.<mission>[/blue] (e.g., cogsguard_machina_1.basic)")
     console.print("  • Or pass a mission config file path")
-    console.print("  • List a site's missions: [blue]cogames missions cogsguard_arena[/blue]")
+    console.print("  • List a site's missions: [blue]cogames missions cogsguard_machina_1[/blue]")
     console.print("\nCogs:")
     console.print("  • [green]--cogs N[/green] or [green]-c N[/green]")
     console.print("\n[bold green]Examples:[/bold green]")
     console.print("  cogames missions")
-    console.print("  cogames missions cogsguard_arena")
-    console.print("  cogames play --mission [blue]cogsguard_arena.basic[/blue]")
-    console.print("  cogames play --mission [blue]cogsguard_arena.basic[/blue] --cogs [green]8[/green]")
-    console.print("  cogames train --mission [blue]cogsguard_arena.basic[/blue] --cogs [green]4[/green]")
+    console.print("  cogames missions cogsguard_machina_1")
+    console.print("  cogames play --mission [blue]cogsguard_machina_1.basic[/blue]")
+    console.print("  cogames play --mission [blue]cogsguard_machina_1.basic[/blue] --cogs [green]8[/green]")
+    console.print("  cogames train --mission [blue]cogsguard_machina_1.basic[/blue] --cogs [green]4[/green]")
 
 
 def list_evals() -> None:

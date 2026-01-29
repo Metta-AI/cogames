@@ -4,10 +4,11 @@ from cogames.cogs_vs_clips.mission import AnyMission, CogsGuardMission, Mission
 from cogames.cogs_vs_clips.mission_utils import get_map
 from cogames.cogs_vs_clips.sites import (
     COGSGUARD_ARENA,
+    COGSGUARD_MACHINA_1,
     HELLO_WORLD,
     MACHINA_1,
     TRAINING_FACILITY,
-    make_cogsguard_arena_site,
+    make_cogsguard_machina1_site,
 )
 from cogames.cogs_vs_clips.variants import (
     AssemblerDrawsFromChestsVariant,
@@ -119,19 +120,27 @@ Machina1OpenWorldSharedRewardsMission = Mission(
 
 
 def make_cogsguard_mission(num_agents: int = 10, max_steps: int = 10000) -> CogsGuardMission:
-    """Create a CogsGuard mission with configurable parameters."""
+    """Create a CogsGuard mission with configurable parameters (Machina1 layout)."""
     return CogsGuardMission(
         name="basic",
-        description="Basic CogsGuard mission",
-        site=make_cogsguard_arena_site(num_agents),
+        description="Basic CogsGuard mission (Machina1 layout)",
+        site=make_cogsguard_machina1_site(num_agents),
         num_cogs=num_agents,
         max_steps=max_steps,
     )
 
 
+CogsGuardMachina1Mission = CogsGuardMission(
+    name="basic",
+    description="CogsGuard Machina1 - compete to control junctions with gear abilities.",
+    site=COGSGUARD_MACHINA_1,
+    num_cogs=10,
+    max_steps=1000,
+)
+
 CogsGuardBasicMission = CogsGuardMission(
     name="basic",
-    description="CogsGuard arena - compete to control junctions with gear abilities.",
+    description="CogsGuard arena - compact training map with gear abilities.",
     site=COGSGUARD_ARENA,
     num_cogs=10,
     max_steps=1000,
@@ -157,6 +166,7 @@ _LEGACY_MISSIONS: list[Mission] = [
 ]
 
 _CORE_MISSIONS: list[AnyMission] = [
+    CogsGuardMachina1Mission,
     CogsGuardBasicMission,
     *(_LEGACY_MISSIONS if _INCLUDE_LEGACY_MISSIONS else []),
 ]

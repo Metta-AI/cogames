@@ -296,7 +296,7 @@ This command has three modes:
 
 [bold]1. List sites:[/bold] Run with no arguments to see all available sites.
 
-[bold]2. List missions at a site:[/bold] Pass a site name (e.g., 'cogsguard_arena') to see its missions.
+[bold]2. List missions at a site:[/bold] Pass a site name (e.g., 'cogsguard_machina_1') to see its missions.
 
 [bold]3. Describe a mission:[/bold] Use -m to describe a specific mission. Only in this mode do \
 --cogs, --variant, --format, and --save have any effect.""",
@@ -305,9 +305,9 @@ This command has three modes:
 
   [cyan]cogames missions[/cyan]                                    List all sites
 
-  [cyan]cogames missions cogsguard_arena[/cyan]                     List missions at site
+  [cyan]cogames missions cogsguard_machina_1[/cyan]                     List missions at site
 
-  [cyan]cogames missions -m cogsguard_arena.basic[/cyan]           Describe a mission
+  [cyan]cogames missions -m cogsguard_machina_1.basic[/cyan]           Describe a mission
 
   [cyan]cogames missions -m arena --format json[/cyan]             Output as JSON""",
     add_help_option=False,
@@ -320,7 +320,7 @@ def games_cmd(
     site: Optional[str] = typer.Argument(
         None,
         metavar="SITE",
-        help="Filter by site (e.g., cogsguard_arena)",
+        help="Filter by site (e.g., cogsguard_machina_1)",
     ),
     # --- Describe (requires -m) ---
     mission: Optional[str] = typer.Option(
@@ -503,13 +503,13 @@ Log mode is non-interactive and doesn't support manual control.
 """,
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames play -m cogsguard_arena.basic[/cyan]                        Interactive
+[cyan]cogames play -m cogsguard_machina_1.basic[/cyan]                        Interactive
 
-[cyan]cogames play -m cogsguard_arena.basic -p class=random[/cyan]        Random policy
+[cyan]cogames play -m cogsguard_machina_1.basic -p class=random[/cyan]        Random policy
 
-[cyan]cogames play -m cogsguard_arena.basic -c 4 -p class=baseline[/cyan] Baseline, 4 cogs
+[cyan]cogames play -m cogsguard_machina_1.basic -c 4 -p class=baseline[/cyan] Baseline, 4 cogs
 
-[cyan]cogames play -m cogsguard_arena -r unicode[/cyan]                   Terminal mode""",
+[cyan]cogames play -m cogsguard_machina_1 -r unicode[/cyan]                   Terminal mode""",
     add_help_option=False,
 )
 def play_cmd(
@@ -887,12 +887,13 @@ def make_policy(
 
         if trainable:
             console.print(
-                "[dim]Train with: cogames tutorial train -m cogsguard_arena.basic -p class="
+                "[dim]Train with: cogames tutorial train -m cogsguard_machina_1.basic -p class="
                 f"{dest_path.stem}.{policy_class}[/dim]"
             )
         else:
             console.print(
-                f"[dim]Play with: cogames play -m cogsguard_arena.basic -p class={dest_path.stem}.{policy_class}[/dim]"
+                "[dim]Play with: cogames play -m cogsguard_machina_1.basic -p class="
+                f"{dest_path.stem}.{policy_class}[/dim]"
             )
 
     except Exception as exc:  # pragma: no cover - user input
@@ -919,9 +920,9 @@ Use wildcards (*) in mission names to match multiple missions at once.""",
     rich_help_panel="Tutorial",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames tutorial train -m cogsguard_arena.basic[/cyan]                   Basic training
+[cyan]cogames tutorial train -m cogsguard_machina_1.basic[/cyan]                   Basic training
 
-[cyan]cogames tutorial train -m cogsguard_arena.basic -p class=baseline[/cyan]
+[cyan]cogames tutorial train -m cogsguard_machina_1.basic -p class=baseline[/cyan]
                                                                  Train baseline policy
 
 [cyan]cogames tutorial train -p ./train_dir/my_run:v5[/cyan]                  Continue from checkpoint
@@ -1135,15 +1136,15 @@ With one policy, this command is equivalent to `cogames scrimmage`.
     rich_help_panel="Evaluate",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames run -m cogsguard_arena.basic -p lstm[/cyan]               Evaluate single policy
+[cyan]cogames run -m cogsguard_machina_1.basic -p lstm[/cyan]               Evaluate single policy
 
-[cyan]cogames run -m cogsguard_arena -p ./train_dir/my_run:v5[/cyan]     Evaluate a checkpoint bundle
+[cyan]cogames run -m cogsguard_machina_1 -p ./train_dir/my_run:v5[/cyan]     Evaluate a checkpoint bundle
 
 [cyan]cogames run -S integrated_evals -p ./train_dir/my_run:v5[/cyan]    Evaluate on mission set
 
 [cyan]cogames run -m 'arena.*' -p lstm -p random -e 20[/cyan]            Evaluate multiple policies together
 
-[cyan]cogames run -m cogsguard_arena -p ./train_dir/my_run:v5,proportion=3 -p class=random,proportion=5[/cyan]
+[cyan]cogames run -m cogsguard_machina_1 -p ./train_dir/my_run:v5,proportion=3 -p class=random,proportion=5[/cyan]
                                                              Evaluate policies in 3:5 mix""",
     add_help_option=False,
 )
@@ -1344,7 +1345,7 @@ def pickup_cmd(
     ctx: typer.Context,
     # --- Mission ---
     mission: str = typer.Option(
-        "cogsguard_arena.basic",
+        "cogsguard_machina_1.basic",
         "--mission",
         "-m",
         metavar="MISSION",
