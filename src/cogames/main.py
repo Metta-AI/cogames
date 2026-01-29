@@ -37,7 +37,7 @@ from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import train as train_module
 from cogames.cli.base import console
-from cogames.cli.client import TournamentServerClient
+from cogames.cli.client import TournamentServerClient, fetch_default_season
 from cogames.cli.docsync import docsync
 from cogames.cli.leaderboard import (
     leaderboard_cmd,
@@ -1736,6 +1736,17 @@ def diagnose_cmd(
     subprocess.run(cmd, check=True)
 
 
+def _resolve_default_season(server: str) -> str:
+    try:
+        season = fetch_default_season(server)
+        console.print(f"[dim]Using default season: {season}[/dim]")
+        return season
+    except Exception as e:
+        console.print(f"[red]Could not fetch default season from server:[/red] {e}")
+        console.print("Specify a season explicitly with [cyan]--season[/cyan]")
+        raise typer.Exit(1) from None
+
+
 @app.command(
     name="validate-policy",
     help="Validate the policy loads and runs for at least a single step",
@@ -1758,12 +1769,19 @@ def validate_policy_cmd(
         help="Path to a Python setup script to run before loading the policy",
         rich_help_panel="Policy",
     ),
-    season: str = typer.Option(
-        "beta-cogsguard",
+    season: Optional[str] = typer.Option(
+        None,
         "--season",
         metavar="SEASON",
         help="Tournament season (determines which game to validate against)",
         rich_help_panel="Tournament",
+    ),
+    server: str = typer.Option(
+        DEFAULT_SUBMIT_SERVER,
+        "--server",
+        metavar="URL",
+        help="Tournament server URL (used to resolve default season)",
+        rich_help_panel="Server",
     ),
     _help: bool = typer.Option(
         False,
@@ -1775,6 +1793,9 @@ def validate_policy_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
+    if season is None:
+        season = _resolve_default_season(server)
+
     if setup_script:
         import subprocess
         import sys
@@ -1869,8 +1890,8 @@ def upload_cmd(
         rich_help_panel="Files",
     ),
     # --- Validation ---
-    season: str = typer.Option(
-        "beta-cogsguard",
+    season: Optional[str] = typer.Option(
+        None,
         "--season",
         metavar="SEASON",
         help="Tournament season (determines which game to validate against)",
@@ -1914,6 +1935,9 @@ def upload_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
+    if season is None:
+        season = _resolve_default_season(server)
+
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
         for kv in init_kwarg:
@@ -1956,8 +1980,8 @@ def submit_cmd(
         metavar="POLICY",
         help="Policy name (e.g., 'my-policy' or 'my-policy:v3' for specific version)",
     ),
-    season: str = typer.Option(
-        "beta-cogsguard",
+    season: Optional[str] = typer.Option(
+        None,
         "--season",
         metavar="SEASON",
         help="Tournament season name",
@@ -1989,6 +2013,9 @@ def submit_cmd(
     ),
 ) -> None:
     import httpx
+
+    if season is None:
+        season = _resolve_default_season(server)
 
     client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
     if not client:
