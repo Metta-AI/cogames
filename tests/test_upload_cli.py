@@ -89,7 +89,17 @@ def test_upload_command_fails_without_auth(
     httpserver.expect_request(
         "/tournament/seasons",
         method="GET",
-    ).respond_with_json([{"name": "test-season", "is_default": True}])
+    ).respond_with_json(
+        [
+            {
+                "name": "test-season",
+                "is_default": True,
+                "validation_mission": "cogsguard_machina_1.basic",
+                "summary": "",
+                "pools": [],
+            }
+        ]
+    )
 
     # Use tmp_path as HOME but don't create any token file
     result = subprocess.run(
@@ -129,7 +139,17 @@ def _setup_mock_upload_server(
     httpserver.expect_request(
         "/tournament/seasons",
         method="GET",
-    ).respond_with_json([{"name": "test-season", "is_default": True}])
+    ).respond_with_json(
+        [
+            {
+                "name": "test-season",
+                "is_default": True,
+                "validation_mission": "cogsguard_machina_1.basic",
+                "summary": "",
+                "pools": [],
+            }
+        ]
+    )
 
     httpserver.expect_request(
         "/stats/policies/submit/presigned-url",

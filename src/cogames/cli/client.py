@@ -13,17 +13,24 @@ from cogames.cli.login import CoGamesAuthenticator
 T = TypeVar("T")
 
 
-def fetch_default_season(server_url: str) -> str:
+def fetch_default_season(server_url: str) -> SeasonInfo:
     with httpx.Client(base_url=server_url, timeout=10.0) as client:
         resp = client.get("/tournament/seasons")
         resp.raise_for_status()
         seasons = resp.json()
         for s in seasons:
             if s.get("is_default"):
-                return s["name"]
+                return SeasonInfo.model_validate(s)
         if seasons:
-            return seasons[0]["name"]
+            return SeasonInfo.model_validate(seasons[0])
     raise RuntimeError("No seasons available from server")
+
+
+def fetch_season_info(server_url: str, season_name: str) -> SeasonInfo:
+    with httpx.Client(base_url=server_url, timeout=10.0) as client:
+        resp = client.get(f"/tournament/seasons/{season_name}")
+        resp.raise_for_status()
+        return SeasonInfo.model_validate(resp.json())
 
 
 class PolicyVersionInfo(BaseModel):

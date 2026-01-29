@@ -37,7 +37,7 @@ from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import train as train_module
 from cogames.cli.base import console
-from cogames.cli.client import TournamentServerClient, fetch_default_season
+from cogames.cli.client import SeasonInfo, TournamentServerClient, fetch_default_season, fetch_season_info
 from cogames.cli.docsync import docsync
 from cogames.cli.leaderboard import (
     leaderboard_cmd,
@@ -1911,13 +1911,17 @@ def diagnose_cmd(
     subprocess.run(cmd, check=True)
 
 
-def _resolve_default_season(server: str) -> str:
+def _resolve_season(server: str, season_name: str | None = None) -> SeasonInfo:
     try:
-        season = fetch_default_season(server)
-        console.print(f"[dim]Using default season: {season}[/dim]")
-        return season
+        if season_name is not None:
+            info = fetch_season_info(server, season_name)
+            console.print(f"[dim]Using season: {info.name}[/dim]")
+        else:
+            info = fetch_default_season(server)
+            console.print(f"[dim]Using default season: {info.name}[/dim]")
+        return info
     except Exception as e:
-        console.print(f"[red]Could not fetch default season from server:[/red] {e}")
+        console.print(f"[red]Could not fetch season from server:[/red] {e}")
         console.print("Specify a season explicitly with [cyan]--season[/cyan]")
         raise typer.Exit(1) from None
 
@@ -1968,8 +1972,7 @@ def validate_policy_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    if season is None:
-        season = _resolve_default_season(server)
+    season_info = _resolve_season(server, season)
 
     if setup_script:
         import subprocess
@@ -1994,7 +1997,7 @@ def validate_policy_cmd(
         console.print("[green]Setup script completed[/green]")
 
     policy_spec = get_policy_spec(ctx, policy)
-    validate_policy_spec(policy_spec, season)
+    validate_policy_spec(policy_spec, season_info.validation_mission)
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
 
@@ -2110,8 +2113,7 @@ def upload_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    if season is None:
-        season = _resolve_default_season(server)
+    season_info = _resolve_season(server, season)
 
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
@@ -2130,7 +2132,7 @@ def upload_cmd(
         skip_validation=skip_validation,
         init_kwargs=init_kwargs if init_kwargs else None,
         setup_script=setup_script,
-        season=season,
+        validation_mission=season_info.validation_mission,
     )
 
     if result:
@@ -2189,8 +2191,8 @@ def submit_cmd(
 ) -> None:
     import httpx
 
-    if season is None:
-        season = _resolve_default_season(server)
+    season_info = _resolve_season(server, season)
+    season_name = season_info.name
 
     client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
     if not client:
@@ -2203,7 +2205,7 @@ def submit_cmd(
         raise typer.Exit(1) from None
 
     version_str = f"[dim]:v{version}[/dim]" if version is not None else "[dim] (latest)[/dim]"
-    console.print(f"[bold]Submitting {name}[/bold]{version_str} to season '{season}'\n")
+    console.print(f"[bold]Submitting {name}[/bold]{version_str} to season '{season_name}'\n")
 
     with client:
         pv = client.lookup_policy_version(name=name, version=version)
@@ -2214,12 +2216,12 @@ def submit_cmd(
             raise typer.Exit(1)
 
         try:
-            result = client.submit_to_season(season, pv.id)
+            result = client.submit_to_season(season_name, pv.id)
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 404:
-                console.print(f"[red]Season '{season}' not found[/red]")
+                console.print(f"[red]Season '{season_name}' not found[/red]")
             elif exc.response.status_code == 409:
-                console.print(f"[red]Policy already submitted to season '{season}'[/red]")
+                console.print(f"[red]Policy already submitted to season '{season_name}'[/red]")
             else:
                 console.print(f"[red]Submit failed with status {exc.response.status_code}[/red]")
                 console.print(f"[dim]{exc.response.text}[/dim]")
@@ -2228,11 +2230,11 @@ def submit_cmd(
             console.print(f"[red]Submit failed:[/red] {exc}")
             raise typer.Exit(1) from exc
 
-    console.print(f"\n[bold green]Submitted to season '{season}'[/bold green]")
+    console.print(f"\n[bold green]Submitted to season '{season_name}'[/bold green]")
     if result.pools:
         console.print(f"[dim]Pools: {', '.join(result.pools)}[/dim]")
-    console.print(f"[dim]Results:[/dim] {results_url_for_season(server, season)}")
-    console.print(f"[dim]CLI:[/dim] cogames leaderboard --season {season}")
+    console.print(f"[dim]Results:[/dim] {results_url_for_season(server, season_name)}")
+    console.print(f"[dim]CLI:[/dim] cogames leaderboard --season {season_name}")
 
 
 @app.command(
