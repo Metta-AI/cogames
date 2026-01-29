@@ -121,7 +121,7 @@ def validate_bundle_in_isolation(policy_zip: Path, console: Console, season: str
         env["UV_NO_CACHE"] = "1"
 
         res = subprocess.run(
-            ["uv", "run", "cogames", "validate-policy", "--policy", f"file://./{bundle_name}"],
+            ["uv", "run", "cogames", "validate-policy", f"file://./{bundle_name}"],
             cwd=temp_dir,
             capture_output=True,
             text=True,
@@ -145,9 +145,9 @@ def validate_bundle_in_isolation(policy_zip: Path, console: Console, season: str
             shutil.rmtree(temp_dir)
 
 
-def get_latest_cogames_version() -> str:
-    """Get the latest published cogames version."""
-    response = httpx.get("https://pypi.org/pypi/cogames/json")
+def get_latest_pypi_version(package: str) -> str:
+    """Get the latest published version of a package from PyPI."""
+    response = httpx.get(f"https://pypi.org/pypi/{package}/json")
     response.raise_for_status()
     return response.json()["info"]["version"]
 
@@ -155,17 +155,18 @@ def get_latest_cogames_version() -> str:
 def create_temp_validation_env() -> Path:
     """Create a temporary directory with a minimal pyproject.toml.
 
-    The pyproject.toml depends on the latest published cogames package.
+    The pyproject.toml depends on the latest published cogames and cogames-agents packages.
     """
     temp_dir = Path(tempfile.mkdtemp(prefix="cogames_submit_"))
 
-    latest_cogames_version = get_latest_cogames_version()
+    latest_cogames_version = get_latest_pypi_version("cogames")
+    latest_agents_version = get_latest_pypi_version("cogames-agents")
 
     pyproject_content = f"""[project]
 name = "cogames-submission-validator"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["cogames=={latest_cogames_version}"]
+dependencies = ["cogames=={latest_cogames_version}", "cogames-agents=={latest_agents_version}"]
 
 [build-system]
 requires = ["setuptools>=42"]
@@ -296,11 +297,10 @@ def validate_policy_in_isolation(
             "run",
             "cogames",
             "validate-policy",
-            "--policy",
-            policy_arg,
         ]
         if setup_script:
             validate_cmd.extend(["--setup-script", setup_script])
+        validate_cmd.append(policy_arg)
 
         _run_from_tmp_dir(validate_cmd)
 
