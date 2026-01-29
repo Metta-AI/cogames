@@ -134,7 +134,7 @@ CogsGuardMachina1Mission = CogsGuardMission(
     name="basic",
     description="CogsGuard Machina1 - compete to control junctions with gear abilities.",
     site=COGSGUARD_MACHINA_1,
-    num_cogs=10,
+    num_cogs=5,
     max_steps=10000,
 )
 
