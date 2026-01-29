@@ -5,6 +5,7 @@ from cogames.cogs_vs_clips.mission import MissionVariant
 from cogames.cogs_vs_clips.procedural import BaseHubVariant, MachinaArenaVariant
 from mettagrid.config.action_config import VibeTransfer
 from mettagrid.config.mettagrid_config import AssemblerConfig, ChestConfig, ProtocolConfig, ResourceLimitsConfig
+from mettagrid.config.reward_config import statReward
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.mapgen.scenes.base_hub import DEFAULT_EXTRACTORS as HUB_EXTRACTORS
@@ -164,15 +165,11 @@ class HeartChorusVariant(MissionVariant):
     @override
     def modify_env(self, mission, env):
         # Supplemental shaping: focus rewards on the acting agent for heart progress.
-        rewards = dict(env.game.agent.rewards.stats)
-        rewards.update(
-            {
-                "assembler.heart.created": 1.0,
-                "chest.heart.deposited_by_agent": 1.0,
-                "chest.heart.withdrawn_by_agent": -1.0,
-            }
+        env.game.agent.rewards["assembler.heart.created"] = statReward("assembler.heart.created")
+        env.game.agent.rewards["chest.heart.deposited_by_agent"] = statReward("chest.heart.deposited_by_agent")
+        env.game.agent.rewards["chest.heart.withdrawn_by_agent"] = statReward(
+            "chest.heart.withdrawn_by_agent", weight=-1.0
         )
-        env.game.agent.rewards.stats = rewards
 
 
 class TinyHeartProtocolsVariant(MissionVariant):
@@ -604,10 +601,10 @@ class SharedRewardsVariant(MissionVariant):
     @override
     def modify_env(self, mission, env):
         num_cogs = mission.num_cogs if mission.num_cogs is not None else mission.site.min_cogs
-        rewards = dict(env.game.agent.rewards.stats)
-        rewards["chest.heart.deposited_by_agent"] = 0
-        rewards["chest.heart.amount"] = 1 / num_cogs
-        env.game.agent.rewards.stats = rewards
+        env.game.agent.rewards["chest.heart.deposited_by_agent"] = statReward(
+            "chest.heart.deposited_by_agent", weight=0
+        )
+        env.game.agent.rewards["chest.heart.amount"] = statReward("chest.heart.amount", weight=1 / num_cogs)
 
 
 # TODO - validate that all variant names are unique
