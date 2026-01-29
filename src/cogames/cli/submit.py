@@ -106,10 +106,8 @@ def _zip_directory_bundle(bundle_dir: Path) -> Path:
     return Path(zip_path)
 
 
-def validate_bundle_in_isolation(policy_zip: Path, console: Console, season: str | None = None) -> bool:
-    """Validate a checkpoint bundle zip works in isolated environment."""
-    mission_name = get_validation_mission_for_season(season)
-    console.print(f"[dim]Testing policy bundle can run 10 steps on {mission_name}...[/dim]")
+def validate_bundle_in_isolation(policy_zip: Path, console: Console, validation_mission: str) -> bool:
+    console.print(f"[dim]Testing policy bundle can run 10 steps on {validation_mission}...[/dim]")
 
     temp_dir = None
     try:
@@ -194,37 +192,10 @@ def copy_files_maintaining_structure(files: list[Path], dest_dir: Path) -> None:
             shutil.copy2(file_path, dest_path)
 
 
-_SEASON_VALIDATION_MISSIONS: dict[str, str] = {
-    "beta": "training_facility.harvest",
-    "beta-cogsguard": "cogsguard_arena.basic",
-    "beta-cvc": "machina_1.open_world",
-}
-_DEFAULT_VALIDATION_MISSION = "cogsguard_machina_1.basic"
-
-
-def get_validation_mission_for_season(season: str | None = None) -> str:
-    """Get the appropriate mission for validating policies in a given season."""
-    if season is None:
-        return _DEFAULT_VALIDATION_MISSION
-    return _SEASON_VALIDATION_MISSIONS.get(season, _DEFAULT_VALIDATION_MISSION)
-
-
-def validate_policy_spec(policy_spec: PolicySpec, season: str | None = None) -> None:
-    """Validate policy works.
-
-    Runs a single episode (up to 10 steps) using the same alo rollout flow as `cogames eval`.
-
-    Args:
-        policy_spec: The policy to validate.
-        season: Optional season name to determine which game to validate against.
-    """
+def validate_policy_spec(policy_spec: PolicySpec, validation_mission: str) -> None:
     from cogames.cli.mission import get_mission
 
-    mission_name = get_validation_mission_for_season(season)
-    # Legacy seasons (e.g., "beta") use legacy missions that require include_legacy=True
-    include_legacy = season in _SEASON_VALIDATION_MISSIONS
-    _, env_cfg, _ = get_mission(mission_name, include_legacy=include_legacy)
-    # Run 1 episode for up to 10 steps to validate the policy works
+    _, env_cfg, _ = get_mission(validation_mission, include_legacy=True)
     env_cfg.game.max_steps = 10
     run_single_episode(
         policy_specs=[policy_spec],
@@ -243,16 +214,8 @@ def validate_policy_in_isolation(
     include_files: list[Path],
     console: Console,
     setup_script: str | None = None,
-    season: str | None = None,
+    validation_mission: str = "",
 ) -> bool:
-    """Validate policy works in isolated environment.
-
-    Creates a temp environment with published cogames package,
-    copies include-files, and runs cogames eval for 1 episode with max 10 steps.
-
-    Returns True if validation succeeds, False otherwise.
-    """
-
     def _format_policy_arg(spec: PolicySpec) -> str:
         parts = [f"class={spec.class_path}"]
         if spec.data_path:
@@ -261,8 +224,7 @@ def validate_policy_in_isolation(
             parts.append(f"kw.{key}={value}")
         return ",".join(parts)
 
-    mission_name = get_validation_mission_for_season(season)
-    console.print(f"[dim]Testing policy can run 10 steps on {mission_name}...[/dim]")
+    console.print(f"[dim]Testing policy can run 10 steps on {validation_mission}...[/dim]")
 
     temp_dir = None
     try:
@@ -445,7 +407,7 @@ def _upload_policy_bundle(
     setup_script: str | None,
     skip_validation: bool,
     dry_run: bool,
-    season: str | None = None,
+    validation_mission: str,
 ) -> UploadResult | None:
     bundle_zip, cleanup_bundle_zip = bundle_result
 
@@ -459,7 +421,7 @@ def _upload_policy_bundle(
             return None
 
         if not skip_validation:
-            if not validate_bundle_in_isolation(bundle_zip, console, season=season):
+            if not validate_bundle_in_isolation(bundle_zip, console, validation_mission=validation_mission):
                 console.print("\n[red]Upload aborted due to validation failure.[/red]")
                 return None
         else:
@@ -491,13 +453,8 @@ def upload_policy(
     dry_run: bool = False,
     skip_validation: bool = False,
     setup_script: str | None = None,
-    season: str | None = None,
+    validation_mission: str = "",
 ) -> UploadResult | None:
-    """Upload a policy to CoGames (without submitting to a tournament).
-
-    Returns UploadResult with policy_version_id, name, and version on success.
-    Returns None on failure.
-    """
     from cogames.cli.client import TournamentServerClient
 
     if dry_run:
@@ -524,7 +481,7 @@ def upload_policy(
             setup_script=setup_script,
             skip_validation=skip_validation,
             dry_run=dry_run,
-            season=season,
+            validation_mission=validation_mission,
         )
 
     try:
@@ -583,7 +540,7 @@ def upload_policy(
 
     if not skip_validation:
         if not validate_policy_in_isolation(
-            policy_spec, validated_paths, console, setup_script=setup_script_rel, season=season
+            policy_spec, validated_paths, console, setup_script=setup_script_rel, validation_mission=validation_mission
         ):
             console.print("\n[red]Upload aborted due to validation failure.[/red]")
             return None
