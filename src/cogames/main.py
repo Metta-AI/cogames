@@ -737,7 +737,10 @@ def play_cmd(
         "gui",
         "--render",
         "-r",
-        help="[bold]gui[/bold]=MettaScope, [bold]unicode[/bold]=terminal, [bold]log[/bold]=metrics only",
+        help=(
+            "[bold]gui[/bold]=MettaScope, [bold]vibescope[/bold]=VibeScope, "
+            "[bold]unicode[/bold]=terminal, [bold]log[/bold]=metrics only"
+        ),
         rich_help_panel="Simulation",
     ),
     seed: int = typer.Option(

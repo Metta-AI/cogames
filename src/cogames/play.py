@@ -173,7 +173,7 @@ def play(
         policy_spec: Policy specification (class path and optional data path)
         game_name: Human-readable name of the game (used for logging/metadata)
         seed: Random seed
-        render_mode: Render mode - "gui", "unicode", or "none"
+        render_mode: Render mode - "gui", "vibescope", "unicode", or "none"
         save_replay: Optional directory path to save replay. Directory will be created if it doesn't exist.
             Replay will be saved with a unique UUID-based filename.
     """
