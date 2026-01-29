@@ -50,7 +50,7 @@ resources = [
 COGSGUARD_GEAR = ["aligner", "scrambler", "miner", "scout"]
 COGSGUARD_ELEMENTS = ["oxygen", "carbon", "germanium", "silicon"]
 
-COGSGUARD_HEART_COST = {e: 1 for e in COGSGUARD_ELEMENTS}
+COGSGUARD_HEART_COST = {e: 10 for e in COGSGUARD_ELEMENTS}
 COGSGUARD_ALIGN_COST = {"heart": 1}
 COGSGUARD_SCRAMBLE_COST = {"heart": 1}
 
