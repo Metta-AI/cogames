@@ -134,15 +134,15 @@ CogsGuardMachina1Mission = CogsGuardMission(
     name="basic",
     description="CogsGuard Machina1 - compete to control junctions with gear abilities.",
     site=COGSGUARD_MACHINA_1,
-    num_cogs=5,
+    num_cogs=8,
     max_steps=10000,
 )
 
 CogsGuardBasicMission = CogsGuardMission(
     name="basic",
-    description="CogsGuard arena - compact training map with gear abilities.",
+    description="CogsGuard Arena - compact training map with gear abilities.",
     site=COGSGUARD_ARENA,
-    num_cogs=10,
+    num_cogs=8,
     max_steps=1000,
 )
 
