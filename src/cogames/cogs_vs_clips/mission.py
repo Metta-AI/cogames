@@ -141,6 +141,7 @@ class Mission(Config):
     wall: CvCWallConfig = Field(default_factory=CvCWallConfig)
     assembler: CvCAssemblerConfig = Field(default_factory=CvCAssemblerConfig)
 
+    max_steps: int = Field(default=10000)
     cargo_capacity: int = Field(default=100)
     energy_capacity: int = Field(default=100)
     energy_regen_amount: int = Field(default=1)
@@ -181,6 +182,7 @@ class Mission(Config):
 
         game = GameConfig(
             map_builder=map_builder,
+            max_steps=self.max_steps,
             num_agents=num_cogs,
             resource_names=resources,
             vibe_names=[vibe.name for vibe in vibes.VIBES],
