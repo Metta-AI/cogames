@@ -52,7 +52,7 @@ class MachinaArenaConfig(SceneConfig):
     #### Building placement ####
 
     # How much of the map is covered by buildings
-    building_coverage: float = 0.0175
+    building_coverage: float = 0.05
     # Resource placement (building-based API)
     # Defines the set of buildings that can be placed on the map
     building_names: list[str] | None = None
@@ -113,8 +113,8 @@ class MachinaArena(Scene[MachinaArenaConfig]):
         # Building weights
         default_building_weights = {
             "chest": 0.0,
-            "charger": 0.6,
-            "germanium_extractor": 0.5,
+            "charger": 0.7,
+            "germanium_extractor": 0.3,
             "silicon_extractor": 0.3,
             "oxygen_extractor": 0.3,
             "carbon_extractor": 0.3,
@@ -373,10 +373,10 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
         default_building_weights = {
             "chest": 0.0,
             "charger": 0.6,
-            "germanium_extractor": 0.5,
-            "silicon_extractor": 0.3,
-            "oxygen_extractor": 0.3,
-            "carbon_extractor": 0.3,
+            "germanium_extractor": 0.2,
+            "silicon_extractor": 0.2,
+            "oxygen_extractor": 0.2,
+            "carbon_extractor": 0.2,
         }
         weights_dict: dict[str, float] = {str(k): v for k, v in (cfg.building_weights or {}).items()}
         if not weights_dict:
