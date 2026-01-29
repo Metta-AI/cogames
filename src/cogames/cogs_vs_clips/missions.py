@@ -143,7 +143,7 @@ CogsGuardBasicMission = CogsGuardMission(
     description="CogsGuard arena - compact training map with gear abilities.",
     site=COGSGUARD_ARENA,
     num_cogs=10,
-    max_steps=1000,
+    max_steps=10000,
 )
 
 
