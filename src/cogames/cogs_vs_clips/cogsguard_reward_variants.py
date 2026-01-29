@@ -9,8 +9,9 @@ from __future__ import annotations
 
 from typing import Literal, Sequence, cast
 
-from mettagrid.config.mettagrid_config import AgentRewards, MettaGridConfig
-from mettagrid.mapgen.mapgen import MapGenConfig
+from mettagrid.config.game_value import StatsSource
+from mettagrid.config.mettagrid_config import MettaGridConfig
+from mettagrid.config.reward_config import AgentReward, statReward
 
 CogsGuardRewardVariant = Literal["credit", "milestones", "no_objective", "objective"]
 
@@ -19,53 +20,43 @@ AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = ("objective", "n
 _OBJECTIVE_STAT_KEY = "aligned.junction.held"
 
 
-def _default_max_junctions(env: MettaGridConfig) -> int:
-    map_builder = env.game.map_builder
-    if not isinstance(map_builder, MapGenConfig):
-        return 1
+def _apply_milestones(rewards: dict[str, AgentReward], *, max_junctions: int = 100) -> None:
+    """Add milestone shaping rewards onto an existing baseline.
 
-    width = map_builder.width
-    height = map_builder.height
-    if width is None or height is None:
-        return 1
-
-    instance = map_builder.instance
-    building_coverage = getattr(instance, "building_coverage", None)
-    if not isinstance(building_coverage, (int, float)):
-        return 1
-
-    padding = 1  # UniformExtractorParams default
-    spacing = padding + 1
-
-    available_height = max(0, height - 2 * padding)
-    available_width = max(0, width - 2 * padding)
-    max_rows = max(0, (available_height + spacing - 1) // spacing)
-    max_cols = max(0, (available_width + spacing - 1) // spacing)
-    max_possible = max_rows * max_cols
-
-    interior_width = max(0, width - 2)
-    interior_height = max(0, height - 2)
-    desired = int(float(building_coverage) * interior_width * interior_height)
-
-    return min(max_possible, max(1, desired))
-
-
-def _apply_milestones(rewards: AgentRewards, *, max_junctions: int) -> None:
-    """Add milestone shaping rewards onto an existing baseline."""
+    Args:
+        rewards: Rewards dict to modify in-place.
+        max_junctions: Maximum expected number of junctions for capping rewards.
+            Defaults to 100 as a reasonable upper bound for most maps.
+    """
     w_junction_aligned = 1.0
     w_scramble_act = 0.5
     w_align_act = 1.0
 
-    rewards.collective_stats["aligned.junction"] = w_junction_aligned
-    rewards.collective_stats_max["aligned.junction"] = w_junction_aligned * max_junctions
+    # Max caps based on expected junction counts
+    max_junction_aligned = w_junction_aligned * max_junctions
+    max_scramble = w_scramble_act * max_junctions
+    max_align = w_align_act * max_junctions
 
-    rewards.stats["junction.scrambled_by_agent"] = w_scramble_act
-    rewards.stats["junction.aligned_by_agent"] = w_align_act
-    rewards.stats_max["junction.scrambled_by_agent"] = w_scramble_act * max_junctions
-    rewards.stats_max["junction.aligned_by_agent"] = w_align_act * max_junctions
+    rewards["aligned.junction"] = statReward(
+        "aligned.junction",
+        source=StatsSource.COLLECTIVE,
+        weight=w_junction_aligned,
+        max=max_junction_aligned,
+    )
+
+    rewards["junction.scrambled_by_agent"] = statReward(
+        "junction.scrambled_by_agent",
+        weight=w_scramble_act,
+        max=max_scramble,
+    )
+    rewards["junction.aligned_by_agent"] = statReward(
+        "junction.aligned_by_agent",
+        weight=w_align_act,
+        max=max_align,
+    )
 
 
-def _apply_credit(rewards: AgentRewards, *, max_junctions: int) -> None:
+def _apply_credit(rewards: dict[str, AgentReward]) -> None:
     """Add dense precursor shaping rewards onto an existing baseline."""
     w_heart = 0.05
     cap_heart = 0.5
@@ -76,35 +67,28 @@ def _apply_credit(rewards: AgentRewards, *, max_junctions: int) -> None:
     w_element_gain = 0.001
     cap_element_gain = 0.1
 
-    rewards.stats.update(
-        {
-            "heart.gained": w_heart,
-            "aligner.gained": w_align_gear,
-            "scrambler.gained": w_scramble_gear,
-            "carbon.gained": w_element_gain,
-            "oxygen.gained": w_element_gain,
-            "germanium.gained": w_element_gain,
-            "silicon.gained": w_element_gain,
-        }
-    )
-    rewards.stats_max.update(
-        {
-            "heart.gained": cap_heart,
-            "aligner.gained": cap_align_gear,
-            "scrambler.gained": cap_scramble_gear,
-            "carbon.gained": cap_element_gain,
-            "oxygen.gained": cap_element_gain,
-            "germanium.gained": cap_element_gain,
-            "silicon.gained": cap_element_gain,
-        }
-    )
+    # Stats rewards for gains as a single map
+    gain_rewards: dict[str, AgentReward] = {
+        "heart.gained": statReward("heart.gained", weight=w_heart, max=cap_heart),
+        "aligner.gained": statReward("aligner.gained", weight=w_align_gear, max=cap_align_gear),
+        "scrambler.gained": statReward("scrambler.gained", weight=w_scramble_gear, max=cap_scramble_gear),
+        "carbon.gained": statReward("carbon.gained", weight=w_element_gain, max=cap_element_gain),
+        "oxygen.gained": statReward("oxygen.gained", weight=w_element_gain, max=cap_element_gain),
+        "germanium.gained": statReward("germanium.gained", weight=w_element_gain, max=cap_element_gain),
+        "silicon.gained": statReward("silicon.gained", weight=w_element_gain, max=cap_element_gain),
+    }
+    rewards.update(gain_rewards)
 
+    # Collective deposit rewards
     w_deposit = 0.002
     cap_deposit = 0.2
-    for element in ["carbon", "oxygen", "germanium", "silicon"]:
-        stat = f"collective.{element}.deposited"
-        rewards.collective_stats[stat] = w_deposit
-        rewards.collective_stats_max[stat] = cap_deposit
+    deposit_rewards: dict[str, AgentReward] = {
+        f"collective.{element}.deposited": statReward(
+            f"collective.{element}.deposited", source=StatsSource.COLLECTIVE, weight=w_deposit, max=cap_deposit
+        )
+        for element in ["carbon", "oxygen", "germanium", "silicon"]
+    }
+    rewards.update(deposit_rewards)
 
 
 def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str] | None = None) -> None:
@@ -135,17 +119,15 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
     if enabled <= {"objective"}:
         return
 
-    max_junctions = _default_max_junctions(env)
-
     # Start from the mission's existing objective baseline to preserve its scaling.
-    rewards = env.game.agent.rewards.model_copy(deep=True)
+    rewards = dict(env.game.agent.rewards)
+
     if "no_objective" in enabled:
-        rewards.collective_stats.pop(_OBJECTIVE_STAT_KEY, None)
-        rewards.collective_stats_max.pop(_OBJECTIVE_STAT_KEY, None)
+        rewards.pop(_OBJECTIVE_STAT_KEY, None)
     if "milestones" in enabled:
-        _apply_milestones(rewards, max_junctions=max_junctions)
+        _apply_milestones(rewards)
     if "credit" in enabled:
-        _apply_credit(rewards, max_junctions=max_junctions)
+        _apply_credit(rewards)
 
     env.game.agent.rewards = rewards
 

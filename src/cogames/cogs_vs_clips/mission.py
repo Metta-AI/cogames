@@ -36,9 +36,9 @@ from mettagrid.config.action_config import (
 )
 from mettagrid.config.event_config import EventConfig, periodic
 from mettagrid.config.filter import isAlignedTo, isNear
+from mettagrid.config.game_value import StatsSource, StatsValue
 from mettagrid.config.mettagrid_config import (
     AgentConfig,
-    AgentRewards,
     CollectiveConfig,
     GameConfig,
     InventoryConfig,
@@ -46,7 +46,8 @@ from mettagrid.config.mettagrid_config import (
     ResourceLimitsConfig,
 )
 from mettagrid.config.mutation import alignTo
-from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig, StatsSource, StatsValue
+from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
+from mettagrid.config.reward_config import numObjects, statReward
 from mettagrid.config.tag import typeTag
 from mettagrid.config.vibes import Vibe
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
@@ -214,10 +215,10 @@ class Mission(Config):
                     initial={"energy": self.energy_capacity},
                     regen_amounts={"default": {"energy": self.energy_regen_amount}},
                 ),
-                rewards=AgentRewards(
+                rewards={
                     # Reward only the agent that deposits a heart.
-                    stats={"chest.heart.deposited_by_agent": 1.0},
-                ),
+                    "chest.heart.deposited_by_agent": statReward("chest.heart.deposited_by_agent"),
+                },
             ),
             inventory_regen_interval=self.inventory_regen_interval,
             objects={
@@ -366,11 +367,14 @@ class CogsGuardMission(Config):
             ),
             agent=self.cog.agent_config(gear=gear, elements=elements).model_copy(
                 update={
-                    "rewards": AgentRewards(
-                        collective_stats={
-                            "aligned.junction.held": 1.0 / self.max_steps,
-                        },
-                    ),
+                    "rewards": {
+                        "aligned.junction.held": statReward(
+                            "aligned.junction.held",
+                            source=StatsSource.COLLECTIVE,
+                            weight=1.0 / self.max_steps,
+                            denoms=[numObjects("junction")],
+                        ),
+                    },
                 }
             ),
             inventory_regen_interval=self.inventory_regen_interval,

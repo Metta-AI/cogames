@@ -13,6 +13,7 @@ from mettagrid.config.mettagrid_config import (
     ProtocolConfig,
     ResourceLimitsConfig,
 )
+from mettagrid.config.reward_config import statReward
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen
 
@@ -232,10 +233,9 @@ class _DiagnosticMissionBase(Mission):
         - Ensure all chests can store at most 1 heart so total reward per episode cannot exceed 1.
         """
         agent_cfg = cfg.game.agent
-        rewards = agent_cfg.rewards
-        stats = dict(rewards.stats or {})
-        stats["chest.heart.deposited_by_agent"] = 1.0
-        agent_cfg.rewards = rewards.model_copy(update={"stats": stats})
+        rewards = dict(agent_cfg.rewards)
+        rewards["chest.heart.deposited_by_agent"] = statReward("chest.heart.deposited_by_agent")
+        agent_cfg.rewards = rewards
 
         # Cap heart capacity for every chest used in diagnostics (communal or resource-specific).
         for _name, obj in cfg.game.objects.items():

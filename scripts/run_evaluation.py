@@ -40,6 +40,7 @@ from cogames.cogs_vs_clips.mission import AnyMission, Mission, MissionVariant, N
 from cogames.cogs_vs_clips.missions import MISSIONS as ALL_MISSIONS
 from cogames.cogs_vs_clips.variants import VARIANTS
 from metta_alo.rollout import run_single_episode_rollout
+from mettagrid.config.reward_config import statReward
 from mettagrid.policy.policy import PolicySpec
 from mettagrid.util.uri_resolvers.schemes import policy_spec_from_uri
 
@@ -180,13 +181,10 @@ def _run_case(
         env_config.game.max_steps = max_steps
 
     # For evaluation, only heart rewards should count (not resource rewards)
-    env_config.game.agent.rewards.stats = env_config.game.agent.rewards.stats or {}
+    # Zero out resource-based rewards by setting their weight to 0
     resource_stats = ["carbon.gained", "oxygen.gained", "germanium.gained", "silicon.gained"]
     for resource_stat in resource_stats:
-        env_config.game.agent.rewards.stats[resource_stat] = 0.0
-    env_config.game.agent.rewards.stats_max = env_config.game.agent.rewards.stats_max or {}
-    for resource_stat in resource_stats:
-        env_config.game.agent.rewards.stats_max[resource_stat] = 0.0
+        env_config.game.agent.rewards[resource_stat] = statReward(resource_stat, weight=0.0, max=0.0)
 
     actual_max_steps = env_config.game.max_steps
     if "://" in agent_config.policy_path:
