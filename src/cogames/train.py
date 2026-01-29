@@ -122,7 +122,6 @@ def train(
     backend = pvector.Multiprocessing
     if platform.system() == "Darwin":
         multiprocessing.set_start_method("spawn", force=True)
-        backend = pvector.Serial
 
     try:
         cpu_cores = psutil.cpu_count(logical=False) or psutil.cpu_count(logical=True)
@@ -142,7 +141,7 @@ def train(
     else:
         num_workers = desired_workers
 
-    if backend is pvector.Multiprocessing and device.type != "cuda":
+    if backend is pvector.Multiprocessing and device.type not in ("cuda", "mps"):
         backend = pvector.Serial
         num_workers = 1
 

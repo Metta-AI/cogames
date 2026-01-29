@@ -1182,10 +1182,10 @@ def train_cmd(
     ),
     # --- Hardware ---
     device: str = typer.Option(
-        "auto",
+        "cpu",
         "--device",
         metavar="DEVICE",
-        help="Device to train on (auto, cpu, cuda)",
+        help="Device to train on (auto, cpu, cuda, mps)",
         rich_help_panel="Hardware",
     ),
     num_workers: Optional[int] = typer.Option(
