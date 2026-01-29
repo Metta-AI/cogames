@@ -63,21 +63,19 @@ def test_upload_command_sends_correct_requests(
     assert "my-test-policy:v1" in result.stdout
 
     # Verify the requests that were made
-    assert len(httpserver.log) == 3, f"Expected 3 requests, got {len(httpserver.log)}"
+    # 0: /tournament/seasons, 1: presigned-url, 2: upload, 3: complete
+    assert len(httpserver.log) == 4, f"Expected 4 requests, got {len(httpserver.log)}"
 
-    # 1. Presigned URL request should have auth token
-    presign_req, _ = httpserver.log[0]
+    presign_req, _ = httpserver.log[1]
     assert presign_req.headers.get("X-Auth-Token") == "test-token-12345"
 
-    # 2. Upload request should contain a valid zip with policy_spec.json
-    upload_req, _ = httpserver.log[1]
+    upload_req, _ = httpserver.log[2]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         spec = json.loads(zf.read("policy_spec.json"))
         assert spec["class_path"] == "cogames.policy.starter_agent.StarterPolicy"
 
-    # 3. Complete request should have correct upload_id and name
-    complete_req, _ = httpserver.log[2]
+    complete_req, _ = httpserver.log[3]
     complete_body = complete_req.json
     assert complete_body["upload_id"] == upload_id
     assert complete_body["name"] == "my-test-policy"
@@ -88,6 +86,11 @@ def test_upload_command_fails_without_auth(
     tmp_path: Path,
 ) -> None:
     """Test that 'cogames upload' fails gracefully when not authenticated."""
+    httpserver.expect_request(
+        "/tournament/seasons",
+        method="GET",
+    ).respond_with_json([{"name": "test-season", "is_default": True}])
+
     # Use tmp_path as HOME but don't create any token file
     result = subprocess.run(
         [
@@ -123,6 +126,11 @@ def _setup_mock_upload_server(
     upload_id: str = "test-upload-id",
 ) -> None:
     """Configure httpserver with the endpoints needed for upload."""
+    httpserver.expect_request(
+        "/tournament/seasons",
+        method="GET",
+    ).respond_with_json([{"name": "test-season", "is_default": True}])
+
     httpserver.expect_request(
         "/stats/policies/submit/presigned-url",
         method="POST",
@@ -203,8 +211,8 @@ def test_upload_directory_bundle(
     assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
     # Verify the uploaded zip contains all files from the directory
-    assert len(httpserver.log) == 3
-    upload_req, _ = httpserver.log[1]
+    assert len(httpserver.log) == 4
+    upload_req, _ = httpserver.log[2]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         assert "weights.pt" in zf.namelist()
@@ -261,8 +269,8 @@ def test_upload_zip_bundle(
     assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
     # Verify the uploaded zip contains all files
-    assert len(httpserver.log) == 3
-    upload_req, _ = httpserver.log[1]
+    assert len(httpserver.log) == 4
+    upload_req, _ = httpserver.log[2]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         assert "model.safetensors" in zf.namelist()
@@ -332,15 +340,15 @@ def test_upload_s3_bundle(
 
     assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
-    # Verify: S3 download + 3 upload requests = 4 total
-    assert len(httpserver.log) == 4, f"Expected 4 requests, got {len(httpserver.log)}"
+    # Verify: seasons + S3 download + 3 upload requests = 5 total
+    assert len(httpserver.log) == 5, f"Expected 5 requests, got {len(httpserver.log)}"
 
-    # First request should be the S3 GetObject
-    s3_req, _ = httpserver.log[0]
+    # Second request should be the S3 GetObject (after seasons)
+    s3_req, _ = httpserver.log[1]
     assert s3_req.path == f"/test-bucket/{unique_key}"
 
     # Verify the uploaded zip contains the files from S3
-    upload_req, _ = httpserver.log[2]  # After S3 download, presigned URL, then upload
+    upload_req, _ = httpserver.log[3]  # After seasons, S3 download, presigned URL, then upload
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         assert "checkpoint.pt" in zf.namelist()
