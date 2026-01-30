@@ -151,21 +151,29 @@ def get_latest_pypi_version(package: str) -> str:
     return response.json()["info"]["version"]
 
 
+def get_pypi_requires_python(package: str) -> str:
+    """Get the requires_python constraint from PyPI."""
+    response = httpx.get(f"https://pypi.org/pypi/{package}/json")
+    response.raise_for_status()
+    return response.json()["info"]["requires_python"]
+
+
 def create_temp_validation_env() -> Path:
     """Create a temporary directory with a minimal pyproject.toml.
 
     The pyproject.toml depends on the latest published cogames and cogames-agents packages.
-    Python is pinned to 3.12 because mettagrid only publishes cp312 wheels.
+    Python version is constrained to match mettagrid's published wheels.
     """
     temp_dir = Path(tempfile.mkdtemp(prefix="cogames_submit_"))
 
     latest_cogames_version = get_latest_pypi_version("cogames")
     latest_agents_version = get_latest_pypi_version("cogames-agents")
+    mettagrid_requires_python = get_pypi_requires_python("mettagrid")
 
     pyproject_content = f"""[project]
 name = "cogames-submission-validator"
 version = "0.1.0"
-requires-python = ">=3.12,<3.13"
+requires-python = "{mettagrid_requires_python}"
 dependencies = ["cogames=={latest_cogames_version}", "cogames-agents=={latest_agents_version}"]
 
 [build-system]
