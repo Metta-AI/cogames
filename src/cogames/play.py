@@ -67,9 +67,9 @@ def _print_cogsguard_stats(
     # Junctions: gained (aligned) | lost | final (current count)
     junctions_added = False
     for team, team_stats, color in [("cogs", cogs_stats, "green"), ("clips", clips_stats, "red")]:
-        gained = int(team_stats.get("aligned.junction.gained", 0))
-        lost = int(team_stats.get("aligned.junction.lost", 0))
-        final = int(team_stats.get("aligned.junction", 0))
+        gained = int(team_stats.get("junction.gained", 0))
+        lost = int(team_stats.get("junction.lost", 0))
+        final = int(team_stats.get("junction", 0))
         if gained > 0 or lost > 0 or final > 0:
             if not junctions_added:
                 table.add_row("[bold]Junctions[/bold]", "", "", "", "")

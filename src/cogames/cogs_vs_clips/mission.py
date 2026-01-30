@@ -36,7 +36,8 @@ from mettagrid.config.action_config import (
 )
 from mettagrid.config.event_config import EventConfig, periodic
 from mettagrid.config.filter import isAlignedTo, isNear
-from mettagrid.config.game_value import StatsSource, StatsValue
+from mettagrid.config.game_value import inv
+from mettagrid.config.game_value import stat as game_stat
 from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
     AgentConfig,
@@ -49,7 +50,7 @@ from mettagrid.config.mettagrid_config import (
 from mettagrid.config.mutation import alignTo
 from mettagrid.config.mutation.resource_mutation import updateActor
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
-from mettagrid.config.reward_config import numObjects, statReward
+from mettagrid.config.reward_config import numObjects, reward
 from mettagrid.config.tag import typeTag
 from mettagrid.config.vibes import Vibe
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
@@ -220,7 +221,7 @@ class Mission(Config):
                 on_tick={"regen": Handler(mutations=[updateActor({"energy": self.energy_regen_amount})])},
                 rewards={
                     # Reward only the agent that deposits a heart.
-                    "chest.heart.deposited_by_agent": statReward("chest.heart.deposited_by_agent"),
+                    "chest_heart_deposited_by_agent": reward(game_stat("chest.heart.deposited_by_agent")),
                 },
             ),
             objects={
@@ -348,11 +349,8 @@ class CogsGuardMission(Config):
         }
         gear_objects = {f"{g}_station": GearStationConfig(gear_type=g).station_cfg() for g in gear}
 
-        # Create stats observations for collective resources
-        collective_stats_obs = [
-            StatsValue(name=f"collective.{resource}.amount", source=StatsSource.COLLECTIVE, delta=False)
-            for resource in elements
-        ]
+        # Create inventory observations for collective resources
+        collective_obs = [inv(f"collective.{resource}") for resource in elements]
 
         game = GameConfig(
             map_builder=map_builder,
@@ -360,7 +358,7 @@ class CogsGuardMission(Config):
             num_agents=num_cogs,
             resource_names=resources_list,
             vibe_names=vibe_names,
-            obs=ObsConfig(global_obs=GlobalObsConfig(stats_obs=collective_stats_obs, local_position=True)),
+            obs=ObsConfig(global_obs=GlobalObsConfig(obs=collective_obs, local_position=True)),
             actions=ActionsConfig(
                 move=MoveActionConfig(consumed_resources={"energy": self.cog.move_energy_cost}),
                 noop=NoopActionConfig(),
@@ -369,10 +367,9 @@ class CogsGuardMission(Config):
             agent=self.cog.agent_config(gear=gear, elements=elements).model_copy(
                 update={
                     "rewards": {
-                        "aligned.junction.held": statReward(
-                            "aligned.junction.held",
-                            source=StatsSource.COLLECTIVE,
-                            weight=100.0 / self.max_steps,
+                        "aligned_junction_held": reward(
+                            game_stat("collective.junction.held"),
+                            weight=1.0 / self.max_steps,
                             denoms=[numObjects("junction")],
                         ),
                     },
