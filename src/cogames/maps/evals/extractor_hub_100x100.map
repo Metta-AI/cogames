@@ -114,7 +114,7 @@ char_to_map_name:
   "#": wall
   ".": empty
   "@": agent.agent
-  "+": charger
+  "+": junction
   "&": hub
   "=": chest
   "G": germanium_extractor

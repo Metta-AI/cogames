@@ -19,6 +19,6 @@ char_to_map_name:
   "O": oxygen_extractor
   "G": germanium_extractor
   "I": silicon_extractor
-  "J": charger
+  "J": junction
   "&": hub
   "=": chest

@@ -119,7 +119,7 @@ char_to_map_name:
   ".": empty
   "O": oxygen_extractor
   "G": germanium_extractor
-  "+": charger
+  "+": junction
   "C": carbon_extractor
   "S": silicon_extractor
   "@": agent.agent

@@ -75,7 +75,7 @@ MACHINA_PROCEDURAL_200 = Site(
             hub_cross_distance=7,
             building_names=[
                 "chest",
-                "charger",
+                "junction",
                 "carbon_extractor",
                 "oxygen_extractor",
                 "germanium_extractor",
@@ -83,7 +83,7 @@ MACHINA_PROCEDURAL_200 = Site(
             ],
             building_weights={
                 "chest": 0.2,
-                "charger": 0.6,
+                "junction": 0.6,
                 "carbon_extractor": 0.3,
                 "oxygen_extractor": 0.3,
                 "germanium_extractor": 0.3,
@@ -93,7 +93,7 @@ MACHINA_PROCEDURAL_200 = Site(
             distribution={"type": "bimodal", "cluster_std": 0.15},
             building_distributions={
                 "chest": {"type": "exponential", "decay_rate": 5.0, "origin_x": 0.0, "origin_y": 0.0},
-                "charger": {"type": "poisson"},
+                "junction": {"type": "poisson"},
             },
         ),
     ),
@@ -208,7 +208,7 @@ Common patterns:
   class MyVariant(MissionVariant):
       name: str = "my"
       def modify_env(self, mission: Mission, env: MettaGridConfig) -> None:
-          env.game.charger.efficiency -= 50
+          env.game.junction.efficiency -= 50
   ```
 
 CLI variants are composed in order, so `cogames play -m machina_procedural.open_world -v city -v both_base` applies

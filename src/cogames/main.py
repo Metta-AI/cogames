@@ -220,7 +220,7 @@ def tutorial_cmd(
             {
                 "title": "Step 5 — Junction Control",
                 "lines": (
-                    "Junctions (chargers) can be aligned to your team.",
+                    "Junctions (junctions) can be aligned to your team.",
                     "As an Aligner: get Influence (stand near the Hub) + a Heart, then bump a neutral junction.",
                     "As a Scrambler: get a Heart, then bump an enemy-aligned junction to neutralize it.",
                     "Aligned junctions recharge energy for your team.",

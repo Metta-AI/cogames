@@ -94,7 +94,7 @@ uv run cogames play --mission hello_world.oxygen_bottleneck --cogs 2
 
 #### energy_starved
 
-**Challenge:** Low energy regen and weak chargers require careful energy management.
+**Challenge:** Low energy regen and weak junctions require careful energy management.
 
 **Variants Applied:**
 
