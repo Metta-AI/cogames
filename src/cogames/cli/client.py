@@ -226,11 +226,14 @@ class TournamentServerClient:
     def get_presigned_upload_url(self) -> dict[str, Any]:
         return self._post("/stats/policies/submit/presigned-url", timeout=60.0)
 
-    def complete_policy_upload(self, upload_id: str, name: str) -> dict[str, Any]:
+    def complete_policy_upload(self, upload_id: str, name: str, season: str | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {"upload_id": upload_id, "name": name}
+        if season is not None:
+            payload["season"] = season
         return self._post(
             "/stats/policies/submit/complete",
             timeout=120.0,
-            json={"upload_id": upload_id, "name": name},
+            json=payload,
         )
 
     def update_policy_version_tags(self, policy_version_id: uuid.UUID, tags: dict[str, str]) -> dict[str, Any]:
