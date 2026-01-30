@@ -6,6 +6,7 @@ from typing import Callable, Dict
 from pydantic import Field
 
 from cogames.cogs_vs_clips.mission import Mission, MissionVariant, Site
+from mettagrid.config.game_value import stat
 from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
     AssemblerConfig,
@@ -15,7 +16,7 @@ from mettagrid.config.mettagrid_config import (
     ResourceLimitsConfig,
 )
 from mettagrid.config.mutation.resource_mutation import updateActor
-from mettagrid.config.reward_config import statReward
+from mettagrid.config.reward_config import reward
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen
 
@@ -236,7 +237,7 @@ class _DiagnosticMissionBase(Mission):
         """
         agent_cfg = cfg.game.agent
         rewards = dict(agent_cfg.rewards)
-        rewards["chest.heart.deposited_by_agent"] = statReward("chest.heart.deposited_by_agent")
+        rewards["chest_heart_deposited_by_agent"] = reward(stat("chest.heart.deposited_by_agent"))
         agent_cfg.rewards = rewards
 
         # Cap heart capacity for every chest used in diagnostics (communal or resource-specific).

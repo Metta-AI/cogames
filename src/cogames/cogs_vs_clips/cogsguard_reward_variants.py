@@ -9,15 +9,15 @@ from __future__ import annotations
 
 from typing import Literal, Sequence, cast
 
-from mettagrid.config.game_value import StatsSource
+from mettagrid.config.game_value import stat
 from mettagrid.config.mettagrid_config import MettaGridConfig
-from mettagrid.config.reward_config import AgentReward, statReward
+from mettagrid.config.reward_config import AgentReward, reward
 
 CogsGuardRewardVariant = Literal["credit", "milestones", "no_objective", "objective"]
 
 AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = ("objective", "no_objective", "milestones", "credit")
 
-_OBJECTIVE_STAT_KEY = "aligned.junction.held"
+_OBJECTIVE_STAT_KEY = "aligned_junction_held"
 
 
 def _apply_milestones(rewards: dict[str, AgentReward], *, max_junctions: int = 100) -> None:
@@ -37,20 +37,19 @@ def _apply_milestones(rewards: dict[str, AgentReward], *, max_junctions: int = 1
     max_scramble = w_scramble_act * max_junctions
     max_align = w_align_act * max_junctions
 
-    rewards["aligned.junction"] = statReward(
-        "aligned.junction",
-        source=StatsSource.COLLECTIVE,
+    rewards["aligned_junctions"] = reward(
+        stat("collective.junction"),
         weight=w_junction_aligned,
         max=max_junction_aligned,
     )
 
-    rewards["junction.scrambled_by_agent"] = statReward(
-        "junction.scrambled_by_agent",
+    rewards["junction_scrambled_by_agent"] = reward(
+        stat("junction.scrambled_by_agent"),
         weight=w_scramble_act,
         max=max_scramble,
     )
-    rewards["junction.aligned_by_agent"] = statReward(
-        "junction.aligned_by_agent",
+    rewards["junction_aligned_by_agent"] = reward(
+        stat("junction.aligned_by_agent"),
         weight=w_align_act,
         max=max_align,
     )
@@ -69,13 +68,13 @@ def _apply_credit(rewards: dict[str, AgentReward]) -> None:
 
     # Stats rewards for gains as a single map
     gain_rewards: dict[str, AgentReward] = {
-        "heart.gained": statReward("heart.gained", weight=w_heart, max=cap_heart),
-        "aligner.gained": statReward("aligner.gained", weight=w_align_gear, max=cap_align_gear),
-        "scrambler.gained": statReward("scrambler.gained", weight=w_scramble_gear, max=cap_scramble_gear),
-        "carbon.gained": statReward("carbon.gained", weight=w_element_gain, max=cap_element_gain),
-        "oxygen.gained": statReward("oxygen.gained", weight=w_element_gain, max=cap_element_gain),
-        "germanium.gained": statReward("germanium.gained", weight=w_element_gain, max=cap_element_gain),
-        "silicon.gained": statReward("silicon.gained", weight=w_element_gain, max=cap_element_gain),
+        "heart_gained": reward(stat("heart.gained"), weight=w_heart, max=cap_heart),
+        "aligner_gained": reward(stat("aligner.gained"), weight=w_align_gear, max=cap_align_gear),
+        "scrambler_gained": reward(stat("scrambler.gained"), weight=w_scramble_gear, max=cap_scramble_gear),
+        "carbon_gained": reward(stat("carbon.gained"), weight=w_element_gain, max=cap_element_gain),
+        "oxygen_gained": reward(stat("oxygen.gained"), weight=w_element_gain, max=cap_element_gain),
+        "germanium_gained": reward(stat("germanium.gained"), weight=w_element_gain, max=cap_element_gain),
+        "silicon_gained": reward(stat("silicon.gained"), weight=w_element_gain, max=cap_element_gain),
     }
     rewards.update(gain_rewards)
 
@@ -83,8 +82,8 @@ def _apply_credit(rewards: dict[str, AgentReward]) -> None:
     w_deposit = 0.002
     cap_deposit = 0.2
     deposit_rewards: dict[str, AgentReward] = {
-        f"collective.{element}.deposited": statReward(
-            f"collective.{element}.deposited", source=StatsSource.COLLECTIVE, weight=w_deposit, max=cap_deposit
+        f"collective_{element}_deposited": reward(
+            stat(f"collective.{element}.deposited"), weight=w_deposit, max=cap_deposit
         )
         for element in ["carbon", "oxygen", "germanium", "silicon"]
     }
@@ -96,7 +95,7 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
 
     Variants are stackable:
     - `objective`: no-op marker; keeps the mission's default objective reward wiring.
-    - `no_objective`: disables the objective stat reward (`aligned.junction.held`).
+    - `no_objective`: disables the objective stat reward (`junction.held`).
     - `milestones`: adds shaped rewards for aligning/scrambling junctions and holding more junctions.
     - `credit`: adds additional dense shaping for precursor behaviors (resources/gear/deposits).
     """
