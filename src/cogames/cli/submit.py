@@ -366,7 +366,10 @@ def upload_submission(
         console.print(f"[red]Upload error: {e}[/red]")
         return None
 
-    console.print("[dim]Registering policy...[/dim]")
+    if not season:
+        console.print("[dim]Uploading policy...[/dim]")
+    else:
+        console.print(f"[dim]Uploading policy and submitting to season {season}...[/dim]")
 
     try:
         result = client.complete_policy_upload(upload_id, submission_name, season=season)
