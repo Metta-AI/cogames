@@ -551,10 +551,7 @@ def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cf
                 console.print(f"  • Biome weights: {instance.biome_weights}")
             console.print(f"  • Building coverage: {instance.building_coverage}")
     # Key knobs
-    console.print(
-        f"  • Regen interval: {game_config.game.inventory_regen_interval}, "
-        f"Move energy cost: {game_config.game.actions.move.consumed_resources.get('energy', 0)}"
-    )
+    console.print(f"  • Move energy cost: {game_config.game.actions.move.consumed_resources.get('energy', 0)}")
 
     # Display available actions
     console.print("\n[bold]Available Actions:[/bold]")
