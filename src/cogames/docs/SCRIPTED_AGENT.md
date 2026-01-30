@@ -214,7 +214,7 @@ Shared `pathfinding.py` module provides:
 
 Agents parse egocentric observations (11×11 grid) to detect:
 
-- Stations (hub, chest, charger, extractors)
+- Stations (hub, chest, junction, extractors)
 - Other agents
 - Walls and obstacles
 - Agent state (resources, energy, inventory)

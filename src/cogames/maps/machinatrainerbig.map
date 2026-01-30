@@ -229,7 +229,7 @@ map_data: |-
 char_to_map_name:
   "#": wall
   ".": empty
-  "+": charger
+  "+": junction
   "&": hub
   "=": chest
   "G": germanium_extractor

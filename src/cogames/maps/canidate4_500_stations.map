@@ -516,7 +516,7 @@ char_to_map_name:
   "O": oxygen_extractor
   "G": germanium_extractor
   "S": silicon_extractor
-  "+": charger
+  "+": junction
   "C": carbon_extractor
   "@": agent.agent
   "&": hub

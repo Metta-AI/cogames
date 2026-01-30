@@ -113,7 +113,7 @@ class MachinaArena(Scene[MachinaArenaConfig]):
         # Building weights
         default_building_weights = {
             "chest": 0.0,
-            "charger": 0.7,
+            "junction": 0.7,
             "germanium_extractor": 0.3,
             "silicon_extractor": 0.3,
             "oxygen_extractor": 0.3,
@@ -372,7 +372,7 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
         base_cfg: SceneConfig = BaseCfgModel.model_validate(cfg.base_biome_config or {})
         default_building_weights = {
             "chest": 0.0,
-            "charger": 0.6,
+            "junction": 0.6,
             "germanium_extractor": 0.2,
             "silicon_extractor": 0.2,
             "oxygen_extractor": 0.2,
