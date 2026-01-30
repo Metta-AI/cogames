@@ -269,7 +269,6 @@ def validate_policy_in_isolation(
             "run",
             "cogames",
             "validate-policy",
-            "--policy",
             policy_arg,
         ]
         if setup_script:
