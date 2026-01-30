@@ -67,7 +67,7 @@ testpaths = ["tests"]
 source = ["cogames"]
 
 [tool.uv.sources]
-mettagrid = { workspace = true }
+mettagrid = {git = "https://github.com/Metta-AI/mettagrid.git"}
 
 [tool.ruff]
 extend = "../../.ruff.toml"

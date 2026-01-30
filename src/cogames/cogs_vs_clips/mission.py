@@ -234,7 +234,7 @@ class Mission(MissionBase):
             objects={
                 "wall": self.wall.station_cfg(),
                 "hub": HubConfig(map_name="hub", team="cogs").station_cfg(),
-                "junction": JunctionConfig(map_name="charger").station_cfg(),
+                "junction": JunctionConfig(map_name="junction").station_cfg(),
                 "chest": CogsGuardChestConfig().station_cfg(),
                 **extractor_objects,
                 **gear_objects,
