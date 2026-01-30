@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Callable, Optional, Protocol, Sequence
 
 import numpy as np
-from pydantic import BaseModel, Field
 
 from metta_alo.pure_single_episode_runner import (
     PureSingleEpisodeJob,
@@ -39,18 +38,6 @@ def write_replay(replay: ReplayLike, path: str) -> None:
     elif path.endswith(".z"):
         replay.set_compression("zlib")
     replay.write_replay(path)
-
-
-class SingleEpisodeJob(BaseModel):
-    policy_uris: list[str]
-    assignments: list[int]
-    env: MettaGridConfig
-    results_uri: Optional[str] = None
-    replay_uri: Optional[str] = None
-    debug_uri: Optional[str] = None  # Presigned URL for uploading debug zip (traces, profiles, etc.)
-    seed: int = 0
-    max_action_time_ms: int = 10000
-    episode_tags: dict[str, str] = Field(default_factory=dict)
 
 
 @contextmanager
