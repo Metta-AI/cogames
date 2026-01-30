@@ -289,11 +289,11 @@ class SimpleExtractorConfig(CvCStationConfig):
                 # Order matters: miner first so agents with miner gear get the bonus
                 "miner": Handler(
                     filters=[actorHas({"miner": 1})],
-                    mutations=[withdraw({self.resource: self.large_amount})],
+                    mutations=[withdraw({self.resource: self.large_amount}, remove_when_empty=True)],
                 ),
                 "extract": Handler(
                     filters=[],
-                    mutations=[withdraw({self.resource: self.small_amount})],
+                    mutations=[withdraw({self.resource: self.small_amount}, remove_when_empty=True)],
                 ),
             },
             inventory=InventoryConfig(initial={self.resource: self.initial_amount}),
