@@ -108,7 +108,7 @@ def test_make_mission_command():
                 "cogames",
                 "make-mission",
                 "-m",
-                "training_facility",
+                "cogsguard_arena.basic",
                 "--output",
                 str(tmp_path),
             ],

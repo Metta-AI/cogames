@@ -1,46 +1,34 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import override
+from typing import TypeVar, override
 
 from pydantic import Field
+from typing_extensions import Self
 
 from cogames.cogs_vs_clips.cog import CogConfig
 from cogames.cogs_vs_clips.stations import (
-    COGSGUARD_ELEMENTS,
-    COGSGUARD_GEAR,
-    CarbonExtractorConfig,
-    ChargerConfig,
+    ELEMENTS,
+    GEAR,
     CogsGuardChestConfig,
-    CvCAssemblerConfig,
-    CvCChestConfig,
     CvCWallConfig,
     GearStationConfig,
-    GermaniumExtractorConfig,
     HubConfig,
     JunctionConfig,
-    OxygenExtractorConfig,
-    SiliconExtractorConfig,
     SimpleExtractorConfig,
-    resources,
 )
 from mettagrid.base_config import Config
-from mettagrid.config import vibes
 from mettagrid.config.action_config import (
     ActionsConfig,
     ChangeVibeActionConfig,
     MoveActionConfig,
     NoopActionConfig,
-    TransferActionConfig,
-    VibeTransfer,
 )
 from mettagrid.config.event_config import EventConfig, periodic
 from mettagrid.config.filter import isAlignedTo, isNear
 from mettagrid.config.game_value import inv
 from mettagrid.config.game_value import stat as game_stat
-from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
-    AgentConfig,
     CollectiveConfig,
     GameConfig,
     InventoryConfig,
@@ -48,12 +36,14 @@ from mettagrid.config.mettagrid_config import (
     ResourceLimitsConfig,
 )
 from mettagrid.config.mutation import alignTo
-from mettagrid.config.mutation.resource_mutation import updateActor
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
 from mettagrid.config.reward_config import numObjects, reward
 from mettagrid.config.tag import typeTag
 from mettagrid.config.vibes import Vibe
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
+
+# Type variable for mission types
+TMission = TypeVar("TMission", bound="MissionBase")
 
 
 class MissionVariant(Config, ABC):
@@ -62,17 +52,17 @@ class MissionVariant(Config, ABC):
     name: str
     description: str = Field(default="")
 
-    def modify_mission(self, mission: Mission) -> None:
+    def modify_mission(self, mission: MissionBase) -> None:
         # Override this method to modify the mission.
         # Variants are allowed to modify the mission in-place - it's guaranteed to be a one-time only instance.
         pass
 
-    def modify_env(self, mission: Mission, env: MettaGridConfig) -> None:
+    def modify_env(self, mission: MissionBase, env: MettaGridConfig) -> None:
         # Override this method to modify the produced environment.
         # Variants are allowed to modify the environment in-place.
         pass
 
-    def compat(self, mission: Mission) -> bool:
+    def compat(self, mission: MissionBase) -> bool:
         """Check if this variant is compatible with the given mission.
 
         Returns True if the variant can be safely applied to the mission.
@@ -80,7 +70,7 @@ class MissionVariant(Config, ABC):
         """
         return True
 
-    def apply(self, mission: Mission) -> Mission:
+    def apply(self, mission: TMission) -> TMission:
         mission = mission.model_copy(deep=True)
         mission.variants.append(self)
         self.modify_mission(mission)
@@ -124,8 +114,8 @@ class Site(Config):
 MAP_MISSION_DELIMITER = "."
 
 
-class Mission(Config):
-    """Mission configuration for Cogs vs Clips."""
+class MissionBase(Config, ABC):
+    """Base class for Mission configurations with common fields and methods."""
 
     name: str
     description: str
@@ -135,26 +125,7 @@ class Mission(Config):
     # Variants are applied to the mission immediately, and to its env when make_env is called
     variants: list[MissionVariant] = Field(default_factory=list)
 
-    carbon_extractor: CarbonExtractorConfig = Field(default_factory=CarbonExtractorConfig)
-    oxygen_extractor: OxygenExtractorConfig = Field(default_factory=OxygenExtractorConfig)
-    germanium_extractor: GermaniumExtractorConfig = Field(default_factory=GermaniumExtractorConfig)
-    silicon_extractor: SiliconExtractorConfig = Field(default_factory=SiliconExtractorConfig)
-    charger: ChargerConfig = Field(default_factory=ChargerConfig)
-    chest: CvCChestConfig = Field(default_factory=CvCChestConfig)
-    wall: CvCWallConfig = Field(default_factory=CvCWallConfig)
-    assembler: CvCAssemblerConfig = Field(default_factory=CvCAssemblerConfig)
-
     max_steps: int = Field(default=10000)
-    cargo_capacity: int = Field(default=100)
-    energy_capacity: int = Field(default=100)
-    energy_regen_amount: int = Field(default=1)
-    gear_capacity: int = Field(default=5)
-    move_energy_cost: int = Field(default=2)
-    heart_capacity: int = Field(default=1)
-    # Control vibe swapping in variants
-    enable_vibe_change: bool = Field(default=True)
-    vibes: list[Vibe] | None = Field(default=None)
-    compass_enabled: bool = Field(default=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -162,7 +133,7 @@ class Mission(Config):
         for variant in self.variants:
             variant.modify_mission(self)
 
-    def with_variants(self, variants: list[MissionVariant]) -> Mission:
+    def with_variants(self, variants: list[MissionVariant]) -> Self:
         mission = self
         for variant in variants:
             mission = variant.apply(mission)
@@ -170,109 +141,6 @@ class Mission(Config):
 
     def full_name(self) -> str:
         return f"{self.site.name}{MAP_MISSION_DELIMITER}{self.name}"
-
-    def make_env(self) -> MettaGridConfig:
-        """Create a MettaGridConfig from this mission.
-
-        Applies all variants to the produced configuration.
-
-        Returns:
-            MettaGridConfig ready for environment creation
-        """
-        map_builder = self.site.map_builder
-        num_cogs = self.num_cogs if self.num_cogs is not None else self.site.min_cogs
-
-        game = GameConfig(
-            map_builder=map_builder,
-            max_steps=self.max_steps,
-            num_agents=num_cogs,
-            resource_names=resources,
-            vibe_names=[vibe.name for vibe in vibes.VIBES],
-            obs=ObsConfig(global_obs=GlobalObsConfig(compass=self.compass_enabled, goal_obs=True)),
-            actions=ActionsConfig(
-                move=MoveActionConfig(consumed_resources={"energy": self.move_energy_cost}),
-                noop=NoopActionConfig(),
-                change_vibe=ChangeVibeActionConfig(
-                    vibes=(
-                        []
-                        if not self.enable_vibe_change
-                        else (self.vibes if self.vibes is not None else list(vibes.VIBES))
-                    )
-                ),
-                transfer=TransferActionConfig(
-                    enabled=True,
-                    vibe_transfers=[VibeTransfer(vibe="charger", target={"energy": 20}, actor={"energy": -20})],
-                ),
-            ),
-            agent=AgentConfig(
-                inventory=InventoryConfig(
-                    limits={
-                        "heart": ResourceLimitsConfig(min=self.heart_capacity, resources=["heart"]),
-                        "energy": ResourceLimitsConfig(min=self.energy_capacity, resources=["energy"]),
-                        "cargo": ResourceLimitsConfig(
-                            min=self.cargo_capacity, resources=["carbon", "oxygen", "germanium", "silicon"]
-                        ),
-                        "gear": ResourceLimitsConfig(
-                            min=self.gear_capacity, resources=["scrambler", "modulator", "decoder", "resonator"]
-                        ),
-                    },
-                    initial={"energy": self.energy_capacity},
-                ),
-                on_tick={"regen": Handler(mutations=[updateActor({"energy": self.energy_regen_amount})])},
-                rewards={
-                    # Reward only the agent that deposits a heart.
-                    "chest_heart_deposited_by_agent": reward(game_stat("chest.heart.deposited_by_agent")),
-                },
-            ),
-            objects={
-                "wall": self.wall.station_cfg(),
-                "assembler": self.assembler.station_cfg(),
-                "chest": self.chest.station_cfg(),
-                "charger": self.charger.station_cfg(),
-                "carbon_extractor": self.carbon_extractor.station_cfg(),
-                "oxygen_extractor": self.oxygen_extractor.station_cfg(),
-                "germanium_extractor": self.germanium_extractor.station_cfg(),
-                "silicon_extractor": self.silicon_extractor.station_cfg(),
-                # Resource-specific chests used by diagnostic missions
-                # These use simplified vibe_transfers (only "default") to avoid issues when vibes are restricted
-                "chest_carbon": self.chest.station_cfg().model_copy(
-                    update={
-                        "map_name": "chest_carbon",
-                        "vibe_transfers": {"default": {"carbon": 255}},
-                    }
-                ),
-                "chest_oxygen": self.chest.station_cfg().model_copy(
-                    update={
-                        "map_name": "chest_oxygen",
-                        "vibe_transfers": {"default": {"oxygen": 255}},
-                    }
-                ),
-                "chest_germanium": self.chest.station_cfg().model_copy(
-                    update={
-                        "map_name": "chest_germanium",
-                        "vibe_transfers": {"default": {"germanium": 255}},
-                    }
-                ),
-                "chest_silicon": self.chest.station_cfg().model_copy(
-                    update={
-                        "map_name": "chest_silicon",
-                        "vibe_transfers": {"default": {"silicon": 255}},
-                    }
-                ),
-            },
-        )
-
-        env = MettaGridConfig(game=game)
-        # Precaution - copy the env, in case the code above uses some global variable that we don't want to modify.
-        # This allows variants to modify the env without copying it again.
-        env = env.model_copy(deep=True)
-        env.label = self.full_name()
-
-        for variant in self.variants:
-            variant.modify_env(self, env)
-            env.label += f".{variant.name}"
-
-        return env
 
 
 # CogsGuard vibes
@@ -287,17 +155,8 @@ COGSGUARD_VIBES = [
 ]
 
 
-class CogsGuardMission(Config):
+class Mission(MissionBase):
     """Mission configuration for CogsGuard game mode."""
-
-    name: str
-    description: str
-    site: Site
-    num_cogs: int | None = None
-    variants: list[MissionVariant] = Field(default_factory=list)
-
-    # Game parameters
-    max_steps: int = Field(default=10000)
 
     # Agent configuration
     cog: CogConfig = Field(default_factory=CogConfig)
@@ -325,22 +184,19 @@ class CogsGuardMission(Config):
     # Station configs
     wall: CvCWallConfig = Field(default_factory=CvCWallConfig)
 
-    def full_name(self) -> str:
-        return f"{self.site.name}{MAP_MISSION_DELIMITER}{self.name}"
-
-    def with_variants(self, variants: list[MissionVariant]) -> CogsGuardMission:
-        """Apply variants to the mission. Currently a no-op for CogsGuard."""
-        if variants:
-            raise NotImplementedError("CogsGuard missions do not support variants yet")
-        return self
-
     def make_env(self) -> MettaGridConfig:
-        """Create a MettaGridConfig from this mission."""
+        """Create a MettaGridConfig from this mission.
+
+        Applies all variants to the produced configuration.
+
+        Returns:
+            MettaGridConfig ready for environment creation
+        """
         map_builder = self.site.map_builder
         num_cogs = self.num_cogs if self.num_cogs is not None else self.site.min_cogs
 
-        gear = COGSGUARD_GEAR
-        elements = COGSGUARD_ELEMENTS
+        gear = GEAR
+        elements = ELEMENTS
         resources_list = ["energy", "heart", "hp", "influence", *elements, *gear]
         vibe_names = [vibe.name for vibe in COGSGUARD_VIBES]
 
@@ -368,7 +224,7 @@ class CogsGuardMission(Config):
                 update={
                     "rewards": {
                         "aligned_junction_held": reward(
-                            game_stat("collective.junction.held"),
+                            game_stat("collective.aligned.junction.held"),
                             weight=1.0 / self.max_steps,
                             denoms=[numObjects("junction")],
                         ),
@@ -377,7 +233,7 @@ class CogsGuardMission(Config):
             ),
             objects={
                 "wall": self.wall.station_cfg(),
-                "hub": HubConfig(map_name="assembler", team="cogs").station_cfg(),
+                "hub": HubConfig(map_name="hub", team="cogs").station_cfg(),
                 "junction": JunctionConfig(map_name="charger").station_cfg(),
                 "chest": CogsGuardChestConfig().station_cfg(),
                 **extractor_objects,
@@ -462,10 +318,19 @@ class CogsGuardMission(Config):
         )
 
         env = MettaGridConfig(game=game)
+        # Precaution - copy the env, in case the code above uses some global variable that we don't want to modify.
+        # This allows variants to modify the env without copying it again.
         env = env.model_copy(deep=True)
         env.label = self.full_name()
+
+        for variant in self.variants:
+            variant.modify_env(self, env)
+            env.label += f".{variant.name}"
 
         return env
 
 
-AnyMission = Mission | CogsGuardMission
+# Backwards compatibility alias
+CogsGuardMission = Mission
+
+AnyMission = Mission

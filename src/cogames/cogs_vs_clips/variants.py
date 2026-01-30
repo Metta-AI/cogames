@@ -1,28 +1,15 @@
-from typing import Iterable, Sequence, override
+from typing import override
 
 from cogames.cogs_vs_clips.evals.difficulty_variants import DIFFICULTY_VARIANTS
-from cogames.cogs_vs_clips.mission import MissionVariant
+from cogames.cogs_vs_clips.mission import Mission, MissionVariant
 from cogames.cogs_vs_clips.procedural import BaseHubVariant, MachinaArenaVariant
 from mettagrid.config.action_config import VibeTransfer
 from mettagrid.config.game_value import stat
-from mettagrid.config.mettagrid_config import AssemblerConfig, ChestConfig, ProtocolConfig, ResourceLimitsConfig
 from mettagrid.config.reward_config import reward
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.mapgen.scenes.base_hub import DEFAULT_EXTRACTORS as HUB_EXTRACTORS
 from mettagrid.mapgen.scenes.building_distributions import DistributionConfig, DistributionType
-
-
-class MinedOutVariant(MissionVariant):
-    name: str = "mined_out"
-    description: str = "All resources are depleted. You must be efficient to survive."
-
-    @override
-    def modify_mission(self, mission):
-        # Clamp efficiency to minimum of 50 to prevent negative values
-        mission.carbon_extractor.max_uses = 2
-        mission.oxygen_extractor.max_uses = 2
-        mission.silicon_extractor.max_uses = 2
 
 
 class DarkSideVariant(MissionVariant):
@@ -31,7 +18,8 @@ class DarkSideVariant(MissionVariant):
 
     @override
     def modify_mission(self, mission):
-        mission.energy_regen_amount = 0
+        assert isinstance(mission, Mission)
+        mission.cog.energy_regen = 0
 
 
 class SuperChargedVariant(MissionVariant):
@@ -40,7 +28,8 @@ class SuperChargedVariant(MissionVariant):
 
     @override
     def modify_mission(self, mission):
-        mission.energy_regen_amount += 2
+        assert isinstance(mission, Mission)
+        mission.cog.energy_regen += 2
 
 
 class RoughTerrainVariant(MissionVariant):
@@ -49,54 +38,8 @@ class RoughTerrainVariant(MissionVariant):
 
     @override
     def modify_mission(self, mission):
-        mission.move_energy_cost += 2
-
-
-class SolarFlareVariant(MissionVariant):
-    name: str = "solar_flare"
-    description: str = "Chargers have been damaged by the solar flare."
-
-    @override
-    def modify_mission(self, mission):
-        # Clamp efficiency to minimum of 1 to prevent negative values
-        mission.charger.efficiency = max(1, mission.charger.efficiency - 50)
-
-
-class TrainingVariant(MissionVariant):
-    name: str = "training"
-    description: str = "Training-friendly: max cargo, fast extractors, chest only deposits hearts."
-
-    @override
-    def modify_mission(self, mission):
-        mission.cargo_capacity = 255  # Maximum cargo for easier resource collection
-
-    @override
-    def modify_env(self, mission, env):
-        # Set all extractor cooldowns to 5ms (fast)
-        for extractor_name in ["carbon_extractor", "oxygen_extractor", "germanium_extractor", "silicon_extractor"]:
-            extractor = env.game.objects.get(extractor_name)
-            if isinstance(extractor, AssemblerConfig):
-                updated_protocols = []
-                for proto in extractor.protocols:
-                    updated_proto = proto.model_copy(deep=True)
-                    updated_proto.cooldown = 5
-                    updated_protocols.append(updated_proto)
-                extractor.protocols = updated_protocols
-
-        # Modify chest to only deposit hearts by default (not all resources)
-        chest = env.game.objects.get("chest")
-        if isinstance(chest, ChestConfig):
-            chest.vibe_transfers = {
-                "heart_b": {"heart": 1},
-                "carbon_a": {"carbon": -10},
-                "carbon_b": {"carbon": 10},
-                "oxygen_a": {"oxygen": -10},
-                "oxygen_b": {"oxygen": 10},
-                "germanium_a": {"germanium": -1},
-                "germanium_b": {"germanium": 1},
-                "silicon_a": {"silicon": -25},
-                "silicon_b": {"silicon": 25},
-            }
+        assert isinstance(mission, Mission)
+        mission.cog.move_energy_cost += 2
 
 
 class PackRatVariant(MissionVariant):
@@ -105,10 +48,11 @@ class PackRatVariant(MissionVariant):
 
     @override
     def modify_mission(self, mission):
-        mission.heart_capacity = max(mission.heart_capacity, 255)
-        mission.energy_capacity = max(mission.energy_capacity, 255)
-        mission.cargo_capacity = max(mission.cargo_capacity, 255)
-        mission.gear_capacity = max(mission.gear_capacity, 255)
+        assert isinstance(mission, Mission)
+        mission.cog.heart_limit = max(mission.cog.heart_limit, 255)
+        mission.cog.energy_limit = max(mission.cog.energy_limit, 255)
+        mission.cog.cargo_limit = max(mission.cog.cargo_limit, 255)
+        mission.cog.gear_limit = max(mission.cog.gear_limit, 255)
 
 
 class EnergizedVariant(MissionVariant):
@@ -117,124 +61,18 @@ class EnergizedVariant(MissionVariant):
 
     @override
     def modify_mission(self, mission):
-        mission.energy_capacity = max(mission.energy_capacity, 255)
-        mission.energy_regen_amount = mission.energy_capacity
-
-
-class ResourceBottleneckVariant(MissionVariant):
-    name: str = "resource_bottleneck"
-    description: str = "A resource is the limiting factor. Agents must prioritize it over other resources."
-    resource: Sequence[str] | str = ("oxygen", "germanium", "silicon", "carbon")
-
-    @override
-    def modify_mission(self, mission):
-        # Accept either a single resource or an iterable of resources to bottleneck
-        if isinstance(self.resource, str):
-            resources: Iterable[str] = [self.resource]
-        else:
-            resources = list(self.resource)
-
-        for resource in resources:
-            if resource in {"carbon", "oxygen", "germanium", "silicon"}:
-                extractor_attr = f"{resource}_extractor"
-            elif resource == "energy":
-                extractor_attr = "charger"
-            else:
-                raise ValueError(f"Unsupported resource for bottleneck: {resource}")
-
-            extractor = getattr(mission, extractor_attr, None)
-            if extractor is None:
-                raise AttributeError(f"Mission has no extractor attribute '{extractor_attr}'")
-
-            # Clamp efficiency to minimum of 1 to prevent negative values
-            extractor.efficiency = max(1, int(extractor.efficiency) - 50)
+        assert isinstance(mission, Mission)
+        mission.cog.energy_limit = max(mission.cog.energy_limit, 255)
+        mission.cog.energy_regen = mission.cog.energy_limit
 
 
 class CompassVariant(MissionVariant):
     name: str = "compass"
-    description: str = "Enable compass observation pointing toward the assembler."
-
-    @override
-    def modify_mission(self, mission):
-        mission.compass_enabled = True
-
-
-class HeartChorusVariant(MissionVariant):
-    name: str = "heart_chorus"
-    description: str = "Heart-centric reward shaping with gentle resource bonuses."
+    description: str = "Enable compass observation."
 
     @override
     def modify_env(self, mission, env):
-        # Supplemental shaping: focus rewards on the acting agent for heart progress.
-        env.game.agent.rewards["assembler_heart_created"] = reward(stat("assembler.heart.created"))
-        env.game.agent.rewards["chest_heart_deposited_by_agent"] = reward(stat("chest.heart.deposited_by_agent"))
-        env.game.agent.rewards["chest_heart_withdrawn_by_agent"] = reward(
-            stat("chest.heart.withdrawn_by_agent"), weight=-1.0
-        )
-
-
-class TinyHeartProtocolsVariant(MissionVariant):
-    """Prepend low-cost heart/red-heart assembler protocols for easy hearts."""
-
-    name: str = "tiny_heart_protocols"
-    description: str = "Prepend low-cost heart/red-heart assembler protocols."
-
-    # Allow customization if ever needed; defaults match prior inline block.
-    carbon_cost: int = 2
-    oxygen_cost: int = 2
-    germanium_cost: int = 1
-    silicon_cost: int = 3
-    energy_cost: int = 2
-
-    @override
-    def modify_env(self, mission, env) -> None:
-        assembler = env.game.objects.get("assembler")
-        if not isinstance(assembler, AssemblerConfig):
-            raise TypeError("Expected 'assembler' to be AssemblerConfig")
-
-        tiny_inputs = {
-            "carbon": self.carbon_cost,
-            "oxygen": self.oxygen_cost,
-            "germanium": self.germanium_cost,
-            "silicon": self.silicon_cost,
-            "energy": self.energy_cost,
-        }
-
-        tiny_protocols = [
-            ProtocolConfig(
-                vibes=[vibe] * (i + 1),
-                input_resources=tiny_inputs,
-                output_resources={"heart": i + 1},
-            )
-            for vibe in ("heart_a", "red-heart")
-            for i in range(4)
-        ]
-        tiny_keys = {(tuple(p.vibes), p.min_agents) for p in tiny_protocols}
-        existing = [p for p in assembler.protocols if (tuple(p.vibes), p.min_agents) not in tiny_keys]
-        assembler.protocols = [*tiny_protocols, *existing]
-
-
-class VibeCheckMin2Variant(MissionVariant):
-    name: str = "vibe_check_min_2"
-    description: str = "Require at least 2 heart vibes to craft a heart."
-    min_vibes: int = 2
-
-    @override
-    def modify_env(self, mission, env):
-        assembler = env.game.objects["assembler"]
-        if not isinstance(assembler, AssemblerConfig):
-            raise TypeError("Expected 'assembler' to be AssemblerConfig")
-
-        filtered: list[ProtocolConfig] = []
-        for proto in assembler.protocols:
-            # Keep non-heart protocols as-is (e.g., gear recipes)
-            if proto.output_resources.get("heart", 0) == 0:
-                filtered.append(proto)
-                continue
-            # Keep only heart protocols that require >= 2 'heart' vibes
-            if len(proto.vibes) >= 2 and all(v == "heart_a" for v in proto.vibes):
-                filtered.append(proto)
-        assembler.protocols = filtered
+        env.game.obs.global_obs.compass = True
 
 
 class Small50Variant(MissionVariant):
@@ -249,113 +87,6 @@ class Small50Variant(MissionVariant):
             # Skip setting width/height for MapBuilderConfig instances
             return
         env.game.map_builder = map_builder.model_copy(update={"width": 50, "height": 50})
-
-
-class InventoryHeartTuneVariant(MissionVariant):
-    name: str = "inventory_heart_tune"
-    description: str = "Tune starting agent inventory to N hearts worth of inputs; optional heart capacity."
-    hearts: int = 1
-    heart_capacity: int | None = None
-
-    @override
-    def modify_env(self, mission, env) -> None:
-        hearts = max(0, int(self.hearts))
-        if hearts == 0 and self.heart_capacity is None:
-            return
-
-        heart_cost = mission.assembler.first_heart_cost
-        per_heart = {
-            "carbon": heart_cost,
-            "oxygen": heart_cost,
-            "germanium": max(heart_cost // 10, 1),
-            "silicon": 3 * heart_cost,
-            "energy": 0,
-        }
-
-        if hearts > 0:
-            agent_cfg = env.game.agent
-            agent_cfg.inventory.initial = dict(agent_cfg.inventory.initial)
-
-            def _limit_for(resource: str) -> int:
-                return agent_cfg.inventory.get_limit(resource)
-
-            for resource_name, per_heart_value in per_heart.items():
-                current = int(agent_cfg.inventory.initial.get(resource_name, 0))
-                target = current + per_heart_value * hearts
-                cap = _limit_for(resource_name)
-                agent_cfg.inventory.initial[resource_name] = min(cap, target)
-
-        if self.heart_capacity is not None:
-            agent_cfg = env.game.agent
-            hearts_limit = agent_cfg.inventory.limits.get("heart")
-            if hearts_limit is None:
-                hearts_limit = ResourceLimitsConfig(min=self.heart_capacity, resources=["heart"])
-            hearts_limit.min = max(int(hearts_limit.min), int(self.heart_capacity))
-            agent_cfg.inventory.limits["heart"] = hearts_limit
-
-
-class ChestHeartTuneVariant(MissionVariant):
-    name: str = "chest_heart_tune"
-    description: str = "Tune chest starting inventory to N hearts worth of inputs."
-    hearts: int = 2
-
-    @override
-    def modify_env(self, mission, env) -> None:
-        hearts = max(0, int(self.hearts))
-        if hearts == 0:
-            return
-        heart_cost = mission.assembler.first_heart_cost
-        per_heart = {
-            "carbon": heart_cost,
-            "oxygen": heart_cost,
-            "germanium": max(heart_cost // 10, 1),
-            "silicon": 3 * heart_cost,
-        }
-        chest_cfg = env.game.objects["chest"]
-        if not isinstance(chest_cfg, ChestConfig):
-            raise TypeError("Expected 'chest' to be ChestConfig")
-        start = dict(chest_cfg.inventory.initial)
-        for k, v in per_heart.items():
-            start[k] = start.get(k, 0) + v * hearts
-        chest_cfg.inventory.initial = start
-
-
-class ExtractorHeartTuneVariant(MissionVariant):
-    name: str = "extractor_heart_tune"
-    description: str = "Tune extractors for N hearts production capability."
-    hearts: int = 1
-
-    @override
-    def modify_mission(self, mission):
-        hearts = max(0, int(self.hearts))
-        if hearts == 0:
-            return
-        heart_cost = mission.assembler.first_heart_cost
-        one_heart = {
-            "carbon": heart_cost,
-            "oxygen": heart_cost,
-            "germanium": max(heart_cost // 10, 1),
-            "silicon": 3 * heart_cost,
-        }
-
-        # Carbon per-use depends on efficiency
-        carbon_per_use = max(1, 4 * mission.carbon_extractor.efficiency // 100)
-        carbon_needed = one_heart["carbon"] * hearts
-        mission.carbon_extractor.max_uses = (carbon_needed + carbon_per_use - 1) // carbon_per_use
-
-        # Oxygen is 20 per use
-        oxygen_per_use = 20
-        oxygen_needed = one_heart["oxygen"] * hearts
-        mission.oxygen_extractor.max_uses = (oxygen_needed + oxygen_per_use - 1) // oxygen_per_use
-
-        # Silicon is ~25 per use (scaled by efficiency); silicon extractor divides by 10 internally
-        silicon_per_use = max(1, int(25 * mission.silicon_extractor.efficiency // 100))
-        silicon_needed = one_heart["silicon"] * hearts
-        silicon_uses = (silicon_needed + silicon_per_use - 1) // silicon_per_use
-        mission.silicon_extractor.max_uses = max(1, silicon_uses * 10)
-
-        # Germanium: fixed one use producing all required
-        mission.germanium_extractor.efficiency = int(one_heart["germanium"] * hearts)
 
 
 # Biome variants (weather) for procedural maps
@@ -390,7 +121,6 @@ class CityVariant(MachinaArenaVariant):
         node.density_scale = 1.0
         node.biome_count = 1
         node.max_biome_zone_fraction = 0.95
-        # Tighten the city grid itself
 
 
 class CavesVariant(MachinaArenaVariant):
@@ -437,34 +167,6 @@ class DistantResourcesVariant(MachinaArenaVariant):
         }
         # Fallback for any unspecified building types
         node.distribution = DistributionConfig(type=DistributionType.UNIFORM)
-
-
-class SingleUseSwarmVariant(MissionVariant):
-    name: str = "single_use_swarm"
-    description: str = "Everything is single use; agents must fan out and reconverge."
-    building_coverage: float = 0.03
-
-    @override
-    def modify_mission(self, mission):
-        # Make each extractor single-use
-        for res in ("carbon", "oxygen", "silicon"):
-            extractor = getattr(mission, f"{res}_extractor", None)
-            if extractor is not None:
-                extractor.max_uses = 1
-
-    @override
-    def modify_env(self, mission, env):
-        # Ensure charger is also single-use (its Config defaults to unlimited)
-        charger = env.game.objects.get("charger")
-        if isinstance(charger, AssemblerConfig):
-            charger.max_uses = 1
-
-        # Increase building coverage a bit to create many single-use points
-        map_builder = getattr(env.game, "map_builder", None)
-        instance = getattr(map_builder, "instance", None)
-        if instance is not None and hasattr(instance, "building_coverage"):
-            current = float(getattr(instance, "building_coverage", 0.01))
-            instance.building_coverage = max(current, float(self.building_coverage))
 
 
 class QuadrantBuildingsVariant(MachinaArenaVariant):
@@ -527,35 +229,6 @@ class EmptyBaseVariant(BaseHubVariant):
         node.corner_bundle = "custom"
 
 
-class AssemblerDrawsFromChestsVariant(BaseHubVariant):
-    name: str = "assembler_draws_from_chests"
-    description: str = "Assembler draws from chests."
-
-    # It would be better if this were configurable, but we use variants in places where that's hard.
-    # This needs to not overlap with the default (heart) chest.
-    chest_distance: int = 2
-
-    @override
-    def modify_node(self, node):
-        node.cross_objects = ["chest_carbon", "chest_oxygen", "chest_germanium", "chest_silicon"]
-        node.cross_bundle = "custom"
-        node.cross_distance = self.chest_distance
-
-    @override
-    def modify_env(self, mission, env):
-        super().modify_env(mission, env)
-        assembler = env.game.objects["assembler"]
-        assert isinstance(assembler, AssemblerConfig)
-        assembler.chest_search_distance = self.chest_distance
-        chest = env.game.objects["chest"]
-        assert isinstance(chest, ChestConfig)
-        chest.vibe_transfers = {
-            "default": {
-                "heart": 255,
-            }
-        }
-
-
 class BalancedCornersVariant(MachinaArenaVariant):
     """Enable corner balancing to ensure fair spawn distances."""
 
@@ -610,33 +283,22 @@ class SharedRewardsVariant(MissionVariant):
 
 # TODO - validate that all variant names are unique
 VARIANTS: list[MissionVariant] = [
-    AssemblerDrawsFromChestsVariant(),
     CavesVariant(),
-    ChestHeartTuneVariant(),
     CityVariant(),
     CompassVariant(),
     DarkSideVariant(),
     DesertVariant(),
     EmptyBaseVariant(),
     EnergizedVariant(),
-    ExtractorHeartTuneVariant(),
     ForestVariant(),
-    HeartChorusVariant(),
-    InventoryHeartTuneVariant(),
-    MinedOutVariant(),
     PackRatVariant(),
     QuadrantBuildingsVariant(),
-    ResourceBottleneckVariant(),
     RoughTerrainVariant(),
     SharedRewardsVariant(),
     SingleResourceUniformVariant(),
     Small50Variant(),
-    SolarFlareVariant(),
     SuperChargedVariant(),
     TraderVariant(),
-    TinyHeartProtocolsVariant(),
-    TrainingVariant(),
-    VibeCheckMin2Variant(),
     *DIFFICULTY_VARIANTS,
 ]
 

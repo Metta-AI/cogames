@@ -30,7 +30,7 @@ def test_env_config():
     Uses training_facility (13x13 map, 4 agents) instead of machina_1 (88x88 map, 20 agents)
     for faster test execution, especially under x86 emulation.
     """
-    return get_mission("training_facility")[1]
+    return get_mission("cogsguard_arena.basic")[1]
 
 
 @pytest.mark.timeout(120)
@@ -123,7 +123,7 @@ def test_make_policy_trainable_and_train(temp_checkpoint_dir):
             # Train using the generated policy for a few steps
             # Use training_facility (13x13 map) for faster execution
             train(
-                env_cfg=get_mission("training_facility")[1],
+                env_cfg=get_mission("cogsguard_arena.basic")[1],
                 policy_class_path=f"{policy_file.stem}.MyTrainablePolicy",
                 device=torch.device("cpu"),
                 initial_weights_path=None,
@@ -176,7 +176,7 @@ def test_make_policy_scripted_runs():
             from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 
             # Use training_facility (13x13 map) for faster execution
-            env_cfg = get_mission("training_facility")[1]
+            env_cfg = get_mission("cogsguard_arena.basic")[1]
             policy_env_info = PolicyEnvInterface.from_mg_cfg(env_cfg)
             policy_spec = PolicySpec(class_path=f"{policy_file.stem}.StarterPolicy")
             policy = initialize_or_load_policy(policy_env_info, policy_spec)

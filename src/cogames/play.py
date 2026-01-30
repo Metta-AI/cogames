@@ -18,8 +18,8 @@ from mettagrid.renderer.renderer import RenderMode
 logger = logging.getLogger("cogames.play")
 
 # Resources and gear types for CogsGuard
-COGSGUARD_ELEMENTS = ["carbon", "oxygen", "germanium", "silicon"]
-COGSGUARD_GEAR = ["miner", "aligner", "scrambler", "scout"]
+ELEMENTS = ["carbon", "oxygen", "germanium", "silicon"]
+GEAR = ["miner", "aligner", "scrambler", "scout"]
 
 
 def _print_episode_stats(console: Console, results: PureSingleEpisodeResult) -> None:
@@ -85,7 +85,7 @@ def _print_cogsguard_stats(
 
     # Gear: gained | lost | final (net = gained - lost)
     gear_added = False
-    for gear in COGSGUARD_GEAR:
+    for gear in GEAR:
         gained = int(agent_totals.get(f"{gear}.gained", 0))
         lost = int(agent_totals.get(f"{gear}.lost", 0))
         final = gained - lost
@@ -112,7 +112,7 @@ def _print_cogsguard_stats(
 
     # Resources: gained (deposited) | lost (withdrawn) | final (current amount)
     resources_added = False
-    for resource in COGSGUARD_ELEMENTS:
+    for resource in ELEMENTS:
         gained = int(cogs_stats.get(f"collective.{resource}.deposited", 0))
         lost = int(cogs_stats.get(f"collective.{resource}.withdrawn", 0))
         final = int(cogs_stats.get(f"collective.{resource}.amount", 0))

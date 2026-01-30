@@ -184,7 +184,7 @@ def tutorial_cmd(
                     "Right Pane (Vibe Deck): Select icons here to change your Cog's broadcast resonance.",
                     "Zoom/Pan: Scroll or pinch to zoom the arena; drag to pan.",
                     "Click various buildings to view their details in the Left Pane.",
-                    "Look for the Hub (Assembler), Junctions, Gear Stations, and Extractors.",
+                    "Look for the Hub (Hub), Junctions, Gear Stations, and Extractors.",
                     "Click your Cog to assume control.",
                 ),
             },
@@ -385,14 +385,14 @@ def cogsguard_tutorial_cmd(
                 "title": "Step 6 — Resources & Hearts",
                 "lines": (
                     "[bold]Extractors:[/bold] Walk into them to gather resources (1 per use, 10 with Miner gear).",
-                    "[bold]Deposit:[/bold] Walk into the Assembler (center of Hub) to deposit resources.",
+                    "[bold]Deposit:[/bold] Walk into the Hub (center of Hub) to deposit resources.",
                     "[bold]Hearts:[/bold] At the Chest, convert [yellow]1C + 1O + 1G + 1S[/yellow] into 1 heart.",
                     "  Hearts are spent to capture/scramble junctions.",
                     "[bold]Aligning:[/bold] Switch to Aligner gear, then walk into a neutral junction to capture it.",
                     "Team coordination: Miners gather → deposit → make hearts → Aligners/Scramblers use them.",
                 ),
                 "task": (
-                    "Extract resources (C/O/G/S), deposit at the Assembler, craft a heart, "
+                    "Extract resources (C/O/G/S), deposit at the Hub, craft a heart, "
                     "then switch to Aligner and capture a junction."
                 ),
             },
@@ -402,7 +402,7 @@ def cogsguard_tutorial_cmd(
                     "[bold green]Congratulations![/bold green] You've completed the CogsGuard tutorial.",
                     "",
                     "[bold]Remember the core loop:[/bold]",
-                    "  1. Miners gather resources and deposit at the Assembler",
+                    "  1. Miners gather resources and deposit at the Hub",
                     "  2. Convert resources to hearts at the Chest",
                     "  3. Scramblers neutralize enemy junctions (1 heart each)",
                     "  4. Aligners capture neutral junctions (1 heart + 1 influence each)",

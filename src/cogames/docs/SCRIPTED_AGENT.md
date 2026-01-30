@@ -91,7 +91,7 @@ energy regen.
 
 - ✅ Visual discovery (explores to find stations and extractors)
 - ✅ Resource gathering (navigates to extractors, handles cooldowns)
-- ✅ Heart assembly (deposits resources at assembler)
+- ✅ Heart assembly (deposits resources at hub)
 - ✅ Heart delivery (brings hearts to chest)
 - ✅ Energy management (recharges when low)
 - ✅ Extractor tracking (remembers positions, cooldowns, remaining uses)
@@ -148,7 +148,7 @@ oxygen | gear | | Germanium | resonator | silicon | gear | | Silicon | scrambler
 1. Detects clipped extractor blocking progress
 2. Gathers craft resource (e.g., carbon for decoder)
 3. Changes glyph to "gear"
-4. Crafts unclip item at assembler
+4. Crafts unclip item at hub
 5. Navigates to clipped extractor
 6. Uses item to unclip
 7. Resumes normal gathering
@@ -194,7 +194,7 @@ All agents use a phase-based state machine:
 ```python
 class Phase(Enum):
     GATHER = "gather"          # Collecting resources
-    ASSEMBLE = "assemble"      # Crafting heart at assembler
+    ASSEMBLE = "assemble"      # Crafting heart at hub
     DELIVER = "deliver"        # Bringing heart to chest
     RECHARGE = "recharge"      # Restoring energy
     CRAFT_UNCLIP = "craft_unclip"  # UnclippingAgent only
@@ -214,7 +214,7 @@ Shared `pathfinding.py` module provides:
 
 Agents parse egocentric observations (11×11 grid) to detect:
 
-- Stations (assembler, chest, charger, extractors)
+- Stations (hub, chest, charger, extractors)
 - Other agents
 - Walls and obstacles
 - Agent state (resources, energy, inventory)

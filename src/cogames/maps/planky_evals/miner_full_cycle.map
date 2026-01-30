@@ -24,5 +24,5 @@ char_to_map_name:
   "G": germanium_extractor
   "I": silicon_extractor
   "J": charger
-  "&": assembler
+  "&": hub
   "=": chest

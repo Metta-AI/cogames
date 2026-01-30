@@ -21,7 +21,6 @@ from cogames.cogs_vs_clips.sites import SITES
 from cogames.cogs_vs_clips.variants import HIDDEN_VARIANTS, VARIANTS
 from cogames.game import load_mission_config, load_mission_config_from_python
 from mettagrid import MettaGridConfig
-from mettagrid.config.mettagrid_config import AssemblerConfig
 from mettagrid.mapgen.mapgen import MapGen
 
 
@@ -326,23 +325,10 @@ def get_mission(
 
     mission: AnyMission = find_mission(site_name, mission_name, include_evals=True, include_legacy=include_legacy)
 
-    # Apply variants only if the mission supports them (Mission has with_variants, CogsGuardMission doesn't)
-    if isinstance(mission, Mission):
-        if variants:
-            mission = mission.with_variants(variants)
-        if cogs is not None:
-            mission = mission.with_variants([NumCogsVariant(num_cogs=cogs)])
-    else:
-        if variants:
-            console.print(f"[yellow]Warning: Variants not supported for {mission.site.name} missions[/yellow]")
-        if cogs is not None:
-            if cogs < mission.site.min_cogs or cogs > mission.site.max_cogs:
-                raise ValueError(
-                    f"Invalid number of cogs for {mission.site.name}: {cogs}. "
-                    f"Must be between {mission.site.min_cogs} and {mission.site.max_cogs}"
-                )
-            mission = mission.model_copy(deep=True)
-            mission.num_cogs = cogs
+    if variants:
+        mission = mission.with_variants(variants)
+    if cogs is not None:
+        mission = mission.with_variants([NumCogsVariant(num_cogs=cogs)])
 
     return (
         mission.full_name(),
@@ -529,8 +515,7 @@ def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cf
         console.print("[bold]Description:[/bold]")
         console.print(f"  {mission_cfg.description}\n")
 
-        # Variants applied (only Mission type has variants, CogsGuardMission doesn't)
-        if isinstance(mission_cfg, Mission) and mission_cfg.variants:
+        if mission_cfg.variants:
             console.print("[bold]Variants Applied:[/bold]")
             for v in mission_cfg.variants:
                 desc = f" - {v.description}" if getattr(v, "description", "") else ""
@@ -561,14 +546,8 @@ def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cf
 
     # Display objects
     console.print("\n[bold]Stations:[/bold]")
-    for obj_name, obj_config in game_config.game.objects.items():
+    for obj_name, _obj_config in game_config.game.objects.items():
         console.print(f"  • {obj_name}")
-        if isinstance(obj_config, AssemblerConfig):
-            for protocol in obj_config.protocols:
-                if protocol.input_resources:
-                    inputs = ", ".join(f"{k}:{v}" for k, v in protocol.input_resources.items())
-                    outputs = ", ".join(f"{k}:{v}" for k, v in protocol.output_resources.items())
-                    console.print(f"    {inputs} → {outputs} (cooldown: {protocol.cooldown})")
 
     # Display agent configuration
     console.print("\n[bold]Agent Configuration:[/bold]")

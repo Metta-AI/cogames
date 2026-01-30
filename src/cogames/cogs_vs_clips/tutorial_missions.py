@@ -10,7 +10,7 @@ class TutorialVariant(MissionVariant):
 
     @override
     def modify_mission(self, mission: Mission) -> None:
-        mission.energy_regen_amount = 1
+        mission.cog.energy_regen = 1
 
     @override
     def modify_env(self, mission: Mission, env) -> None:

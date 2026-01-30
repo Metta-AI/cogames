@@ -115,8 +115,8 @@ def _run_case(
     mission = base_mission.with_variants(mission_variants)
     env_config = mission.make_env()
 
-    assembler = env_config.game.objects.get("assembler")
-    protocols = getattr(assembler, "protocols", None) if assembler is not None else None
+    hub = env_config.game.objects.get("hub")
+    protocols = getattr(hub, "protocols", None) if hub is not None else None
     if protocols:
         for proto in protocols:
             if any(v == "gear" for v in getattr(proto, "vibes", [])):

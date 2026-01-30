@@ -31,8 +31,8 @@ Diagnostic missions test specific skills in isolation with controlled, repeatabl
 
 #### Assembly
 
-- `diagnostic_assemble_seeded_near` - Agents pre-seeded with resources, assemble hearts at nearby assembler
-- `diagnostic_assemble_seeded_search` - Agents pre-seeded, find assembler and craft hearts
+- `diagnostic_assemble_seeded_near` - Agents pre-seeded with resources, assemble hearts at nearby hub
+- `diagnostic_assemble_seeded_search` - Agents pre-seeded, find hub and craft hearts
 
 #### Energy Management
 

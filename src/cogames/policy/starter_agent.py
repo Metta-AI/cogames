@@ -26,8 +26,8 @@ from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Action
 from mettagrid.simulator.interface import AgentObservation
 
-COGSGUARD_GEAR = ("aligner", "scrambler", "miner", "scout")
-COGSGUARD_ELEMENTS = ("carbon", "oxygen", "germanium", "silicon")
+GEAR = ("aligner", "scrambler", "miner", "scout")
+ELEMENTS = ("carbon", "oxygen", "germanium", "silicon")
 WANDER_DIRECTIONS = ("east", "south", "west", "north")
 WANDER_STEPS = 8
 
@@ -52,8 +52,8 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         self._fallback_action_name = "noop" if "noop" in self._action_name_set else self._action_names[0]
         self._center = (policy_env_info.obs_height // 2, policy_env_info.obs_width // 2)
         self._tag_name_to_id = {name: idx for idx, name in enumerate(policy_env_info.tags)}
-        self._gear_station_tags = self._resolve_tag_ids([f"{gear}_station" for gear in COGSGUARD_GEAR])
-        self._extractor_tags = self._resolve_tag_ids([f"{element}_extractor" for element in COGSGUARD_ELEMENTS])
+        self._gear_station_tags = self._resolve_tag_ids([f"{gear}_station" for gear in GEAR])
+        self._extractor_tags = self._resolve_tag_ids([f"{element}_extractor" for element in ELEMENTS])
         self._junction_tags = self._resolve_tag_ids(["junction"])
         self._chest_tags = self._resolve_tag_ids(["chest"])
         self._hub_tags = self._resolve_tag_ids(["hub"])
@@ -126,7 +126,7 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         return self._action(f"move_{direction}"), state
 
     def _current_gear(self, items: set[str]) -> Optional[str]:
-        for gear in COGSGUARD_GEAR:
+        for gear in GEAR:
             if gear in items:
                 return gear
         return None

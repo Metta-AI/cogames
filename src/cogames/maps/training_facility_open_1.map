@@ -28,7 +28,7 @@ char_to_map_name:
   "+": charger
   "o": oxygen_extractor
   "@": agent.agent
-  "&": assembler
+  "&": hub
   "g": germanium_extractor
   "=": chest
   "s": silicon_extractor
