@@ -3,11 +3,13 @@ from __future__ import annotations
 from pydantic import Field
 
 from mettagrid.base_config import Config
+from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
     AgentConfig,
     InventoryConfig,
     ResourceLimitsConfig,
 )
+from mettagrid.config.mutation.resource_mutation import updateActor
 
 
 class CogConfig(Config):
@@ -60,12 +62,18 @@ class CogConfig(Config):
                     ),
                 },
                 initial={"energy": self.initial_energy, "hp": self.initial_hp},
-                regen_amounts={
-                    "default": {
-                        "energy": self.energy_regen,
-                        "hp": self.hp_regen,
-                        "influence": self.influence_regen,
-                    },
-                },
             ),
+            on_tick={
+                "regen": Handler(
+                    mutations=[
+                        updateActor(
+                            {
+                                "energy": self.energy_regen,
+                                "hp": self.hp_regen,
+                                "influence": self.influence_regen,
+                            }
+                        )
+                    ]
+                )
+            },
         )

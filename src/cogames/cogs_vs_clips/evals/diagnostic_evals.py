@@ -6,6 +6,7 @@ from typing import Callable, Dict
 from pydantic import Field
 
 from cogames.cogs_vs_clips.mission import Mission, MissionVariant, Site
+from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
     AssemblerConfig,
     ChestConfig,
@@ -13,6 +14,7 @@ from mettagrid.config.mettagrid_config import (
     ProtocolConfig,
     ResourceLimitsConfig,
 )
+from mettagrid.config.mutation.resource_mutation import updateActor
 from mettagrid.config.reward_config import statReward
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen
@@ -415,7 +417,7 @@ class DiagnosticChargeUp(_DiagnosticMissionBase):
         agent = cfg.game.agent
         agent.inventory.initial = dict(agent.inventory.initial)
         agent.inventory.initial["energy"] = 60
-        agent.inventory.regen_amounts = {"default": {"energy": 0}}
+        agent.on_tick = {"regen": Handler(mutations=[updateActor({"energy": 0})])}
 
 
 class DiagnosticAgile(_DiagnosticMissionBase):
@@ -461,7 +463,7 @@ class DiagnosticRadial(_DiagnosticMissionBase):
         inventory = dict(agent.inventory.initial)
         inventory["energy"] = 255
         agent.inventory.initial = inventory
-        agent.inventory.regen_amounts = {"default": {"energy": 255}}
+        agent.on_tick = {"regen": Handler(mutations=[updateActor({"energy": 255})])}
 
 
 # ----------------------------------------------------------------------
@@ -520,7 +522,7 @@ class DiagnosticChargeUpHard(_DiagnosticMissionBase):
         agent = cfg.game.agent
         agent.inventory.initial = dict(agent.inventory.initial)
         agent.inventory.initial["energy"] = 60
-        agent.inventory.regen_amounts = {"default": {"energy": 0}}
+        agent.on_tick = {"regen": Handler(mutations=[updateActor({"energy": 0})])}
 
 
 class DiagnosticMemoryHard(_DiagnosticMissionBase):
@@ -610,7 +612,7 @@ class DiagnosticRadialHard(_DiagnosticMissionBase):
         inventory = dict(agent.inventory.initial)
         inventory["energy"] = 255
         agent.inventory.initial = inventory
-        agent.inventory.regen_amounts = {"default": {"energy": 255}}
+        agent.on_tick = {"regen": Handler(mutations=[updateActor({"energy": 255})])}
 
 
 DIAGNOSTIC_EVALS: list[type[_DiagnosticMissionBase]] = [

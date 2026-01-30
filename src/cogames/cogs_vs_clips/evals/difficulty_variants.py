@@ -22,6 +22,7 @@ from pydantic import Field
 
 from cogames.cogs_vs_clips.mission import Mission, MissionVariant
 from mettagrid.config.mettagrid_config import AssemblerConfig, MettaGridConfig
+from mettagrid.config.mutation.resource_mutation import ResourceDeltaMutation
 
 logger = logging.getLogger(__name__)
 
@@ -169,13 +170,15 @@ class DifficultyLevel(MissionVariant):
             if obj.max_uses > 0 and num_agents > 1:
                 obj.max_uses = obj.max_uses * num_agents
 
-        # Energy regen floor: if nonzero, keep at least 1
-        default_regen = env.game.agent.inventory.regen_amounts.get("default", {})
-        current_regen = default_regen.get("energy", 1)
-        if current_regen > 0:
-            if "default" not in env.game.agent.inventory.regen_amounts:
-                env.game.agent.inventory.regen_amounts["default"] = {}
-            env.game.agent.inventory.regen_amounts["default"]["energy"] = max(ENERGY_REGEN_FLOOR, current_regen)
+        # Energy regen floor: if nonzero, keep at least ENERGY_REGEN_FLOOR
+        on_tick = env.game.agent.on_tick.get("regen")
+        if on_tick:
+            for mutation in on_tick.mutations:
+                if isinstance(mutation, ResourceDeltaMutation) and "energy" in mutation.deltas:
+                    current_regen = mutation.deltas["energy"]
+                    if current_regen > 0:
+                        mutation.deltas["energy"] = max(ENERGY_REGEN_FLOOR, current_regen)
+                    break
 
 
 # =============================================================================

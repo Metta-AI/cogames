@@ -37,6 +37,7 @@ from mettagrid.config.action_config import (
 from mettagrid.config.event_config import EventConfig, periodic
 from mettagrid.config.filter import isAlignedTo, isNear
 from mettagrid.config.game_value import StatsSource, StatsValue
+from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
     AgentConfig,
     CollectiveConfig,
@@ -46,6 +47,7 @@ from mettagrid.config.mettagrid_config import (
     ResourceLimitsConfig,
 )
 from mettagrid.config.mutation import alignTo
+from mettagrid.config.mutation.resource_mutation import updateActor
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
 from mettagrid.config.reward_config import numObjects, statReward
 from mettagrid.config.tag import typeTag
@@ -145,7 +147,6 @@ class Mission(Config):
     cargo_capacity: int = Field(default=100)
     energy_capacity: int = Field(default=100)
     energy_regen_amount: int = Field(default=1)
-    inventory_regen_interval: int = Field(default=1)
     gear_capacity: int = Field(default=5)
     move_energy_cost: int = Field(default=2)
     heart_capacity: int = Field(default=1)
@@ -215,14 +216,13 @@ class Mission(Config):
                         ),
                     },
                     initial={"energy": self.energy_capacity},
-                    regen_amounts={"default": {"energy": self.energy_regen_amount}},
                 ),
+                on_tick={"regen": Handler(mutations=[updateActor({"energy": self.energy_regen_amount})])},
                 rewards={
                     # Reward only the agent that deposits a heart.
                     "chest.heart.deposited_by_agent": statReward("chest.heart.deposited_by_agent"),
                 },
             ),
-            inventory_regen_interval=self.inventory_regen_interval,
             objects={
                 "wall": self.wall.station_cfg(),
                 "assembler": self.assembler.station_cfg(),
@@ -297,7 +297,6 @@ class CogsGuardMission(Config):
 
     # Game parameters
     max_steps: int = Field(default=10000)
-    inventory_regen_interval: int = Field(default=1)
 
     # Agent configuration
     cog: CogConfig = Field(default_factory=CogConfig)
@@ -379,7 +378,6 @@ class CogsGuardMission(Config):
                     },
                 }
             ),
-            inventory_regen_interval=self.inventory_regen_interval,
             objects={
                 "wall": self.wall.station_cfg(),
                 "hub": HubConfig(map_name="assembler", team="cogs").station_cfg(),
