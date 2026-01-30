@@ -23,7 +23,7 @@ This guide explains how the procedural map system is wired together and how to e
   - CLI glue (`cogames play`, `cogames missions`, `cogames train`) and variant composition
 
 Everything ultimately produces a `MapBuilderConfig` that feeds into a `MettaGridConfig`. Missions and variants
-coordinate map building, agent setup, and post-processing such as assembler rewrites.
+coordinate map building, agent setup, and post-processing such as hub rewrites.
 
 ---
 

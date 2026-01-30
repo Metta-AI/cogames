@@ -98,14 +98,14 @@ feature IDs for your configuration.
 | `last_action`                     | Last action taken by the cog                                                    | self                      |                                                                                 |
 | `last_reward`                     | Last reward received by the cog                                                 | self                      |                                                                                 |
 | `vibe`                            | Cog's current vibe                                                              | any object                | Values can be found in `vibes.VIBES`                                            |
-| `agent:compass`                   | Compass direction toward assembler                                              | self                      |                                                                                 |
+| `agent:compass`                   | Compass direction toward hub                                                    | self                      |                                                                                 |
 | `tag`                             | Tags associated with an object (e.g., "wall", "oxygen_extractor", "blue")       | any object                | Values can be found in `IdMap.tag_names()`. Multiple tags emit multiple tokens. |
-| `cooldown_remaining`              | Remaining cooldown time for objects                                             | assembler, extractors     | Value capped at 255                                                             |
-| `clipped`                         | Whether an assembler is clipped or not                                          | extractors                |                                                                                 |
+| `cooldown_remaining`              | Remaining cooldown time for objects                                             | hub, extractors           | Value capped at 255                                                             |
+| `clipped`                         | Whether an hub is clipped or not                                                | extractors                |                                                                                 |
 | `remaining_uses`                  | Remaining uses for objects with use limits                                      | extractors                | Value capped at 255. Only emitted if `max_uses > 0`                             |
 | `inv:{resource_name}`             | Amount of resource in the object                                                | cogs, chests              | One feature per resource (e.g., `inv:food`, `inv:wood`, `inv:stone`)            |
-| `protocol_input:{resource_name}`  | Required input resource amount for current protocol                             | assembler, extractors     | One feature per resource                                                        |
-| `protocol_output:{resource_name}` | Output resource amount for current protocol                                     | assembler, extractors     | One feature per resource                                                        |
+| `protocol_input:{resource_name}`  | Required input resource amount for current protocol                             | hub, extractors           | One feature per resource                                                        |
+| `protocol_output:{resource_name}` | Output resource amount for current protocol                                     | hub, extractors           | One feature per resource                                                        |
 
 ---
 

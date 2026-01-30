@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Dict
+from typing import Dict
 
 from pydantic import Field
 
-from cogames.cogs_vs_clips.mission import Mission, MissionVariant, Site
+from cogames.cogs_vs_clips.cog import CogConfig
+from cogames.cogs_vs_clips.mission import Mission, Site
 from mettagrid.config.game_value import stat
 from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
-    AssemblerConfig,
     ChestConfig,
     MettaGridConfig,
-    ProtocolConfig,
     ResourceLimitsConfig,
 )
 from mettagrid.config.mutation.resource_mutation import updateActor
@@ -42,19 +41,6 @@ def get_map(map_name: str) -> MapBuilderConfig:
     )
 
 
-def _add_make_env_modifier(mission: Mission, modifier: Callable[[MettaGridConfig], None]) -> Mission:
-    """Attach a post-make_env modifier to an instantiated mission."""
-    original_make_env = mission.make_env
-
-    def wrapped_make_env() -> MettaGridConfig:
-        env_cfg = original_make_env()
-        modifier(env_cfg)
-        return env_cfg
-
-    object.__setattr__(mission, "make_env", wrapped_make_env)
-    return mission
-
-
 EVALS = Site(
     name="evals",
     description="Diagnostic evaluation arenas.",
@@ -64,10 +50,40 @@ EVALS = Site(
 )
 
 
+# Generous cog config for diagnostic missions: high limits and full energy regen
+_GENEROUS_COG = CogConfig(
+    gear_limit=255,
+    hp_limit=255,
+    heart_limit=255,
+    energy_limit=255,
+    cargo_limit=255,
+    initial_energy=255,
+    initial_hp=100,
+    energy_regen=255,
+    hp_regen=0,
+    influence_regen=0,
+)
+
+# Same but without generous energy regen (for charge-up diagnostics)
+_MODEST_COG = CogConfig(
+    gear_limit=255,
+    hp_limit=255,
+    heart_limit=255,
+    energy_limit=255,
+    cargo_limit=255,
+    initial_energy=255,
+    initial_hp=100,
+    energy_regen=1,
+    hp_regen=0,
+    influence_regen=0,
+)
+
+
 class _DiagnosticMissionBase(Mission):
     """Base class for minimal diagnostic evaluation missions."""
 
     site: Site = EVALS
+    cog: CogConfig = Field(default_factory=lambda: _GENEROUS_COG.model_copy())
 
     map_name: str = Field(default="evals/diagnostic_eval_template.map")
     max_steps: int = Field(default=250)
@@ -76,25 +92,15 @@ class _DiagnosticMissionBase(Mission):
     inventory_seed: Dict[str, int] = Field(default_factory=dict)
     communal_chest_hearts: int | None = Field(default=None)
     resource_chest_stock: Dict[str, int] = Field(default_factory=dict)
-    extractor_max_uses: Dict[str, int] = Field(default_factory=dict)
-    assembler_heart_chorus: int = Field(default=1)
-    # If True, set assembler heart chorus to the number of agents in the environment
-    dynamic_assembler_chorus: bool = Field(default=False)
     # If True, give agents high energy capacity and regen (overridden by specific missions)
     generous_energy: bool = Field(default=True)
 
+    # Disable clips events for diagnostic evals
+    clips_scramble_start: int = Field(default=99999)
+    clips_align_start: int = Field(default=99999)
+
     def configure_env(self, cfg: MettaGridConfig) -> None:  # pragma: no cover - hook for subclasses
         """Hook for mission-specific environment alterations."""
-
-    def configure(self) -> None:
-        # Defaults per spec: large capacities, high regen unless mission disables it
-        self.heart_capacity = max(self.heart_capacity, 255)
-        self.cargo_capacity = max(self.cargo_capacity, 255)
-        self.gear_capacity = max(self.gear_capacity, 255)
-        self.energy_capacity = max(self.energy_capacity, 255)
-        if self.generous_energy:
-            # Full energy each step; effectively "lots of charge"
-            self.energy_regen_amount = self.energy_capacity
 
     def make_env(self) -> MettaGridConfig:
         """Override make_env to use the mission's map_name instead of site.map_builder."""
@@ -110,15 +116,6 @@ class _DiagnosticMissionBase(Mission):
             self._apply_inventory_seed(cfg)
             self._apply_communal_chest(cfg)
             self._apply_resource_chests(cfg)
-            self._apply_extractor_settings(cfg)
-            # Apply assembler requirements (may be overridden by dynamic chorus below)
-            self._apply_assembler_requirements(cfg)
-            # Zero out cooldowns everywhere to keep interactions snappy
-            self._zero_all_protocol_cooldowns(cfg)
-            # If required, set heart chorus to the number of agents after env is created
-            if self.dynamic_assembler_chorus:
-                self.assembler_heart_chorus = max(1, int(cfg.game.num_agents))
-                self._apply_assembler_requirements(cfg)
             # Finally, normalize rewards so a single deposited heart yields at most 1 reward.
             self._apply_heart_reward_cap(cfg)
             self.configure_env(cfg)
@@ -126,41 +123,6 @@ class _DiagnosticMissionBase(Mission):
         finally:
             # Restore original map_builder
             self.site.map_builder = original_map_builder
-
-    def instantiate(
-        self,
-        map_builder: MapBuilderConfig,
-        num_cogs: int,
-        variant: MissionVariant | None = None,
-        *,
-        cli_override: bool = False,
-    ) -> "Mission":
-        forced_map = get_map(self.map_name)
-        # TODO: Mission doesn't have instantiate() - this code path appears unused
-        mission = super().instantiate(forced_map, num_cogs, variant, cli_override=cli_override)  # type: ignore[attr-defined]
-        if not cli_override and self.required_agents is not None:
-            mission.num_cogs = self.required_agents
-
-        def _post(cfg: MettaGridConfig) -> None:
-            cfg.game.map_builder = forced_map
-            cfg.game.max_steps = self.max_steps
-            self._apply_inventory_seed(cfg)
-            self._apply_communal_chest(cfg)
-            self._apply_resource_chests(cfg)
-            self._apply_extractor_settings(cfg)
-            # Apply assembler requirements (may be overridden by dynamic chorus below)
-            self._apply_assembler_requirements(cfg)
-            # Zero out cooldowns everywhere to keep interactions snappy
-            self._zero_all_protocol_cooldowns(cfg)
-            # If required, set heart chorus to the number of agents after env is created
-            if self.dynamic_assembler_chorus:
-                self.assembler_heart_chorus = max(1, int(cfg.game.num_agents))
-                self._apply_assembler_requirements(cfg)
-            # Finally, normalize rewards so a single deposited heart yields at most 1 reward.
-            self._apply_heart_reward_cap(cfg)
-            self.configure_env(cfg)
-
-        return _add_make_env_modifier(mission, _post)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -188,47 +150,6 @@ class _DiagnosticMissionBase(Mission):
             if isinstance(chest_cfg, ChestConfig):
                 chest_cfg.inventory.initial = {resource: amount}
 
-    def _apply_extractor_settings(self, cfg: MettaGridConfig) -> None:
-        for resource in RESOURCE_NAMES:
-            extractor = cfg.game.objects.get(f"{resource}_extractor")
-            if not isinstance(extractor, AssemblerConfig):
-                continue
-            if resource in self.extractor_max_uses:
-                extractor.max_uses = self.extractor_max_uses[resource]
-
-    def _apply_assembler_requirements(self, cfg: MettaGridConfig) -> None:
-        assembler = cfg.game.objects.get("assembler")
-        if not isinstance(assembler, AssemblerConfig):
-            return
-        self._ensure_minimal_heart_recipe(assembler)
-        if self.assembler_heart_chorus <= 1:
-            return
-        # Use a valid heart vibe from the CVC vibe set.
-        chorus = ["heart_a"] * self.assembler_heart_chorus
-        updated: list[ProtocolConfig] = []
-        heart_protocol_applied = False
-        for proto in assembler.protocols:
-            if proto.output_resources.get("heart", 0) > 0:
-                if heart_protocol_applied:
-                    # Drop duplicate heart protocols to avoid vibe collisions.
-                    continue
-                updated_proto = proto.model_copy(update={"vibes": chorus})
-                updated.append(updated_proto)
-                heart_protocol_applied = True
-            else:
-                updated.append(proto)
-        assembler.protocols = updated
-
-    def _zero_all_protocol_cooldowns(self, cfg: MettaGridConfig) -> None:
-        # Zero cooldowns on assembler/extractor protocols
-        for _name, obj in list(cfg.game.objects.items()):
-            if not isinstance(obj, AssemblerConfig):
-                continue
-            updated: list[ProtocolConfig] = []
-            for proto in obj.protocols:
-                updated.append(proto.model_copy(update={"cooldown": 0}))
-            obj.protocols = updated
-
     def _apply_heart_reward_cap(self, cfg: MettaGridConfig) -> None:
         """Normalize diagnostics so a single deposited heart yields at most 1 reward per episode.
 
@@ -249,52 +170,9 @@ class _DiagnosticMissionBase(Mission):
             heart_limit.min = 1
             obj.inventory.limits["heart"] = heart_limit
 
-    def _ensure_minimal_heart_recipe(self, assembler: AssemblerConfig) -> None:
-        minimal_inputs = {
-            "carbon": 2,
-            "oxygen": 2,
-            "germanium": 1,
-            "silicon": 3,
-            "energy": 2,
-        }
-
-        updated_protocols: list[ProtocolConfig] = []
-        heart_recipe_applied = False
-
-        for proto in assembler.protocols:
-            if proto.output_resources.get("heart", 0) > 0:
-                if heart_recipe_applied:
-                    # Drop duplicate heart recipes to avoid conflicting requirements.
-                    continue
-                updated_proto = proto.model_copy(
-                    update={
-                        "vibes": ["heart_a"],
-                        "input_resources": minimal_inputs,
-                        "cooldown": 0,
-                        "output_resources": {"heart": 1},
-                    }
-                )
-                updated_protocols.append(updated_proto)
-                heart_recipe_applied = True
-            else:
-                updated_protocols.append(proto)
-
-        if not heart_recipe_applied:
-            updated_protocols.insert(
-                0,
-                ProtocolConfig(
-                    vibes=["heart_a"],
-                    input_resources=minimal_inputs,
-                    output_resources={"heart": 1},
-                    cooldown=0,
-                ),
-            )
-
-        assembler.protocols = updated_protocols
-
 
 # ----------------------------------------------------------------------
-# New diagnostics per spec
+# Diagnostics (non-hub)
 # ----------------------------------------------------------------------
 
 
@@ -306,7 +184,6 @@ class DiagnosticChestNavigation1(_DiagnosticMissionBase):
     inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"heart": 1})
     max_steps: int = Field(default=250)
     required_agents: int | None = 1
-    # 1-4 agents by default; no forced agent count
 
 
 class DiagnosticChestNavigation2(_DiagnosticMissionBase):
@@ -346,63 +223,6 @@ class DiagnosticChestDepositSearch(_DiagnosticMissionBase):
     max_steps: int = Field(default=250)
 
 
-# Assemble seeded: 1-4 agents, assembler requires exactly num agents to chorus
-class DiagnosticAssembleSeededNear(_DiagnosticMissionBase):
-    name: str = "diagnostic_assemble_seeded_near"
-    description: str = "Agents are pre-seeded; chorus glyph HEART near the assembler."
-    map_name: str = "evals/diagnostic_assembler_near.map"
-    dynamic_assembler_chorus: bool = True
-    inventory_seed: Dict[str, int] = Field(
-        default_factory=lambda: {"carbon": 2, "oxygen": 2, "germanium": 1, "silicon": 3}
-    )
-    max_steps: int = Field(default=50)
-
-
-class DiagnosticAssembleSeededSearch(_DiagnosticMissionBase):
-    name: str = "diagnostic_assemble_seeded_search"
-    description: str = "Agents are pre-seeded; locate the assembler and chorus glyph HEART."
-    map_name: str = "evals/diagnostic_assembler_search.map"
-    dynamic_assembler_chorus: bool = True
-    inventory_seed: Dict[str, int] = Field(
-        default_factory=lambda: {"carbon": 2, "oxygen": 2, "germanium": 1, "silicon": 3}
-    )
-    max_steps: int = Field(default=150)
-
-
-# Extract mission set: missing one resource; 1-4 agents; chorus required
-class DiagnosticExtractMissingCarbon(_DiagnosticMissionBase):
-    name: str = "diagnostic_extract_missing_carbon"
-    description: str = "All agents start around the assembler; carbon must be extracted."
-    map_name: str = "evals/diagnostic_extract_lab.map"
-    dynamic_assembler_chorus: bool = True
-    inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"oxygen": 2, "germanium": 1, "silicon": 3})
-    max_steps: int = Field(default=130)
-
-
-class DiagnosticExtractMissingOxygen(_DiagnosticMissionBase):
-    name: str = "diagnostic_extract_missing_oxygen"
-    description: str = "Gather oxygen from the extractor to complete a heart."
-    map_name: str = "evals/diagnostic_extract_lab.map"
-    inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"carbon": 2, "germanium": 1, "silicon": 3})
-    max_steps: int = Field(default=130)
-
-
-class DiagnosticExtractMissingGermanium(_DiagnosticMissionBase):
-    name: str = "diagnostic_extract_missing_germanium"
-    description: str = "Gather germanium from the extractor to complete a heart."
-    map_name: str = "evals/diagnostic_extract_lab.map"
-    inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"carbon": 2, "oxygen": 2, "silicon": 3})
-    max_steps: int = Field(default=130)
-
-
-class DiagnosticExtractMissingSilicon(_DiagnosticMissionBase):
-    name: str = "diagnostic_extract_missing_silicon"
-    description: str = "Gather silicon from the extractor to complete a heart."
-    map_name: str = "evals/diagnostic_extract_lab.map"
-    inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"carbon": 2, "oxygen": 2, "germanium": 1})
-    max_steps: int = Field(default=130)
-
-
 class DiagnosticChargeUp(_DiagnosticMissionBase):
     name: str = "diagnostic_charge_up"
     description: str = "Agent starts low on energy and must charge to proceed."
@@ -421,28 +241,6 @@ class DiagnosticChargeUp(_DiagnosticMissionBase):
         agent.on_tick = {"regen": Handler(mutations=[updateActor({"energy": 0})])}
 
 
-class DiagnosticAgile(_DiagnosticMissionBase):
-    name: str = "diagnostic_agile"
-    description: str = "Navigation agility challenge; 1-4 agents."
-    map_name: str = "evals/diagnostic_agile.map"
-    max_steps: int = Field(default=250)
-
-    def configure_env(self, cfg: MettaGridConfig) -> None:
-        required = {"carbon": 2, "oxygen": 2, "germanium": 1, "silicon": 3}
-        for resource, needed in required.items():
-            station = cfg.game.objects.get(f"{resource}_extractor")
-            if isinstance(station, AssemblerConfig):
-                station.max_uses = 1
-                updated: list[ProtocolConfig] = []
-                for proto in station.protocols:
-                    outputs = dict(proto.output_resources)
-                    if resource in outputs:
-                        outputs = {resource: needed}
-                        proto = proto.model_copy(update={"output_resources": outputs})
-                    updated.append(proto)
-                station.protocols = updated
-
-
 class DiagnosticMemory(_DiagnosticMissionBase):
     name: str = "diagnostic_memory"
     description: str = "Harder memory challenge with longer distance to chest."
@@ -450,21 +248,6 @@ class DiagnosticMemory(_DiagnosticMissionBase):
     inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"heart": 1})
     required_agents: int | None = 1
     max_steps: int = Field(default=110)
-
-
-class DiagnosticRadial(_DiagnosticMissionBase):
-    name: str = "diagnostic_radial"
-    description: str = "Radial resource layout; gather all four ingredients and chorus assemble."
-    map_name: str = "evals/diagnostic_radial.map"
-    dynamic_assembler_chorus: bool = True
-    max_steps: int = Field(default=250)
-
-    def configure_env(self, cfg: MettaGridConfig) -> None:
-        agent = cfg.game.agent
-        inventory = dict(agent.inventory.initial)
-        inventory["energy"] = 255
-        agent.inventory.initial = inventory
-        agent.on_tick = {"regen": Handler(mutations=[updateActor({"energy": 255})])}
 
 
 # ----------------------------------------------------------------------
@@ -535,87 +318,6 @@ class DiagnosticMemoryHard(_DiagnosticMissionBase):
     max_steps: int = Field(default=170)
 
 
-class DiagnosticAssembleSeededSearchHard(_DiagnosticMissionBase):
-    name: str = "diagnostic_assemble_seeded_search_hard"
-    description: str = "Agents are pre-seeded; locate the assembler and chorus glyph HEART (hard)."
-    map_name: str = "evals/diagnostic_assembler_search_hard.map"
-    dynamic_assembler_chorus: bool = True
-    inventory_seed: Dict[str, int] = Field(
-        default_factory=lambda: {"carbon": 2, "oxygen": 2, "germanium": 1, "silicon": 3}
-    )
-    max_steps: int = Field(default=250)
-
-
-class DiagnosticExtractMissingCarbonHard(_DiagnosticMissionBase):
-    name: str = "diagnostic_extract_missing_carbon_hard"
-    description: str = "All agents start around the assembler; carbon must be extracted (hard)."
-    map_name: str = "evals/diagnostic_extract_lab_hard.map"
-    dynamic_assembler_chorus: bool = True
-    inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"oxygen": 2, "germanium": 1, "silicon": 3})
-    max_steps: int = Field(default=230)
-
-
-class DiagnosticExtractMissingOxygenHard(_DiagnosticMissionBase):
-    name: str = "diagnostic_extract_missing_oxygen_hard"
-    description: str = "Gather oxygen from the extractor to complete a heart (hard)."
-    map_name: str = "evals/diagnostic_extract_lab_hard.map"
-    inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"carbon": 2, "germanium": 1, "silicon": 3})
-    max_steps: int = Field(default=230)
-
-
-class DiagnosticExtractMissingGermaniumHard(_DiagnosticMissionBase):
-    name: str = "diagnostic_extract_missing_germanium_hard"
-    description: str = "Gather germanium from the extractor to complete a heart (hard)."
-    map_name: str = "evals/diagnostic_extract_lab_hard.map"
-    inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"carbon": 2, "oxygen": 2, "silicon": 3})
-    max_steps: int = Field(default=230)
-
-
-class DiagnosticExtractMissingSiliconHard(_DiagnosticMissionBase):
-    name: str = "diagnostic_extract_missing_silicon_hard"
-    description: str = "Gather silicon from the extractor to complete a heart (hard)."
-    map_name: str = "evals/diagnostic_extract_lab_hard.map"
-    inventory_seed: Dict[str, int] = Field(default_factory=lambda: {"carbon": 2, "oxygen": 2, "germanium": 1})
-    max_steps: int = Field(default=230)
-
-
-class DiagnosticAgileHard(_DiagnosticMissionBase):
-    name: str = "diagnostic_agile_hard"
-    description: str = "Navigation agility challenge; 1-4 agents (hard)."
-    map_name: str = "evals/diagnostic_agile_hard.map"
-    max_steps: int = Field(default=350)
-
-    def configure_env(self, cfg: MettaGridConfig) -> None:
-        required = {"carbon": 2, "oxygen": 2, "germanium": 1, "silicon": 3}
-        for resource, needed in required.items():
-            station = cfg.game.objects.get(f"{resource}_extractor")
-            if isinstance(station, AssemblerConfig):
-                station.max_uses = 1
-                updated: list[ProtocolConfig] = []
-                for proto in station.protocols:
-                    outputs = dict(proto.output_resources)
-                    if resource in outputs:
-                        outputs = {resource: needed}
-                        proto = proto.model_copy(update={"output_resources": outputs})
-                    updated.append(proto)
-                station.protocols = updated
-
-
-class DiagnosticRadialHard(_DiagnosticMissionBase):
-    name: str = "diagnostic_radial_hard"
-    description: str = "Radial resource layout; gather all four ingredients and chorus assemble (hard)."
-    map_name: str = "evals/diagnostic_radial_hard.map"
-    dynamic_assembler_chorus: bool = True
-    max_steps: int = Field(default=350)
-
-    def configure_env(self, cfg: MettaGridConfig) -> None:
-        agent = cfg.game.agent
-        inventory = dict(agent.inventory.initial)
-        inventory["energy"] = 255
-        agent.inventory.initial = inventory
-        agent.on_tick = {"regen": Handler(mutations=[updateActor({"energy": 255})])}
-
-
 DIAGNOSTIC_EVALS: list[type[_DiagnosticMissionBase]] = [
     DiagnosticChestNavigation1,
     DiagnosticChestNavigation2,
@@ -624,14 +326,6 @@ DIAGNOSTIC_EVALS: list[type[_DiagnosticMissionBase]] = [
     DiagnosticChestDepositSearch,
     DiagnosticChargeUp,
     DiagnosticMemory,
-    DiagnosticAssembleSeededNear,
-    DiagnosticAssembleSeededSearch,
-    DiagnosticExtractMissingCarbon,
-    DiagnosticExtractMissingOxygen,
-    DiagnosticExtractMissingGermanium,
-    DiagnosticExtractMissingSilicon,
-    DiagnosticAgile,
-    DiagnosticRadial,
     # Hard versions
     DiagnosticChestNavigation1Hard,
     DiagnosticChestNavigation2Hard,
@@ -639,11 +333,4 @@ DIAGNOSTIC_EVALS: list[type[_DiagnosticMissionBase]] = [
     DiagnosticChestDepositSearchHard,
     DiagnosticChargeUpHard,
     DiagnosticMemoryHard,
-    DiagnosticAssembleSeededSearchHard,
-    DiagnosticExtractMissingCarbonHard,
-    DiagnosticExtractMissingOxygenHard,
-    DiagnosticExtractMissingGermaniumHard,
-    DiagnosticExtractMissingSiliconHard,
-    DiagnosticAgileHard,
-    DiagnosticRadialHard,
 ]

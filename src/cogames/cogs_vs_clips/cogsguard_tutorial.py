@@ -1,6 +1,6 @@
 """CogsGuard tutorial mission configuration."""
 
-from cogames.cogs_vs_clips.mission import CogsGuardMission, Site
+from cogames.cogs_vs_clips.mission import Mission, Site
 from cogames.cogs_vs_clips.procedural import MachinaArena
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.mapgen.scenes.base_hub import BaseHubConfig
@@ -41,7 +41,7 @@ def make_cogsguard_tutorial_site() -> Site:
     )
 
 
-CogsGuardTutorialMission = CogsGuardMission(
+CogsGuardTutorialMission = Mission(
     name="tutorial",
     description="Learn the basics of CogsGuard: Roles, Resources, and Territory Control.",
     site=make_cogsguard_tutorial_site(),
