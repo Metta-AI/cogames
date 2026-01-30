@@ -269,10 +269,12 @@ def validate_policy_in_isolation(
             "run",
             "cogames",
             "validate-policy",
+            "--policy",
+            policy_arg,
         ]
         if setup_script:
-            validate_cmd.extend(["--setup-script", setup_script])
-        validate_cmd.append(policy_arg)
+            validate_cmd.append("--setup-script")
+            validate_cmd.append(setup_script)
 
         _run_from_tmp_dir(validate_cmd)
 
