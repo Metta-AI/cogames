@@ -2019,9 +2019,11 @@ def _parse_init_kwarg(value: str) -> tuple[str, str]:
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames upload -p ./train_dir/my_run -n my-policy[/cyan]       From training run
+[cyan]cogames upload -p ./train_dir/my_run -n my-policy[/cyan]       Upload and submit to default season
 
-[cyan]cogames upload -p my_module.MyPolicy -n my-policy[/cyan]       From class
+[cyan]cogames upload -p ./run -n my-policy --season beta-cvc[/cyan]  Upload and submit to specific season
+
+[cyan]cogames upload -p ./run -n my-policy --no-submit[/cyan]        Upload without submitting
 
 [cyan]cogames upload -p lstm -n my-lstm --dry-run[/cyan]             Validate only""",
     add_help_option=False,
@@ -2070,14 +2072,21 @@ def upload_cmd(
         help="Python setup script to run before loading the policy",
         rich_help_panel="Files",
     ),
-    # --- Validation ---
+    # --- Tournament ---
     season: Optional[str] = typer.Option(
         None,
         "--season",
         metavar="SEASON",
-        help="Tournament season (determines which game to validate against)",
-        rich_help_panel="Validation",
+        help="Tournament season (default: server's default season)",
+        rich_help_panel="Tournament",
     ),
+    no_submit: bool = typer.Option(
+        False,
+        "--no-submit",
+        help="Upload without submitting to a season",
+        rich_help_panel="Tournament",
+    ),
+    # --- Validation ---
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -2136,11 +2145,16 @@ def upload_cmd(
         init_kwargs=init_kwargs if init_kwargs else None,
         setup_script=setup_script,
         validation_mission=season_info.validation_mission,
+        season=season_info.name if not no_submit else None,
     )
 
     if result:
         console.print(f"[green]Upload complete: {result.name}:v{result.version}[/green]")
-        console.print(f"\nTo submit to a tournament: cogames submit {result.name}:v{result.version} --season <name>")
+        if result.pools:
+            console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
+            console.print(f"[dim]Results:[/dim] {results_url_for_season(server, season_info.name)}")
+        elif no_submit:
+            console.print(f"\nTo submit to a tournament: cogames submit {result.name}:v{result.version}")
 
 
 @app.command(
@@ -2149,9 +2163,9 @@ def upload_cmd(
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames submit my-policy --season beta-cogsguard[/cyan]          Submit latest version
+[cyan]cogames submit my-policy[/cyan]                                   Submit to default season
 
-[cyan]cogames submit my-policy:v3 --season beta-cogsguard[/cyan]       Submit specific version""",
+[cyan]cogames submit my-policy:v3 --season beta-cvc[/cyan]              Submit specific version to specific season""",
     add_help_option=False,
 )
 def submit_cmd(
@@ -2235,7 +2249,7 @@ def submit_cmd(
 
     console.print(f"\n[bold green]Submitted to season '{season_name}'[/bold green]")
     if result.pools:
-        console.print(f"[dim]Pools: {', '.join(result.pools)}[/dim]")
+        console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
     console.print(f"[dim]Results:[/dim] {results_url_for_season(server, season_name)}")
     console.print(f"[dim]CLI:[/dim] cogames leaderboard --season {season_name}")
 

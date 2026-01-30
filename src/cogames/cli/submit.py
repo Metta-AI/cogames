@@ -38,6 +38,7 @@ class UploadResult:
     policy_version_id: uuid.UUID
     name: str
     version: int
+    pools: list[str] | None = None
 
 
 def validate_paths(paths: list[str], console: Console) -> list[Path]:
@@ -319,6 +320,7 @@ def upload_submission(
     zip_path: Path,
     submission_name: str,
     console: Console,
+    season: str | None = None,
 ) -> UploadResult | None:
     """Upload submission to CoGames backend using a presigned S3 URL."""
     console.print("[bold]Uploading[/bold]")
@@ -367,16 +369,18 @@ def upload_submission(
     console.print("[dim]Registering policy...[/dim]")
 
     try:
-        result = client.complete_policy_upload(upload_id, submission_name)
+        result = client.complete_policy_upload(upload_id, submission_name, season=season)
         submission_id = result.get("id")
         name = result.get("name")
         version = result.get("version")
+        pools = result.get("pools")
         if submission_id is not None and name is not None and version is not None:
             try:
                 return UploadResult(
                     policy_version_id=uuid.UUID(str(submission_id)),
                     name=name,
                     version=version,
+                    pools=pools,
                 )
             except ValueError:
                 console.print(f"[red]Invalid submission ID returned: {submission_id}[/red]")
@@ -408,6 +412,7 @@ def _upload_policy_bundle(
     skip_validation: bool,
     dry_run: bool,
     validation_mission: str,
+    season: str | None = None,
 ) -> UploadResult | None:
     bundle_zip, cleanup_bundle_zip = bundle_result
 
@@ -432,10 +437,11 @@ def _upload_policy_bundle(
             return None
 
         with client:
-            result = upload_submission(client, bundle_zip, name, console)
+            result = upload_submission(client, bundle_zip, name, console, season=season)
         if not result:
             console.print("\n[red]Upload failed.[/red]")
             return None
+
         return result
     finally:
         if cleanup_bundle_zip and bundle_zip.exists():
@@ -454,6 +460,7 @@ def upload_policy(
     skip_validation: bool = False,
     setup_script: str | None = None,
     validation_mission: str = "",
+    season: str | None = None,
 ) -> UploadResult | None:
     from cogames.cli.client import TournamentServerClient
 
@@ -482,6 +489,7 @@ def upload_policy(
             skip_validation=skip_validation,
             dry_run=dry_run,
             validation_mission=validation_mission,
+            season=season,
         )
 
     try:
@@ -561,10 +569,11 @@ def upload_policy(
 
     try:
         with client:
-            result = upload_submission(client, zip_path, name, console)
+            result = upload_submission(client, zip_path, name, console, season=season)
         if not result:
             console.print("\n[red]Upload failed.[/red]")
             return None
+
         return result
     finally:
         if zip_path.exists():
