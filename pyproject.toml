@@ -35,7 +35,7 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 agents = ["cogames-agents>=0.0.1"]
-test = ["pytest", "pytest-xdist", "ruff", "cogames-agents>=0.0.1"]
+test = ["pytest", "pytest-xdist", "ruff"]
 
 [project.scripts]
 cogames = "cogames.main:app"
