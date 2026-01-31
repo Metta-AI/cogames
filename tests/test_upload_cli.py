@@ -7,9 +7,11 @@ import subprocess
 import uuid
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pytest_httpserver import HTTPServer
+from typer.testing import CliRunner
 from werkzeug import Response
 
 from cogames.auth import AuthConfigReaderWriter
@@ -378,3 +380,235 @@ def test_upload_s3_bundle(
         spec = json.loads(zf.read("policy_spec.json"))
         assert spec["class_path"] == "my_policies.S3Agent"
         assert zf.read("training_config.yaml").decode() == "epochs: 50\nlr: 0.0003\n"
+
+
+# ---------------------------------------------------------------------------
+# CliRunner-based tests for upload validation flow
+# ---------------------------------------------------------------------------
+
+_SEASON_WITH_ENTRY_CONFIG: list[dict[str, Any]] = [
+    {
+        "name": "test-season",
+        "is_default": True,
+        "entry_pool": "qualifying",
+        "leaderboard_pool": "ranked",
+        "summary": "",
+        "pools": [
+            {"name": "qualifying", "description": "entry pool", "config_id": "cfg-123"},
+            {"name": "ranked", "description": "ranked pool", "config_id": None},
+        ],
+    }
+]
+
+_SEASON_NO_ENTRY_CONFIG: list[dict[str, Any]] = [
+    {
+        "name": "test-season",
+        "is_default": True,
+        "entry_pool": None,
+        "leaderboard_pool": "ranked",
+        "summary": "",
+        "pools": [
+            {"name": "ranked", "description": "ranked pool", "config_id": None},
+        ],
+    }
+]
+
+
+def _setup_mock_upload_server_with_season(
+    httpserver: HTTPServer,
+    seasons: list[dict[str, Any]],
+    upload_id: str = "test-upload-id",
+) -> None:
+    httpserver.expect_request(
+        "/tournament/seasons",
+        method="GET",
+    ).respond_with_json(seasons)
+
+    httpserver.expect_request(
+        "/stats/policies/submit/presigned-url",
+        method="POST",
+    ).respond_with_json(
+        {
+            "upload_url": httpserver.url_for("/fake-s3-upload"),
+            "upload_id": upload_id,
+        }
+    )
+
+    httpserver.expect_request(
+        "/fake-s3-upload",
+        method="PUT",
+    ).respond_with_data("")
+
+    def handle_complete(request):
+        body = request.json
+        return Response(
+            json.dumps(
+                {
+                    "id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                    "name": body["name"],
+                    "version": 1,
+                }
+            ),
+            content_type="application/json",
+        )
+
+    httpserver.expect_request(
+        "/stats/policies/submit/complete",
+        method="POST",
+    ).respond_with_handler(handle_complete)
+
+
+def test_upload_resolves_season_and_validates(
+    httpserver: HTTPServer,
+    fake_home: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _setup_mock_upload_server_with_season(httpserver, _SEASON_WITH_ENTRY_CONFIG)
+
+    bundle_dir = tmp_path / "my_bundle"
+    bundle_dir.mkdir()
+    (bundle_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
+
+    captured: dict[str, Any] = {}
+
+    def fake_validate(policy_zip, console, *, season, server):
+        captured["season"] = season
+        captured["server"] = server
+        captured["called"] = True
+        return True
+
+    monkeypatch.setattr("cogames.cli.submit.validate_bundle_in_isolation", fake_validate)
+
+    from cogames.main import app
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "upload",
+            "--policy",
+            bundle_dir.as_uri(),
+            "--name",
+            "test-policy",
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "http://fake-login-server",
+        ],
+    )
+
+    assert result.exit_code == 0, f"Upload failed:\n{result.output}"
+    assert captured.get("called") is True
+    assert captured["season"] == "test-season"
+    assert captured["server"] == httpserver.url_for("")
+
+    # seasons + presigned-url + s3 upload + complete = 4 requests
+    assert len(httpserver.log) == 4
+
+
+def test_upload_skips_validation_when_no_entry_config(
+    httpserver: HTTPServer,
+    fake_home: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _setup_mock_upload_server_with_season(httpserver, _SEASON_NO_ENTRY_CONFIG)
+
+    bundle_dir = tmp_path / "my_bundle"
+    bundle_dir.mkdir()
+    (bundle_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
+
+    validation_called = False
+
+    def fake_validate(policy_zip, console, *, season, server):
+        nonlocal validation_called
+        validation_called = True
+        return True
+
+    monkeypatch.setattr("cogames.cli.submit.validate_bundle_in_isolation", fake_validate)
+
+    from cogames.main import app
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "upload",
+            "--policy",
+            bundle_dir.as_uri(),
+            "--name",
+            "test-policy",
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "http://fake-login-server",
+        ],
+    )
+
+    assert result.exit_code == 0, f"Upload failed:\n{result.output}"
+    assert not validation_called, "Validation should be skipped when no entry config"
+
+
+def test_validate_policy_fetches_config_and_runs(
+    httpserver: HTTPServer,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from mettagrid.config.mettagrid_config import MettaGridConfig
+
+    default_cfg = MettaGridConfig()
+
+    httpserver.expect_request(
+        "/tournament/seasons/test-season",
+        method="GET",
+    ).respond_with_json(
+        {
+            "name": "test-season",
+            "is_default": True,
+            "entry_pool": "qualifying",
+            "leaderboard_pool": "ranked",
+            "summary": "",
+            "pools": [
+                {"name": "qualifying", "description": "entry pool", "config_id": "cfg-abc"},
+                {"name": "ranked", "description": "ranked pool", "config_id": None},
+            ],
+        }
+    )
+
+    httpserver.expect_request(
+        "/tournament/configs/cfg-abc",
+        method="GET",
+    ).respond_with_json(default_cfg.model_dump(mode="json"))
+
+    captured_args: dict[str, Any] = {}
+
+    def fake_validate_policy_spec(policy_spec, env_cfg):
+        captured_args["policy_spec"] = policy_spec
+        captured_args["env_cfg"] = env_cfg
+
+    monkeypatch.setattr("cogames.main.validate_policy_spec", fake_validate_policy_spec)
+
+    from cogames.main import app
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "validate-policy",
+            "--policy",
+            "class=cogames.policy.starter_agent.StarterPolicy",
+            "--season",
+            "test-season",
+            "--server",
+            httpserver.url_for(""),
+        ],
+    )
+
+    assert result.exit_code == 0, f"Validation failed:\n{result.output}"
+
+    # Config endpoint was hit
+    config_requests = [req for req, _ in httpserver.log if "/tournament/configs/" in req.path]
+    assert len(config_requests) == 1
+
+    assert captured_args.get("env_cfg") is not None
+    assert captured_args["env_cfg"].game.max_steps == default_cfg.game.max_steps
