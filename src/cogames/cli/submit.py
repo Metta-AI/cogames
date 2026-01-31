@@ -24,6 +24,7 @@ from metta_alo.rollout import run_single_episode
 if TYPE_CHECKING:
     from cogames.cli.client import TournamentServerClient
 
+from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec
 
 DEFAULT_SUBMIT_SERVER = "https://api.observatory.softmax-research.net"
@@ -107,8 +108,8 @@ def _zip_directory_bundle(bundle_dir: Path) -> Path:
     return Path(zip_path)
 
 
-def validate_bundle_in_isolation(policy_zip: Path, console: Console, validation_mission: str) -> bool:
-    console.print(f"[dim]Testing policy bundle can run 10 steps on {validation_mission}...[/dim]")
+def validate_bundle_in_isolation(policy_zip: Path, console: Console, *, season: str, server: str) -> bool:
+    console.print("[dim]Testing policy bundle can run 10 steps...[/dim]")
 
     temp_dir = None
     try:
@@ -120,7 +121,18 @@ def validate_bundle_in_isolation(policy_zip: Path, console: Console, validation_
         env["UV_NO_CACHE"] = "1"
 
         res = subprocess.run(
-            ["uv", "run", "cogames", "validate-policy", f"file://./{bundle_name}"],
+            [
+                "uv",
+                "run",
+                "cogames",
+                "validate-policy",
+                "--season",
+                season,
+                "--server",
+                server,
+                "--policy",
+                f"file://./{bundle_name}",
+            ],
             cwd=temp_dir,
             capture_output=True,
             text=True,
@@ -202,14 +214,21 @@ def copy_files_maintaining_structure(files: list[Path], dest_dir: Path) -> None:
             shutil.copy2(file_path, dest_path)
 
 
-def validate_policy_spec(policy_spec: PolicySpec, validation_mission: str) -> None:
-    from cogames.cli.mission import get_mission
-
-    _, env_cfg, _ = get_mission(validation_mission, include_legacy=True)
+def validate_policy_spec(policy_spec: PolicySpec, env_cfg: MettaGridConfig) -> None:
+    env_cfg = env_cfg.model_copy()
     env_cfg.game.max_steps = 10
+    n = env_cfg.game.num_agents
+    n_submitted = min(2, n)
+    noop_spec = PolicySpec(class_path="mettagrid.policy.noop.NoopPolicy")
+    if n_submitted < n:
+        policy_specs = [policy_spec, noop_spec]
+        assignments = [0] * n_submitted + [1] * (n - n_submitted)
+    else:
+        policy_specs = [policy_spec]
+        assignments = [0] * n
     run_single_episode(
-        policy_specs=[policy_spec],
-        assignments=[0] * env_cfg.game.num_agents,
+        policy_specs=policy_specs,
+        assignments=assignments,
         env=env_cfg,
         results_uri=None,
         replay_uri=None,
@@ -224,7 +243,9 @@ def validate_policy_in_isolation(
     include_files: list[Path],
     console: Console,
     setup_script: str | None = None,
-    validation_mission: str = "",
+    *,
+    season: str,
+    server: str,
 ) -> bool:
     def _format_policy_arg(spec: PolicySpec) -> str:
         parts = [f"class={spec.class_path}"]
@@ -234,7 +255,7 @@ def validate_policy_in_isolation(
             parts.append(f"kw.{key}={value}")
         return ",".join(parts)
 
-    console.print(f"[dim]Testing policy can run 10 steps on {validation_mission}...[/dim]")
+    console.print("[dim]Testing policy can run 10 steps...[/dim]")
 
     temp_dir = None
     try:
@@ -243,7 +264,7 @@ def validate_policy_in_isolation(
 
         policy_arg = _format_policy_arg(policy_spec)
 
-        def _run_from_tmp_dir(cmd: list[str]) -> subprocess.CompletedProcess:
+        def _run_from_tmp_dir(cmd: list[str]) -> subprocess.CompletedProcess[str]:
             env = os.environ.copy()
             env["UV_NO_CACHE"] = "1"
             res = subprocess.run(
@@ -251,7 +272,7 @@ def validate_policy_in_isolation(
                 cwd=temp_dir,
                 capture_output=True,
                 text=True,
-                timeout=300,  # 5 minute timeout
+                timeout=300,
                 env=env,
             )
             if not res.returncode == 0:
@@ -270,10 +291,14 @@ def validate_policy_in_isolation(
             "cogames",
             "validate-policy",
             policy_arg,
+            "--season",
+            season,
+            "--server",
+            server,
         ]
         if setup_script:
-            validate_cmd.append("--setup-script")
-            validate_cmd.append(setup_script)
+            validate_cmd.extend(["--setup-script", setup_script])
+        validate_cmd.extend(["--policy", policy_arg])
 
         _run_from_tmp_dir(validate_cmd)
 
@@ -424,7 +449,8 @@ def _upload_policy_bundle(
     setup_script: str | None,
     skip_validation: bool,
     dry_run: bool,
-    validation_mission: str,
+    validation_season: str,
+    server: str,
     season: str | None = None,
 ) -> UploadResult | None:
     bundle_zip, cleanup_bundle_zip = bundle_result
@@ -439,7 +465,7 @@ def _upload_policy_bundle(
             return None
 
         if not skip_validation:
-            if not validate_bundle_in_isolation(bundle_zip, console, validation_mission=validation_mission):
+            if not validate_bundle_in_isolation(bundle_zip, console, season=validation_season, server=server):
                 console.print("\n[red]Upload aborted due to validation failure.[/red]")
                 return None
         else:
@@ -472,7 +498,7 @@ def upload_policy(
     dry_run: bool = False,
     skip_validation: bool = False,
     setup_script: str | None = None,
-    validation_mission: str = "",
+    validation_season: str = "",
     season: str | None = None,
 ) -> UploadResult | None:
     from cogames.cli.client import TournamentServerClient
@@ -501,7 +527,8 @@ def upload_policy(
             setup_script=setup_script,
             skip_validation=skip_validation,
             dry_run=dry_run,
-            validation_mission=validation_mission,
+            validation_season=validation_season,
+            server=server,
             season=season,
         )
 
@@ -561,7 +588,12 @@ def upload_policy(
 
     if not skip_validation:
         if not validate_policy_in_isolation(
-            policy_spec, validated_paths, console, setup_script=setup_script_rel, validation_mission=validation_mission
+            policy_spec,
+            validated_paths,
+            console,
+            setup_script=setup_script_rel,
+            season=validation_season,
+            server=server,
         ):
             console.print("\n[red]Upload aborted due to validation failure.[/red]")
             return None

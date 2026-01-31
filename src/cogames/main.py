@@ -65,6 +65,7 @@ from cogames.cli.policy import (
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER, results_url_for_season, upload_policy, validate_policy_spec
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
+from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.loader import discover_and_register_policies
 from mettagrid.policy.policy_registry import get_policy_registry
@@ -1976,6 +1977,14 @@ def validate_policy_cmd(
     ),
 ) -> None:
     season_info = _resolve_season(server, season)
+    entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool), None)
+    if not entry_pool_info or not entry_pool_info.config_id:
+        console.print("[red]No entry config found for season[/red]")
+        raise typer.Exit(1)
+
+    with TournamentServerClient(server_url=server) as client:
+        config_data = client.get_config(entry_pool_info.config_id)
+    env_cfg = MettaGridConfig.model_validate(config_data)
 
     if setup_script:
         import subprocess
@@ -2000,7 +2009,7 @@ def validate_policy_cmd(
         console.print("[green]Setup script completed[/green]")
 
     policy_spec = get_policy_spec(ctx, policy)
-    validate_policy_spec(policy_spec, season_info.validation_mission)
+    validate_policy_spec(policy_spec, env_cfg)
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
 
@@ -2127,6 +2136,11 @@ def upload_cmd(
 ) -> None:
     season_info = _resolve_season(server, season)
 
+    has_entry_config = any(p.config_id for p in season_info.pools if p.name == season_info.entry_pool)
+    if not has_entry_config and not skip_validation:
+        console.print("[yellow]Warning: No entry config found for season. Skipping validation.[/yellow]")
+        skip_validation = True
+
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
         for kv in init_kwarg:
@@ -2144,7 +2158,7 @@ def upload_cmd(
         skip_validation=skip_validation,
         init_kwargs=init_kwargs if init_kwargs else None,
         setup_script=setup_script,
-        validation_mission=season_info.validation_mission,
+        validation_season=season_info.name,
         season=season_info.name if not no_submit else None,
     )
 
