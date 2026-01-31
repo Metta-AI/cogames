@@ -46,12 +46,14 @@ class PolicyVersionInfo(BaseModel):
 class PoolInfo(BaseModel):
     name: str
     description: str
+    config_id: str | None = None
 
 
 class SeasonInfo(BaseModel):
     name: str
     summary: str
-    validation_mission: str = ""
+    entry_pool: str | None = None
+    leaderboard_pool: str | None = None
     is_default: bool = False
     pools: list[PoolInfo]
 
@@ -168,6 +170,9 @@ class TournamentServerClient:
 
     def get_seasons(self) -> list[SeasonInfo]:
         return self._get("/tournament/seasons", list[SeasonInfo])
+
+    def get_config(self, config_id: str) -> dict[str, Any]:
+        return self._get(f"/tournament/configs/{config_id}")
 
     def get_leaderboard(self, season_name: str, include_hidden_seasons: bool = False) -> list[LeaderboardEntry]:
         return self._get(

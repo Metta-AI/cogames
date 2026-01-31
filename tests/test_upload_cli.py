@@ -94,7 +94,8 @@ def test_upload_command_fails_without_auth(
             {
                 "name": "test-season",
                 "is_default": True,
-                "validation_mission": "cogsguard_machina_1.basic",
+                "entry_pool": None,
+                "leaderboard_pool": None,
                 "summary": "",
                 "pools": [],
             }
@@ -144,7 +145,8 @@ def _setup_mock_upload_server(
             {
                 "name": "test-season",
                 "is_default": True,
-                "validation_mission": "cogsguard_machina_1.basic",
+                "entry_pool": None,
+                "leaderboard_pool": None,
                 "summary": "",
                 "pools": [],
             }
