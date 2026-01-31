@@ -13,9 +13,15 @@ from mettagrid.config.game_value import stat
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.reward_config import AgentReward, reward
 
-CogsGuardRewardVariant = Literal["credit", "milestones", "no_objective", "objective"]
+CogsGuardRewardVariant = Literal["credit", "milestones", "no_objective", "penalize_vibe_change", "objective"]
 
-AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = ("objective", "no_objective", "milestones", "credit")
+AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = (
+    "objective",
+    "no_objective",
+    "milestones",
+    "credit",
+    "penalize_vibe_change",
+)
 
 _OBJECTIVE_STAT_KEY = "aligned_junction_held"
 
@@ -53,6 +59,12 @@ def _apply_milestones(rewards: dict[str, AgentReward], *, max_junctions: int = 1
         weight=w_align_act,
         max=max_align,
     )
+
+
+def _apply_penalize_vibe_change(rewards: dict[str, AgentReward]) -> None:
+    """Add penalty for vibe changes to discourage spamming."""
+    w_vibe_change = -0.01
+    rewards["vibe_change_penalty"] = reward(stat("action.change_vibe.success"), weight=w_vibe_change)
 
 
 def _apply_credit(rewards: dict[str, AgentReward]) -> None:
@@ -98,6 +110,7 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
     - `no_objective`: disables the objective stat reward (`junction.held`).
     - `milestones`: adds shaped rewards for aligning/scrambling junctions and holding more junctions.
     - `credit`: adds additional dense shaping for precursor behaviors (resources/gear/deposits).
+    - `penalize_vibe_change`: adds a penalty for vibe changes to discourage spamming.
     """
     if not variants:
         return
@@ -127,6 +140,8 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
         _apply_milestones(rewards)
     if "credit" in enabled:
         _apply_credit(rewards)
+    if "penalize_vibe_change" in enabled:
+        _apply_penalize_vibe_change(rewards)
 
     env.game.agent.rewards = rewards
 
