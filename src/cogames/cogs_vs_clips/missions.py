@@ -57,10 +57,12 @@ def get_legacy_missions() -> list[Mission]:
     return []
 
 
-def _build_eval_missions() -> list[Mission]:
+def _build_eval_missions() -> list[AnyMission]:
+    from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS
     from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS
 
     return [
+        *COGSGUARD_EVAL_MISSIONS,
         *INTEGRATED_EVAL_MISSIONS,
     ]
 

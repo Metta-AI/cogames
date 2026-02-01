@@ -39,12 +39,14 @@ def _get_legacy_missions() -> list[Mission]:
 
 
 @lru_cache(maxsize=1)
-def _get_eval_missions_all() -> list[Mission]:
+def _get_eval_missions_all() -> list[AnyMission]:
+    from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS
     from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
     from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS
     from cogames.cogs_vs_clips.evals.spanning_evals import EVAL_MISSIONS as SPANNING_EVAL_MISSIONS
 
-    missions: list[Mission] = []
+    missions: list[AnyMission] = []
+    missions.extend(COGSGUARD_EVAL_MISSIONS)
     missions.extend(INTEGRATED_EVAL_MISSIONS)
     missions.extend(SPANNING_EVAL_MISSIONS)
     missions.extend(mission_cls() for mission_cls in DIAGNOSTIC_EVALS)  # type: ignore[call-arg]
@@ -56,6 +58,7 @@ def load_mission_set(mission_set: str) -> list[AnyMission]:
 
     Args:
         mission_set: Name of mission set to load. Options:
+            - "cogsguard_evals": CogsGuard evaluation missions (map-based)
             - "integrated_evals": Integrated evaluation missions
             - "spanning_evals": Spanning evaluation missions
             - "diagnostic_evals": Diagnostic evaluation missions
@@ -82,6 +85,10 @@ def load_mission_set(mission_set: str) -> list[AnyMission]:
         from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
 
         missions_list = [mission_cls() for mission_cls in DIAGNOSTIC_EVALS]  # type: ignore[call-arg]
+    elif mission_set == "cogsguard_evals":
+        from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS
+
+        missions_list = list(COGSGUARD_EVAL_MISSIONS)
     elif mission_set == "integrated_evals":
         from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS
 
@@ -91,7 +98,7 @@ def load_mission_set(mission_set: str) -> list[AnyMission]:
 
         missions_list = list(SPANNING_EVAL_MISSIONS)
     else:
-        available = "integrated_evals, spanning_evals, diagnostic_evals, all"
+        available = "cogsguard_evals, integrated_evals, spanning_evals, diagnostic_evals, all"
         raise ValueError(f"Unknown mission set: {mission_set}\nAvailable sets: {available}")
 
     return missions_list
@@ -447,7 +454,7 @@ def list_evals() -> None:
         return
 
     # Group missions by site
-    missions_by_site: dict[str, list[Mission]] = {}
+    missions_by_site: dict[str, list[AnyMission]] = {}
     for m in evals:
         missions_by_site.setdefault(m.site.name, []).append(m)
 
