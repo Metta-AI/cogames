@@ -25,7 +25,6 @@ from mettagrid.config.handler_config import (
     withdraw,
 )
 from mettagrid.config.mettagrid_config import (
-    ChestConfig,
     GridObjectConfig,
     InventoryConfig,
     WallConfig,
@@ -95,8 +94,8 @@ class SimpleExtractorConfig(CvCStationConfig):
     small_amount: int = Field(default=1, description="Amount extracted without mining equipment")
     large_amount: int = Field(default=10, description="Amount extracted with mining equipment")
 
-    def station_cfg(self) -> ChestConfig:
-        return ChestConfig(
+    def station_cfg(self) -> GridObjectConfig:
+        return GridObjectConfig(
             name=f"{self.resource}_extractor",
             map_name=f"{self.resource}_extractor",
             render_symbol="📦",
