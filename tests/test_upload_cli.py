@@ -95,6 +95,8 @@ def test_upload_command_fails_without_auth(
         [
             {
                 "name": "test-season",
+                "version": 1,
+                "canonical": True,
                 "is_default": True,
                 "entry_pool": None,
                 "leaderboard_pool": None,
@@ -146,6 +148,8 @@ def _setup_mock_upload_server(
         [
             {
                 "name": "test-season",
+                "version": 1,
+                "canonical": True,
                 "is_default": True,
                 "entry_pool": None,
                 "leaderboard_pool": None,
@@ -389,6 +393,8 @@ def test_upload_s3_bundle(
 _SEASON_WITH_ENTRY_CONFIG: list[dict[str, Any]] = [
     {
         "name": "test-season",
+        "version": 1,
+        "canonical": True,
         "is_default": True,
         "entry_pool": "qualifying",
         "leaderboard_pool": "ranked",
@@ -403,6 +409,8 @@ _SEASON_WITH_ENTRY_CONFIG: list[dict[str, Any]] = [
 _SEASON_NO_ENTRY_CONFIG: list[dict[str, Any]] = [
     {
         "name": "test-season",
+        "version": 1,
+        "canonical": True,
         "is_default": True,
         "entry_pool": None,
         "leaderboard_pool": "ranked",
@@ -564,6 +572,8 @@ def test_validate_policy_fetches_config_and_runs(
     ).respond_with_json(
         {
             "name": "test-season",
+            "version": 1,
+            "canonical": True,
             "is_default": True,
             "entry_pool": "qualifying",
             "leaderboard_pool": "ranked",

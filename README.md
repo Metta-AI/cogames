@@ -1270,7 +1270,7 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">                                                                                                                   </span>
-<span style="font-weight: bold"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">Usage: </span><span style="font-weight: bold">cogames seasons [OPTIONS]                                                                                  </span>
+<span style="font-weight: bold"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">Usage: </span><span style="font-weight: bold">cogames seasons [OPTIONS] [SEASON_NAME]                                                                    </span>
 <span style="font-weight: bold">                                                                                                                   </span>
 </pre>
 
@@ -1279,6 +1279,22 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> List currently running tournament seasons                                                                         
 
+</pre>
+
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>   season_name      <span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">[</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">SEASON_NAME</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span>  Show versions of a specific season                                            <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
+</pre>
+
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--versions</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-v</span>        List all versions of the season                                                           <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
 </pre>
 
 

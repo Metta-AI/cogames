@@ -36,6 +36,22 @@ def parse_policy_identifier(identifier: str) -> tuple[str, int | None]:
     return identifier, None
 
 
+def parse_season_ref(season_ref: str) -> tuple[str, int | None]:
+    if ":v" in season_ref:
+        name, version_str = season_ref.rsplit(":v", 1)
+        try:
+            return name, int(version_str)
+        except ValueError:
+            return season_ref, None
+    if ":" in season_ref:
+        name, version_str = season_ref.rsplit(":", 1)
+        try:
+            return name, int(version_str)
+        except ValueError:
+            return season_ref, None
+    return season_ref, None
+
+
 def _format_timestamp(value: Optional[str]) -> str:
     """Format ISO timestamps for CLI output."""
     if not value:
@@ -321,6 +337,8 @@ def leaderboard_cmd(
 
 
 def seasons_cmd(
+    season_name: Optional[str] = typer.Argument(None, help="Show versions of a specific season"),
+    versions: bool = typer.Option(False, "--versions", "-v", help="List all versions of the season"),
     login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
@@ -358,6 +376,28 @@ def seasons_cmd(
 
     try:
         with client:
+            if season_name and versions:
+                season_versions = client.get_season_versions(season_name)
+                if json_output:
+                    console.print(json.dumps([v.model_dump() for v in season_versions], indent=2))
+                    return
+
+                if not season_versions:
+                    console.print(f"[yellow]No versions found for season '{season_name}'.[/yellow]")
+                    return
+
+                table = Table(title=f"Versions: {season_name}", box=box.SIMPLE_HEAVY, show_lines=False, pad_edge=False)
+                table.add_column("Version", style="bold cyan")
+                table.add_column("Status", style="white")
+                table.add_column("Created", style="dim")
+
+                for v in season_versions:
+                    status = "[green]canonical[/green]" if v.canonical else "[dim]historical[/dim]"
+                    table.add_row(f"v{v.version}", status, _format_timestamp(v.created_at))
+
+                console.print(table)
+                return
+
             seasons = client.get_seasons()
     except httpx.HTTPError as exc:
         console.print(f"[red]Failed to reach server:[/red] {exc}")
