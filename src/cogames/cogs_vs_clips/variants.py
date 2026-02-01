@@ -65,15 +65,6 @@ class EnergizedVariant(MissionVariant):
         mission.cog.energy_regen = mission.cog.energy_limit
 
 
-class CompassVariant(MissionVariant):
-    name: str = "compass"
-    description: str = "Enable compass observation."
-
-    @override
-    def modify_env(self, mission, env):
-        env.game.obs.global_obs.compass = True
-
-
 class Small50Variant(MissionVariant):
     name: str = "small_50"
     description: str = "Set map size to 50x50 for quick runs."
@@ -260,7 +251,6 @@ class SharedRewardsVariant(MissionVariant):
 VARIANTS: list[MissionVariant] = [
     CavesVariant(),
     CityVariant(),
-    CompassVariant(),
     DarkSideVariant(),
     DesertVariant(),
     EmptyBaseVariant(),

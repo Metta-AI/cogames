@@ -324,7 +324,6 @@ Key design choices:
 
 - Pack the base hub lightly (`EmptyBaseVariant`) where appropriate to encourage early exploration without
   over-constraining.
-- Add guidance (`CompassVariant`) on distance-heavy tasks to reduce pure exploration failure modes.
 - Raise agent caps modestly (`PackRatVariant`) to avoid early inventory stalls but keep routing relevant.
 - Shape reward on vibe missions (`HeartChorusVariant`) so partial progress is scored.
 - Keep vibe mechanics intact unless the mission explicitly focuses on vibe manipulation.
@@ -334,9 +333,9 @@ Included missions and variants:
 - oxygen_bottleneck: `EmptyBaseVariant(missing=["oxygen_extractor"])`, `ResourceBottleneckVariant(["oxygen"])`,
   `SingleResourceUniformVariant("oxygen_extractor")`, `PackRatVariant`
 - energy_starved: `EmptyBaseVariant`, `DarkSideVariant`, `PackRatVariant`
-- distant_resources: `EmptyBaseVariant`, `CompassVariant`, `DistantResourcesVariant`
-- quadrant_buildings: `EmptyBaseVariant`, `QuadrantBuildingsVariant`, `CompassVariant`
-- single_use_swarm: `EmptyBaseVariant`, `SingleUseSwarmVariant`, `CompassVariant`, `PackRatVariant`
+- distant_resources: `EmptyBaseVariant`, `DistantResourcesVariant`
+- quadrant_buildings: `EmptyBaseVariant`, `QuadrantBuildingsVariant`
+- single_use_swarm: `EmptyBaseVariant`, `SingleUseSwarmVariant`, `PackRatVariant`
 - vibe_check: `HeartChorusVariant`, `VibeCheckMin2Variant`
 
 Usage example:
@@ -349,6 +348,6 @@ uv run python packages/cogames/scripts/run_evaluation.py \
   --repeats 2
 ```
 
-Recommendation: When designing new scorable baselines, combine one “shaping” variant (e.g., `CompassVariant`,
-`HeartChorusVariant`, `PackRatVariant`) with one “constraint” variant (e.g., `DarkSideVariant`,
-`ResourceBottleneckVariant`, `SingleUseSwarmVariant`) to keep tasks legible yet challenging.
+Recommendation: When designing new scorable baselines, combine one "shaping" variant (e.g., `HeartChorusVariant`,
+`PackRatVariant`) with one "constraint" variant (e.g., `DarkSideVariant`, `ResourceBottleneckVariant`,
+`SingleUseSwarmVariant`) to keep tasks legible yet challenging.

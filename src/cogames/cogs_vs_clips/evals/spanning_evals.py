@@ -9,14 +9,11 @@ from cogames.cogs_vs_clips.mission import Mission, Site
 from cogames.cogs_vs_clips.procedural import MachinaArena
 from cogames.cogs_vs_clips.sites import HELLO_WORLD, TRAINING_FACILITY
 from cogames.cogs_vs_clips.variants import (
-    CompassVariant,
     DarkSideVariant,
     DistantResourcesVariant,
     EmptyBaseVariant,
     EnergizedVariant,
-    PackRatVariant,
     QuadrantBuildingsVariant,
-    RoughTerrainVariant,
     SingleResourceUniformVariant,
     SuperChargedVariant,
 )
@@ -56,7 +53,7 @@ OxygenBottleneck = Mission(
     variants=[
         EmptyBaseVariant(missing=["oxygen_extractor"]),
         SingleResourceUniformVariant(building_name="oxygen_extractor"),
-        PackRatVariant(),
+        EnergizedVariant(),
     ],
 )
 
@@ -80,7 +77,7 @@ OxygenBottleneckEasy = Mission(
     site=HELLO_WORLD,
     variants=[
         SingleResourceUniformVariant(building_name="oxygen_extractor"),
-        PackRatVariant(),
+        EnergizedVariant(),
     ],
 )
 
@@ -95,11 +92,11 @@ OxygenBottleneckStandard = Mission(
 
 OxygenBottleneckHard = Mission(
     name="oxygen_bottleneck_hard",
-    description="Hard: oxygen bottleneck plus rough terrain.",
+    description="Hard: oxygen bottleneck with dark side.",
     site=HELLO_WORLD,
     variants=[
         EmptyBaseVariant(missing=["oxygen_extractor"]),
-        RoughTerrainVariant(),
+        DarkSideVariant(),
     ],
 )
 
@@ -125,11 +122,10 @@ EnergyStarvedStandard = Mission(
 
 EnergyStarvedHard = Mission(
     name="energy_starved_hard",
-    description="Hard: energy bottleneck with dark side and rough terrain.",
+    description="Hard: energy bottleneck with dark side.",
     site=HELLO_WORLD,
     variants=[
         DarkSideVariant(),
-        RoughTerrainVariant(),
     ],
 )
 
@@ -147,11 +143,10 @@ DistantResources = Mission(
 # Distant Resources tiers
 DistantResourcesEasy = Mission(
     name="distant_resources_easy",
-    description="Easy: simplified distribution and navigation aids.",
+    description="Easy: simplified distribution with generous capacity.",
     site=HELLO_WORLD,
     variants=[
-        CompassVariant(),
-        PackRatVariant(),
+        EnergizedVariant(),
         DistantResourcesVariant(),
     ],
 )
@@ -161,18 +156,17 @@ DistantResourcesStandard = Mission(
     description="Standard: resources scattered far from base.",
     site=HELLO_WORLD,
     variants=[
-        CompassVariant(),
         DistantResourcesVariant(),
     ],
 )
 
 DistantResourcesHard = Mission(
     name="distant_resources_hard",
-    description="Hard: distant resources with rough terrain.",
+    description="Hard: distant resources with dark side.",
     site=HELLO_WORLD,
     variants=[
         DistantResourcesVariant(),
-        RoughTerrainVariant(),
+        DarkSideVariant(),
     ],
 )
 
@@ -190,12 +184,11 @@ QuadrantBuildings = Mission(
 # Quadrant Buildings tiers
 QuadrantBuildingsEasy = Mission(
     name="quadrant_buildings_easy",
-    description="Easy: buildings in quadrants with navigation aid and inventory boost.",
+    description="Easy: buildings in quadrants with energy boost.",
     site=HELLO_WORLD,
     variants=[
         QuadrantBuildingsVariant(),
-        CompassVariant(),
-        PackRatVariant(),
+        EnergizedVariant(),
     ],
 )
 
@@ -211,48 +204,48 @@ QuadrantBuildingsStandard = Mission(
 
 QuadrantBuildingsHard = Mission(
     name="quadrant_buildings_hard",
-    description="Hard: quadrant distribution with empty base and rough terrain.",
+    description="Hard: quadrant distribution with empty base and dark side.",
     site=HELLO_WORLD,
     variants=[
         QuadrantBuildingsVariant(),
         EmptyBaseVariant(),
-        RoughTerrainVariant(),
+        DarkSideVariant(),
     ],
 )
 
 EasyHeartsTraining = Mission(
     name="easy_hearts_training",
-    description="Simplified heart crafting with generous caps and extractor base.",
+    description="Simplified heart crafting with generous energy.",
     site=TRAINING_FACILITY,
     variants=[
-        PackRatVariant(),
+        EnergizedVariant(),
     ],
 )
 
 EasyHeartsSmallWorld = Mission(
     name="easy_small_hearts",
-    description="Simplified heart crafting with generous caps and extractor base.",
+    description="Simplified heart crafting with generous energy.",
     site=SMALL_HELLO_WORLD,
     variants=[
-        PackRatVariant(),
+        EnergizedVariant(),
     ],
 )
 
 EasyHeartsMediumWorld = Mission(
     name="easy_medium_hearts",
-    description="Simplified heart crafting with generous caps and extractor base.",
+    description="Simplified heart crafting with generous energy.",
     site=MEDIUM_HELLO_WORLD,
     variants=[
-        PackRatVariant(),
+        EnergizedVariant(),
     ],
 )
 
 EasyHeartsLargeWorld = Mission(
     name="easy_large_hearts",
-    description="Simplified heart crafting with generous caps and extractor base.",
+    description="Simplified heart crafting with generous energy.",
     site=LARGE_HELLO_WORLD,
     variants=[
-        PackRatVariant(),
+        EnergizedVariant(),
     ],
 )
 
