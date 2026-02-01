@@ -3,7 +3,6 @@ from typing import override
 from cogames.cogs_vs_clips.evals.difficulty_variants import DIFFICULTY_VARIANTS
 from cogames.cogs_vs_clips.mission import Mission, MissionVariant
 from cogames.cogs_vs_clips.procedural import BaseHubVariant, MachinaArenaVariant
-from mettagrid.config.action_config import VibeTransfer
 from mettagrid.config.game_value import stat
 from mettagrid.config.reward_config import reward
 from mettagrid.map_builder.map_builder import MapBuilderConfig
@@ -244,30 +243,6 @@ class BalancedCornersVariant(MachinaArenaVariant):
         node.max_balance_shortcuts = self.max_balance_shortcuts
 
 
-class TraderVariant(MissionVariant):
-    name: str = "trader"
-    description: str = "Agents can trade resources with each other."
-
-    @override
-    def modify_env(self, mission, env):
-        # Define vibe transfers for trading resources (actor gives, target receives)
-        trade_transfers = [
-            VibeTransfer(vibe="carbon_a", target={"carbon": 1}, actor={"carbon": -1}),
-            VibeTransfer(vibe="carbon_b", target={"carbon": 10}, actor={"carbon": -10}),
-            VibeTransfer(vibe="oxygen_a", target={"oxygen": 1}, actor={"oxygen": -1}),
-            VibeTransfer(vibe="oxygen_b", target={"oxygen": 10}, actor={"oxygen": -10}),
-            VibeTransfer(vibe="germanium_a", target={"germanium": 1}, actor={"germanium": -1}),
-            VibeTransfer(vibe="germanium_b", target={"germanium": 4}, actor={"germanium": -4}),
-            VibeTransfer(vibe="silicon_a", target={"silicon": 10}, actor={"silicon": -10}),
-            VibeTransfer(vibe="silicon_b", target={"silicon": 50}, actor={"silicon": -50}),
-            VibeTransfer(vibe="heart_a", target={"heart": 1}, actor={"heart": -1}),
-            VibeTransfer(vibe="heart_b", target={"heart": 4}, actor={"heart": -4}),
-        ]
-        # Enable transfer action with these vibes
-        env.game.actions.transfer.enabled = True
-        env.game.actions.transfer.vibe_transfers.extend(trade_transfers)
-
-
 class SharedRewardsVariant(MissionVariant):
     name: str = "shared_rewards"
     description: str = "Rewards for deposited hearts are shared among all agents."
@@ -298,7 +273,6 @@ VARIANTS: list[MissionVariant] = [
     SingleResourceUniformVariant(),
     Small50Variant(),
     SuperChargedVariant(),
-    TraderVariant(),
     *DIFFICULTY_VARIANTS,
 ]
 

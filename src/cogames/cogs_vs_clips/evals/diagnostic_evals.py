@@ -10,7 +10,6 @@ from cogames.cogs_vs_clips.mission import Mission, Site
 from mettagrid.config.game_value import stat
 from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
-    ChestConfig,
     MettaGridConfig,
     ResourceLimitsConfig,
 )
@@ -139,7 +138,7 @@ class _DiagnosticMissionBase(Mission):
         if self.communal_chest_hearts is None:
             return
         chest = cfg.game.objects.get("communal_chest")
-        if isinstance(chest, ChestConfig):
+        if chest is not None and chest.inventory is not None:
             chest.inventory.initial = {"heart": self.communal_chest_hearts}
 
     def _apply_resource_chests(self, cfg: MettaGridConfig) -> None:
@@ -147,7 +146,7 @@ class _DiagnosticMissionBase(Mission):
             return
         for resource, amount in self.resource_chest_stock.items():
             chest_cfg = cfg.game.objects.get(f"chest_{resource}")
-            if isinstance(chest_cfg, ChestConfig):
+            if chest_cfg is not None and chest_cfg.inventory is not None:
                 chest_cfg.inventory.initial = {resource: amount}
 
     def _apply_heart_reward_cap(self, cfg: MettaGridConfig) -> None:
@@ -163,7 +162,7 @@ class _DiagnosticMissionBase(Mission):
 
         # Cap heart capacity for every chest used in diagnostics (communal or resource-specific).
         for _name, obj in cfg.game.objects.items():
-            if not isinstance(obj, ChestConfig):
+            if obj.inventory is None:
                 continue
             # Find existing heart limit or create new one
             heart_limit = obj.inventory.limits.get("heart", ResourceLimitsConfig(min=1, resources=["heart"]))
