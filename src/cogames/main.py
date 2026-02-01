@@ -65,6 +65,7 @@ from cogames.cli.policy import (
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER, results_url_for_season, upload_policy, validate_policy_spec
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
+from metta.common.tool import game_version as game_version_module
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.loader import discover_and_register_policies
@@ -109,13 +110,37 @@ def _register_policies() -> None:
     discover_and_register_policies()
 
 
+def _register_policies_callback(
+    game_version: Optional[str] = typer.Option(
+        None,
+        "--game-version",
+        "--game_version",
+        help="Run the CLI using a different game version (git commit or alias).",
+    ),
+) -> None:
+    if game_version:
+        try:
+            argv = game_version_module.strip_game_version_args(sys.argv[1:])
+            if shutil.which("uv"):
+                cmd = ["uv", "run", "cogames"]
+            else:
+                cmd = [sys.executable, "-m", "cogames.main"]
+            exit_code = game_version_module.run_in_game_version(game_version, argv, cmd)
+        except Exception as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            raise SystemExit(1) from None
+        if exit_code >= 0:
+            raise SystemExit(exit_code)
+    _register_policies()
+
+
 app = typer.Typer(
     help="CoGames - Multi-agent cooperative and competitive games",
     context_settings={"help_option_names": ["-h", "--help"]},
     no_args_is_help=True,
     rich_markup_mode="rich",
     pretty_exceptions_show_locals=False,
-    callback=_register_policies,
+    callback=_register_policies_callback,
 )
 
 tutorial_app = typer.Typer(
