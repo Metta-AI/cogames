@@ -179,11 +179,11 @@ uv run cogames play --mission hello_world.easy_hearts --cogs 2
 You can apply additional variants on top of the mission's built-in variants:
 
 ```bash
-# Add compass variant
-uv run cogames play --mission hello_world.oxygen_bottleneck --cogs 2 --variant compass
+# Add pack_rat variant
+uv run cogames play --mission hello_world.oxygen_bottleneck --cogs 2 --variant pack_rat
 
 # Add multiple variants
-uv run cogames play --mission hello_world.energy_starved --cogs 2 --variant compass --variant small_50
+uv run cogames play --mission hello_world.energy_starved --cogs 2 --variant pack_rat --variant small_50
 
 # With policy
 uv run cogames play --mission hello_world.single_use_swarm --cogs 4 -p baseline
@@ -230,7 +230,7 @@ mission_variant_curriculum.train(
 mission_variant_curriculum.train(
     base_missions=["oxygen_bottleneck", "energy_starved"],
     num_cogs=4,
-    variants=["compass", "pack_rat"]
+    variants=["pack_rat", "energized"]
 )
 ```
 
