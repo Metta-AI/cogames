@@ -51,11 +51,20 @@ class PoolInfo(BaseModel):
 
 class SeasonInfo(BaseModel):
     name: str
+    version: int
+    canonical: bool
     summary: str
     entry_pool: str | None = None
     leaderboard_pool: str | None = None
     is_default: bool = False
     pools: list[PoolInfo]
+
+
+class SeasonVersionInfo(BaseModel):
+    version: int
+    canonical: bool
+    disabled_at: str | None
+    created_at: str
 
 
 class LeaderboardEntry(BaseModel):
@@ -173,6 +182,9 @@ class TournamentServerClient:
 
     def get_config(self, config_id: str) -> dict[str, Any]:
         return self._get(f"/tournament/configs/{config_id}")
+
+    def get_season_versions(self, season_name: str) -> list[SeasonVersionInfo]:
+        return self._get(f"/tournament/seasons/{season_name}/versions", list[SeasonVersionInfo])
 
     def get_leaderboard(self, season_name: str, include_hidden_seasons: bool = False) -> list[LeaderboardEntry]:
         return self._get(
