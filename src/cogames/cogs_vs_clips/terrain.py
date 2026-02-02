@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any, Literal, override
+from typing import TYPE_CHECKING, Any, Literal, override
 
 import numpy as np
 
-from cogames.cogs_vs_clips.mission import Mission, MissionVariant
+from cogames.core import CoGameMissionVariant
+
+if TYPE_CHECKING:
+    from cogames.cogs_vs_clips.mission import CvCMission
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.mapgen.area import AreaWhere
 from mettagrid.mapgen.mapgen import MapGen, MapGenConfig
@@ -65,6 +70,7 @@ class MachinaArenaConfig(SceneConfig):
         corner_bundle="extractors",
         cross_bundle="none",
         cross_distance=7,
+        junction_object="junction",
     )
 
     # Optional asteroid-shaped boundary mask.
@@ -547,7 +553,7 @@ class RandomTransform(Scene[RandomTransformConfig]):
         ]
 
 
-class EnvNodeVariant[T](MissionVariant, ABC):
+class EnvNodeVariant[T](CoGameMissionVariant, ABC):
     @abstractmethod
     def extract_node(self, env: MettaGridConfig) -> T: ...
 
@@ -590,7 +596,7 @@ class MapSeedVariant(MapGenVariant):
 
 class BaseHubVariant(EnvNodeVariant[BaseHubConfig]):
     @override
-    def compat(self, mission: Mission) -> bool:
+    def compat(self, mission: CvCMission) -> bool:
         env = mission.make_env()
         if not isinstance(env.game.map_builder, MapGen.Config):
             return False
@@ -618,7 +624,7 @@ class BaseHubVariant(EnvNodeVariant[BaseHubConfig]):
 
 
 class MachinaArenaVariant(EnvNodeVariant[MachinaArenaConfig]):
-    def compat(self, mission: Mission) -> bool:
+    def compat(self, mission: CvCMission) -> bool:
         env = mission.make_env()
         return isinstance(env.game.map_builder, MapGen.Config) and isinstance(
             env.game.map_builder.instance, MachinaArena.Config
@@ -632,7 +638,7 @@ class MachinaArenaVariant(EnvNodeVariant[MachinaArenaConfig]):
 
 
 class SequentialMachinaArenaVariant(EnvNodeVariant[SequentialMachinaArenaConfig]):
-    def compat(self, mission: Mission) -> bool:
+    def compat(self, mission: CvCMission) -> bool:
         env = mission.make_env()
         return isinstance(env.game.map_builder, MapGen.Config) and isinstance(
             env.game.map_builder.instance, SequentialMachinaArena.Config

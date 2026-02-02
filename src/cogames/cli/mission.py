@@ -9,51 +9,43 @@ from rich.table import Table
 
 from cogames.cli.base import console
 from cogames.cogs_vs_clips.mission import (
-    MAP_MISSION_DELIMITER,
-    AnyMission,
-    Mission,
-    MissionVariant,
+    CvCMission,
     NumCogsVariant,
-    Site,
 )
-from cogames.cogs_vs_clips.procedural import MachinaArena
 from cogames.cogs_vs_clips.sites import SITES
+from cogames.cogs_vs_clips.terrain import MachinaArena
 from cogames.cogs_vs_clips.variants import HIDDEN_VARIANTS, VARIANTS
+from cogames.core import (
+    MAP_MISSION_DELIMITER,
+    CoGameMissionVariant,
+    CoGameSite,
+)
 from cogames.game import load_mission_config, load_mission_config_from_python
 from mettagrid import MettaGridConfig
 from mettagrid.mapgen.mapgen import MapGen
 
 
 @lru_cache(maxsize=1)
-def _get_core_missions() -> list[AnyMission]:
+def _get_core_missions() -> list[CvCMission]:
     from cogames.cogs_vs_clips.missions import get_core_missions
 
     return get_core_missions()
 
 
 @lru_cache(maxsize=1)
-def _get_legacy_missions() -> list[Mission]:
-    from cogames.cogs_vs_clips.missions import get_legacy_missions
-
-    return get_legacy_missions()
-
-
-@lru_cache(maxsize=1)
-def _get_eval_missions_all() -> list[AnyMission]:
-    from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS
+def _get_eval_missions_all() -> list[CvCMission]:
     from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
     from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS
     from cogames.cogs_vs_clips.evals.spanning_evals import EVAL_MISSIONS as SPANNING_EVAL_MISSIONS
 
-    missions: list[AnyMission] = []
-    missions.extend(COGSGUARD_EVAL_MISSIONS)
+    missions: list[CvCMission] = []
     missions.extend(INTEGRATED_EVAL_MISSIONS)
     missions.extend(SPANNING_EVAL_MISSIONS)
     missions.extend(mission_cls() for mission_cls in DIAGNOSTIC_EVALS)  # type: ignore[call-arg]
     return missions
 
 
-def load_mission_set(mission_set: str) -> list[AnyMission]:
+def load_mission_set(mission_set: str) -> list[CvCMission]:
     """Load a predefined set of evaluation missions.
 
     Args:
@@ -70,7 +62,7 @@ def load_mission_set(mission_set: str) -> list[AnyMission]:
     Raises:
         ValueError: If mission_set name is unknown
     """
-    missions_list: list[AnyMission]
+    missions_list: list[CvCMission]
     if mission_set == "all":
         # All missions: eval missions + integrated + spanning + diagnostic + core missions
         missions_list = list(_get_eval_missions_all())
@@ -104,14 +96,14 @@ def load_mission_set(mission_set: str) -> list[AnyMission]:
     return missions_list
 
 
-def parse_variants(variants_arg: Optional[list[str]]) -> list[MissionVariant]:
+def parse_variants(variants_arg: Optional[list[str]]) -> list[CoGameMissionVariant]:
     """Parse variant specifications from command line.
 
     Args:
         variants_arg: List of variant names like ["solar_flare", "dark_side"]
 
     Returns:
-        List of configured MissionVariant instances
+        List of configured CoGameMissionVariant instances
 
     Raises:
         ValueError: If variant name is unknown
@@ -119,11 +111,11 @@ def parse_variants(variants_arg: Optional[list[str]]) -> list[MissionVariant]:
     if not variants_arg:
         return []
 
-    variants: list[MissionVariant] = []
+    variants: list[CoGameMissionVariant] = []
     all_variants = [*VARIANTS, *HIDDEN_VARIANTS]
     for name in variants_arg:
         # Find matching variant class by instantiating and checking the name
-        variant: MissionVariant | None = None
+        variant: CoGameMissionVariant | None = None
         for v in all_variants:
             if v.name == name:
                 variant = v
@@ -150,7 +142,7 @@ def get_all_eval_missions() -> list[str]:
     return [mission.full_name() for mission in _get_eval_missions_all()]
 
 
-def get_site_by_name(site_name: str) -> Site:
+def get_site_by_name(site_name: str) -> CoGameSite:
     """Get a site by name.
 
     Raises:
@@ -166,7 +158,7 @@ def get_site_by_name(site_name: str) -> Site:
 
 def get_mission_name_and_config(
     ctx: typer.Context, mission_arg: Optional[str], variants_arg: Optional[list[str]] = None, cogs: Optional[int] = None
-) -> tuple[str, MettaGridConfig, Optional[AnyMission]]:
+) -> tuple[str, MettaGridConfig, Optional[CvCMission]]:
     if not mission_arg:
         console.print(ctx.get_help())
         console.print("[yellow]Missing: --mission / -m[/yellow]\n")
@@ -253,12 +245,10 @@ def find_mission(
     *,
     include_evals: bool = False,
     include_legacy: bool = False,
-) -> AnyMission:
-    missions: list[AnyMission] = list(_get_core_missions())
+) -> CvCMission:
+    missions: list[CvCMission] = list(_get_core_missions())
     if include_evals:
         missions = [*missions, *_get_eval_missions_all()]
-    if include_legacy:
-        missions = [*missions, *_get_legacy_missions()]
 
     found_site = False
     for mission in missions:
@@ -288,7 +278,7 @@ def get_mission(
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
     include_legacy: bool = False,
-) -> tuple[str, MettaGridConfig, Optional[AnyMission]]:
+) -> tuple[str, MettaGridConfig, Optional[CvCMission]]:
     """Get a specific mission configuration by name or file path.
 
     Args:
@@ -298,7 +288,7 @@ def get_mission(
         include_legacy: Whether to include legacy (pre-CogsGuard) missions
 
     Returns:
-        Tuple of (mission name, MettaGridConfig, Mission or None)
+        Tuple of (mission name, MettaGridConfig, CvCMission or None)
 
     Raises:
         ValueError: If mission not found or file cannot be loaded
@@ -330,7 +320,7 @@ def get_mission(
     else:
         site_name, mission_name = mission_arg.split(MAP_MISSION_DELIMITER)
 
-    mission: AnyMission = find_mission(site_name, mission_name, include_evals=True, include_legacy=include_legacy)
+    mission: CvCMission = find_mission(site_name, mission_name, include_evals=True, include_legacy=include_legacy)
 
     if variants:
         mission = mission.with_variants(variants)
@@ -454,7 +444,7 @@ def list_evals() -> None:
         return
 
     # Group missions by site
-    missions_by_site: dict[str, list[AnyMission]] = {}
+    missions_by_site: dict[str, list[CvCMission]] = {}
     for m in evals:
         missions_by_site.setdefault(m.site.name, []).append(m)
 
@@ -506,7 +496,7 @@ def list_evals() -> None:
     console.print("  [bold]cogames play[/bold] --mission [blue]evals.divide_and_conquer[/blue]")
 
 
-def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cfg: AnyMission | None = None) -> None:
+def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cfg: CvCMission | None = None) -> None:
     """Print detailed information about a specific mission.
 
     Args:

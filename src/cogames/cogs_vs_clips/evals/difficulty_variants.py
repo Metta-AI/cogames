@@ -9,11 +9,14 @@ energy regen, move cost, and capacity limits.
 from __future__ import annotations
 
 import logging
-from typing import override
+from typing import TYPE_CHECKING, override
 
 from pydantic import Field
 
-from cogames.cogs_vs_clips.mission import Mission, MissionVariant
+from cogames.core import CoGameMissionVariant
+
+if TYPE_CHECKING:
+    from cogames.cogs_vs_clips.mission import CvCMission
 from mettagrid.config.mettagrid_config import MettaGridConfig
 
 logger = logging.getLogger(__name__)
@@ -28,7 +31,7 @@ ENERGY_REGEN_FLOOR = 0
 # =============================================================================
 
 
-class DifficultyLevel(MissionVariant):
+class DifficultyLevel(CoGameMissionVariant):
     """Configuration for a difficulty level."""
 
     name: str = Field(description="Difficulty name (easy, medium, hard, brutal, etc.)")
@@ -45,24 +48,12 @@ class DifficultyLevel(MissionVariant):
     max_steps_override: int | None = Field(default=None)
 
     @override
-    def modify_mission(self, mission: Mission):
+    def modify_mission(self, mission: CvCMission):
         """Apply a difficulty level to a mission instance."""
-        # Energy regen
-        if self.energy_regen_override is not None:
-            mission.cog.energy_regen = self.energy_regen_override
-        else:
-            mission.cog.energy_regen = max(0, int(mission.cog.energy_regen * self.energy_regen_mult))
-
-        # Mission-level overrides
-        if self.move_energy_cost_override is not None:
-            mission.cog.move_energy_cost = self.move_energy_cost_override
-        if self.energy_capacity_override is not None:
-            mission.cog.energy_limit = self.energy_capacity_override
-        if self.cargo_capacity_override is not None:
-            mission.cog.cargo_limit = self.cargo_capacity_override
+        pass  # No mission-level modifications needed currently
 
     @override
-    def modify_env(self, mission: Mission, env: MettaGridConfig):
+    def modify_env(self, mission: CvCMission, env: MettaGridConfig):
         if self.max_steps_override is not None:
             env.game.max_steps = self.max_steps_override
 

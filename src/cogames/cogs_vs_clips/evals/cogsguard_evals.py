@@ -2,15 +2,30 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cogames.cogs_vs_clips.mission import CogsGuardMission, Site
-from cogames.cogs_vs_clips.mission_utils import get_map
+from cogames.cogs_vs_clips.mission import CvCMission
+from cogames.core import CoGameSite as Site
+from mettagrid.map_builder.map_builder import MapBuilderConfig
+from mettagrid.mapgen.mapgen import MapGen, MapGenConfig
 
 MAPS_DIR = Path(__file__).resolve().parent.parent.parent / "maps"
+
+
+def _load_map(map_name: str) -> MapGenConfig:
+    map_path = MAPS_DIR / map_name
+    if not map_path.exists():
+        raise FileNotFoundError(f"Map not found: {map_path}")
+    return MapGen.Config(
+        instance=MapBuilderConfig.from_uri(str(map_path)),
+        instances=1,
+        fixed_spawn_order=False,
+        instance_border_width=0,
+    )
+
 
 COGSGUARD_EVALS_BASE = Site(
     name="cogsguard_evals",
     description="CogsGuard evaluation arenas.",
-    map_builder=get_map("evals/eval_balanced_spread.map"),
+    map_builder=_load_map("evals/eval_balanced_spread.map"),
     min_cogs=1,
     max_cogs=20,
 )
@@ -30,7 +45,7 @@ def _count_spawn_pads(map_path: Path) -> int:
 def _make_eval_site(map_name: str, num_cogs: int) -> Site:
     site = COGSGUARD_EVALS_BASE.model_copy(
         update={
-            "map_builder": get_map(map_name),
+            "map_builder": _load_map(map_name),
             "min_cogs": num_cogs,
             "max_cogs": num_cogs,
         }
@@ -66,13 +81,13 @@ COGSGUARD_EVAL_MAPS: list[str] = [
 
 COGSGUARD_EVAL_COGS = {map_name: _count_spawn_pads(MAPS_DIR / map_name) for map_name in COGSGUARD_EVAL_MAPS}
 
-COGSGUARD_EVAL_MISSIONS: list[CogsGuardMission] = []
+COGSGUARD_EVAL_MISSIONS: list[CvCMission] = []
 for map_name in COGSGUARD_EVAL_MAPS:
     stem = Path(map_name).stem
     num_cogs = COGSGUARD_EVAL_COGS[map_name]
     site = _make_eval_site(map_name, num_cogs)
     COGSGUARD_EVAL_MISSIONS.append(
-        CogsGuardMission(
+        CvCMission(
             name=stem,
             description=_description_from_stem(stem),
             site=site,

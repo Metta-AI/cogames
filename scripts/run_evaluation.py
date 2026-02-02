@@ -25,7 +25,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, cast
+from typing import Dict, List, Optional
 
 import matplotlib
 
@@ -36,9 +36,12 @@ from safetensors.torch import load_file as load_safetensors_file
 
 from cogames.cli.policy import parse_policy_spec
 from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
-from cogames.cogs_vs_clips.mission import AnyMission, Mission, MissionVariant, NumCogsVariant
+from cogames.cogs_vs_clips.mission import CvCMission as AnyMission
+from cogames.cogs_vs_clips.mission import CvCMission as Mission
+from cogames.cogs_vs_clips.mission import NumCogsVariant
 from cogames.cogs_vs_clips.missions import MISSIONS as ALL_MISSIONS
 from cogames.cogs_vs_clips.variants import VARIANTS
+from cogames.core import CoGameMissionVariant as MissionVariant
 from metta_alo.rollout import run_single_episode_rollout
 from mettagrid.config.reward_config import statReward
 from mettagrid.policy.policy import PolicySpec
@@ -169,13 +172,6 @@ def _run_case(
                         env_config.game.agent.vibe = 0
                 if env_config.game.actions.attack:
                     env_config.game.actions.attack.enabled = False
-
-            allowed_vibes = set(vibe_names)
-            chest = env_config.game.objects.get("chest")
-            if chest:
-                vibe_transfers = getattr(chest, "vibe_transfers", None)
-                if isinstance(vibe_transfers, dict):
-                    cast(Any, chest).vibe_transfers = {v: t for v, t in vibe_transfers.items() if v in allowed_vibes}
 
     if variant is None or getattr(variant, "max_steps_override", None) is None:
         env_config.game.max_steps = max_steps

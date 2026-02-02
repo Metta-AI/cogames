@@ -1,52 +1,20 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Dict
 
 from pydantic import Field
 
 from cogames.cogs_vs_clips.cog import CogConfig
-from cogames.cogs_vs_clips.mission import Mission, Site
-from mettagrid.config.game_value import stat
+from cogames.cogs_vs_clips.mission import CvCMission
+from cogames.cogs_vs_clips.sites import EVALS, get_map
+from cogames.core import CoGameSite
 from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
     MettaGridConfig,
-    ResourceLimitsConfig,
 )
 from mettagrid.config.mutation.resource_mutation import updateActor
-from mettagrid.config.reward_config import reward
-from mettagrid.map_builder.map_builder import MapBuilderConfig
-from mettagrid.mapgen.mapgen import MapGen
 
 RESOURCE_NAMES: tuple[str, ...] = ("carbon", "oxygen", "germanium", "silicon")
-
-MAPS_DIR = Path(__file__).resolve().parent.parent.parent / "maps"
-
-
-def get_map(map_name: str) -> MapBuilderConfig:
-    """Load a map builder configuration from the local diagnostics directory."""
-    normalized = map_name
-    if normalized.startswith("evals/"):
-        normalized = f"diagnostic_evals/{normalized.split('/', 1)[1]}"
-    map_path = MAPS_DIR / normalized
-    if not map_path.exists():
-        raise FileNotFoundError(f"Diagnostic map not found: {map_path}")
-    # Wrap AsciiMapBuilderConfig in MapGen.Config to match standard get_map() behavior
-    return MapGen.Config(
-        instance=MapBuilderConfig.from_uri(str(map_path)),
-        instances=1,  # Force single instance - use spawn points from ASCII map directly
-        fixed_spawn_order=False,
-        instance_border_width=0,  # Don't add border - maps already have borders built in
-    )
-
-
-EVALS = Site(
-    name="evals",
-    description="Diagnostic evaluation arenas.",
-    map_builder=get_map("evals/diagnostic_radial.map"),
-    min_cogs=1,
-    max_cogs=4,
-)
 
 
 # Generous cog config for diagnostic missions: high limits and full energy regen
@@ -63,25 +31,11 @@ _GENEROUS_COG = CogConfig(
     influence_regen=0,
 )
 
-# Same but without generous energy regen (for charge-up diagnostics)
-_MODEST_COG = CogConfig(
-    gear_limit=255,
-    hp_limit=255,
-    heart_limit=255,
-    energy_limit=255,
-    cargo_limit=255,
-    initial_energy=255,
-    initial_hp=100,
-    energy_regen=1,
-    hp_regen=0,
-    influence_regen=0,
-)
 
-
-class _DiagnosticMissionBase(Mission):
+class _DiagnosticMissionBase(CvCMission):
     """Base class for minimal diagnostic evaluation missions."""
 
-    site: Site = EVALS
+    site: CoGameSite = EVALS
     cog: CogConfig = Field(default_factory=lambda: _GENEROUS_COG.model_copy())
 
     map_name: str = Field(default="evals/diagnostic_eval_template.map")
@@ -89,14 +43,8 @@ class _DiagnosticMissionBase(Mission):
     required_agents: int | None = Field(default=None)
 
     inventory_seed: Dict[str, int] = Field(default_factory=dict)
-    communal_chest_hearts: int | None = Field(default=None)
-    resource_chest_stock: Dict[str, int] = Field(default_factory=dict)
     # If True, give agents high energy capacity and regen (overridden by specific missions)
     generous_energy: bool = Field(default=True)
-
-    # Disable clips events for diagnostic evals
-    clips_scramble_start: int = Field(default=99999)
-    clips_align_start: int = Field(default=99999)
 
     def configure_env(self, cfg: MettaGridConfig) -> None:  # pragma: no cover - hook for subclasses
         """Hook for mission-specific environment alterations."""
@@ -113,10 +61,6 @@ class _DiagnosticMissionBase(Mission):
             cfg.game.map_builder = forced_map
             cfg.game.max_steps = self.max_steps
             self._apply_inventory_seed(cfg)
-            self._apply_communal_chest(cfg)
-            self._apply_resource_chests(cfg)
-            # Finally, normalize rewards so a single deposited heart yields at most 1 reward.
-            self._apply_heart_reward_cap(cfg)
             self.configure_env(cfg)
             return cfg
         finally:
@@ -133,45 +77,15 @@ class _DiagnosticMissionBase(Mission):
         seed = dict(cfg.game.agent.inventory.initial)
         seed.update(self.inventory_seed)
         cfg.game.agent.inventory.initial = seed
-
-    def _apply_communal_chest(self, cfg: MettaGridConfig) -> None:
-        if self.communal_chest_hearts is None:
-            return
-        chest = cfg.game.objects.get("communal_chest")
-        if chest is not None and chest.inventory is not None:
-            chest.inventory.initial = {"heart": self.communal_chest_hearts}
-
-    def _apply_resource_chests(self, cfg: MettaGridConfig) -> None:
-        if not self.resource_chest_stock:
-            return
-        for resource, amount in self.resource_chest_stock.items():
-            chest_cfg = cfg.game.objects.get(f"chest_{resource}")
-            if chest_cfg is not None and chest_cfg.inventory is not None:
-                chest_cfg.inventory.initial = {resource: amount}
-
-    def _apply_heart_reward_cap(self, cfg: MettaGridConfig) -> None:
-        """Normalize diagnostics so a single deposited heart yields at most 1 reward per episode.
-
-        - Make each agent-deposited heart worth exactly 1.0 reward (credited only to the depositor).
-        - Ensure all chests can store at most 1 heart so total reward per episode cannot exceed 1.
-        """
-        agent_cfg = cfg.game.agent
-        rewards = dict(agent_cfg.rewards)
-        rewards["chest_heart_deposited_by_agent"] = reward(stat("chest.heart.deposited_by_agent"))
-        agent_cfg.rewards = rewards
-
-        # Cap heart capacity for every chest used in diagnostics (communal or resource-specific).
-        for _name, obj in cfg.game.objects.items():
-            if obj.inventory is None:
-                continue
-            # Find existing heart limit or create new one
-            heart_limit = obj.inventory.limits.get("heart", ResourceLimitsConfig(min=1, resources=["heart"]))
-            heart_limit.min = 1
-            obj.inventory.limits["heart"] = heart_limit
+        # Also apply to per-agent configs (used by CvCMission)
+        for agent_cfg in cfg.game.agents:
+            agent_seed = dict(agent_cfg.inventory.initial)
+            agent_seed.update(self.inventory_seed)
+            agent_cfg.inventory.initial = agent_seed
 
 
 # ----------------------------------------------------------------------
-# Diagnostics (non-hub)
+# Diagnostic missions (no assemblers)
 # ----------------------------------------------------------------------
 
 
@@ -233,7 +147,7 @@ class DiagnosticChargeUp(_DiagnosticMissionBase):
     max_steps: int = Field(default=250)
 
     def configure_env(self, cfg: MettaGridConfig) -> None:
-        # Set starting energy to 30 and no regen
+        # Set starting energy to 60 and no regen
         agent = cfg.game.agent
         agent.inventory.initial = dict(agent.inventory.initial)
         agent.inventory.initial["energy"] = 60
@@ -301,7 +215,7 @@ class DiagnosticChargeUpHard(_DiagnosticMissionBase):
     max_steps: int = Field(default=350)
 
     def configure_env(self, cfg: MettaGridConfig) -> None:
-        # Set starting energy to 30 and no regen
+        # Set starting energy to 60 and no regen
         agent = cfg.game.agent
         agent.inventory.initial = dict(agent.inventory.initial)
         agent.inventory.initial["energy"] = 60

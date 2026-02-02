@@ -1,12 +1,14 @@
 """CogsGuard tutorial mission configuration."""
 
-from cogames.cogs_vs_clips.mission import Mission, Site
-from cogames.cogs_vs_clips.procedural import MachinaArena
+from cogames.cogs_vs_clips.mission import CvCMission
+from cogames.cogs_vs_clips.team import CogTeam
+from cogames.cogs_vs_clips.terrain import MachinaArena
+from cogames.core import CoGameSite
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.mapgen.scenes.base_hub import BaseHubConfig
 
 
-def make_cogsguard_tutorial_site() -> Site:
+def make_cogsguard_tutorial_site() -> CoGameSite:
     """Create a smaller, simpler CogsGuard arena for the tutorial."""
     hub_config = BaseHubConfig(
         corner_bundle="extractors",
@@ -32,7 +34,7 @@ def make_cogsguard_tutorial_site() -> Site:
             hub=hub_config,
         ),
     )
-    return Site(
+    return CoGameSite(
         name="cogsguard_tutorial",
         description="CogsGuard tutorial arena - small map for learning",
         map_builder=map_builder,
@@ -41,16 +43,13 @@ def make_cogsguard_tutorial_site() -> Site:
     )
 
 
-CogsGuardTutorialMission = Mission(
+CogsGuardTutorialMission = CvCMission(
     name="tutorial",
     description="Learn the basics of CogsGuard: Roles, Resources, and Territory Control.",
     site=make_cogsguard_tutorial_site(),
     num_cogs=1,
     max_steps=2000,
-    # Generous initial resources for learning
-    collective_initial_carbon=50,
-    collective_initial_oxygen=50,
-    collective_initial_germanium=50,
-    collective_initial_silicon=50,
-    collective_initial_heart=10,
+    teams={
+        "cogs": CogTeam(name="cogs", num_agents=1, wealth=1),
+    },
 )

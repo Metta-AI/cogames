@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pydantic import Field
 
+from cogames.cogs_vs_clips.config import CvCConfig
 from mettagrid.base_config import Config
+from mettagrid.config.game_value import stat as game_stat
 from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
     AgentConfig,
@@ -10,6 +12,7 @@ from mettagrid.config.mettagrid_config import (
     ResourceLimitsConfig,
 )
 from mettagrid.config.mutation.resource_mutation import updateActor
+from mettagrid.config.reward_config import reward
 
 
 class CogConfig(Config):
@@ -37,25 +40,23 @@ class CogConfig(Config):
     energy_regen: int = Field(default=1)
     hp_regen: int = Field(default=-1)
     influence_regen: int = Field(default=-1)
+    action_cost: dict[str, int] = Field(default_factory=lambda: {"energy": 3})
 
-    # Movement cost
-    move_energy_cost: int = Field(default=3)
-
-    def agent_config(self, gear: list[str], elements: list[str]) -> AgentConfig:
+    def agent_config(self, team: str, max_steps: int) -> AgentConfig:
         """Create an AgentConfig for this cog configuration."""
         return AgentConfig(
-            collective="cogs",
+            collective=team,
             inventory=InventoryConfig(
                 limits={
                     "hp": ResourceLimitsConfig(min=self.hp_limit, resources=["hp"], modifiers=self.hp_modifiers),
                     # when hp == 0, the cog can't hold gear or hearts
-                    "gear": ResourceLimitsConfig(max=self.gear_limit, resources=gear, modifiers={"hp": 100}),
+                    "gear": ResourceLimitsConfig(max=self.gear_limit, resources=CvCConfig.GEAR, modifiers={"hp": 100}),
                     "heart": ResourceLimitsConfig(max=self.heart_limit, resources=["heart"], modifiers={"hp": 100}),
                     "energy": ResourceLimitsConfig(
                         min=self.energy_limit, resources=["energy"], modifiers=self.energy_modifiers
                     ),
                     "cargo": ResourceLimitsConfig(
-                        min=self.cargo_limit, resources=elements, modifiers=self.cargo_modifiers
+                        min=self.cargo_limit, resources=CvCConfig.ELEMENTS, modifiers=self.cargo_modifiers
                     ),
                     "influence": ResourceLimitsConfig(
                         min=self.influence_limit, resources=["influence"], modifiers=self.influence_modifiers
@@ -75,5 +76,11 @@ class CogConfig(Config):
                         )
                     ]
                 )
+            },
+            rewards={
+                "aligned_junction_held": reward(
+                    game_stat("collective.aligned.junction.held"),
+                    weight=1.0 / max_steps,
+                ),
             },
         )
