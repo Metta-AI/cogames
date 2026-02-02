@@ -812,8 +812,6 @@ def play_cmd(
             map_builder.seed = map_seed
 
     policy_spec = get_policy_spec(ctx, policy)
-    console.print(f"[cyan]Playing {resolved_mission}[/cyan]")
-    console.print(f"Max Steps: {steps}, Render: {render}")
 
     if ctx.get_parameter_source("steps") in (
         ParameterSource.COMMANDLINE,
@@ -821,6 +819,9 @@ def play_cmd(
         ParameterSource.PROMPT,
     ):
         env_cfg.game.max_steps = steps
+
+    console.print(f"[cyan]Playing {resolved_mission}[/cyan]")
+    console.print(f"Max Steps: {env_cfg.game.max_steps}, Render: {render}")
 
     play_module.play(
         console,
