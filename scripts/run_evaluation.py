@@ -125,7 +125,7 @@ def _run_case(
             if any(v == "gear" for v in getattr(proto, "vibes", [])):
                 change_vibe = env_config.game.actions.change_vibe
                 if not any(v.name == "gear" for v in change_vibe.vibes):
-                    from mettagrid.config.vibes import VIBE_BY_NAME
+                    from mettagrid.config.vibes import VIBE_BY_NAME  # noqa: PLC0415
 
                     change_vibe.vibes = list(change_vibe.vibes) + [VIBE_BY_NAME["gear"]]
                 break
@@ -152,7 +152,7 @@ def _run_case(
         if num_vibes <= 0:
             logger.warning(f"Invalid action space {policy_action_space}, skipping vibe configuration")
         else:
-            from mettagrid.config import vibes as vibes_module
+            from mettagrid.config import vibes as vibes_module  # noqa: PLC0415
 
             if num_vibes == 16:
                 vibe_names = [v.name for v in vibes_module.VIBES[:16]]
@@ -244,7 +244,7 @@ def _run_case(
 
 
 def _load_thinky_eval_cases() -> list[tuple[str, int]]:
-    from cogames_agents.policy.nim_agents.thinky_eval import EVALS as THINKY_EVALS
+    from cogames_agents.policy.nim_agents.thinky_eval import EVALS as THINKY_EVALS  # noqa: PLC0415
 
     return [(exp_name, num_cogs) for exp_name, _tag, num_cogs in THINKY_EVALS]
 

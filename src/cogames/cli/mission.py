@@ -27,16 +27,16 @@ from mettagrid.mapgen.mapgen import MapGen
 
 @lru_cache(maxsize=1)
 def _get_core_missions() -> list[CvCMission]:
-    from cogames.cogs_vs_clips.missions import get_core_missions
+    from cogames.cogs_vs_clips.missions import get_core_missions  # noqa: PLC0415
 
     return get_core_missions()
 
 
 @lru_cache(maxsize=1)
 def _get_eval_missions_all() -> list[CvCMission]:
-    from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
-    from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS
-    from cogames.cogs_vs_clips.evals.spanning_evals import EVAL_MISSIONS as SPANNING_EVAL_MISSIONS
+    from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
+    from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS  # noqa: PLC0415
+    from cogames.cogs_vs_clips.evals.spanning_evals import EVAL_MISSIONS as SPANNING_EVAL_MISSIONS  # noqa: PLC0415
 
     missions: list[CvCMission] = []
     missions.extend(INTEGRATED_EVAL_MISSIONS)
@@ -74,19 +74,21 @@ def load_mission_set(mission_set: str) -> list[CvCMission]:
                 missions_list.append(mission)
 
     elif mission_set == "diagnostic_evals":
-        from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
+        from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
 
         missions_list = [mission_cls() for mission_cls in DIAGNOSTIC_EVALS]  # type: ignore[call-arg]
     elif mission_set == "cogsguard_evals":
-        from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS
+        from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS  # noqa: PLC0415
 
         missions_list = list(COGSGUARD_EVAL_MISSIONS)
     elif mission_set == "integrated_evals":
-        from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS
+        from cogames.cogs_vs_clips.evals.integrated_evals import (  # noqa: PLC0415
+            EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS,
+        )
 
         missions_list = list(INTEGRATED_EVAL_MISSIONS)
     elif mission_set == "spanning_evals":
-        from cogames.cogs_vs_clips.evals.spanning_evals import EVAL_MISSIONS as SPANNING_EVAL_MISSIONS
+        from cogames.cogs_vs_clips.evals.spanning_evals import EVAL_MISSIONS as SPANNING_EVAL_MISSIONS  # noqa: PLC0415
 
         missions_list = list(SPANNING_EVAL_MISSIONS)
     else:

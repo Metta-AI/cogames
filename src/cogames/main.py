@@ -160,7 +160,7 @@ def tutorial_cmd(
     console.print("[dim]Initializing Mettascope...[/dim]")
 
     # Load tutorial mission (CogsGuard)
-    from cogames.cogs_vs_clips.missions import make_cogsguard_mission
+    from cogames.cogs_vs_clips.missions import make_cogsguard_mission  # noqa: PLC0415
 
     # Create environment config
     env_cfg = make_cogsguard_mission(num_agents=1, max_steps=1000).make_env()
@@ -310,7 +310,7 @@ def cogsguard_tutorial_cmd(
     console.print("[dim]Initializing Mettascope...[/dim]")
 
     # Load CogsGuard tutorial mission
-    from cogames.cogs_vs_clips.cogsguard_tutorial import CogsGuardTutorialMission
+    from cogames.cogs_vs_clips.cogsguard_tutorial import CogsGuardTutorialMission  # noqa: PLC0415
 
     # Create environment config
     env_cfg = CogsGuardTutorialMission.make_env()
@@ -1465,7 +1465,7 @@ def run_cmd(
         raise typer.Exit(1)
 
     if mission_set:
-        from cogames.cli.mission import load_mission_set
+        from cogames.cli.mission import load_mission_set  # noqa: PLC0415
 
         try:
             mission_objs = load_mission_set(mission_set)
@@ -1631,7 +1631,7 @@ def pickup_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    import httpx
+    import httpx  # noqa: PLC0415
 
     if policy is None:
         console.print(ctx.get_help())
@@ -1762,10 +1762,10 @@ def login_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse  # noqa: PLC0415
 
     # Check if we already have a token
-    from cogames.auth import BaseCLIAuthenticator
+    from cogames.auth import BaseCLIAuthenticator  # noqa: PLC0415
 
     temp_auth = BaseCLIAuthenticator(
         token_file_name="cogames.yaml",
@@ -1991,9 +1991,9 @@ def validate_policy_cmd(
     env_cfg = MettaGridConfig.model_validate(config_data)
 
     if setup_script:
-        import subprocess
-        import sys
-        from pathlib import Path
+        import subprocess  # noqa: PLC0415
+        import sys  # noqa: PLC0415
+        from pathlib import Path  # noqa: PLC0415
 
         script_path = Path(setup_script)
         if not script_path.exists():
@@ -2224,7 +2224,7 @@ def submit_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    import httpx
+    import httpx  # noqa: PLC0415
 
     season_info = _resolve_season(server, season)
     season_name = season_info.name
@@ -2322,7 +2322,7 @@ def docs_cmd(
 
     # If no argument provided, show available documents
     if doc_name is None:
-        from rich.table import Table
+        from rich.table import Table  # noqa: PLC0415
 
         console.print("\n[bold cyan]Available Documents:[/bold cyan]\n")
         table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED, padding=(0, 1))
