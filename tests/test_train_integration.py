@@ -67,7 +67,7 @@ def test_train_lstm_policy(test_env_config, temp_checkpoint_dir):
 @pytest.mark.timeout(180)
 def test_train_lstm_and_load_policy_data(test_env_config, temp_checkpoint_dir):
     """Test training LSTM policy, then loading it for evaluation."""
-    from mettagrid.policy.lstm import LSTMPolicy
+    from mettagrid.policy.lstm import LSTMPolicy  # noqa: PLC0415
 
     # Train the policy
     train(
@@ -91,14 +91,14 @@ def test_train_lstm_and_load_policy_data(test_env_config, temp_checkpoint_dir):
     assert len(checkpoints) > 0, f"Should have at least one checkpoint in {temp_checkpoint_dir}"
 
     # Load the checkpoint into a new policy
-    from mettagrid.policy.policy_env_interface import PolicyEnvInterface
+    from mettagrid.policy.policy_env_interface import PolicyEnvInterface  # noqa: PLC0415
 
     policy_env_info = PolicyEnvInterface.from_mg_cfg(test_env_config)
     policy = LSTMPolicy(policy_env_info)
     policy.load_policy_data(str(checkpoints[0]))
 
     # Verify the policy network was loaded successfully
-    import torch.nn as nn
+    import torch.nn as nn  # noqa: PLC0415
 
     assert isinstance(policy.network(), nn.Module)
     # Verify the network has parameters (was loaded)
@@ -171,9 +171,9 @@ def test_make_policy_scripted_runs():
         # Verify policy can be instantiated
         sys.path.insert(0, str(tmpdir))
         try:
-            from mettagrid.policy.loader import initialize_or_load_policy
-            from mettagrid.policy.policy import PolicySpec
-            from mettagrid.policy.policy_env_interface import PolicyEnvInterface
+            from mettagrid.policy.loader import initialize_or_load_policy  # noqa: PLC0415
+            from mettagrid.policy.policy import PolicySpec  # noqa: PLC0415
+            from mettagrid.policy.policy_env_interface import PolicyEnvInterface  # noqa: PLC0415
 
             # Use training_facility (13x13 map) for faster execution
             env_cfg = get_mission("cogsguard_arena.basic")[1]

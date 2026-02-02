@@ -70,8 +70,8 @@ def validate_paths(paths: list[str], console: Console) -> list[Path]:
 
 def _maybe_resolve_checkpoint_bundle_uri(policy: str) -> tuple[Path, bool] | None:
     """Return (local_zip_path, cleanup) if policy points to a checkpoint bundle URI."""
-    from mettagrid.policy.prepare_policy_spec import download_policy_spec_from_s3_as_zip
-    from mettagrid.util.uri_resolvers.schemes import parse_uri, resolve_uri
+    from mettagrid.policy.prepare_policy_spec import download_policy_spec_from_s3_as_zip  # noqa: PLC0415
+    from mettagrid.util.uri_resolvers.schemes import parse_uri, resolve_uri  # noqa: PLC0415
 
     first = policy.split(",", 1)[0].strip()
     parsed = parse_uri(first, allow_none=True, default_scheme=None)
@@ -518,7 +518,7 @@ def upload_policy(
     validation_season: str = "",
     season: str | None = None,
 ) -> UploadResult | None:
-    from cogames.cli.client import TournamentServerClient
+    from cogames.cli.client import TournamentServerClient  # noqa: PLC0415
 
     if dry_run:
         console.print("[dim]Dry run mode - no upload[/dim]\n")

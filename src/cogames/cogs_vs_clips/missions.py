@@ -50,7 +50,7 @@ def get_core_missions() -> list[CvCMission]:
 
 
 def _build_eval_missions() -> list[CvCMission]:
-    from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS
+    from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS  # noqa: PLC0415
 
     return [
         *INTEGRATED_EVAL_MISSIONS,

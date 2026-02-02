@@ -112,7 +112,7 @@ def test_cli_all_creates_missing_py():
 
 def test_cli_all_noops_when_in_sync():
     """Test all command does nothing when .py and .ipynb are already in sync."""
-    import jupytext
+    import jupytext  # noqa: PLC0415
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)

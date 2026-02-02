@@ -488,7 +488,7 @@ def test_upload_resolves_season_and_validates(
 
     monkeypatch.setattr("cogames.cli.submit.validate_bundle_in_isolation", fake_validate)
 
-    from cogames.main import app
+    from cogames.main import app  # noqa: PLC0415
 
     runner = CliRunner()
     result = runner.invoke(
@@ -536,7 +536,7 @@ def test_upload_skips_validation_when_no_entry_config(
 
     monkeypatch.setattr("cogames.cli.submit.validate_bundle_in_isolation", fake_validate)
 
-    from cogames.main import app
+    from cogames.main import app  # noqa: PLC0415
 
     runner = CliRunner()
     result = runner.invoke(
@@ -562,7 +562,7 @@ def test_validate_policy_fetches_config_and_runs(
     httpserver: HTTPServer,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from mettagrid.config.mettagrid_config import MettaGridConfig
+    from mettagrid.config.mettagrid_config import MettaGridConfig  # noqa: PLC0415
 
     default_cfg = MettaGridConfig()
 
@@ -598,7 +598,7 @@ def test_validate_policy_fetches_config_and_runs(
 
     monkeypatch.setattr("cogames.main.validate_policy_spec", fake_validate_policy_spec)
 
-    from cogames.main import app
+    from cogames.main import app  # noqa: PLC0415
 
     runner = CliRunner()
     result = runner.invoke(
