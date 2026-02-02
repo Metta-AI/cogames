@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 from rich.console import Console
 
-from cogames.cli.submit import _maybe_resolve_checkpoint_bundle_uri, validate_paths
+from cogames.cli.policy import PolicySpec
+from cogames.cli.submit import _maybe_resolve_checkpoint_bundle_uri, create_submission_zip, validate_paths
 
 
 def test_validate_paths_accepts_absolute_within_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -61,3 +62,32 @@ def test_bundle_uri_zip_is_reused(tmp_path: Path) -> None:
 
     resolved = _maybe_resolve_checkpoint_bundle_uri(bundle_zip.as_uri())
     assert resolved == (bundle_zip, False)
+
+
+def test_create_submission_zip_includes_ancestor_inits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    # src/pkg/__init__.py
+    # src/pkg/sub/__init__.py
+    # src/pkg/sub/leaf/__init__.py
+    # src/pkg/sub/leaf/policy.py
+    leaf = tmp_path / "src" / "pkg" / "sub" / "leaf"
+    leaf.mkdir(parents=True)
+    (tmp_path / "src" / "pkg" / "__init__.py").write_text("")
+    (tmp_path / "src" / "pkg" / "sub" / "__init__.py").write_text("")
+    (leaf / "__init__.py").write_text("")
+    (leaf / "policy.py").write_text("class P: pass")
+
+    policy_spec = PolicySpec(class_path="pkg.sub.leaf.policy.P")
+    include = [Path("src/pkg/sub/leaf")]
+
+    zip_path = create_submission_zip(include, policy_spec)
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            names = set(zf.namelist())
+        assert "src/pkg/__init__.py" in names
+        assert "src/pkg/sub/__init__.py" in names
+        assert "src/pkg/sub/leaf/__init__.py" in names
+        assert "src/pkg/sub/leaf/policy.py" in names
+    finally:
+        zip_path.unlink()

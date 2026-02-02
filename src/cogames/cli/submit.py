@@ -315,6 +315,18 @@ def validate_policy_in_isolation(
             shutil.rmtree(temp_dir)
 
 
+def _collect_ancestor_init_files(include_files: list[Path]) -> list[Path]:
+    found: set[Path] = set()
+    for path in include_files:
+        parent = path.parent
+        while parent != Path(".") and parent != parent.parent:
+            init = parent / "__init__.py"
+            if init.is_file():
+                found.add(init)
+            parent = parent.parent
+    return sorted(found)
+
+
 def create_submission_zip(
     include_files: list[Path],
     policy_spec: PolicySpec,
@@ -335,17 +347,22 @@ def create_submission_zip(
         setup_script=setup_script,
     )
 
+    all_files: dict[str, Path] = {}
+    for init_path in _collect_ancestor_init_files(include_files):
+        all_files[str(init_path)] = init_path
+    for file_path in include_files:
+        if file_path.is_dir():
+            for root, _, files in os.walk(file_path):
+                for file in files:
+                    full = Path(root) / file
+                    all_files[str(full)] = full
+        else:
+            all_files[str(file_path)] = file_path
+
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         zipf.writestr(data=submission_spec.model_dump_json(), zinfo_or_arcname=POLICY_SPEC_FILENAME)
-
-        for file_path in include_files:
-            if file_path.is_dir():
-                for root, _, files in os.walk(file_path):
-                    for file in files:
-                        file_full_path = Path(root) / file
-                        zipf.write(file_full_path, arcname=file_full_path)
-            else:
-                zipf.write(file_path, arcname=file_path)
+        for arcname, path in all_files.items():
+            zipf.write(path, arcname=arcname)
 
     return Path(zip_path)
 
