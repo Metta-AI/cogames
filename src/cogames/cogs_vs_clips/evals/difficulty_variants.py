@@ -37,11 +37,8 @@ class DifficultyLevel(CoGameMissionVariant):
     name: str = Field(description="Difficulty name (easy, medium, hard, brutal, etc.)")
     description: str = Field(description="What makes this difficulty challenging", default="")
 
-    # Energy regen multiplier (relative to mission baseline)
-    energy_regen_mult: float = Field(default=1.0)
-
-    # Absolute overrides (if set, ignore multipliers)
-    energy_regen_override: int | None = Field(default=None)
+    # Solar override (if set, overrides weather day/night deltas)
+    solar_override: int | None = Field(default=None)
     move_energy_cost_override: int | None = Field(default=None)
     energy_capacity_override: int | None = Field(default=None)
     cargo_capacity_override: int | None = Field(default=None)
@@ -70,20 +67,20 @@ STANDARD = DifficultyLevel(
 HARD = DifficultyLevel(
     name="hard",
     description="Minimal passive regen and higher move cost",
-    energy_regen_override=1,  # Minimal regen prevents deadlock
+    solar_override=1,  # Minimal regen prevents deadlock
     move_energy_cost_override=2,
 )
 
 SINGLE_USE = DifficultyLevel(
     name="single_use",
     description="Minimal regen - no second chances",
-    energy_regen_override=1,
+    solar_override=1,
 )
 
 SPEED_RUN = DifficultyLevel(
     name="speed_run",
     description="Short clock, cheap movement",
-    energy_regen_override=2,
+    solar_override=2,
     move_energy_cost_override=1,
     max_steps_override=600,
 )
@@ -91,7 +88,7 @@ SPEED_RUN = DifficultyLevel(
 ENERGY_CRISIS = DifficultyLevel(
     name="energy_crisis",
     description="Minimal passive regen - plan every move",
-    energy_regen_override=1,  # Minimal regen prevents deadlock
+    solar_override=1,  # Minimal regen prevents deadlock
 )
 
 # Export variants for use with --variant CLI flag.
@@ -116,7 +113,7 @@ def list_difficulties() -> None:
     print("=" * 80)
     for diff in DIFFICULTY_VARIANTS:
         print(f"\n{diff.name.upper()}: {diff.description}")
-        print(f"  Energy regen mult: {diff.energy_regen_mult}")
+        print(f"  Solar override: {diff.solar_override}")
 
 
 if __name__ == "__main__":
