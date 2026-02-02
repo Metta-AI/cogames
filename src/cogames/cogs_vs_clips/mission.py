@@ -15,6 +15,7 @@ from cogames.cogs_vs_clips.stations import (
 )
 from cogames.cogs_vs_clips.team import CogTeam
 from cogames.cogs_vs_clips.variants import NumCogsVariant
+from cogames.cogs_vs_clips.weather import WeatherConfig
 from cogames.core import (
     MAP_MISSION_DELIMITER,
     CoGameMission,
@@ -55,6 +56,7 @@ class CvCMission(CoGameMission):
     )
 
     clips: ClipsConfig = Field(default_factory=lambda: ClipsConfig())
+    weather: WeatherConfig = Field(default_factory=lambda: WeatherConfig())
 
     @property
     def num_agents(self) -> int:
@@ -108,7 +110,7 @@ class CvCMission(CoGameMission):
                 **{team.name: team.collective_config() for team in self.teams.values()},
                 "clips": self.clips.collective_config(),
             },
-            events=self.clips.events(max_steps=self.max_steps),
+            events=self._merge_events(),
         )
 
         env = MettaGridConfig(game=game)
@@ -122,3 +124,12 @@ class CvCMission(CoGameMission):
             env.label += f".{variant.name}"
 
         return env
+
+    def _merge_events(self) -> dict:
+        """Merge clips and weather events, raising on key conflicts."""
+        clips_events = self.clips.events(max_steps=self.max_steps)
+        weather_events = self.weather.events(max_steps=self.max_steps)
+        overlap = set(clips_events) & set(weather_events)
+        if overlap:
+            raise ValueError(f"Overlapping event keys between clips and weather: {overlap}")
+        return {**clips_events, **weather_events}

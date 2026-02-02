@@ -32,7 +32,7 @@ CvCConfig = SimpleNamespace(
         "miner": "⛏️",
         "scout": "🔭",
     },
-    RESOURCES=["energy", "heart", "hp", "influence", *_ELEMENTS, *_GEAR],
+    RESOURCES=["energy", "heart", "hp", "influence", "solar", *_ELEMENTS, *_GEAR],
     VIBES=_VIBES,
     VIBE_NAMES=[vibe.name for vibe in _VIBES],
 )

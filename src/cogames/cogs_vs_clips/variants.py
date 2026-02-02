@@ -36,7 +36,8 @@ class DarkSideVariant(CoGameMissionVariant):
 
     @override
     def modify_mission(self, mission: CvCMission) -> None:
-        mission.cog.energy_regen = 0
+        mission.weather.day_deltas = {"solar": 0}
+        mission.weather.night_deltas = {"solar": 0}
 
 
 class SuperChargedVariant(CoGameMissionVariant):
@@ -45,7 +46,8 @@ class SuperChargedVariant(CoGameMissionVariant):
 
     @override
     def modify_mission(self, mission: CvCMission) -> None:
-        mission.cog.energy_regen += 2
+        mission.weather.day_deltas = {k: v + 2 for k, v in mission.weather.day_deltas.items()}
+        mission.weather.night_deltas = {k: v + 2 for k, v in mission.weather.night_deltas.items()}
 
 
 class EnergizedVariant(CoGameMissionVariant):
@@ -55,7 +57,8 @@ class EnergizedVariant(CoGameMissionVariant):
     @override
     def modify_mission(self, mission: CvCMission) -> None:
         mission.cog.energy_limit = max(mission.cog.energy_limit, 255)
-        mission.cog.energy_regen = mission.cog.energy_limit
+        mission.weather.day_deltas = {"solar": 255}
+        mission.weather.night_deltas = {"solar": 255}
 
 
 class Small50Variant(CoGameMissionVariant):

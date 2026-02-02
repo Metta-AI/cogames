@@ -26,7 +26,6 @@ _GENEROUS_COG = CogConfig(
     cargo_limit=255,
     initial_energy=255,
     initial_hp=100,
-    energy_regen=255,
     hp_regen=0,
     influence_regen=0,
 )

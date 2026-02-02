@@ -4,6 +4,7 @@ from pydantic import Field
 
 from cogames.cogs_vs_clips.config import CvCConfig
 from mettagrid.base_config import Config
+from mettagrid.config.game_value import InventoryValue
 from mettagrid.config.game_value import stat as game_stat
 from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
@@ -11,6 +12,8 @@ from mettagrid.config.mettagrid_config import (
     InventoryConfig,
     ResourceLimitsConfig,
 )
+from mettagrid.config.mutation.game_value_mutation import SetGameValueMutation
+from mettagrid.config.mutation.mutation import EntityTarget
 from mettagrid.config.mutation.resource_mutation import updateActor
 from mettagrid.config.reward_config import reward
 
@@ -35,12 +38,12 @@ class CogConfig(Config):
     # Initial inventory
     initial_energy: int = Field(default=100)
     initial_hp: int = Field(default=50)
+    initial_solar: int = Field(default=1)
 
     # Regen amounts
-    energy_regen: int = Field(default=1)
     hp_regen: int = Field(default=-1)
     influence_regen: int = Field(default=-1)
-    action_cost: dict[str, int] = Field(default_factory=lambda: {"energy": 3})
+    action_cost: dict[str, int] = Field(default_factory=lambda: {"energy": 4})
 
     def agent_config(self, team: str, max_steps: int) -> AgentConfig:
         """Create an AgentConfig for this cog configuration."""
@@ -62,20 +65,28 @@ class CogConfig(Config):
                         min=self.influence_limit, resources=["influence"], modifiers=self.influence_modifiers
                     ),
                 },
-                initial={"energy": self.initial_energy, "hp": self.initial_hp},
+                initial={"energy": self.initial_energy, "hp": self.initial_hp, "solar": self.initial_solar},
             ),
             on_tick={
                 "regen": Handler(
                     mutations=[
                         updateActor(
                             {
-                                "energy": self.energy_regen,
                                 "hp": self.hp_regen,
                                 "influence": self.influence_regen,
                             }
                         )
                     ]
-                )
+                ),
+                "solar_to_energy": Handler(
+                    mutations=[
+                        SetGameValueMutation(
+                            value=InventoryValue(item="energy"),
+                            source=InventoryValue(item="solar"),
+                            target=EntityTarget.ACTOR,
+                        )
+                    ]
+                ),
             },
             rewards={
                 "aligned_junction_held": reward(
