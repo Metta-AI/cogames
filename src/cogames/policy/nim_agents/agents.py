@@ -26,7 +26,6 @@ end_measure: Callable[[], None]
 ThinkyAgentsMultiPolicy: type[MultiAgentPolicy]
 RandomAgentsMultiPolicy: type[MultiAgentPolicy]
 RaceCarAgentsMultiPolicy: type[MultiAgentPolicy]
-LadyBugAgentsMultiPolicy: type[MultiAgentPolicy]
 CogsguardAgentsMultiPolicy: type[MultiAgentPolicy]
 CogsguardAlignAllAgentsMultiPolicy: type[MultiAgentPolicy]
 
@@ -36,9 +35,6 @@ try:
     )
     from cogames_agents.policy.nim_agents.agents import (
         CogsguardAlignAllAgentsMultiPolicy as _CogsguardAlignAllAgentsMultiPolicy,
-    )
-    from cogames_agents.policy.nim_agents.agents import (
-        LadyBugAgentsMultiPolicy as _LadyBugAgentsMultiPolicy,
     )
     from cogames_agents.policy.nim_agents.agents import (
         RaceCarAgentsMultiPolicy as _RaceCarAgentsMultiPolicy,
@@ -85,10 +81,6 @@ except (ModuleNotFoundError, OSError) as exc:
         def __init__(self, policy_env_info: PolicyEnvInterface, **_: object):
             _raise_missing_nim_agents()
 
-    class _MissingLadyBugAgentsMultiPolicy(MultiAgentPolicy):
-        def __init__(self, policy_env_info: PolicyEnvInterface, **_: object):
-            _raise_missing_nim_agents()
-
     class _MissingCogsguardAgentsMultiPolicy(MultiAgentPolicy):
         def __init__(self, policy_env_info: PolicyEnvInterface, **_: object):
             _raise_missing_nim_agents()
@@ -102,7 +94,6 @@ except (ModuleNotFoundError, OSError) as exc:
     ThinkyAgentsMultiPolicy = _MissingThinkyAgentsMultiPolicy
     RandomAgentsMultiPolicy = _MissingRandomAgentsMultiPolicy
     RaceCarAgentsMultiPolicy = _MissingRaceCarAgentsMultiPolicy
-    LadyBugAgentsMultiPolicy = _MissingLadyBugAgentsMultiPolicy
     CogsguardAgentsMultiPolicy = _MissingCogsguardAgentsMultiPolicy
     CogsguardAlignAllAgentsMultiPolicy = _MissingCogsguardAlignAllAgentsMultiPolicy
 else:
@@ -111,7 +102,6 @@ else:
     ThinkyAgentsMultiPolicy = _ThinkyAgentsMultiPolicy
     RandomAgentsMultiPolicy = _RandomAgentsMultiPolicy
     RaceCarAgentsMultiPolicy = _RaceCarAgentsMultiPolicy
-    LadyBugAgentsMultiPolicy = _LadyBugAgentsMultiPolicy
     CogsguardAgentsMultiPolicy = _CogsguardAgentsMultiPolicy
     CogsguardAlignAllAgentsMultiPolicy = _CogsguardAlignAllAgentsMultiPolicy
 
@@ -121,7 +111,6 @@ __all__ = [
     "ThinkyAgentsMultiPolicy",
     "RandomAgentsMultiPolicy",
     "RaceCarAgentsMultiPolicy",
-    "LadyBugAgentsMultiPolicy",
     "CogsguardAgentsMultiPolicy",
     "CogsguardAlignAllAgentsMultiPolicy",
 ]

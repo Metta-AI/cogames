@@ -93,7 +93,10 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
                 continue
             if token.value not in tag_ids:
                 continue
-            distance = abs(token.location[0] - self._center[0]) + abs(token.location[1] - self._center[1])
+            loc = token.location
+            if loc is None:
+                continue
+            distance = abs(loc[0] - self._center[0]) + abs(loc[1] - self._center[1])
             if distance < best_distance:
                 best_distance = distance
                 best_location = token.location
