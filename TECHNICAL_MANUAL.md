@@ -37,6 +37,17 @@ Each token encodes a single feature value at a specific location within your obs
 Your sensors use a special marker value `0xFF` (255) to indicate empty or invalid tokens. When `location == 0xFF`, the
 token should be ignored. Empty tokens are used to pad observation arrays to a fixed size for efficient batch processing.
 
+### Global Tokens
+
+Global tokens use a dedicated location marker `0xFE` (254) to indicate non-spatial, agent-wide state. These include:
+
+- `episode_completion_pct`: How far through the episode you are (0-255)
+- `last_action`: The action you took last step
+- `last_reward`: The reward you received last step
+- Local position observations (lp:north, lp:south, lp:east, lp:west)
+
+Global tokens can be detected by position alone: `location == 0xFE` means it's a global token.
+
 ### Coordinate Encoding
 
 Your observation window uses a packed coordinate system to efficiently encode spatial information:
@@ -44,6 +55,7 @@ Your observation window uses a packed coordinate system to efficiently encode sp
 - **Upper 4 bits (high nibble)**: Row coordinate (0-14)
 - **Lower 4 bits (low nibble)**: Column coordinate (0-14)
 - **Special value `0xFF`**: Empty/invalid coordinate
+- **Special value `0xFE`**: Global token (non-spatial observation)
 
 Observation windows are typically 11x11 centered on your position; you are located at `0x55` (row 5, column 5).
 Coordinates are **egocentric** (relative to your position), not absolute map coordinates.
@@ -52,7 +64,7 @@ Coordinates are **egocentric** (relative to your position), not absolute map coo
 
 - **Row (r/y)**: Vertical coordinate, increases downward
 - **Column (c/x)**: Horizontal coordinate, increases rightward
-- **Center location**: Used for cog-specific features (inventory, global state)
+- **Center location**: Used for cog-specific features (inventory)
 
 ### Observation Features
 

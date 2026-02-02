@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 
-from cogames.cogs_vs_clips.mission import Mission, Site
-from cogames.cogs_vs_clips.procedural import MachinaArena
+from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.sites import HELLO_WORLD, TRAINING_FACILITY
+from cogames.cogs_vs_clips.terrain import MachinaArena
 from cogames.cogs_vs_clips.variants import (
     DarkSideVariant,
     DistantResourcesVariant,
@@ -17,11 +17,12 @@ from cogames.cogs_vs_clips.variants import (
     SingleResourceUniformVariant,
     SuperChargedVariant,
 )
+from cogames.core import CoGameSite
 from mettagrid.mapgen.mapgen import MapGen
 
 logger = logging.getLogger(__name__)
 
-SMALL_HELLO_WORLD = Site(
+SMALL_HELLO_WORLD = CoGameSite(
     name="small_hello_world",
     description="Small hello world map.",
     map_builder=MapGen.Config(width=50, height=50, instance=MachinaArena.Config(spawn_count=20)),
@@ -29,7 +30,7 @@ SMALL_HELLO_WORLD = Site(
     max_cogs=20,
 )
 
-MEDIUM_HELLO_WORLD = Site(
+MEDIUM_HELLO_WORLD = CoGameSite(
     name="medium_hello_world",
     description="Medium hello world map.",
     map_builder=MapGen.Config(width=100, height=100, instance=MachinaArena.Config(spawn_count=20)),
@@ -37,7 +38,7 @@ MEDIUM_HELLO_WORLD = Site(
     max_cogs=20,
 )
 
-LARGE_HELLO_WORLD = Site(
+LARGE_HELLO_WORLD = CoGameSite(
     name="large_hello_world",
     description="Large hello world map.",
     map_builder=MapGen.Config(width=500, height=500, instance=MachinaArena.Config(spawn_count=20)),
@@ -46,7 +47,7 @@ LARGE_HELLO_WORLD = Site(
 )
 
 # Resource Bottleneck evals
-OxygenBottleneck = Mission(
+OxygenBottleneck = CvCMission(
     name="oxygen_bottleneck",
     description="Oxygen is the limiting resource; agents must prioritize oxygen over other resources.",
     site=HELLO_WORLD,
@@ -58,7 +59,7 @@ OxygenBottleneck = Mission(
 )
 
 # Energy Starved evals
-EnergyStarved = Mission(
+EnergyStarved = CvCMission(
     name="energy_starved",
     description="Energy is the limiting resource; agents must prioritize energy over other resources.",
     site=HELLO_WORLD,
@@ -71,7 +72,7 @@ EnergyStarved = Mission(
 # Curated difficulty tiers per mission
 # ------------------------------------------------------------
 # Oxygen Bottleneck
-OxygenBottleneckEasy = Mission(
+OxygenBottleneckEasy = CvCMission(
     name="oxygen_bottleneck_easy",
     description="Easy: tuned oxygen focus with simple layout and generous capacities.",
     site=HELLO_WORLD,
@@ -81,7 +82,7 @@ OxygenBottleneckEasy = Mission(
     ],
 )
 
-OxygenBottleneckStandard = Mission(
+OxygenBottleneckStandard = CvCMission(
     name="oxygen_bottleneck_standard",
     description="Standard: oxygen is the bottleneck; extractor missing at base.",
     site=HELLO_WORLD,
@@ -90,7 +91,7 @@ OxygenBottleneckStandard = Mission(
     ],
 )
 
-OxygenBottleneckHard = Mission(
+OxygenBottleneckHard = CvCMission(
     name="oxygen_bottleneck_hard",
     description="Hard: oxygen bottleneck with dark side.",
     site=HELLO_WORLD,
@@ -101,7 +102,7 @@ OxygenBottleneckHard = Mission(
 )
 
 # Energy Starved
-EnergyStarvedEasy = Mission(
+EnergyStarvedEasy = CvCMission(
     name="energy_starved_easy",
     description="Easy: abundant energy regen and capacity.",
     site=HELLO_WORLD,
@@ -111,7 +112,7 @@ EnergyStarvedEasy = Mission(
     ],
 )
 
-EnergyStarvedStandard = Mission(
+EnergyStarvedStandard = CvCMission(
     name="energy_starved_standard",
     description="Standard: energy is the limiting resource with dark-side regen.",
     site=HELLO_WORLD,
@@ -120,7 +121,7 @@ EnergyStarvedStandard = Mission(
     ],
 )
 
-EnergyStarvedHard = Mission(
+EnergyStarvedHard = CvCMission(
     name="energy_starved_hard",
     description="Hard: energy bottleneck with dark side.",
     site=HELLO_WORLD,
@@ -130,7 +131,7 @@ EnergyStarvedHard = Mission(
 )
 
 # Collect Distant Resources evals
-DistantResources = Mission(
+DistantResources = CvCMission(
     name="distant_resources",
     description="Resources scattered far from base; heavy routing coordination.",
     site=HELLO_WORLD,
@@ -141,7 +142,7 @@ DistantResources = Mission(
 )
 
 # Distant Resources tiers
-DistantResourcesEasy = Mission(
+DistantResourcesEasy = CvCMission(
     name="distant_resources_easy",
     description="Easy: simplified distribution with generous capacity.",
     site=HELLO_WORLD,
@@ -151,7 +152,7 @@ DistantResourcesEasy = Mission(
     ],
 )
 
-DistantResourcesStandard = Mission(
+DistantResourcesStandard = CvCMission(
     name="distant_resources_standard",
     description="Standard: resources scattered far from base.",
     site=HELLO_WORLD,
@@ -160,7 +161,7 @@ DistantResourcesStandard = Mission(
     ],
 )
 
-DistantResourcesHard = Mission(
+DistantResourcesHard = CvCMission(
     name="distant_resources_hard",
     description="Hard: distant resources with dark side.",
     site=HELLO_WORLD,
@@ -171,7 +172,7 @@ DistantResourcesHard = Mission(
 )
 
 # Divide and Conquer evals
-QuadrantBuildings = Mission(
+QuadrantBuildings = CvCMission(
     name="quadrant_buildings",
     description="Place buildings in the four quadrants of the map.",
     site=HELLO_WORLD,
@@ -182,7 +183,7 @@ QuadrantBuildings = Mission(
 )
 
 # Quadrant Buildings tiers
-QuadrantBuildingsEasy = Mission(
+QuadrantBuildingsEasy = CvCMission(
     name="quadrant_buildings_easy",
     description="Easy: buildings in quadrants with energy boost.",
     site=HELLO_WORLD,
@@ -192,7 +193,7 @@ QuadrantBuildingsEasy = Mission(
     ],
 )
 
-QuadrantBuildingsStandard = Mission(
+QuadrantBuildingsStandard = CvCMission(
     name="quadrant_buildings_standard",
     description="Standard: buildings placed in quadrants.",
     site=HELLO_WORLD,
@@ -202,7 +203,7 @@ QuadrantBuildingsStandard = Mission(
     ],
 )
 
-QuadrantBuildingsHard = Mission(
+QuadrantBuildingsHard = CvCMission(
     name="quadrant_buildings_hard",
     description="Hard: quadrant distribution with empty base and dark side.",
     site=HELLO_WORLD,
@@ -213,7 +214,7 @@ QuadrantBuildingsHard = Mission(
     ],
 )
 
-EasyHeartsTraining = Mission(
+EasyHeartsTraining = CvCMission(
     name="easy_hearts_training",
     description="Simplified heart crafting with generous energy.",
     site=TRAINING_FACILITY,
@@ -222,7 +223,7 @@ EasyHeartsTraining = Mission(
     ],
 )
 
-EasyHeartsSmallWorld = Mission(
+EasyHeartsSmallWorld = CvCMission(
     name="easy_small_hearts",
     description="Simplified heart crafting with generous energy.",
     site=SMALL_HELLO_WORLD,
@@ -231,7 +232,7 @@ EasyHeartsSmallWorld = Mission(
     ],
 )
 
-EasyHeartsMediumWorld = Mission(
+EasyHeartsMediumWorld = CvCMission(
     name="easy_medium_hearts",
     description="Simplified heart crafting with generous energy.",
     site=MEDIUM_HELLO_WORLD,
@@ -240,7 +241,7 @@ EasyHeartsMediumWorld = Mission(
     ],
 )
 
-EasyHeartsLargeWorld = Mission(
+EasyHeartsLargeWorld = CvCMission(
     name="easy_large_hearts",
     description="Simplified heart crafting with generous energy.",
     site=LARGE_HELLO_WORLD,
@@ -249,7 +250,7 @@ EasyHeartsLargeWorld = Mission(
     ],
 )
 
-EVAL_MISSIONS: list[Mission] = [
+EVAL_MISSIONS: list[CvCMission] = [
     # Oxygen bottleneck tiers
     OxygenBottleneckEasy,
     OxygenBottleneckStandard,

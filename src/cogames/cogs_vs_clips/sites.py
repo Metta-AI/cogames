@@ -1,14 +1,34 @@
 """Central site definitions shared across mission modules."""
 
+from pathlib import Path
 from typing import cast
 
-from cogames.cogs_vs_clips.mission import Site
-from cogames.cogs_vs_clips.mission_utils import get_map
-from cogames.cogs_vs_clips.procedural import MachinaArena, RandomTransform, SequentialMachinaArena
+from cogames.cogs_vs_clips.terrain import MachinaArena, RandomTransform, SequentialMachinaArena
+from cogames.core import CoGameSite
+from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen, MapGenConfig
 from mettagrid.mapgen.scenes.base_hub import BaseHub, BaseHubConfig
 
-TRAINING_FACILITY = Site(
+MAPS_DIR = Path(__file__).resolve().parent.parent / "maps"
+
+
+def get_map(map_name: str) -> MapBuilderConfig:
+    """Load a map builder configuration from the maps directory."""
+    normalized = map_name
+    if normalized.startswith("evals/"):
+        normalized = f"diagnostic_evals/{normalized.split('/', 1)[1]}"
+    map_path = MAPS_DIR / normalized
+    if not map_path.exists():
+        raise FileNotFoundError(f"Map not found: {map_path}")
+    return MapGen.Config(
+        instance=MapBuilderConfig.from_uri(str(map_path)),
+        instances=1,  # Force single instance - use spawn points from ASCII map directly
+        fixed_spawn_order=False,
+        instance_border_width=0,  # Don't add border - maps already have borders built in
+    )
+
+
+TRAINING_FACILITY = CoGameSite(
     name="training_facility",
     description="COG Training Facility. Basic training facility with open spaces and no obstacles.",
     map_builder=MapGen.Config(
@@ -25,6 +45,7 @@ TRAINING_FACILITY = Site(
                     "silicon_extractor",
                 ],
                 cross_bundle="none",
+                junction_object="junction",
             )
         ),
     ),
@@ -32,7 +53,7 @@ TRAINING_FACILITY = Site(
     max_cogs=4,
 )
 
-HELLO_WORLD = Site(
+HELLO_WORLD = CoGameSite(
     name="hello_world",
     description="Welcome to space.",
     map_builder=MapGen.Config(width=100, height=100, instance=MachinaArena.Config(spawn_count=20)),
@@ -40,7 +61,7 @@ HELLO_WORLD = Site(
     max_cogs=20,
 )
 
-MACHINA_1 = Site(
+MACHINA_1 = CoGameSite(
     name="machina_1",
     description="Your first mission. Collect resources and assemble HEARTs.",
     map_builder=MapGen.Config(width=88, height=88, instance=SequentialMachinaArena.Config(spawn_count=20)),
@@ -54,6 +75,7 @@ def _cogsguard_hub_config() -> BaseHubConfig:
         corner_bundle="extractors",
         cross_bundle="none",
         cross_distance=7,
+        junction_object="junction",
         stations=[
             "aligner_station",
             "scrambler_station",
@@ -66,7 +88,7 @@ def _cogsguard_hub_config() -> BaseHubConfig:
 
 # Evals site used by diagnostic evaluation missions
 # Note: Individual diagnostic missions override this with their own specific maps
-EVALS = Site(
+EVALS = CoGameSite(
     name="evals",
     description="Diagnostic evaluation arenas.",
     map_builder=get_map("diagnostic_evals/diagnostic_radial.map"),  # Default map (rarely used)
@@ -75,7 +97,7 @@ EVALS = Site(
 )
 
 
-def make_cogsguard_arena_site(num_agents: int = 10) -> Site:
+def make_cogsguard_arena_site(num_agents: int = 10) -> CoGameSite:
     """Create a CogsGuard arena site with configurable agent count."""
     map_builder = MapGen.Config(
         width=50,
@@ -86,7 +108,7 @@ def make_cogsguard_arena_site(num_agents: int = 10) -> Site:
             hub=_cogsguard_hub_config(),
         ),
     )
-    return Site(
+    return CoGameSite(
         name="cogsguard_arena",
         description="CogsGuard arena map",
         map_builder=map_builder,
@@ -111,9 +133,9 @@ def _build_cogsguard_machina1_map_builder(spawn_count: int) -> MapGenConfig:
     )
 
 
-def make_cogsguard_machina1_site(num_agents: int = 10) -> Site:
+def make_cogsguard_machina1_site(num_agents: int = 10) -> CoGameSite:
     """Create a CogsGuard Machina1 site with configurable agent count."""
-    return Site(
+    return CoGameSite(
         name="cogsguard_machina_1",
         description="CogsGuard Machina1 layout with gear stations.",
         map_builder=_build_cogsguard_machina1_map_builder(num_agents),
@@ -123,7 +145,7 @@ def make_cogsguard_machina1_site(num_agents: int = 10) -> Site:
 
 
 # Default CogsGuard Machina1 site with flexible agent count
-COGSGUARD_MACHINA_1 = Site(
+COGSGUARD_MACHINA_1 = CoGameSite(
     name="cogsguard_machina_1",
     description="CogsGuard Machina1 layout with gear stations.",
     map_builder=_build_cogsguard_machina1_map_builder(20),
@@ -132,7 +154,7 @@ COGSGUARD_MACHINA_1 = Site(
 )
 
 # Default CogsGuard arena site with flexible agent count
-COGSGUARD_ARENA = Site(
+COGSGUARD_ARENA = CoGameSite(
     name="cogsguard_arena",
     description="CogsGuard arena - compact training map with gear stations.",
     map_builder=MapGen.Config(
@@ -149,20 +171,8 @@ COGSGUARD_ARENA = Site(
 )
 
 
-# Feature flag: Set to True to include legacy (pre-CogsGuard) sites in the CLI.
-# To enable, add TRAINING_FACILITY, HELLO_WORLD, MACHINA_1 to SITES below.
-# Also set _INCLUDE_LEGACY_MISSIONS = True in missions.py.
-_INCLUDE_LEGACY_SITES = False
-
-_LEGACY_SITES = [
-    TRAINING_FACILITY,
-    HELLO_WORLD,
-    MACHINA_1,
-]
-
 SITES = [
     COGSGUARD_MACHINA_1,
     COGSGUARD_ARENA,
     EVALS,
-    *(_LEGACY_SITES if _INCLUDE_LEGACY_SITES else []),
 ]

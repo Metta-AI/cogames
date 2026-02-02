@@ -1,0 +1,86 @@
+"""Clips behavior events for CogsGuard missions.
+
+Clips are a non-player faction that gradually takes over neutral junctions.
+These events create the spreading/scrambling behavior that pressures players.
+"""
+
+from pydantic import Field
+
+from mettagrid.base_config import Config
+from mettagrid.config.event_config import EventConfig, once, periodic
+from mettagrid.config.filter import isAlignedTo, isNear
+from mettagrid.config.filter.alignment_filter import isNeutral, isNotAlignedTo, isNotNeutral
+from mettagrid.config.mettagrid_config import CollectiveConfig
+from mettagrid.config.mutation import alignTo, removeAlignment
+from mettagrid.config.tag import typeTag
+
+
+class ClipsConfig(Config):
+    """Configuration for clips behavior in CogsGuard game mode."""
+
+    # Clips Behavior - scramble cogs junctions to neutral
+    initial_clips_start: int = Field(default=10)
+    initial_clips_spots: int = Field(default=1)
+
+    scramble_start: int = Field(default=50)
+    scramble_interval: int = Field(default=100)
+    scramble_radius: int = Field(default=25)
+
+    # Clips Behavior - align neutral junctions to clips
+    align_start: int = Field(default=100)
+    align_interval: int = Field(default=100)
+    align_radius: int = Field(default=25)
+
+    def events(self, max_steps: int) -> dict[str, EventConfig]:
+        """Create all clips events for a mission.
+
+        Returns:
+            Dictionary of event name to EventConfig.
+        """
+        return {
+            "initial_clips": EventConfig(
+                name="initial_clips",
+                target_tag=typeTag("junction"),
+                timesteps=once(self.initial_clips_start),
+                mutations=[alignTo("clips")],
+                max_targets=self.initial_clips_spots,
+            ),
+            "cogs_to_neutral": EventConfig(
+                name="cogs_to_neutral",
+                target_tag=typeTag("junction"),
+                timesteps=periodic(start=self.scramble_start, period=self.scramble_interval, end=max_steps),
+                # near a clips-aligned junction
+                filters=[
+                    isNear(typeTag("junction"), [isAlignedTo("clips")], radius=self.scramble_radius),
+                    isNotAlignedTo("clips"),
+                    isNotNeutral(),
+                ],
+                mutations=[removeAlignment()],
+                max_targets=1,
+            ),
+            "neutral_to_clips": EventConfig(
+                name="neutral_to_clips",
+                target_tag=typeTag("junction"),
+                timesteps=periodic(start=self.align_start, period=self.align_interval, end=max_steps),
+                # neutral junctions near a clips-aligned junction
+                filters=[
+                    isNear(typeTag("junction"), [isAlignedTo("clips")], radius=self.align_radius),
+                    isNeutral(),
+                ],
+                mutations=[alignTo("clips")],
+                max_targets=1,
+            ),
+            # If there are no clips-aligned junctions, re-invade
+            "presence_check": EventConfig(
+                name="presence_check",
+                target_tag=typeTag("junction"),
+                timesteps=periodic(start=self.initial_clips_start, period=self.scramble_interval * 2, end=max_steps),
+                filters=[isNear(typeTag("junction"), [isAlignedTo("clips")], radius=1000)],
+                max_targets=1,
+                fallback="initial_clips",
+            ),
+        }
+
+    def collective_config(self) -> CollectiveConfig:
+        """Create a CollectiveConfig for this clips configuration."""
+        return CollectiveConfig(name="clips")
