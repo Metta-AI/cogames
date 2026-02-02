@@ -290,6 +290,7 @@ def validate_policy_in_isolation(
             "run",
             "cogames",
             "validate-policy",
+            "--policy",
             policy_arg,
             "--season",
             season,
@@ -298,7 +299,6 @@ def validate_policy_in_isolation(
         ]
         if setup_script:
             validate_cmd.extend(["--setup-script", setup_script])
-        validate_cmd.extend(["--policy", policy_arg])
 
         _run_from_tmp_dir(validate_cmd)
 
