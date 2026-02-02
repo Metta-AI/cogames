@@ -13,7 +13,6 @@ try:
     import cogames.policy.nim_agents.agents as agents  # noqa: F401
     from cogames.policy.nim_agents.agents import (  # noqa: F401
         CogsguardAlignAllAgentsMultiPolicy,
-        LadyBugAgentsMultiPolicy,
         RaceCarAgentsMultiPolicy,
         RandomAgentsMultiPolicy,
         ThinkyAgentsMultiPolicy,
@@ -30,6 +29,5 @@ __all__ = [
     "RandomAgentsMultiPolicy",
     "ThinkyAgentsMultiPolicy",
     "RaceCarAgentsMultiPolicy",
-    "LadyBugAgentsMultiPolicy",
     "CogsguardAlignAllAgentsMultiPolicy",
 ]
