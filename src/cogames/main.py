@@ -762,6 +762,12 @@ def play_cmd(
         show_default="same as --seed",
         rich_help_panel="Simulation",
     ),
+    autostart: bool = typer.Option(
+        False,
+        "--autostart",
+        help="Start simulation immediately without waiting for user input",
+        rich_help_panel="Simulation",
+    ),
     # --- Output ---
     save_replay_dir: Optional[Path] = typer.Option(  # noqa: B008
         None,
@@ -831,6 +837,7 @@ def play_cmd(
         render_mode=render,
         game_name=resolved_mission,
         save_replay=save_replay_dir,
+        autostart=autostart,
     )
 
 
