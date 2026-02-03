@@ -1824,7 +1824,9 @@ app.command(
     rich_help_panel="Evaluate",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames diagnose ./train_dir/my_run[/cyan]                         Default diagnostics
+[cyan]cogames diagnose ./train_dir/my_run[/cyan]                         Default CogsGuard evals
+
+[cyan]cogames diagnose lstm -S diagnostic_evals[/cyan]                   Diagnostic evals (non-CogsGuard)
 
 [cyan]cogames diagnose lstm -S tournament[/cyan]                         Tournament suite
 
@@ -1839,6 +1841,7 @@ def diagnose_cmd(
     ),
     # --- Evaluation ---
     mission_set: Literal[
+        "cogsguard_evals",
         "diagnostic_evals",
         "integrated_evals",
         "spanning_evals",
@@ -1846,7 +1849,7 @@ def diagnose_cmd(
         "tournament",
         "all",
     ] = typer.Option(
-        "diagnostic_evals",
+        "cogsguard_evals",
         "--mission-set",
         "-S",
         metavar="SET",

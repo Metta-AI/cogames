@@ -35,6 +35,7 @@ import numpy as np
 from safetensors.torch import load_file as load_safetensors_file
 
 from cogames.cli.policy import parse_policy_spec
+from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS
 from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
 from cogames.cogs_vs_clips.mission import CvCMission as AnyMission
 from cogames.cogs_vs_clips.mission import CvCMission as Mission
@@ -254,6 +255,7 @@ def run_evaluation(
     experiments: List[str],
     variants: List[str],
     cogs_list: List[int],
+    respect_cogs_list: bool = True,
     max_steps: int = 1000,
     seed: int = 42,
     repeats: int = 3,
@@ -274,6 +276,24 @@ def run_evaluation(
     logger.info(f"{'=' * 80}\n")
 
     cases: List[tuple[str, Optional[str], int, AnyMission, Optional[MissionVariant], int]] = []
+
+    def _cogs_for_mission(base_mission: AnyMission) -> List[int]:
+        fixed_cogs = getattr(base_mission, "num_cogs", None)
+        if fixed_cogs is not None:
+            if respect_cogs_list and fixed_cogs not in cogs_list:
+                return []
+            return [fixed_cogs]
+        site = getattr(base_mission, "site", None)
+        if site is None:
+            return list(cogs_list)
+        min_cogs = getattr(site, "min_cogs", None)
+        max_cogs = getattr(site, "max_cogs", None)
+        return [
+            num_cogs
+            for num_cogs in cogs_list
+            if (min_cogs is None or num_cogs >= min_cogs) and (max_cogs is None or num_cogs <= max_cogs)
+        ]
+
     if cases_override is not None:
         for exp_name, variant_name, num_cogs in cases_override:
             base_mission = experiment_lookup.get(exp_name)
@@ -298,7 +318,7 @@ def run_evaluation(
                     logger.error(f"Unknown variant: {variant_name}")
                     continue
                 clip_period = getattr(variant, "extractor_clip_period", 0) if variant else 0
-                for num_cogs in cogs_list:
+                for num_cogs in _cogs_for_mission(base_mission):
                     cases.append((exp_name, variant_name, num_cogs, base_mission, variant, clip_period))
 
     total_cases = len(cases)
@@ -1098,7 +1118,15 @@ def main():
     parser.add_argument(
         "--mission-set",
         "-S",
-        choices=["integrated_evals", "spanning_evals", "diagnostic_evals", "thinky_evals", "tournament", "all"],
+        choices=[
+            "cogsguard_evals",
+            "integrated_evals",
+            "spanning_evals",
+            "diagnostic_evals",
+            "thinky_evals",
+            "tournament",
+            "all",
+        ],
         default="all",
     )
     parser.add_argument(
@@ -1126,6 +1154,7 @@ def main():
     if args.mission_set == "all":
         missions_list = []
         # Skip eval_missions - they are deprecated
+        missions_list.extend(COGSGUARD_EVAL_MISSIONS)
         missions_list.extend(load_eval_missions("cogames.cogs_vs_clips.evals.integrated_evals"))
         missions_list.extend(load_eval_missions("cogames.cogs_vs_clips.evals.spanning_evals"))
         missions_list.extend([mission_cls() for mission_cls in DIAGNOSTIC_EVALS])  # type: ignore[call-arg]
@@ -1133,6 +1162,8 @@ def main():
         for mission in ALL_MISSIONS:
             if mission.name not in eval_mission_names:
                 missions_list.append(mission)
+    elif args.mission_set == "cogsguard_evals":
+        missions_list = list(COGSGUARD_EVAL_MISSIONS)
     elif args.mission_set == "diagnostic_evals":
         missions_list = [mission_cls() for mission_cls in DIAGNOSTIC_EVALS]  # type: ignore[call-arg]
     elif args.mission_set == "thinky_evals":
@@ -1180,7 +1211,29 @@ def main():
     for config in configs:
         variants = args.variants if args.variants else []
         cogs_list = args.cogs if args.cogs else [1, 2, 4]
+        respect_cogs_list = args.cogs is not None
         cases_override: Optional[List[tuple[str, Optional[str], int]]] = None
+
+        if args.mission_set == "cogsguard_evals":
+            cogsguard_cases: list[tuple[str, int]] = []
+            for mission in missions_list:
+                if mission.num_cogs is None:
+                    raise ValueError(f"CogsGuard mission {mission.name} is missing num_cogs.")
+                cogsguard_cases.append((mission.name, mission.num_cogs))
+            if args.experiments:
+                allowed = set(args.experiments)
+                cogsguard_cases = [case for case in cogsguard_cases if case[0] in allowed]
+            if args.cogs:
+                allowed = set(args.cogs)
+                cogsguard_cases = [case for case in cogsguard_cases if case[1] in allowed]
+            variant_list = variants or [None]
+            cases_override = [
+                (exp_name, variant_name, num_cogs)
+                for exp_name, num_cogs in cogsguard_cases
+                for variant_name in variant_list
+            ]
+            experiments = sorted({exp_name for exp_name, _num_cogs in cogsguard_cases})
+            cogs_list = sorted({num_cogs for _exp_name, num_cogs in cogsguard_cases})
 
         if args.mission_set == "thinky_evals":
             if variants:
@@ -1206,6 +1259,7 @@ def main():
             experiments=experiments,
             variants=variants,
             cogs_list=cogs_list,
+            respect_cogs_list=respect_cogs_list,
             experiment_map=experiment_map,
             max_steps=args.steps,
             seed=args.seed,
