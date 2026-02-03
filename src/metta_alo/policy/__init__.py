@@ -2,7 +2,6 @@ from typing import Optional
 
 
 def parse_policy_identifier(identifier: str) -> tuple[str, Optional[int]]:
-    """Parse a policy identifier into (name, version)."""
     if identifier.endswith(":latest"):
         return identifier[:-7], None
     if ":" not in identifier:
