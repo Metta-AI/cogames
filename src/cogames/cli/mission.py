@@ -168,8 +168,12 @@ def get_mission_name_and_config(
         try:
             return get_mission(mission_arg, variants_arg, cogs)
         except ValueError as e:
-            console.print(f"[red]Mission '{mission_arg}' not found.[/red]")
-            console.print("[dim]Run: cogames missions (or cogames missions <site>) to list options.[/dim]\n")
+            error_msg = str(e)
+            if "variant" in error_msg.lower():
+                console.print(f"[red]{error_msg}[/red]")
+            else:
+                console.print(f"[red]Mission '{mission_arg}' not found.[/red]")
+                console.print("[dim]Run: cogames missions (or cogames missions <site>) to list options.[/dim]\n")
             raise typer.Exit(1) from e
     list_missions()
 

@@ -118,7 +118,7 @@ def _run_case(
     mission = base_mission.with_variants(mission_variants)
     env_config = mission.make_env()
 
-    hub = env_config.game.objects.get("hub")
+    hub = env_config.game.objects.get("c:hub")
     protocols = getattr(hub, "protocols", None) if hub is not None else None
     if protocols:
         for proto in protocols:

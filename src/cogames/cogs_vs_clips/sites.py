@@ -72,16 +72,17 @@ MACHINA_1 = CoGameSite(
 
 def _cogsguard_hub_config() -> BaseHubConfig:
     return BaseHubConfig(
+        hub_object="c:hub",
         corner_bundle="extractors",
         cross_bundle="none",
         cross_distance=7,
         junction_object="junction",
+        heart_chest_object="c:chest",
         stations=[
-            "aligner_station",
-            "scrambler_station",
-            "miner_station",
-            "scout_station",
-            "chest",
+            "c:aligner",
+            "c:scrambler",
+            "c:miner",
+            "c:scout",
         ],
     )
 

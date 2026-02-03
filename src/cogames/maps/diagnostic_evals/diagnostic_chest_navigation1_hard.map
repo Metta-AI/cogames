@@ -46,11 +46,11 @@ char_to_map_name:
   "C": carbon_extractor
   "S": silicon_extractor
   "@": agent.agent
-  "&": hub
-  "=": chest
-  "1": chest_carbon
-  "2": chest_oxygen
-  "3": chest_germanium
-  "4": chest_silicon
+  "&": c:hub
+  "=": c:chest
+  "1": c:chest_carbon
+  "2": c:chest_oxygen
+  "3": c:chest_germanium
+  "4": c:chest_silicon
 
 

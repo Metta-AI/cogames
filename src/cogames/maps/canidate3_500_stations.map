@@ -519,5 +519,5 @@ char_to_map_name:
   "O": oxygen_extractor
   "G": germanium_extractor
   "@": agent.agent
-  "&": hub
-  "=": chest
+  "&": c:hub
+  "=": c:chest

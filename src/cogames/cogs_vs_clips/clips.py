@@ -18,6 +18,8 @@ from mettagrid.config.tag import typeTag
 class ClipsConfig(Config):
     """Configuration for clips behavior in CogsGuard game mode."""
 
+    disabled: bool = Field(default=False)
+
     # Clips Behavior - scramble cogs junctions to neutral
     initial_clips_start: int = Field(default=10)
     initial_clips_spots: int = Field(default=1)
@@ -37,6 +39,8 @@ class ClipsConfig(Config):
         Returns:
             Dictionary of event name to EventConfig.
         """
+        if self.disabled:
+            return {}
         return {
             "initial_clips": EventConfig(
                 name="initial_clips",
@@ -81,6 +85,8 @@ class ClipsConfig(Config):
             ),
         }
 
-    def collective_config(self) -> CollectiveConfig:
-        """Create a CollectiveConfig for this clips configuration."""
-        return CollectiveConfig(name="clips")
+    def collectives(self) -> dict[str, CollectiveConfig]:
+        """Create collectives for clips."""
+        if self.disabled:
+            return {}
+        return {"clips": CollectiveConfig(name="clips")}

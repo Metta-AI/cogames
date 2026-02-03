@@ -1014,4 +1014,4 @@ char_to_map_name:
   "#": wall
   ".": empty
   "@": agent.agent
-  "&": hub
+  "&": c:hub

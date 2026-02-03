@@ -17,7 +17,8 @@ from mettagrid.config.mettagrid_config import (
 class CogTeam(Config):
     """Configuration for a cogs team."""
 
-    name: str = Field(default="cogs", description="Team name")
+    name: str = Field(default="cogs", description="Team name used for collectives and alignment")
+    short_name: str = Field(default="c", description="Short prefix used for map object names")
     wealth: int = Field(default=1, description="Wealth multiplier for initial resources")
     num_agents: int = Field(default=8, ge=1, description="Number of agents in the team")
 
@@ -28,6 +29,7 @@ class CogTeam(Config):
             CollectiveConfig with resource limits and initial inventory.
         """
         return CollectiveConfig(
+            name=self.name,
             inventory=InventoryConfig(
                 limits={
                     "resources": ResourceLimitsConfig(min=10000, resources=CvCConfig.ELEMENTS),

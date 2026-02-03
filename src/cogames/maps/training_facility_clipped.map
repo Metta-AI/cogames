@@ -38,7 +38,7 @@ char_to_map_name:
   "N": clipped_oxygen_extractor
   "+": junction
   "@": agent.agent
-  "&": hub
-  "=": chest
+  "&": c:hub
+  "=": c:chest
   "F": clipped_germanium_extractor
   "R": clipped_silicon_extractor

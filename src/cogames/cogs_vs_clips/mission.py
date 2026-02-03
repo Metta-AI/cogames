@@ -29,7 +29,7 @@ from mettagrid.config.action_config import (
     NoopActionConfig,
 )
 from mettagrid.config.game_value import inv
-from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig
+from mettagrid.config.mettagrid_config import CollectiveConfig, GameConfig, MettaGridConfig
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
 
@@ -76,7 +76,7 @@ class CvCMission(CoGameMission):
         Returns:
             MettaGridConfig ready for environment creation
         """
-
+        team_objs = list(self.teams.values())
         game = GameConfig(
             map_builder=self.map_builder(),
             max_steps=self.max_steps,
@@ -93,22 +93,38 @@ class CvCMission(CoGameMission):
                 noop=NoopActionConfig(),
                 change_vibe=ChangeVibeActionConfig(vibes=CvCConfig.VIBES),
             ),
-            agent=self.cog.agent_config(team="cogs", max_steps=self.max_steps),
-            agents=[self.cog.agent_config(team="cogs", max_steps=self.max_steps) for _ in range(self.num_agents)],
+            agents=[
+                self.cog.agent_config(team=t.name, max_steps=self.max_steps)
+                for t in team_objs
+                for _ in range(t.num_agents)
+            ],
             objects={
                 "wall": CvCWallConfig().station_cfg(),
-                "hub": CvCHubConfig().station_cfg(team="cogs"),
                 "junction": CvCJunctionConfig().station_cfg(),
-                "chest": CvCChestConfig().station_cfg(team="cogs"),
                 **{
                     f"{resource}_extractor": CvCExtractorConfig(resource=resource).station_cfg()
                     for resource in CvCConfig.ELEMENTS
                 },
-                **{f"{g}_station": CvCGearStationConfig(gear_type=g).station_cfg(team="cogs") for g in CvCConfig.GEAR},
+                **{
+                    f"{t.short_name}:hub": CvCHubConfig().station_cfg(team=t.short_name, collective=t.name)
+                    for t in team_objs
+                },
+                **{
+                    f"{t.short_name}:chest": CvCChestConfig().station_cfg(team=t.short_name, collective=t.name)
+                    for t in team_objs
+                },
+                **{
+                    f"{t.short_name}:{g}": CvCGearStationConfig(gear_type=g).station_cfg(
+                        team=t.short_name, collective=t.name
+                    )
+                    for t in team_objs
+                    for g in CvCConfig.GEAR
+                },
             },
             collectives={
-                **{team.name: team.collective_config() for team in self.teams.values()},
-                "clips": self.clips.collective_config(),
+                **{t.name: t.collective_config() for t in team_objs},
+                **self.clips.collectives(),
+                "neutral": CollectiveConfig(name="neutral"),
             },
             events=self._merge_events(),
         )

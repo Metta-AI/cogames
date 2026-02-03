@@ -166,8 +166,8 @@ char_to_map_name:
   "C": carbon_extractor
   "S": silicon_extractor
   "O": oxygen_extractor
-  "&": hub
-  "=": chest
+  "&": c:hub
+  "=": c:chest
   "@": agent.agent
   "1": agent.agent
   "2": agent.agent
