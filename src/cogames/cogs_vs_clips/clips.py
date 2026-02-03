@@ -4,6 +4,8 @@ Clips are a non-player faction that gradually takes over neutral junctions.
 These events create the spreading/scrambling behavior that pressures players.
 """
 
+from typing import Optional
+
 from pydantic import Field
 
 from mettagrid.base_config import Config
@@ -27,11 +29,16 @@ class ClipsConfig(Config):
     scramble_start: int = Field(default=50)
     scramble_interval: int = Field(default=100)
     scramble_radius: int = Field(default=25)
+    scramble_end: Optional[int] = Field(default=None)
 
     # Clips Behavior - align neutral junctions to clips
     align_start: int = Field(default=100)
     align_interval: int = Field(default=100)
     align_radius: int = Field(default=25)
+    align_end: Optional[int] = Field(default=None)
+
+    # Clips Behavior - presence check for re-invasion
+    presence_end: Optional[int] = Field(default=None)
 
     def events(self, max_steps: int) -> dict[str, EventConfig]:
         """Create all clips events for a mission.
@@ -41,6 +48,10 @@ class ClipsConfig(Config):
         """
         if self.disabled:
             return {}
+        scramble_end = max_steps if self.scramble_end is None else min(self.scramble_end, max_steps)
+        align_end = max_steps if self.align_end is None else min(self.align_end, max_steps)
+        presence_end = max_steps if self.presence_end is None else min(self.presence_end, max_steps)
+
         return {
             "initial_clips": EventConfig(
                 name="initial_clips",
@@ -52,7 +63,7 @@ class ClipsConfig(Config):
             "cogs_to_neutral": EventConfig(
                 name="cogs_to_neutral",
                 target_tag=typeTag("junction"),
-                timesteps=periodic(start=self.scramble_start, period=self.scramble_interval, end=max_steps),
+                timesteps=periodic(start=self.scramble_start, period=self.scramble_interval, end=scramble_end),
                 # near a clips-aligned junction
                 filters=[
                     isNear(typeTag("junction"), [isAlignedTo("clips")], radius=self.scramble_radius),
@@ -65,7 +76,7 @@ class ClipsConfig(Config):
             "neutral_to_clips": EventConfig(
                 name="neutral_to_clips",
                 target_tag=typeTag("junction"),
-                timesteps=periodic(start=self.align_start, period=self.align_interval, end=max_steps),
+                timesteps=periodic(start=self.align_start, period=self.align_interval, end=align_end),
                 # neutral junctions near a clips-aligned junction
                 filters=[
                     isNear(typeTag("junction"), [isAlignedTo("clips")], radius=self.align_radius),
@@ -78,7 +89,7 @@ class ClipsConfig(Config):
             "presence_check": EventConfig(
                 name="presence_check",
                 target_tag=typeTag("junction"),
-                timesteps=periodic(start=self.initial_clips_start, period=self.scramble_interval * 2, end=max_steps),
+                timesteps=periodic(start=self.initial_clips_start, period=self.scramble_interval * 2, end=presence_end),
                 filters=[isNear(typeTag("junction"), [isAlignedTo("clips")], radius=1000)],
                 max_targets=1,
                 fallback="initial_clips",

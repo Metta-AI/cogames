@@ -526,6 +526,13 @@ def games_cmd(
         help="Apply variant (requires -m, repeatable)",
         rich_help_panel="Describe",
     ),
+    difficulty: Optional[str] = typer.Option(
+        None,
+        "--difficulty",
+        metavar="LEVEL",
+        help="Difficulty (easy, medium, hard) controlling clips events (requires -m)",
+        rich_help_panel="Describe",
+    ),
     format_: Optional[Literal["yaml", "json"]] = typer.Option(
         None,
         "--format",
@@ -569,7 +576,13 @@ def games_cmd(
         return
 
     try:
-        resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(ctx, mission, variant, cogs)
+        resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(
+            ctx,
+            mission,
+            variants_arg=variant,
+            cogs=cogs,
+            difficulty=difficulty,
+        )
     except typer.Exit as exc:
         if exc.exit_code != 1:
             raise
@@ -653,6 +666,13 @@ def describe_cmd(
         help="Apply variant (repeatable)",
         rich_help_panel="Configuration",
     ),
+    difficulty: Optional[str] = typer.Option(
+        None,
+        "--difficulty",
+        metavar="LEVEL",
+        help="Difficulty (easy, medium, hard) controlling clips events",
+        rich_help_panel="Configuration",
+    ),
     _help: bool = typer.Option(
         False,
         "--help",
@@ -663,7 +683,13 @@ def describe_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(ctx, mission, variant, cogs)
+    resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(
+        ctx,
+        mission,
+        variants_arg=variant,
+        cogs=cogs,
+        difficulty=difficulty,
+    )
     describe_mission(resolved_mission, env_cfg, mission_cfg)
 
 
@@ -709,6 +735,13 @@ def play_cmd(
         "-v",
         metavar="VARIANT",
         help="Apply variant modifier (repeatable)",
+        rich_help_panel="Game Setup",
+    ),
+    difficulty: Optional[str] = typer.Option(
+        None,
+        "--difficulty",
+        metavar="LEVEL",
+        help="Difficulty (easy, medium, hard) controlling clips events",
         rich_help_panel="Game Setup",
     ),
     cogs: Optional[int] = typer.Option(
@@ -802,7 +835,13 @@ def play_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(ctx, mission, variant, cogs)
+    resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(
+        ctx,
+        mission,
+        variants_arg=variant,
+        cogs=cogs,
+        difficulty=difficulty,
+    )
 
     if print_cvc_config or print_mg_config:
         try:
@@ -1159,6 +1198,13 @@ def train_cmd(
         help="Mission variant (repeatable)",
         rich_help_panel="Mission Setup",
     ),
+    difficulty: Optional[str] = typer.Option(
+        None,
+        "--difficulty",
+        metavar="LEVEL",
+        help="Difficulty (easy, medium, hard) controlling clips events",
+        rich_help_panel="Mission Setup",
+    ),
     # --- Policy ---
     policy: str = typer.Option(
         "class=lstm",
@@ -1269,7 +1315,13 @@ def train_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    selected_missions = get_mission_names_and_configs(ctx, missions, variants_arg=variant, cogs=cogs)
+    selected_missions = get_mission_names_and_configs(
+        ctx,
+        missions,
+        variants_arg=variant,
+        cogs=cogs,
+        difficulty=difficulty,
+    )
     if len(selected_missions) == 1:
         mission_name, env_cfg = selected_missions[0]
         supplier = None
@@ -1388,6 +1440,13 @@ def run_cmd(
         help="Mission variant (repeatable)",
         rich_help_panel="Mission",
     ),
+    difficulty: Optional[str] = typer.Option(
+        None,
+        "--difficulty",
+        metavar="LEVEL",
+        help="Difficulty (easy, medium, hard) controlling clips events",
+        rich_help_panel="Mission",
+    ),
     # --- Policy ---
     policies: Optional[list[str]] = typer.Option(  # noqa: B008
         None,
@@ -1487,7 +1546,14 @@ def run_cmd(
         if cogs is None:
             cogs = 4
 
-    selected_missions = get_mission_names_and_configs(ctx, missions, variants_arg=variant, cogs=cogs, steps=steps)
+    selected_missions = get_mission_names_and_configs(
+        ctx,
+        missions,
+        variants_arg=variant,
+        cogs=cogs,
+        steps=steps,
+        difficulty=difficulty,
+    )
 
     # Optional MapGen seed override for procedural maps.
     if map_seed is not None:
@@ -1558,6 +1624,13 @@ def pickup_cmd(
         "-v",
         metavar="VARIANT",
         help="Mission variant (repeatable)",
+        rich_help_panel="Mission",
+    ),
+    difficulty: Optional[str] = typer.Option(
+        None,
+        "--difficulty",
+        metavar="LEVEL",
+        help="Difficulty (easy, medium, hard) controlling clips events",
         rich_help_panel="Mission",
     ),
     # --- Policy ---
@@ -1652,7 +1725,13 @@ def pickup_cmd(
         raise typer.Exit(1)
 
     # Resolve mission
-    resolved_mission, env_cfg, _ = get_mission_name_and_config(ctx, mission, variants_arg=variant, cogs=cogs)
+    resolved_mission, env_cfg, _ = get_mission_name_and_config(
+        ctx,
+        mission,
+        variants_arg=variant,
+        cogs=cogs,
+        difficulty=difficulty,
+    )
     if steps is not None:
         env_cfg.game.max_steps = steps
 
