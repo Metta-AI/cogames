@@ -120,7 +120,13 @@ def check(
         typer.echo("\nNotebook documentation is out of sync!", err=True)
         for error in errors:
             typer.echo(f"  {error}", err=True)
-        typer.echo("\nTo fix: run 'cogames docsync all'", err=True)
+        typer.echo(
+            "\nThis can happen if you modified cogames CLI flags (the README includes a command reference)"
+            "\nor changed code that affects notebook outputs."
+            "\n"
+            "\nTo fix: run 'cogames docsync all'",
+            err=True,
+        )
         raise typer.Exit(1)
 
     typer.echo("All notebooks are in sync!")
