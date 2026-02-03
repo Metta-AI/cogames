@@ -8,10 +8,8 @@ from rich import box
 from rich.table import Table
 
 from cogames.cli.base import console
-from cogames.cogs_vs_clips.mission import (
-    CvCMission,
-    NumCogsVariant,
-)
+from cogames.cogs_vs_clips.clip_difficulty import get_cogsguard_difficulty
+from cogames.cogs_vs_clips.mission import CvCMission, NumCogsVariant
 from cogames.cogs_vs_clips.sites import SITES
 from cogames.cogs_vs_clips.terrain import MachinaArena
 from cogames.cogs_vs_clips.variants import HIDDEN_VARIANTS, VARIANTS
@@ -134,6 +132,12 @@ def parse_variants(variants_arg: Optional[list[str]]) -> list[CoGameMissionVaria
     return variants
 
 
+def parse_difficulty(difficulty_arg: Optional[str]) -> Optional[CoGameMissionVariant]:
+    if difficulty_arg is None:
+        return None
+    return get_cogsguard_difficulty(difficulty_arg)
+
+
 def get_all_missions() -> list[str]:
     """Get all core mission names in the format site.mission (excludes evals)."""
     return [mission.full_name() for mission in _get_core_missions()]
@@ -159,17 +163,21 @@ def get_site_by_name(site_name: str) -> CoGameSite:
 
 
 def get_mission_name_and_config(
-    ctx: typer.Context, mission_arg: Optional[str], variants_arg: Optional[list[str]] = None, cogs: Optional[int] = None
+    ctx: typer.Context,
+    mission_arg: Optional[str],
+    variants_arg: Optional[list[str]] = None,
+    cogs: Optional[int] = None,
+    difficulty: Optional[str] = None,
 ) -> tuple[str, MettaGridConfig, Optional[CvCMission]]:
     if not mission_arg:
         console.print(ctx.get_help())
         console.print("[yellow]Missing: --mission / -m[/yellow]\n")
     else:
         try:
-            return get_mission(mission_arg, variants_arg, cogs)
+            return get_mission(mission_arg, variants_arg=variants_arg, cogs=cogs, difficulty=difficulty)
         except ValueError as e:
             error_msg = str(e)
-            if "variant" in error_msg.lower():
+            if "variant" in error_msg.lower() or "difficulty" in error_msg.lower():
                 console.print(f"[red]{error_msg}[/red]")
             else:
                 console.print(f"[red]Mission '{mission_arg}' not found.[/red]")
@@ -189,6 +197,7 @@ def get_mission_names_and_configs(
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
     steps: Optional[int] = None,
+    difficulty: Optional[str] = None,
 ) -> list[tuple[str, MettaGridConfig]]:
     if not missions_arg:
         console.print(ctx.get_help())
@@ -198,7 +207,7 @@ def get_mission_names_and_configs(
             not_deduped = [
                 mission
                 for missions in missions_arg
-                for mission in _get_missions_by_possible_wildcard(missions, variants_arg, cogs)
+                for mission in _get_missions_by_possible_wildcard(missions, variants_arg, cogs, difficulty)
             ]
             name_set: set[str] = set()
             deduped = []
@@ -230,6 +239,7 @@ def _get_missions_by_possible_wildcard(
     mission_arg: str,
     variants_arg: Optional[list[str]],
     cogs: Optional[int],
+    difficulty: Optional[str],
 ) -> list[tuple[str, MettaGridConfig]]:
     if "*" in mission_arg:
         # Convert shell-style wildcard to regex pattern
@@ -238,10 +248,12 @@ def _get_missions_by_possible_wildcard(
         # Drop the Mission (3rd element) for wildcard results
         return [
             (name, env_cfg)
-            for name, env_cfg, _ in (get_mission(m, variants_arg=variants_arg, cogs=cogs) for m in missions)
+            for name, env_cfg, _ in (
+                get_mission(m, variants_arg=variants_arg, cogs=cogs, difficulty=difficulty) for m in missions
+            )
         ]
     # Drop the Mission for single mission
-    name, env_cfg, _ = get_mission(mission_arg, variants_arg=variants_arg, cogs=cogs)
+    name, env_cfg, _ = get_mission(mission_arg, variants_arg=variants_arg, cogs=cogs, difficulty=difficulty)
     return [(name, env_cfg)]
 
 
@@ -284,6 +296,7 @@ def get_mission(
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
     include_legacy: bool = False,
+    difficulty: Optional[str] = None,
 ) -> tuple[str, MettaGridConfig, Optional[CvCMission]]:
     """Get a specific mission configuration by name or file path.
 
@@ -292,6 +305,7 @@ def get_mission(
         variants_arg: List of variant names like ["solar_flare", "dark_side"]
         cogs: Number of cogs (agents) to use, overrides the default from the mission
         include_legacy: Whether to include legacy (pre-CogsGuard) missions
+        difficulty: Difficulty name (easy, medium, hard) controlling clips events
 
     Returns:
         Tuple of (mission name, MettaGridConfig, CvCMission or None)
@@ -301,6 +315,8 @@ def get_mission(
     """
     # Check if it's a file path
     if any(mission_arg.endswith(ext) for ext in [".yaml", ".yml", ".json", ".py"]):
+        if difficulty is not None:
+            raise ValueError("Difficulty can only be used with mission names, not config files.")
         path = Path(mission_arg)
         if not path.exists():
             raise ValueError(f"File not found: {mission_arg}")
@@ -317,6 +333,7 @@ def get_mission(
 
     # Parse variants if provided
     variants = parse_variants(variants_arg)
+    difficulty_variant = parse_difficulty(difficulty)
 
     # Otherwise, treat it as a fully qualified mission name, or as a site name
     if (delim_count := mission_arg.count(MAP_MISSION_DELIMITER)) == 0:
@@ -328,6 +345,8 @@ def get_mission(
 
     mission: CvCMission = find_mission(site_name, mission_name, include_evals=True, include_legacy=include_legacy)
 
+    if difficulty_variant is not None:
+        mission = mission.with_variants([difficulty_variant])
     if variants:
         mission = mission.with_variants(variants)
     if cogs is not None:
