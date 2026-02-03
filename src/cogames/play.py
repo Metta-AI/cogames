@@ -164,6 +164,7 @@ def play(
     seed: int = 42,
     render_mode: RenderMode = "gui",
     save_replay: Optional[Path] = None,
+    autostart: bool = False,
 ) -> None:
     """Play a single game episode with a policy.
 
@@ -195,6 +196,7 @@ def play(
             seed=seed,
             device="cpu",
             render_mode=render_mode,
+            autostart=autostart,
         )
     except KeyboardInterrupt:
         logger.info("Interrupted; ending episode early.")
