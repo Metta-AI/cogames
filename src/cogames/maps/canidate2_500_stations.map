@@ -519,4 +519,4 @@ char_to_map_name:
   "O": oxygen_extractor
   "C": carbon_extractor
   "@": agent.agent
-  "&": hub
+  "&": c:hub

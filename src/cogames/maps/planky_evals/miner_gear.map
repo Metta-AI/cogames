@@ -11,14 +11,14 @@ char_to_map_name:
   "#": wall
   ".": empty
   "@": agent.agent
-  "M": miner_station
-  "S": scout_station
-  "A": aligner_station
-  "X": scrambler_station
+  "M": c:miner
+  "S": c:scout
+  "A": c:aligner
+  "X": c:scrambler
   "C": carbon_extractor
   "O": oxygen_extractor
   "G": germanium_extractor
   "I": silicon_extractor
   "J": junction
-  "&": hub
-  "=": chest
+  "&": c:hub
+  "=": c:chest

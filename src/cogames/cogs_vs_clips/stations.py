@@ -82,6 +82,7 @@ class CvCJunctionConfig(CvCStationConfig):
     def station_cfg(self, team: Optional[str] = None) -> GridObjectConfig:
         return GridObjectConfig(
             name="junction",
+            render_name="junction",
             render_symbol="📦",
             collective=team,
             aoes={
@@ -121,11 +122,12 @@ class CvCHubConfig(CvCStationConfig):
     attack_deltas: dict[str, int] = Field(default_factory=lambda: {"hp": -1, "influence": -100})
     elements: list[str] = Field(default_factory=lambda: CvCConfig.ELEMENTS)
 
-    def station_cfg(self, team: str) -> GridObjectConfig:
+    def station_cfg(self, team: str, collective: str | None = None) -> GridObjectConfig:
         return GridObjectConfig(
-            name="hub",
+            name=f"{team}:hub",
+            render_name="hub",
             render_symbol="📦",
-            collective=team,
+            collective=collective or team,
             aoes={
                 "influence": AOEConfig(
                     radius=self.aoe_range,
@@ -152,11 +154,12 @@ class CvCChestConfig(CvCStationConfig):
 
     heart_cost: dict[str, int] = Field(default_factory=lambda: CvCConfig.HEART_COST)
 
-    def station_cfg(self, team: str) -> GridObjectConfig:
+    def station_cfg(self, team: str, collective: str | None = None) -> GridObjectConfig:
         return GridObjectConfig(
-            name="chest",
+            name=f"{team}:chest",
+            render_name="chest",
             render_symbol="📦",
-            collective=team,
+            collective=collective or team,
             on_use_handlers={
                 "get_heart": Handler(
                     filters=[isAlignedToActor(), targetCollectiveHas({"heart": 1})],
@@ -180,12 +183,13 @@ class CvCGearStationConfig(CvCStationConfig):
     gear_costs: dict[str, dict[str, int]] = Field(default_factory=lambda: CvCConfig.GEAR_COSTS)
     gear_symbols: dict[str, str] = Field(default_factory=lambda: CvCConfig.GEAR_SYMBOLS)
 
-    def station_cfg(self, team: str) -> GridObjectConfig:
+    def station_cfg(self, team: str, collective: str | None = None) -> GridObjectConfig:
         cost = self.gear_costs.get(self.gear_type, {})
         return GridObjectConfig(
-            name=f"{self.gear_type}_station",
+            name=f"{team}:{self.gear_type}",
+            render_name=f"{self.gear_type}_station",
             render_symbol=self.gear_symbols[self.gear_type],
-            collective=team,
+            collective=collective or team,
             on_use_handlers={
                 "keep_gear": Handler(
                     filters=[isAlignedToActor(), actorHas({self.gear_type: 1})],

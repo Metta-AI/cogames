@@ -74,6 +74,6 @@ char_to_map_name:
   "C": carbon_extractor
   "S": silicon_extractor
   "@": agent.agent
-  "&": hub
-  "=": chest
+  "&": c:hub
+  "=": c:chest
 

@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, override
 
+from pydantic import Field
+
+from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.evals.difficulty_variants import DIFFICULTY_VARIANTS
 from cogames.cogs_vs_clips.terrain import BaseHubVariant, MachinaArenaVariant
 from cogames.core import CoGameMissionVariant
+from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.mapgen.scenes.base_hub import DEFAULT_EXTRACTORS as HUB_EXTRACTORS
@@ -216,14 +220,65 @@ class BalancedCornersVariant(MachinaArenaVariant):
         node.max_balance_shortcuts = self.max_balance_shortcuts
 
 
+class MultiTeamVariant(CoGameMissionVariant):
+    """Split the map into multiple team instances, each with their own hub and resources."""
+
+    name: str = "multi_team"
+    description: str = "Split map into separate team instances with independent hubs."
+    num_teams: int = Field(default=2, ge=2, le=2, description="Number of teams (max 2 supported)")
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        team = next(iter(mission.teams.values()))
+        # Each team gets the original agent count; clear num_cogs so total is derived from teams
+        original_agents = mission.num_agents
+        mission.teams = {
+            name: team.model_copy(update={"name": name, "short_name": name, "num_agents": original_agents})
+            for name in ["cogs_green", "cogs_blue"][: self.num_teams]
+        }
+        mission.num_cogs = None
+
+    def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
+        original_builder = env.game.map_builder
+        # Shrink inner instance borders so teams are close together
+        if isinstance(original_builder, MapGen.Config):
+            original_builder.border_width = 1
+        env.game.map_builder = MapGen.Config(
+            instance=original_builder,
+            instances=self.num_teams,
+            set_team_by_instance=True,
+            instance_names=[t.short_name for t in mission.teams.values()],
+            instance_object_remap={
+                "c:hub": "{instance_name}:hub",
+                "c:chest": "{instance_name}:chest",
+                **{f"c:{g}": f"{{instance_name}}:{g}" for g in CvCConfig.GEAR},
+            },
+            # Connect instances: no added borders, clear walls at boundary
+            border_width=0,  # No outer border (inner instances have their own)
+            instance_border_width=0,  # No border between instances
+            instance_border_clear_radius=3,  # Clear walls near instance boundary
+        )
+
+
+class NoClipsVariant(CoGameMissionVariant):
+    name: str = "no_clips"
+    description: str = "Disable clips behavior entirely."
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        mission.clips.disabled = True
+
+
 VARIANTS: list[CoGameMissionVariant] = [
     CavesVariant(),
     CityVariant(),
     DarkSideVariant(),
+    NoClipsVariant(),
     DesertVariant(),
     EmptyBaseVariant(),
     EnergizedVariant(),
     ForestVariant(),
+    MultiTeamVariant(),
     QuadrantBuildingsVariant(),
     SingleResourceUniformVariant(),
     Small50Variant(),

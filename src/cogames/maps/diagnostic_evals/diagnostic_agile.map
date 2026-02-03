@@ -25,8 +25,8 @@ char_to_map_name:
   "O": oxygen_extractor
   "G": germanium_extractor
   "+": junction
-  "&": hub
-  "=": chest
+  "&": c:hub
+  "=": c:chest
   "@": agent.agent
   "1": agent.agent
   "2": agent.agent

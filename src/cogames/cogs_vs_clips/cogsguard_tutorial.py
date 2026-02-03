@@ -18,11 +18,11 @@ def make_cogsguard_tutorial_site() -> CoGameSite:
         hub_height=15,
         outer_clearance=2,
         stations=[
-            "aligner_station",
-            "scrambler_station",
-            "miner_station",
-            "scout_station",
-            "chest",
+            "c:aligner",
+            "c:scrambler",
+            "c:miner",
+            "c:scout",
+            "c:chest",
         ],
     )
     map_builder = MapGen.Config(

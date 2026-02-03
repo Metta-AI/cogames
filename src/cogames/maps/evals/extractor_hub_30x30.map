@@ -45,13 +45,13 @@ char_to_map_name:
   ".": empty
   "@": agent.agent
   "+": junction
-  "&": hub
-  "=": chest
+  "&": c:hub
+  "=": c:chest
   "G": germanium_extractor
   "S": silicon_extractor
   "O": oxygen_extractor
   "C": carbon_extractor
-  "a": aligner_station
-  "r": scrambler_station
-  "m": miner_station
-  "t": scout_station
+  "a": c:aligner
+  "r": c:scrambler
+  "m": c:miner
+  "t": c:scout
