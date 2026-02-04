@@ -18,6 +18,37 @@ if TYPE_CHECKING:
     from cogames.cogs_vs_clips.mission import CvCMission
 
 
+def _apply_clips_settings(
+    mission: CvCMission,
+    *,
+    initial_clips_start: int | None = None,
+    initial_clips_spots: int | None = None,
+    scramble_start: int | None = None,
+    scramble_interval: int | None = None,
+    scramble_radius: int | None = None,
+    align_start: int | None = None,
+    align_interval: int | None = None,
+    align_radius: int | None = None,
+) -> None:
+    clips = mission.clips
+    if initial_clips_start is not None:
+        clips.initial_clips_start = initial_clips_start
+    if initial_clips_spots is not None:
+        clips.initial_clips_spots = initial_clips_spots
+    if scramble_start is not None:
+        clips.scramble_start = scramble_start
+    if scramble_interval is not None:
+        clips.scramble_interval = scramble_interval
+    if scramble_radius is not None:
+        clips.scramble_radius = scramble_radius
+    if align_start is not None:
+        clips.align_start = align_start
+    if align_interval is not None:
+        clips.align_interval = align_interval
+    if align_radius is not None:
+        clips.align_radius = align_radius
+
+
 class NumCogsVariant(CoGameMissionVariant):
     name: str = "num_cogs"
     description: str = "Set the number of cogs for the mission."
@@ -32,6 +63,83 @@ class NumCogsVariant(CoGameMissionVariant):
             )
 
         mission.num_cogs = self.num_cogs
+
+
+class ClipsEasyVariant(CoGameMissionVariant):
+    name: str = "clips_easy"
+    description: str = "Slow clips expansion with late pressure."
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        _apply_clips_settings(
+            mission,
+            initial_clips_start=50,
+            initial_clips_spots=1,
+            scramble_start=250,
+            scramble_interval=250,
+            scramble_radius=15,
+            align_start=300,
+            align_interval=250,
+            align_radius=15,
+        )
+
+
+class ClipsMediumVariant(CoGameMissionVariant):
+    name: str = "clips_medium"
+    description: str = "Baseline clips pressure (Machina1 default)."
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        _apply_clips_settings(
+            mission,
+            initial_clips_start=10,
+            initial_clips_spots=1,
+            scramble_start=50,
+            scramble_interval=100,
+            scramble_radius=25,
+            align_start=100,
+            align_interval=100,
+            align_radius=25,
+        )
+
+
+class ClipsHardVariant(CoGameMissionVariant):
+    name: str = "clips_hard"
+    description: str = "Fast clips pressure with wider influence."
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        _apply_clips_settings(
+            mission,
+            initial_clips_start=5,
+            initial_clips_spots=2,
+            scramble_start=25,
+            scramble_interval=50,
+            scramble_radius=35,
+            align_start=50,
+            align_interval=50,
+            align_radius=35,
+        )
+
+
+class ClipsWaveOnlyVariant(CoGameMissionVariant):
+    name: str = "clips_wave_only"
+    description: str = "Initial clips wave only, no further spread."
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        disable_start = mission.max_steps + 1
+        _apply_clips_settings(
+            mission,
+            initial_clips_start=10,
+            initial_clips_spots=3,
+            scramble_start=disable_start,
+            scramble_interval=disable_start,
+            align_start=disable_start,
+            align_interval=disable_start,
+            scramble_radius=25,
+            align_radius=25,
+        )
 
 
 class DarkSideVariant(CoGameMissionVariant):
@@ -286,4 +394,9 @@ VARIANTS: list[CoGameMissionVariant] = [
     *DIFFICULTY_VARIANTS,
 ]
 
-HIDDEN_VARIANTS: list[CoGameMissionVariant] = []
+HIDDEN_VARIANTS: list[CoGameMissionVariant] = [
+    ClipsEasyVariant(),
+    ClipsMediumVariant(),
+    ClipsHardVariant(),
+    ClipsWaveOnlyVariant(),
+]
