@@ -1,5 +1,3 @@
-from typing import Optional
-
 import pytest
 
 from metta_alo.scoring import (
@@ -8,7 +6,6 @@ from metta_alo.scoring import (
     allocate_counts,
     summarize_vor_scenario,
 )
-from mettagrid.runner.rollout import write_replay
 from mettagrid.simulator.multi_episode.rollout import EpisodeRolloutResult, MultiEpisodeRolloutResult
 from mettagrid.types import EpisodeStats
 
@@ -83,42 +80,3 @@ def test_vor_totals_update() -> None:
     assert totals.total_candidate_weighted_sum == pytest.approx(6.0)
     assert totals.total_candidate_agents == 4
     assert totals.replacement_mean == pytest.approx(2.0)
-
-
-class DummyReplay:
-    def __init__(self) -> None:
-        self.compression: Optional[str] = None
-        self.path: Optional[str] = None
-
-    def set_compression(self, compression: str) -> None:
-        self.compression = compression
-
-    def write_replay(self, path: str) -> None:
-        self.path = path
-
-
-def test_write_replay_sets_gzip() -> None:
-    replay = DummyReplay()
-
-    write_replay(replay, "replay.json.gz")
-
-    assert replay.compression == "gzip"
-    assert replay.path == "replay.json.gz"
-
-
-def test_write_replay_sets_zlib() -> None:
-    replay = DummyReplay()
-
-    write_replay(replay, "replay.json.z")
-
-    assert replay.compression == "zlib"
-    assert replay.path == "replay.json.z"
-
-
-def test_write_replay_no_compression() -> None:
-    replay = DummyReplay()
-
-    write_replay(replay, "replay.json")
-
-    assert replay.compression is None
-    assert replay.path == "replay.json"

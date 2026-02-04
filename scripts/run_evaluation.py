@@ -45,7 +45,7 @@ from cogames.cogs_vs_clips.variants import VARIANTS
 from cogames.core import CoGameMissionVariant as MissionVariant
 from mettagrid.config.reward_config import statReward
 from mettagrid.policy.policy import PolicySpec
-from mettagrid.runner.rollout import run_single_episode_rollout
+from mettagrid.runner.rollout import run_single_episode
 from mettagrid.util.uri_resolvers.schemes import policy_spec_from_uri
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -202,20 +202,20 @@ def _run_case(
     assignments = [0] * num_cogs
     for run_idx in range(runs_per_case):
         run_seed = seed + run_idx
-        rollout = run_single_episode_rollout(
+        results, _replay = run_single_episode(
             policy_specs=[policy_spec],
             assignments=assignments,
-            env_cfg=env_config,
+            env=env_config,
             seed=run_seed,
             max_action_time_ms=10000,
             device="cpu",
         )
 
-        total_reward = float(sum(rollout.rewards))
+        total_reward = float(sum(results.rewards))
         avg_reward_per_agent = total_reward / max(1, num_cogs)
 
         heart_gained = 0.0
-        episode_stats = rollout.stats
+        episode_stats = results.stats
         if "agent" in episode_stats:
             agent_stats_list = episode_stats["agent"]
             for agent_stats in agent_stats_list:
@@ -234,7 +234,7 @@ def _run_case(
                 hearts_assembled=int(total_reward),
                 heart_gained=heart_gained,
                 avg_heart_gained_per_agent=avg_heart_gained_per_agent,
-                steps_taken=rollout.steps + 1,
+                steps_taken=results.steps + 1,
                 max_steps=actual_max_steps,
                 success=total_reward > 0,
                 seed_used=run_seed,
