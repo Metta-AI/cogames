@@ -70,7 +70,7 @@ def evaluate(
     all_replay_paths: list[str] = []
     for mission_name, env_cfg in missions:
         counts = allocate_counts(env_cfg.game.num_agents, proportions)
-        assignments = np.repeat(np.arange(len(counts), dtype=int), counts)
+        assignments = [i for i, c in enumerate(counts) for _ in range(c)]
 
         progress_label = f"Simulating ({mission_name})"
         with typer.progressbar(length=episodes, label=progress_label) as progress:

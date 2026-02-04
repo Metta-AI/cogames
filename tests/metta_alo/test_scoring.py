@@ -1,6 +1,5 @@
 from typing import Optional
 
-import numpy as np
 import pytest
 
 from metta_alo.scoring import (
@@ -18,9 +17,9 @@ EMPTY_STATS: EpisodeStats = {"game": {}, "agent": []}
 
 def _episode(assignments: list[int], rewards: list[float]) -> EpisodeRolloutResult:
     return EpisodeRolloutResult(
-        assignments=np.array(assignments, dtype=int),
-        rewards=np.array(rewards, dtype=float),
-        action_timeouts=np.zeros(len(rewards), dtype=float),
+        assignments=assignments,
+        rewards=rewards,
+        action_timeouts=[0] * len(rewards),
         stats=EMPTY_STATS,
         replay_path=None,
         steps=3,

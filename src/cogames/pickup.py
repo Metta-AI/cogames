@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-import numpy as np
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -77,11 +77,11 @@ def pickup(
 
     results: list[PickupScenarioResult] = []
     totals = VorTotals()
-    rng = np.random.default_rng(seed)
+    rng = random.Random(seed)
 
     with typer.progressbar(scenarios, label="Simulating") as progress:
         for scenario in progress:
-            assignments = np.repeat(np.arange(len(policy_specs)), [scenario.candidate_count, *scenario.pool_counts])
+            assignments = [i for i, c in enumerate([scenario.candidate_count, *scenario.pool_counts]) for _ in range(c)]
 
             rollout, replay_paths = run_multi_episode_rollout(
                 policy_specs=policy_specs,
