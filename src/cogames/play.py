@@ -12,8 +12,8 @@ from rich.table import Table
 from mettagrid import MettaGridConfig
 from mettagrid.policy.policy import PolicySpec
 from mettagrid.renderer.renderer import RenderMode
-from mettagrid.runner.pure_single_episode_runner import PureSingleEpisodeResult
-from mettagrid.runner.rollout import run_single_episode
+from mettagrid.runner.rollout import run_episode_local
+from mettagrid.runner.types import PureSingleEpisodeResult
 
 logger = logging.getLogger("cogames.play")
 
@@ -187,12 +187,11 @@ def play(
         replay_path = save_replay / f"{uuid.uuid4()}.json.z"
 
     try:
-        results, _replay = run_single_episode(
+        results, _replay = run_episode_local(
             policy_specs=[policy_spec],
             assignments=[0] * env_cfg.game.num_agents,
             env=env_cfg,
-            results_uri=None,
-            replay_uri=str(replay_path) if replay_path else None,
+            replay_path=replay_path,
             seed=seed,
             device="cpu",
             render_mode=render_mode,

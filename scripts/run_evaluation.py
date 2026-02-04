@@ -45,7 +45,7 @@ from cogames.cogs_vs_clips.variants import VARIANTS
 from cogames.core import CoGameMissionVariant as MissionVariant
 from mettagrid.config.reward_config import statReward
 from mettagrid.policy.policy import PolicySpec
-from mettagrid.runner.rollout import run_single_episode
+from mettagrid.runner.rollout import run_episode_local
 from mettagrid.util.uri_resolvers.schemes import policy_spec_from_uri
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -202,7 +202,7 @@ def _run_case(
     assignments = [0] * num_cogs
     for run_idx in range(runs_per_case):
         run_seed = seed + run_idx
-        results, _replay = run_single_episode(
+        results, _replay = run_episode_local(
             policy_specs=[policy_spec],
             assignments=assignments,
             env=env_config,
