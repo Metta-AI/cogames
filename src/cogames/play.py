@@ -9,11 +9,11 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from metta_alo.pure_single_episode_runner import PureSingleEpisodeResult
-from metta_alo.rollout import run_single_episode
 from mettagrid import MettaGridConfig
 from mettagrid.policy.policy import PolicySpec
 from mettagrid.renderer.renderer import RenderMode
+from mettagrid.runner.pure_single_episode_runner import PureSingleEpisodeResult
+from mettagrid.runner.rollout import run_single_episode
 
 logger = logging.getLogger("cogames.play")
 

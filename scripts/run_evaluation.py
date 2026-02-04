@@ -43,9 +43,9 @@ from cogames.cogs_vs_clips.mission import NumCogsVariant
 from cogames.cogs_vs_clips.missions import MISSIONS as ALL_MISSIONS
 from cogames.cogs_vs_clips.variants import VARIANTS
 from cogames.core import CoGameMissionVariant as MissionVariant
-from metta_alo.rollout import run_single_episode_rollout
 from mettagrid.config.reward_config import statReward
 from mettagrid.policy.policy import PolicySpec
+from mettagrid.runner.rollout import run_single_episode_rollout
 from mettagrid.util.uri_resolvers.schemes import policy_spec_from_uri
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
