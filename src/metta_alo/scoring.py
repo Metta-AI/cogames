@@ -3,8 +3,6 @@ from dataclasses import dataclass
 from typing import Mapping, Optional, Protocol, Sequence
 from uuid import UUID
 
-import numpy as np
-
 from mettagrid.simulator.multi_episode.rollout import MultiEpisodeRolloutResult
 
 
@@ -147,15 +145,17 @@ def summarize_vor_scenario(
     replacement_episode_count = 0
 
     for episode in rollout.episodes:
-        if episode.rewards.size == 0:
+        if len(episode.rewards) == 0:
             continue
         if candidate_count == 0:
-            replacement_sum += float(episode.rewards.mean())
+            replacement_sum += sum(episode.rewards) / len(episode.rewards)
             replacement_episode_count += 1
         else:
-            mask = episode.assignments == candidate_policy_index
-            if np.any(mask):
-                candidate_sum += float(episode.rewards[mask].mean())
+            masked = [
+                r for a, r in zip(episode.assignments, episode.rewards, strict=True) if a == candidate_policy_index
+            ]
+            if masked:
+                candidate_sum += sum(masked) / len(masked)
                 candidate_episode_count += 1
 
     candidate_mean = candidate_sum / candidate_episode_count if candidate_episode_count else None

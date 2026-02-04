@@ -199,7 +199,7 @@ def _run_case(
         )
 
     out: List[EvalResult] = []
-    assignments = np.zeros(num_cogs, dtype=int)
+    assignments = [0] * num_cogs
     for run_idx in range(runs_per_case):
         run_seed = seed + run_idx
         rollout = run_single_episode_rollout(
@@ -211,7 +211,7 @@ def _run_case(
             device="cpu",
         )
 
-        total_reward = float(rollout.rewards.sum())
+        total_reward = float(sum(rollout.rewards))
         avg_reward_per_agent = total_reward / max(1, num_cogs)
 
         heart_gained = 0.0
