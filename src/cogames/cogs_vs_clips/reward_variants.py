@@ -14,7 +14,13 @@ from mettagrid.config.game_value import stat
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.reward_config import AgentReward, reward
 
-CogsGuardRewardVariant = Literal["credit", "milestones", "no_objective", "penalize_vibe_change", "objective"]
+CogsGuardRewardVariant = Literal[
+    "credit",
+    "milestones",
+    "no_objective",
+    "penalize_vibe_change",
+    "objective",
+]
 
 AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = (
     "objective",
@@ -83,7 +89,9 @@ def _apply_credit(rewards: dict[str, AgentReward]) -> None:
     gain_rewards: dict[str, AgentReward] = {
         "heart_gained": reward(stat("heart.gained"), weight=w_heart, max=cap_heart),
         "aligner_gained": reward(stat("aligner.gained"), weight=w_align_gear, max=cap_align_gear),
+        "aligner_lost": reward(stat("aligner.lost"), weight=-w_align_gear, max=-cap_align_gear),
         "scrambler_gained": reward(stat("scrambler.gained"), weight=w_scramble_gear, max=cap_scramble_gear),
+        "scrambler_lost": reward(stat("scrambler.lost"), weight=-w_scramble_gear, max=-cap_scramble_gear),
         "carbon_gained": reward(stat("carbon.gained"), weight=w_element_gain, max=cap_element_gain),
         "oxygen_gained": reward(stat("oxygen.gained"), weight=w_element_gain, max=cap_element_gain),
         "germanium_gained": reward(stat("germanium.gained"), weight=w_element_gain, max=cap_element_gain),
