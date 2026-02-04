@@ -19,7 +19,8 @@ from rich.console import Console
 from cogames.cli.base import console
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.policy import PolicySpec, get_policy_spec
-from mettagrid.runner.rollout import run_single_episode
+from mettagrid.runner.episode_runner import run_episode
+from mettagrid.runner.job_specs import SingleEpisodeJob
 
 if TYPE_CHECKING:
     from cogames.cli.client import TournamentServerClient
@@ -214,28 +215,27 @@ def copy_files_maintaining_structure(files: list[Path], dest_dir: Path) -> None:
             shutil.copy2(file_path, dest_path)
 
 
-def validate_policy_spec(policy_spec: PolicySpec, env_cfg: MettaGridConfig) -> None:
+def validate_policy_uri(policy_uri: str, env_cfg: MettaGridConfig) -> None:
     env_cfg = env_cfg.model_copy()
     env_cfg.game.max_steps = 10
     n = env_cfg.game.num_agents
     n_submitted = min(2, n)
-    noop_spec = PolicySpec(class_path="mettagrid.policy.noop.NoopPolicy")
+    noop_uri = "mock://noop"
     if n_submitted < n:
-        policy_specs = [policy_spec, noop_spec]
+        policy_uris = [policy_uri, noop_uri]
         assignments = [0] * n_submitted + [1] * (n - n_submitted)
     else:
-        policy_specs = [policy_spec]
+        policy_uris = [policy_uri]
         assignments = [0] * n
-    run_single_episode(
-        policy_specs=policy_specs,
+    job = SingleEpisodeJob(
+        policy_uris=policy_uris,
         assignments=assignments,
         env=env_cfg,
-        results_uri=None,
-        replay_uri=None,
         seed=42,
         max_action_time_ms=10000,
-        device="cpu",
     )
+    result = run_episode(job)
+    shutil.rmtree(result.results_path.parent, ignore_errors=True)
 
 
 def validate_policy_in_isolation(
