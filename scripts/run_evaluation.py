@@ -32,6 +32,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import torch
+from cogames_agents.policy.nim_agents.thinky_eval import EVALS as THINKY_EVALS
 from safetensors.torch import load_file as load_safetensors_file
 
 from cogames.cli.policy import parse_policy_spec
@@ -43,7 +45,9 @@ from cogames.cogs_vs_clips.mission import NumCogsVariant
 from cogames.cogs_vs_clips.missions import MISSIONS as ALL_MISSIONS
 from cogames.cogs_vs_clips.variants import VARIANTS
 from cogames.core import CoGameMissionVariant as MissionVariant
+from mettagrid.config import vibes as vibes_module
 from mettagrid.config.reward_config import statReward
+from mettagrid.config.vibes import VIBE_BY_NAME
 from mettagrid.policy.policy import PolicySpec
 from mettagrid.runner.rollout import run_episode_local
 from mettagrid.util.uri_resolvers.schemes import policy_spec_from_uri
@@ -101,6 +105,29 @@ def load_eval_missions(module_path: str) -> List[Mission]:
     return missions
 
 
+def _resolve_policy_spec(agent_config: AgentConfig, device: Optional[str]) -> PolicySpec:
+    if "://" in agent_config.policy_path:
+        resolved_spec = policy_spec_from_uri(agent_config.policy_path, device=device or "cpu")
+        if agent_config.init_kwargs:
+            resolved_spec = resolved_spec.model_copy(
+                update={"init_kwargs": {**resolved_spec.init_kwargs, **agent_config.init_kwargs}}
+            )
+        if device:
+            resolved_spec = resolved_spec.model_copy(
+                update={"init_kwargs": {**resolved_spec.init_kwargs, "device": device}}
+            )
+        return resolved_spec
+
+    policy_spec = PolicySpec(
+        class_path=agent_config.policy_path,
+        data_path=agent_config.data_path,
+        init_kwargs=agent_config.init_kwargs or {},
+    )
+    if device:
+        policy_spec = policy_spec.model_copy(update={"init_kwargs": {**policy_spec.init_kwargs, "device": device}})
+    return policy_spec
+
+
 def _run_case(
     exp_name: str,
     variant_name: Optional[str],
@@ -112,6 +139,7 @@ def _run_case(
     seed: int,
     runs_per_case: int,
     agent_config: AgentConfig,
+    device: Optional[str],
 ) -> List[EvalResult]:
     mission_variants: List[MissionVariant] = [NumCogsVariant(num_cogs=num_cogs)]
     if variant:
@@ -126,8 +154,6 @@ def _run_case(
             if any(v == "gear" for v in getattr(proto, "vibes", [])):
                 change_vibe = env_config.game.actions.change_vibe
                 if not any(v.name == "gear" for v in change_vibe.vibes):
-                    from mettagrid.config.vibes import VIBE_BY_NAME  # noqa: PLC0415
-
                     change_vibe.vibes = list(change_vibe.vibes) + [VIBE_BY_NAME["gear"]]
                 break
 
@@ -136,25 +162,20 @@ def _run_case(
     if policy_path and ("://" in policy_path or Path(policy_path).expanduser().exists()):
         policy_action_space = _policy_action_space_cache.get(policy_path)
         if policy_action_space is None:
-            try:
-                spec = policy_spec_from_uri(policy_path)
-                if spec.data_path:
-                    for key, tensor in load_safetensors_file(str(Path(spec.data_path))).items():
-                        if "actor_head" in key and "weight" in key and len(tensor.shape) == 2:
-                            policy_action_space = int(tensor.shape[0])
-                            _policy_action_space_cache[policy_path] = policy_action_space
-                            logger.info(f"Detected policy action space: {policy_action_space} actions")
-                            break
-            except Exception as exc:
-                logger.warning(f"Failed to detect policy action space: {exc}")
+            spec = policy_spec_from_uri(policy_path, device=device or "cpu")
+            if spec.data_path:
+                for key, tensor in load_safetensors_file(str(Path(spec.data_path))).items():
+                    if "actor_head" in key and "weight" in key and len(tensor.shape) == 2:
+                        policy_action_space = int(tensor.shape[0])
+                        _policy_action_space_cache[policy_path] = policy_action_space
+                        logger.info(f"Detected policy action space: {policy_action_space} actions")
+                        break
 
     if policy_action_space is not None:
         num_vibes = policy_action_space - 5
         if num_vibes <= 0:
             logger.warning(f"Invalid action space {policy_action_space}, skipping vibe configuration")
         else:
-            from mettagrid.config import vibes as vibes_module  # noqa: PLC0415
-
             if num_vibes == 16:
                 vibe_names = [v.name for v in vibes_module.VIBES[:16]]
             elif num_vibes == 13:
@@ -184,19 +205,7 @@ def _run_case(
         env_config.game.agent.rewards[resource_stat] = statReward(resource_stat, weight=0.0, max=0.0)
 
     actual_max_steps = env_config.game.max_steps
-    if "://" in agent_config.policy_path:
-        resolved_spec = policy_spec_from_uri(agent_config.policy_path)
-        if agent_config.init_kwargs:
-            resolved_spec = resolved_spec.model_copy(
-                update={"init_kwargs": {**resolved_spec.init_kwargs, **agent_config.init_kwargs}}
-            )
-        policy_spec = resolved_spec
-    else:
-        policy_spec = PolicySpec(
-            class_path=agent_config.policy_path,
-            data_path=agent_config.data_path,
-            init_kwargs=agent_config.init_kwargs or {},
-        )
+    policy_spec = _resolve_policy_spec(agent_config, device)
 
     out: List[EvalResult] = []
     assignments = [0] * num_cogs
@@ -208,7 +217,7 @@ def _run_case(
             env=env_config,
             seed=run_seed,
             max_action_time_ms=10000,
-            device="cpu",
+            device=device,
         )
 
         total_reward = float(sum(results.rewards))
@@ -245,8 +254,6 @@ def _run_case(
 
 
 def _load_thinky_eval_cases() -> list[tuple[str, int]]:
-    from cogames_agents.policy.nim_agents.thinky_eval import EVALS as THINKY_EVALS  # noqa: PLC0415
-
     return [(exp_name, num_cogs) for exp_name, _tag, num_cogs in THINKY_EVALS]
 
 
@@ -262,6 +269,7 @@ def run_evaluation(
     jobs: int = 0,
     experiment_map: Optional[Dict[str, AnyMission]] = None,
     cases_override: Optional[List[tuple[str, Optional[str], int]]] = None,
+    device: Optional[str] = None,
 ) -> List[EvalResult]:
     results: List[EvalResult] = []
     experiment_lookup = experiment_map if experiment_map is not None else EXPERIMENT_MAP
@@ -349,6 +357,7 @@ def run_evaluation(
                     seed,
                     runs_per_case,
                     agent_config,
+                    device,
                 ): (exp_name, variant_name, num_cogs)
                 for exp_name, variant_name, num_cogs, base_mission, variant, clip_period in cases
             }
@@ -380,6 +389,7 @@ def run_evaluation(
                 seed,
                 runs_per_case,
                 agent_config,
+                device,
             )
             results.extend(case_results)
             completed += len(case_results)
@@ -1116,6 +1126,12 @@ def main():
     parser.add_argument("--plot-dir", type=str, default="eval_plots", help="Directory to save plots")
     parser.add_argument("--no-plots", action="store_true", help="Skip generating plots")
     parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        help="Policy device (auto, cpu, cuda, cuda:0, etc.)",
+    )
+    parser.add_argument(
         "--mission-set",
         "-S",
         choices=[
@@ -1143,6 +1159,14 @@ def main():
     parser.add_argument("--jobs", type=int, default=0, help="Max parallel cases (0 = CPU count)")
 
     args = parser.parse_args()
+    normalized_device = args.device.strip().lower()
+    if normalized_device == "auto":
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+    else:
+        candidate = torch.device(args.device)
+        if candidate.type == "cuda" and not torch.cuda.is_available():
+            raise RuntimeError(f"CUDA requested but not available: {args.device}")
+        device = args.device
 
     if args.diagnostic and args.tournament:
         parser.error("Use only one of --diagnostic or --tournament.")
@@ -1191,7 +1215,7 @@ def main():
 
     for policy_arg in args.policy:
         try:
-            policy_spec = parse_policy_spec(policy_arg).to_policy_spec()
+            policy_spec = parse_policy_spec(policy_arg, device=device).to_policy_spec()
         except (ValueError, ModuleNotFoundError) as exc:
             parser.error(f"Invalid --policy '{policy_arg}': {exc}")
         configs.append(
@@ -1266,6 +1290,7 @@ def main():
             repeats=args.repeats,
             jobs=args.jobs,
             cases_override=cases_override,
+            device=device,
         )
         all_results.extend(policy_results)
 

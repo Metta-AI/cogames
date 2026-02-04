@@ -162,6 +162,7 @@ def play(
     policy_spec: PolicySpec,
     game_name: str,
     seed: int = 42,
+    device: str = "cpu",
     render_mode: RenderMode = "gui",
     save_replay: Optional[Path] = None,
     autostart: bool = False,
@@ -186,20 +187,16 @@ def play(
         save_replay.mkdir(parents=True, exist_ok=True)
         replay_path = save_replay / f"{uuid.uuid4()}.json.z"
 
-    try:
-        results, _replay = run_episode_local(
-            policy_specs=[policy_spec],
-            assignments=[0] * env_cfg.game.num_agents,
-            env=env_cfg,
-            replay_path=replay_path,
-            seed=seed,
-            device="cpu",
-            render_mode=render_mode,
-            autostart=autostart,
-        )
-    except KeyboardInterrupt:
-        logger.info("Interrupted; ending episode early.")
-        return
+    results, _replay = run_episode_local(
+        policy_specs=[policy_spec],
+        assignments=[0] * env_cfg.game.num_agents,
+        env=env_cfg,
+        replay_path=replay_path,
+        seed=seed,
+        device=device,
+        render_mode=render_mode,
+        autostart=autostart,
+    )
 
     # Print summary
     console.print("\n[bold green]Episode Complete![/bold green]")

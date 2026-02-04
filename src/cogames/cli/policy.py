@@ -68,13 +68,13 @@ def _translate_error(e: Exception) -> str:
     return translated
 
 
-def get_policy_spec(ctx: typer.Context, policy_arg: Optional[str]) -> PolicySpec:
+def get_policy_spec(ctx: typer.Context, policy_arg: Optional[str], device: str | None = None) -> PolicySpec:
     if policy_arg is None:
         console.print(ctx.get_help())
         console.print("[yellow]Missing: --policy / -p[/yellow]\n")
     else:
         try:
-            return parse_policy_spec(spec=policy_arg).to_policy_spec()
+            return parse_policy_spec(spec=policy_arg, device=device).to_policy_spec()
         except (ValueError, ModuleNotFoundError) as e:
             translated = _translate_error(e)
             console.print(f"[yellow]Error parsing policy argument: {translated}[/yellow]\n")
@@ -90,14 +90,14 @@ def get_policy_spec(ctx: typer.Context, policy_arg: Optional[str]) -> PolicySpec
 
 
 def get_policy_specs_with_proportions(
-    ctx: typer.Context, policy_args: Optional[list[str]]
+    ctx: typer.Context, policy_args: Optional[list[str]], device: str | None = None
 ) -> list[PolicySpecWithProportion]:
     if not policy_args:
         console.print(ctx.get_help())
         console.print("[yellow]Supply at least one: --policy / -p[/yellow]\n")
     else:
         try:
-            return [parse_policy_spec(spec=policy_arg) for policy_arg in policy_args]
+            return [parse_policy_spec(spec=policy_arg, device=device) for policy_arg in policy_args]
         except (ValueError, ModuleNotFoundError) as e:
             translated = _translate_error(e)
             console.print(f"[yellow]Error parsing policy argument: {translated}[/yellow]")
@@ -112,7 +112,20 @@ def get_policy_specs_with_proportions(
     raise typer.Exit(1)
 
 
-def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
+def _apply_device_override(spec: PolicySpecWithProportion, device: str | None) -> PolicySpecWithProportion:
+    if device is None:
+        return spec
+    init_kwargs = dict(spec.init_kwargs or {})
+    init_kwargs["device"] = device
+    return PolicySpecWithProportion(
+        class_path=spec.class_path,
+        data_path=spec.data_path,
+        proportion=spec.proportion,
+        init_kwargs=init_kwargs,
+    )
+
+
+def parse_policy_spec(spec: str, device: str | None = None) -> PolicySpecWithProportion:
     """Parse a policy CLI option into its components.
 
     Supports two formats:
@@ -161,13 +174,14 @@ def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
             uri_part = spec
             fraction = 1.0
 
-        policy = policy_spec_from_uri(uri_part.strip())
-        return PolicySpecWithProportion(
+        policy = policy_spec_from_uri(uri_part.strip(), device=device or "cpu")
+        policy_spec = PolicySpecWithProportion(
             class_path=policy.class_path,
             data_path=policy.data_path,
             proportion=fraction,
             init_kwargs=policy.init_kwargs,
         )
+        return _apply_device_override(policy_spec, device)
 
     entries = [part.strip() for part in spec.split(",") if part.strip()]
     if not entries:
@@ -176,19 +190,20 @@ def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
     fraction = 1.0
     first = entries[0]
     if is_uri(first) or ("=" not in first and is_path_like(first)):
-        policy = policy_spec_from_uri(first)
+        policy = policy_spec_from_uri(first, device=device or "cpu")
         for entry in entries[1:]:
             key, value = parse_key_value(entry)
             if key != "proportion":
                 raise ValueError("Only proportion is supported after a checkpoint URI.")
             fraction = parse_proportion(value)
 
-        return PolicySpecWithProportion(
+        policy_spec = PolicySpecWithProportion(
             class_path=policy.class_path,
             data_path=policy.data_path,
             proportion=fraction,
             init_kwargs=policy.init_kwargs,
         )
+        return _apply_device_override(policy_spec, device)
 
     if "=" not in first:
         if ":" in first:
@@ -230,9 +245,10 @@ def parse_policy_spec(spec: str) -> PolicySpecWithProportion:
     if class_path is None:
         raise ValueError("Policy specification must include class= for key=value format.")
 
-    return PolicySpecWithProportion(
+    policy_spec = PolicySpecWithProportion(
         class_path=class_path,
         data_path=data_path,
         proportion=fraction,
         init_kwargs=init_kwargs,
     )
+    return _apply_device_override(policy_spec, device)
