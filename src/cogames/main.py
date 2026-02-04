@@ -1493,12 +1493,13 @@ def run_cmd(
         rich_help_panel="Simulation",
     ),
     steps: Optional[int] = typer.Option(
-        1000,
+        None,
         "--steps",
         "-s",
         metavar="N",
         help="Max steps per episode",
         min=1,
+        show_default="from mission",
         rich_help_panel="Simulation",
     ),
     seed: int = typer.Option(
