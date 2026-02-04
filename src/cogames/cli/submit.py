@@ -19,8 +19,8 @@ from rich.console import Console
 from cogames.cli.base import console
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.policy import PolicySpec, get_policy_spec
-from mettagrid.runner.episode_runner import run_episode
-from mettagrid.runner.job_specs import SingleEpisodeJob
+from mettagrid.runner.episode_runner import run_episode_isolated
+from mettagrid.runner.types import EpisodeSpec
 
 if TYPE_CHECKING:
     from cogames.cli.client import TournamentServerClient
@@ -227,15 +227,16 @@ def validate_policy_uri(policy_uri: str, env_cfg: MettaGridConfig) -> None:
     else:
         policy_uris = [policy_uri]
         assignments = [0] * n
-    job = SingleEpisodeJob(
+    spec = EpisodeSpec(
         policy_uris=policy_uris,
         assignments=assignments,
         env=env_cfg,
         seed=42,
         max_action_time_ms=10000,
     )
-    result = run_episode(job)
-    shutil.rmtree(result.results_path.parent, ignore_errors=True)
+    with tempfile.TemporaryDirectory() as output_dir:
+        results_path = Path(output_dir) / "results.json"
+        run_episode_isolated(spec, results_path)
 
 
 def validate_policy_in_isolation(
