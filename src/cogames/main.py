@@ -61,7 +61,7 @@ from cogames.cli.policy import (
     policy_arg_example,
     policy_arg_w_proportion_example,
 )
-from cogames.cli.submit import DEFAULT_SUBMIT_SERVER, results_url_for_season, upload_policy, validate_policy_spec
+from cogames.cli.submit import DEFAULT_SUBMIT_SERVER, results_url_for_season, upload_policy, validate_policy_uri
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
 from mettagrid.config.mettagrid_config import MettaGridConfig
@@ -2112,8 +2112,7 @@ def validate_policy_cmd(
             raise typer.Exit(1)
         console.print("[green]Setup script completed[/green]")
 
-    policy_spec = get_policy_spec(ctx, policy)
-    validate_policy_spec(policy_spec, env_cfg)
+    validate_policy_uri(policy, env_cfg)
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
 

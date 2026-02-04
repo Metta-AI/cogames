@@ -592,11 +592,11 @@ def test_validate_policy_fetches_config_and_runs(
 
     captured_args: dict[str, Any] = {}
 
-    def fake_validate_policy_spec(policy_spec, env_cfg):
-        captured_args["policy_spec"] = policy_spec
+    def fake_validate_policy_uri(policy_uri, env_cfg):
+        captured_args["policy_uri"] = policy_uri
         captured_args["env_cfg"] = env_cfg
 
-    monkeypatch.setattr("cogames.main.validate_policy_spec", fake_validate_policy_spec)
+    monkeypatch.setattr("cogames.main.validate_policy_uri", fake_validate_policy_uri)
 
     from cogames.main import app  # noqa: PLC0415
 
