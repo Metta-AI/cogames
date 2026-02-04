@@ -47,6 +47,7 @@ class CvCMission(CoGameMission):
     """Mission configuration for CogsGuard game mode."""
 
     max_steps: int = Field(default=10000)
+    total_junctions: int = Field(default=118, description="Total junctions on the map (for curriculum scaling)")
 
     cog: CogConfig = Field(default_factory=lambda: CogConfig())
     teams: dict[str, CogTeam] = Field(
