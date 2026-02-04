@@ -19,7 +19,7 @@ from rich.console import Console
 from cogames.cli.base import console
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.policy import PolicySpec, get_policy_spec
-from metta_alo.rollout import run_single_episode
+from mettagrid.runner.rollout import run_single_episode
 
 if TYPE_CHECKING:
     from cogames.cli.client import TournamentServerClient

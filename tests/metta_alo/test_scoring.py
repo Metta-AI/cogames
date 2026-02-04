@@ -3,13 +3,13 @@ from typing import Optional
 import numpy as np
 import pytest
 
-from metta_alo.rollout import write_replay
 from metta_alo.scoring import (
     VorScenarioSummary,
     VorTotals,
     allocate_counts,
     summarize_vor_scenario,
 )
+from mettagrid.runner.rollout import write_replay
 from mettagrid.simulator.multi_episode.rollout import EpisodeRolloutResult, MultiEpisodeRolloutResult
 from mettagrid.types import EpisodeStats
 

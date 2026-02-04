@@ -9,7 +9,6 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from metta_alo.rollout import run_multi_episode_rollout
 from metta_alo.scoring import (
     VorTotals,
     allocate_counts,
@@ -20,6 +19,7 @@ from metta_alo.scoring import (
 from mettagrid import MettaGridConfig
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.policy import PolicySpec
+from mettagrid.runner.rollout import run_multi_episode_rollout
 
 
 @dataclass(frozen=True)
