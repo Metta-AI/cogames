@@ -46,6 +46,7 @@ def evaluate(
     episodes: int,
     action_timeout_ms: int,
     seed: int = 42,
+    device: Optional[str] = None,
     output_format: Optional[Literal["yaml", "json"]] = None,
     save_replay: Optional[str] = None,
 ) -> MissionResultsSummary:
@@ -83,6 +84,7 @@ def evaluate(
                 max_action_time_ms=action_timeout_ms,
                 replay_dir=save_replay,
                 create_replay_dir=save_replay is not None,
+                device=device,
                 on_progress=lambda _episode_idx, _result: progress.update(1),
             )
 

@@ -15,6 +15,8 @@ from typer.testing import CliRunner
 from werkzeug import Response
 
 from cogames.auth import AuthConfigReaderWriter
+from cogames.main import app
+from mettagrid.config.mettagrid_config import MettaGridConfig
 
 
 @pytest.fixture
@@ -488,8 +490,6 @@ def test_upload_resolves_season_and_validates(
 
     monkeypatch.setattr("cogames.cli.submit.validate_bundle_in_isolation", fake_validate)
 
-    from cogames.main import app  # noqa: PLC0415
-
     runner = CliRunner()
     result = runner.invoke(
         app,
@@ -536,8 +536,6 @@ def test_upload_skips_validation_when_no_entry_config(
 
     monkeypatch.setattr("cogames.cli.submit.validate_bundle_in_isolation", fake_validate)
 
-    from cogames.main import app  # noqa: PLC0415
-
     runner = CliRunner()
     result = runner.invoke(
         app,
@@ -562,8 +560,6 @@ def test_validate_policy_fetches_config_and_runs(
     httpserver: HTTPServer,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from mettagrid.config.mettagrid_config import MettaGridConfig  # noqa: PLC0415
-
     default_cfg = MettaGridConfig()
 
     httpserver.expect_request(
@@ -592,13 +588,13 @@ def test_validate_policy_fetches_config_and_runs(
 
     captured_args: dict[str, Any] = {}
 
-    def fake_validate_policy_uri(policy_uri, env_cfg):
-        captured_args["policy_uri"] = policy_uri
+    def fake_validate_policy_spec(policy_spec, env_cfg, *, device: str = "cpu", season: str | None = None):
+        captured_args["policy_spec"] = policy_spec
         captured_args["env_cfg"] = env_cfg
+        captured_args["device"] = device
+        captured_args["season"] = season
 
-    monkeypatch.setattr("cogames.main.validate_policy_uri", fake_validate_policy_uri)
-
-    from cogames.main import app  # noqa: PLC0415
+    monkeypatch.setattr("cogames.main.validate_policy_spec", fake_validate_policy_spec)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -622,3 +618,5 @@ def test_validate_policy_fetches_config_and_runs(
 
     assert captured_args.get("env_cfg") is not None
     assert captured_args["env_cfg"].game.max_steps == default_cfg.game.max_steps
+    assert captured_args["device"] == "cpu"
+    assert captured_args["season"] == "test-season"

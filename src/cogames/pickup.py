@@ -48,6 +48,7 @@ def pickup(
     map_seed: Optional[int],
     action_timeout_ms: int,
     save_replay_dir: Optional[Path],
+    device: Optional[str] = None,
     candidate_label: Optional[str] = None,
     pool_labels: Optional[list[str]] = None,
 ) -> None:
@@ -92,7 +93,7 @@ def pickup(
                 max_action_time_ms=action_timeout_ms,
                 replay_dir=save_replay_dir,
                 rng=rng,
-                device="cpu",
+                device=device,
             )
             summary = summarize_vor_scenario(
                 rollout,

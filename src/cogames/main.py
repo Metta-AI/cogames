@@ -61,7 +61,7 @@ from cogames.cli.policy import (
     policy_arg_example,
     policy_arg_w_proportion_example,
 )
-from cogames.cli.submit import DEFAULT_SUBMIT_SERVER, results_url_for_season, upload_policy, validate_policy_uri
+from cogames.cli.submit import DEFAULT_SUBMIT_SERVER, results_url_for_season, upload_policy, validate_policy_spec
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
 from mettagrid.config.mettagrid_config import MettaGridConfig
@@ -772,6 +772,13 @@ def play_cmd(
         help="Policy controlling cogs ([bold]noop[/bold], [bold]random[/bold], [bold]lstm[/bold], or path)",
         rich_help_panel="Policy",
     ),
+    device: str = typer.Option(
+        "auto",
+        "--device",
+        metavar="DEVICE",
+        help="Policy device (auto, cpu, cuda, cuda:0, etc.)",
+        rich_help_panel="Policy",
+    ),
     # --- Simulation ---
     steps: int = typer.Option(
         1000,
@@ -866,7 +873,8 @@ def play_cmd(
         if isinstance(map_builder, MapGen.Config):
             map_builder.seed = map_seed
 
-    policy_spec = get_policy_spec(ctx, policy)
+    resolved_device = resolve_training_device(console, device)
+    policy_spec = get_policy_spec(ctx, policy, device=str(resolved_device))
 
     if ctx.get_parameter_source("steps") in (
         ParameterSource.COMMANDLINE,
@@ -883,6 +891,7 @@ def play_cmd(
         env_cfg=env_cfg,
         policy_spec=policy_spec,
         seed=seed,
+        device=str(resolved_device),
         render_mode=render,
         game_name=resolved_mission,
         save_replay=save_replay_dir,
@@ -1466,6 +1475,13 @@ def run_cmd(
         help=f"Policies to evaluate: ({policy_arg_w_proportion_example}...)",
         rich_help_panel="Policy",
     ),
+    device: str = typer.Option(
+        "auto",
+        "--device",
+        metavar="DEVICE",
+        help="Policy device (auto, cpu, cuda, cuda:0, etc.)",
+        rich_help_panel="Policy",
+    ),
     # --- Simulation ---
     episodes: int = typer.Option(
         10,
@@ -1572,7 +1588,8 @@ def run_cmd(
             if isinstance(map_builder, MapGen.Config):
                 map_builder.seed = map_seed
 
-    policy_specs = get_policy_specs_with_proportions(ctx, policies)
+    resolved_device = resolve_training_device(console, device)
+    policy_specs = get_policy_specs_with_proportions(ctx, policies, device=str(resolved_device))
 
     if ctx.info_name == "scrimmage":
         if len(policy_specs) != 1:
@@ -1594,6 +1611,7 @@ def run_cmd(
         action_timeout_ms=action_timeout_ms,
         episodes=episodes,
         seed=seed,
+        device=str(resolved_device),
         output_format=format_,
         save_replay=str(save_replay_dir) if save_replay_dir else None,
     )
@@ -1657,6 +1675,13 @@ def pickup_cmd(
         "--pool",
         metavar="POLICY",
         help="Pool policy (repeatable)",
+        rich_help_panel="Policy",
+    ),
+    device: str = typer.Option(
+        "auto",
+        "--device",
+        metavar="DEVICE",
+        help="Policy device (auto, cpu, cuda, cuda:0, etc.)",
         rich_help_panel="Policy",
     ),
     # --- Simulation ---
@@ -1747,9 +1772,10 @@ def pickup_cmd(
 
     candidate_label = policy
     pool_labels = pool
-    candidate_spec = get_policy_spec(ctx, policy)
+    resolved_device = resolve_training_device(console, device)
+    candidate_spec = get_policy_spec(ctx, policy, device=str(resolved_device))
     try:
-        pool_specs = [parse_policy_spec(spec).to_policy_spec() for spec in pool]
+        pool_specs = [parse_policy_spec(spec, device=str(resolved_device)).to_policy_spec() for spec in pool]
     except (ValueError, ModuleNotFoundError, httpx.HTTPError) as exc:
         translated = _translate_error(exc)
         console.print(f"[yellow]Error parsing pool policy: {translated}[/yellow]\n")
@@ -1766,6 +1792,7 @@ def pickup_cmd(
         map_seed=map_seed,
         action_timeout_ms=action_timeout_ms,
         save_replay_dir=save_replay_dir,
+        device=str(resolved_device),
         candidate_label=candidate_label,
         pool_labels=pool_labels,
     )
@@ -1967,6 +1994,13 @@ def diagnose_cmd(
         help="Agent counts to test (repeatable)",
         rich_help_panel="Evaluation",
     ),
+    device: str = typer.Option(
+        "auto",
+        "--device",
+        metavar="DEVICE",
+        help="Policy device (auto, cpu, cuda, cuda:0, etc.)",
+        rich_help_panel="Evaluation",
+    ),
     # --- Simulation ---
     steps: int = typer.Option(
         1000,
@@ -1997,6 +2031,8 @@ def diagnose_cmd(
 ) -> None:
     script_path = Path(__file__).resolve().parents[2] / "scripts" / "run_evaluation.py"
 
+    resolved_device = resolve_training_device(console, device)
+
     cmd = [sys.executable, str(script_path)]
     cmd.extend(["--mission-set", mission_set])
 
@@ -2011,6 +2047,7 @@ def diagnose_cmd(
     cmd.extend(["--steps", str(steps)])
     cmd.extend(["--repeats", str(episodes)])
     cmd.append("--no-plots")
+    cmd.extend(["--device", str(resolved_device)])
 
     cmd.extend(["--policy", policy])
 
@@ -2048,6 +2085,13 @@ def validate_policy_cmd(
         "-p",
         metavar="POLICY",
         help=f"Policy specification: {policy_arg_example}",
+        rich_help_panel="Policy",
+    ),
+    device: str = typer.Option(
+        "auto",
+        "--device",
+        metavar="DEVICE",
+        help="Policy device (auto, cpu, cuda, cuda:0, etc.)",
         rich_help_panel="Policy",
     ),
     setup_script: Optional[str] = typer.Option(
@@ -2112,7 +2156,14 @@ def validate_policy_cmd(
             raise typer.Exit(1)
         console.print("[green]Setup script completed[/green]")
 
-    validate_policy_uri(policy, env_cfg)
+    resolved_device = resolve_training_device(console, device)
+    policy_spec = get_policy_spec(ctx, policy, device=str(resolved_device))
+    validate_policy_spec(
+        policy_spec,
+        env_cfg,
+        device=str(resolved_device),
+        season=season_info.name,
+    )
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
 
