@@ -212,30 +212,6 @@ uv run python packages/cogames/scripts/run_evaluation.py \
   --output eval_baseline.json
 ```
 
-### Using in Curriculum Training
-
-Both diagnostic and integrated missions can be used in curriculum training via `mission_variant_curriculum.py`:
-
-```python
-from recipes.experiment.cvc import mission_variant_curriculum
-
-# Train on diagnostic missions
-mission_variant_curriculum.train(
-    base_missions=["diagnostic_missions"],
-    num_cogs=4,
-    variants="all"
-)
-
-# Train on specific integrated missions
-mission_variant_curriculum.train(
-    base_missions=["oxygen_bottleneck", "energy_starved"],
-    num_cogs=4,
-    variants=["pack_rat", "energized"]
-)
-```
-
----
-
 ## Design Philosophy
 
 ### Diagnostic Missions
