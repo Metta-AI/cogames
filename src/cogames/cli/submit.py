@@ -192,7 +192,11 @@ def create_bundle(
 
 
 def validate_bundle(policy_uri: str, env_cfg: MettaGridConfig) -> None:
-    """Validate a policy bundle by running a short episode in process isolation."""
+    """Validate a policy bundle by running a short episode in process isolation.
+
+    Policy servers run in an isolated environment with the latest published
+    mettagrid + torch, ensuring validation matches the production environment.
+    """
     env_cfg.game.max_steps = 10
 
     spec = EpisodeSpec(
