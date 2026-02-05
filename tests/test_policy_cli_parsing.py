@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+import cogames.cli.policy as policy_module
 from cogames.cli.policy import parse_policy_spec
 from mettagrid.policy.loader import resolve_policy_class_path
 
@@ -59,6 +60,17 @@ def test_parse_policy_spec_with_metta_uri_and_proportion():
     assert spec.class_path == resolve_policy_class_path("random")
     assert spec.init_kwargs == {"vibe_action_p": "0.5"}
     assert spec.proportion == 0.25
+
+
+def test_parse_policy_spec_applies_device_override_for_uri(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_policy_spec_from_uri(_uri: str, *, device: str = "cpu", remove_downloaded_copy_on_exit: bool = False):
+        return policy_module.PolicySpec(class_path="policy", data_path=None, init_kwargs={})
+
+    monkeypatch.setattr(policy_module, "policy_spec_from_uri", fake_policy_spec_from_uri)
+
+    spec = policy_module.parse_policy_spec("s3://bucket/run:v1.zip", device="cuda")
+
+    assert spec.init_kwargs.get("device") == "cuda"
 
 
 @pytest.mark.parametrize(

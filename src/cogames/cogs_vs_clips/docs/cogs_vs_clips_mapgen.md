@@ -341,11 +341,10 @@ Included missions and variants:
 Usage example:
 
 ```bash
-uv run python packages/cogames/scripts/run_evaluation.py \
-  --policy thinky \
+uv run cogames diagnose thinky \
   --mission-set integrated_evals \
   --cogs 4 \
-  --repeats 2
+  --episodes 2
 ```
 
 Recommendation: When designing new scorable baselines, combine one "shaping" variant (e.g., `HeartChorusVariant`,

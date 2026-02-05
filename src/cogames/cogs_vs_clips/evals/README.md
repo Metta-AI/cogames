@@ -193,23 +193,23 @@ uv run cogames play --mission hello_world.single_use_swarm --cogs 4 -p baseline
 
 ## Programmatic Evaluation
 
-### Using run_evaluation.py
+### Using cogames diagnose / cogames run
 
 For systematic evaluation across multiple missions and configurations:
 
 ```bash
 # Evaluate on integrated eval suite
-uv run python packages/cogames/scripts/run_evaluation.py \
-  --policy thinky \
+uv run cogames diagnose thinky \
   --mission-set integrated_evals \
   --cogs 4 \
-  --repeats 2
+  --episodes 2
 
-# Evaluate specific agent
-uv run python packages/cogames/scripts/run_evaluation.py \
+# Evaluate specific agent with structured output
+uv run cogames run \
+  --mission-set integrated_evals \
   --policy baseline \
-  --steps 1000 \
-  --output eval_baseline.json
+  --episodes 10 \
+  --format json
 ```
 
 ## Design Philosophy
