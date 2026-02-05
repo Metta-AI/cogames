@@ -8,6 +8,7 @@ import uuid
 import zipfile
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from pytest_httpserver import HTTPServer
@@ -17,6 +18,7 @@ from werkzeug import Response
 from cogames.auth import AuthConfigReaderWriter
 from cogames.main import app
 from mettagrid.config.mettagrid_config import MettaGridConfig
+from mettagrid.runner.types import PureSingleEpisodeResult
 
 
 @pytest.fixture
@@ -435,6 +437,11 @@ def _setup_mock_upload_server_with_season(
     ).respond_with_json(seasons)
 
     httpserver.expect_request(
+        "/tournament/configs/cfg-123",
+        method="GET",
+    ).respond_with_json(MettaGridConfig().model_dump(mode="json"))
+
+    httpserver.expect_request(
         "/stats/policies/submit/presigned-url",
         method="POST",
     ).respond_with_json(
@@ -482,13 +489,12 @@ def test_upload_resolves_season_and_validates(
 
     captured: dict[str, Any] = {}
 
-    def fake_validate(bundle_zip, *, season, server):
-        captured["season"] = season
-        captured["server"] = server
+    def fake_subprocess_run(cmd, **kwargs):
+        captured["cmd"] = cmd
         captured["called"] = True
-        return True
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("cogames.cli.submit.validate_bundle", fake_validate)
+    monkeypatch.setattr("cogames.cli.submit.subprocess.run", fake_subprocess_run)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -508,8 +514,7 @@ def test_upload_resolves_season_and_validates(
 
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
     assert captured.get("called") is True
-    assert captured["season"] == "test-season"
-    assert captured["server"] == httpserver.url_for("")
+    assert "validate-bundle" in captured["cmd"]
 
     # seasons + presigned-url + s3 upload + complete = 4 requests
     assert len(httpserver.log) == 4
@@ -529,12 +534,12 @@ def test_upload_skips_validation_when_no_entry_config(
 
     validation_called = False
 
-    def fake_validate(bundle_zip, *, season, server):
+    def fake_subprocess_run(cmd, **kwargs):
         nonlocal validation_called
         validation_called = True
-        return True
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-    monkeypatch.setattr("cogames.cli.submit.validate_bundle", fake_validate)
+    monkeypatch.setattr("cogames.cli.submit.subprocess.run", fake_subprocess_run)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -549,16 +554,16 @@ def test_upload_skips_validation_when_no_entry_config(
             httpserver.url_for(""),
             "--login-server",
             "http://fake-login-server",
+            "--skip-validation",
         ],
     )
 
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
-    assert not validation_called, "Validation should be skipped when no entry config"
+    assert not validation_called, "Validation should be skipped"
 
 
-def test_validate_policy_fetches_config_and_runs(
+def test_validate_bundle_fetches_config_and_runs(
     httpserver: HTTPServer,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     default_cfg = MettaGridConfig()
 
@@ -588,26 +593,30 @@ def test_validate_policy_fetches_config_and_runs(
 
     captured_args: dict[str, Any] = {}
 
-    def fake_validate_policy_spec(policy_spec, env_cfg, *, device: str = "cpu"):
-        captured_args["policy_spec"] = policy_spec
-        captured_args["env_cfg"] = env_cfg
-        captured_args["device"] = device
-
-    monkeypatch.setattr("cogames.main.validate_policy_spec", fake_validate_policy_spec)
+    def fake_run_episode_isolated(spec, _results_path, **_kwargs):
+        captured_args["spec"] = spec
+        captured_args["called"] = True
+        return PureSingleEpisodeResult(
+            rewards=[1.0],
+            action_timeouts=[0],
+            stats={"game": {}, "agent": [{"action.move": 1.0}]},
+            steps=10,
+        )
 
     runner = CliRunner()
-    result = runner.invoke(
-        app,
-        [
-            "validate-policy",
-            "--policy",
-            "class=cogames.policy.starter_agent.StarterPolicy",
-            "--season",
-            "test-season",
-            "--server",
-            httpserver.url_for(""),
-        ],
-    )
+    with patch("cogames.cli.submit.run_episode_isolated", fake_run_episode_isolated):
+        result = runner.invoke(
+            app,
+            [
+                "validate-bundle",
+                "--policy",
+                "class=cogames.policy.starter_agent.StarterPolicy",
+                "--season",
+                "test-season",
+                "--server",
+                httpserver.url_for(""),
+            ],
+        )
 
     assert result.exit_code == 0, f"Validation failed:\n{result.output}"
 
@@ -615,6 +624,5 @@ def test_validate_policy_fetches_config_and_runs(
     config_requests = [req for req, _ in httpserver.log if "/tournament/configs/" in req.path]
     assert len(config_requests) == 1
 
-    assert captured_args.get("env_cfg") is not None
-    assert captured_args["env_cfg"].game.max_steps == default_cfg.game.max_steps
-    assert captured_args["device"] == "cpu"
+    assert captured_args.get("called") is True
+    assert captured_args["spec"].env.game.max_steps == 10

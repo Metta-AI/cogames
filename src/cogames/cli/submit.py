@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import uuid
 import zipfile
@@ -13,7 +14,6 @@ from pathlib import Path
 
 import httpx
 import typer
-from rich.console import Console
 
 from cogames.cli.base import console
 from cogames.cli.client import TournamentServerClient
@@ -21,14 +21,12 @@ from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.policy import PolicySpec, get_policy_spec
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec
-from mettagrid.runner.rollout import run_episode_local
+from mettagrid.runner.episode_runner import run_episode_isolated
+from mettagrid.runner.types import EpisodeSpec
 from mettagrid.util.uri_resolvers.schemes import localize_uri, parse_uri
 
 DEFAULT_SUBMIT_SERVER = "https://api.observatory.softmax-research.net"
-
-
-def results_url_for_season(_server: str, _season: str) -> str:
-    return "https://www.softmax.com/alignmentleague"
+RESULTS_URL = "https://www.softmax.com/alignmentleague"
 
 
 @dataclass
@@ -39,28 +37,27 @@ class UploadResult:
     pools: list[str] | None = None
 
 
-def validate_paths(paths: list[str], console: Console) -> list[Path]:
-    """Validate paths are within CWD and return them as relative paths."""
+def _resolve_path_within_cwd(path_str: str, cwd: Path) -> Path:
+    """Resolve a path and return it relative to CWD. Raises if path escapes CWD."""
+    raw_path = Path(path_str).expanduser()
+    resolved = raw_path.resolve() if raw_path.is_absolute() else (cwd / raw_path).resolve()
+    if not resolved.is_relative_to(cwd):
+        console.print(f"[red]Error:[/red] Path must be within the current directory: {path_str}")
+        raise ValueError(f"Path escapes CWD: {path_str}")
+    return resolved.relative_to(cwd)
+
+
+def validate_paths(paths: list[str]) -> list[Path]:
+    """Validate paths exist and are within CWD, return them as relative paths."""
     cwd = Path.cwd().resolve()
     validated_paths = []
-
     for path_str in paths:
-        raw_path = Path(path_str).expanduser()
-
-        # Resolve the path and check it's within CWD
-        resolved = raw_path.resolve() if raw_path.is_absolute() else (cwd / raw_path).resolve()
-        if not resolved.is_relative_to(cwd):
-            console.print(f"[red]Error:[/red] Path must be within the current directory: {path_str}")
-            raise ValueError(f"Path escapes CWD: {path_str}")
-        relative = resolved.relative_to(cwd)
-
-        # Check if path exists
+        relative = _resolve_path_within_cwd(path_str, cwd)
+        resolved = cwd / relative
         if not resolved.exists():
             console.print(f"[red]Error:[/red] Path does not exist: {path_str}")
             raise FileNotFoundError(f"Path not found: {path_str}")
-
         validated_paths.append(relative)
-
     return validated_paths
 
 
@@ -69,76 +66,6 @@ def _zip_directory_to(src: Path, dest: Path) -> None:
         for file_path in src.rglob("*"):
             if file_path.is_file():
                 zipf.write(file_path, arcname=file_path.relative_to(src))
-
-
-def get_latest_pypi_version(package: str) -> str:
-    """Get the latest published version of a package from PyPI."""
-    response = httpx.get(f"https://pypi.org/pypi/{package}/json")
-    response.raise_for_status()
-    return response.json()["info"]["version"]
-
-
-def get_pypi_requires_python(package: str) -> str:
-    """Get the requires_python constraint from PyPI."""
-    response = httpx.get(f"https://pypi.org/pypi/{package}/json")
-    response.raise_for_status()
-    return response.json()["info"]["requires_python"]
-
-
-def create_temp_validation_env() -> Path:
-    """Create a temporary directory with a minimal pyproject.toml.
-
-    The pyproject.toml depends on the latest published cogames and cogames-agents packages.
-    Python version is constrained to match mettagrid's published wheels.
-    """
-    temp_dir = Path(tempfile.mkdtemp(prefix="cogames_submit_"))
-
-    latest_cogames_version = get_latest_pypi_version("cogames")
-    latest_agents_version = get_latest_pypi_version("cogames-agents")
-    mettagrid_requires_python = get_pypi_requires_python("mettagrid")
-
-    pyproject_content = f"""[project]
-name = "cogames-submission-validator"
-version = "0.1.0"
-requires-python = "{mettagrid_requires_python}"
-dependencies = ["cogames=={latest_cogames_version}", "cogames-agents=={latest_agents_version}"]
-
-[build-system]
-requires = ["setuptools>=42"]
-build-backend = "setuptools.build_meta"
-"""
-
-    pyproject_path = temp_dir / "pyproject.toml"
-    pyproject_path.write_text(pyproject_content)
-
-    return temp_dir
-
-
-def validate_policy_spec(
-    policy_spec: PolicySpec,
-    env_cfg: MettaGridConfig,
-    *,
-    device: str = "cpu",
-) -> None:
-    # Run 1 episode for up to 10 steps to validate the policy works
-    env_cfg.game.max_steps = 10
-    n = env_cfg.game.num_agents
-    n_submitted = min(2, n)
-    noop_spec = PolicySpec(class_path="mettagrid.policy.noop.NoopPolicy")
-    if n_submitted < n:
-        policy_specs = [policy_spec, noop_spec]
-        assignments = [0] * n_submitted + [1] * (n - n_submitted)
-    else:
-        policy_specs = [policy_spec]
-        assignments = [0] * n
-    run_episode_local(
-        policy_specs=policy_specs,
-        assignments=assignments,
-        env=env_cfg,
-        seed=42,
-        max_action_time_ms=10000,
-        device=device,
-    )
 
 
 def _collect_ancestor_init_files(include_files: list[Path]) -> list[Path]:
@@ -232,11 +159,7 @@ def create_bundle(
 
     cwd = Path.cwd().resolve()
     if policy_spec.data_path:
-        resolved = Path(policy_spec.data_path).expanduser().resolve()
-        if not resolved.is_relative_to(cwd):
-            console.print("[red]Error:[/red] Policy weights path must be within the current directory.")
-            raise typer.Exit(1)
-        data_rel = str(resolved.relative_to(cwd))
+        data_rel = str(_resolve_path_within_cwd(policy_spec.data_path, cwd))
         policy_spec = PolicySpec(
             class_path=policy_spec.class_path,
             data_path=data_rel,
@@ -246,11 +169,7 @@ def create_bundle(
 
     setup_script_rel: str | None = None
     if setup_script:
-        resolved = Path(setup_script).expanduser().resolve()
-        if not resolved.is_relative_to(cwd):
-            console.print("[red]Error:[/red] Setup script path must be within the current directory.")
-            raise typer.Exit(1)
-        setup_script_rel = str(resolved.relative_to(cwd))
+        setup_script_rel = str(_resolve_path_within_cwd(setup_script, cwd))
         console.print(f"[dim]Setup script: {setup_script_rel}[/dim]")
 
     files_to_include = []
@@ -263,7 +182,7 @@ def create_bundle(
 
     validated_paths: list[Path] = []
     if files_to_include:
-        validated_paths = validate_paths(files_to_include, console)
+        validated_paths = validate_paths(files_to_include)
         console.print(f"[dim]Including {len(validated_paths)} file(s)[/dim]")
 
     tmp_zip = create_submission_zip(validated_paths, policy_spec, setup_script=setup_script_rel)
@@ -272,58 +191,34 @@ def create_bundle(
     return output
 
 
-def validate_bundle(bundle_zip: Path, *, season: str, server: str) -> bool:
-    console.print(f"[dim]Validating bundle in isolated environment (season={season})...[/dim]")
-    console.print(f"[dim]Bundle: {bundle_zip} ({bundle_zip.stat().st_size / 1024:.0f} KB)[/dim]")
+def validate_bundle(policy_uri: str, env_cfg: MettaGridConfig) -> None:
+    """Validate a policy bundle by running a short episode in process isolation."""
+    env_cfg.game.max_steps = 10
 
-    console.print("[dim]Creating temp validation env with latest published cogames/cogames-agents...[/dim]")
-    temp_dir = create_temp_validation_env()
-    try:
-        bundle_name = bundle_zip.name
-        shutil.copy2(bundle_zip, temp_dir / bundle_name)
+    spec = EpisodeSpec(
+        policy_uris=[policy_uri],
+        assignments=[0] * env_cfg.game.num_agents,
+        env=env_cfg,
+        seed=42,
+        max_action_time_ms=10000,
+    )
 
-        env = os.environ.copy()
-        env["UV_NO_CACHE"] = "1"
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=True) as results_file:
+        res = run_episode_isolated(spec, Path(results_file.name))
+        console.print(f"[dim]Ran for {res.steps} steps[/dim]")
 
-        console.print("[dim]Running: cogames validate-policy in isolated env...[/dim]")
-        res = subprocess.run(
-            [
-                "uv",
-                "run",
-                "cogames",
-                "validate-policy",
-                "--season",
-                season,
-                "--server",
-                server,
-                "--policy",
-                f"file://./{bundle_name}",
-            ],
-            cwd=temp_dir,
-            capture_output=True,
-            text=True,
-            timeout=300,
-            env=env,
+        non_noop_actions = sum(
+            v for k, v in res.stats["agent"][0].items() if k.startswith("action.") and ".noop." not in k
         )
-        if res.returncode != 0:
-            console.print("[red]Validation failed[/red]")
-            console.print(f"\n[red]Error:[/red]\n{res.stderr}")
-            if res.stdout:
-                console.print(f"\n[dim]Output:[/dim]\n{res.stdout}")
-            return False
-
-        console.print("[green]Validation passed[/green]")
-        return True
-    finally:
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir)
+        if non_noop_actions == 0:
+            console.print("[yellow]Warning: Policy took no actions (all no-ops)[/yellow]")
+            raise typer.Exit(1)
 
 
 def upload_submission(
     client: TournamentServerClient,
     zip_path: Path,
     submission_name: str,
-    console: Console,
     season: str | None = None,
 ) -> UploadResult | None:
     """Upload submission to CoGames backend using a presigned S3 URL."""
@@ -381,7 +276,6 @@ def upload_policy(
     dry_run: bool = False,
     skip_validation: bool = False,
     setup_script: str | None = None,
-    validation_season: str = "",
     season: str | None = None,
 ) -> UploadResult | None:
     if dry_run:
@@ -404,9 +298,23 @@ def upload_policy(
         )
 
         if not skip_validation:
-            if not validate_bundle(zip_path, season=validation_season, server=server):
-                console.print("\n[red]Upload aborted due to validation failure.[/red]")
+            cmd = [
+                sys.executable,
+                "-m",
+                "cogames",
+                "validate-bundle",
+                "--policy",
+                zip_path.as_uri(),
+                "--server",
+                server,
+            ]
+            if season:
+                cmd.extend(["--season", season])
+            result = subprocess.run(cmd, text=True, timeout=300)
+            if result.returncode != 0:
+                console.print("[red]Validation failed[/red]")
                 return None
+            console.print("[green]Validation passed[/green]")
         else:
             console.print("[dim]Skipping validation[/dim]")
 
@@ -415,7 +323,7 @@ def upload_policy(
             return None
 
         with client:
-            result = upload_submission(client, zip_path, name, console, season=season)
+            result = upload_submission(client, zip_path, name, season=season)
         if not result:
             console.print("\n[red]Upload failed.[/red]")
             return None

@@ -4,7 +4,6 @@ import zipfile
 from pathlib import Path
 
 import pytest
-from rich.console import Console
 
 from cogames.cli.policy import PolicySpec
 from cogames.cli.submit import create_submission_zip, validate_paths
@@ -14,23 +13,21 @@ from mettagrid.util.uri_resolvers.schemes import localize_uri
 def test_validate_paths_accepts_absolute_within_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "weights.safetensors").write_text("ok")
-    console = Console()
 
-    rel = validate_paths(["weights.safetensors"], console=console)
+    rel = validate_paths(["weights.safetensors"])
     assert rel == [Path("weights.safetensors")]
 
     abs_path = str((tmp_path / "weights.safetensors").resolve())
-    rel2 = validate_paths([abs_path], console=console)
+    rel2 = validate_paths([abs_path])
     assert rel2 == [Path("weights.safetensors")]
 
 
 def test_validate_paths_rejects_outside_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.chdir(tmp_path)
     outside = tmp_path.parent / "outside.txt"
-    console = Console()
 
     with pytest.raises(ValueError):
-        validate_paths([str(outside)], console=console)
+        validate_paths([str(outside)])
 
 
 def test_bundle_uri_directory_is_localized(tmp_path: Path) -> None:

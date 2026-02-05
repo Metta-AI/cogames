@@ -65,11 +65,10 @@ from cogames.cli.policy import (
 )
 from cogames.cli.submit import (
     DEFAULT_SUBMIT_SERVER,
+    RESULTS_URL,
     create_bundle,
-    results_url_for_season,
     upload_policy,
     validate_bundle,
-    validate_policy_spec,
 )
 from cogames.cogs_vs_clips.mission import CvCMission, NumCogsVariant
 from cogames.curricula import make_rotation
@@ -2310,80 +2309,17 @@ def create_bundle_cmd(
 
 @app.command(
     name="validate-bundle",
-    help="Validate a submission bundle zip in an isolated environment",
+    help="Validate a policy bundle runs correctly in process isolation",
     rich_help_panel="Policies",
     add_help_option=False,
 )
 def validate_bundle_cmd(
-    bundle: Path = typer.Argument(  # noqa: B008
-        ...,
-        metavar="BUNDLE",
-        help="Path to the submission bundle zip",
-    ),
-    season: Optional[str] = typer.Option(
-        None,
-        "--season",
-        metavar="SEASON",
-        help="Tournament season (determines which game to validate against)",
-        rich_help_panel="Tournament",
-    ),
-    server: str = typer.Option(
-        DEFAULT_SUBMIT_SERVER,
-        "--server",
-        metavar="URL",
-        help="Tournament server URL (used to resolve default season)",
-        rich_help_panel="Server",
-    ),
-    _help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show this message and exit",
-        is_eager=True,
-        callback=_help_callback,
-        rich_help_panel="Other",
-    ),
-) -> None:
-    if not bundle.exists():
-        console.print(f"[red]Bundle not found:[/red] {bundle}")
-        raise typer.Exit(1)
-
-    season_info = _resolve_season(server, season)
-
-    if validate_bundle(bundle, season=season_info.name, server=server):
-        raise typer.Exit(0)
-    else:
-        raise typer.Exit(1)
-
-
-@app.command(
-    name="validate-policy",
-    help="Validate the policy loads and runs for at least a single step",
-    rich_help_panel="Policies",
-    add_help_option=False,
-)
-def validate_policy_cmd(
-    ctx: typer.Context,
     policy: str = typer.Option(
         ...,
         "--policy",
         "-p",
-        metavar="POLICY",
-        help=f"Policy specification: {policy_arg_example}",
-        rich_help_panel="Policy",
-    ),
-    device: str = typer.Option(
-        "auto",
-        "--device",
-        metavar="DEVICE",
-        help="Policy device (auto, cpu, cuda, cuda:0, etc.)",
-        rich_help_panel="Policy",
-    ),
-    setup_script: Optional[str] = typer.Option(
-        None,
-        "--setup-script",
-        help="Path to a Python setup script to run before loading the policy",
-        rich_help_panel="Policy",
+        metavar="URI",
+        help="Bundle URI (file://, s3://, or local path to .zip or directory)",
     ),
     season: Optional[str] = typer.Option(
         None,
@@ -2418,36 +2354,8 @@ def validate_policy_cmd(
     with TournamentServerClient(server_url=server) as client:
         config_data = client.get_config(entry_pool_info.config_id)
     env_cfg = MettaGridConfig.model_validate(config_data)
+    validate_bundle(policy, env_cfg)
 
-    if setup_script:
-        import subprocess  # noqa: PLC0415
-        import sys  # noqa: PLC0415
-        from pathlib import Path  # noqa: PLC0415
-
-        script_path = Path(setup_script)
-        if not script_path.exists():
-            console.print(f"[red]Setup script not found: {setup_script}[/red]")
-            raise typer.Exit(1)
-        console.print(f"[yellow]Running setup script: {setup_script}[/yellow]")
-        result = subprocess.run(
-            [sys.executable, str(script_path)],
-            cwd=Path.cwd(),
-            capture_output=True,
-            text=True,
-            timeout=300,
-        )
-        if result.returncode != 0:
-            console.print(f"[red]Setup script failed:[/red]\n{result.stderr}")
-            raise typer.Exit(1)
-        console.print("[green]Setup script completed[/green]")
-
-    resolved_device = resolve_training_device(console, device)
-    policy_spec = get_policy_spec(ctx, policy, device=str(resolved_device))
-    validate_policy_spec(
-        policy_spec,
-        env_cfg,
-        device=str(resolved_device),
-    )
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
 
@@ -2574,11 +2482,6 @@ def upload_cmd(
 ) -> None:
     season_info = _resolve_season(server, season)
 
-    has_entry_config = any(p.config_id for p in season_info.pools if p.name == season_info.entry_pool)
-    if not has_entry_config and not skip_validation:
-        console.print("[yellow]Warning: No entry config found for season. Skipping validation.[/yellow]")
-        skip_validation = True
-
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
         for kv in init_kwarg:
@@ -2596,7 +2499,6 @@ def upload_cmd(
         skip_validation=skip_validation,
         init_kwargs=init_kwargs if init_kwargs else None,
         setup_script=setup_script,
-        validation_season=season_info.name,
         season=season_info.name if not no_submit else None,
     )
 
@@ -2604,7 +2506,7 @@ def upload_cmd(
         console.print(f"[green]Upload complete: {result.name}:v{result.version}[/green]")
         if result.pools:
             console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
-            console.print(f"[dim]Results:[/dim] {results_url_for_season(server, season_info.name)}")
+            console.print(f"[dim]Results:[/dim] {RESULTS_URL}")
         elif no_submit:
             console.print(f"\nTo submit to a tournament: cogames submit {result.name}:v{result.version}")
 
@@ -2702,7 +2604,7 @@ def submit_cmd(
     console.print(f"\n[bold green]Submitted to season '{season_name}'[/bold green]")
     if result.pools:
         console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
-    console.print(f"[dim]Results:[/dim] {results_url_for_season(server, season_name)}")
+    console.print(f"[dim]Results:[/dim] {RESULTS_URL}")
     console.print(f"[dim]CLI:[/dim] cogames leaderboard --season {season_name}")
 
 
