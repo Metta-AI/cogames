@@ -18,13 +18,11 @@ from rich.console import Console
 from cogames.cli.base import console
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
-from cogames.cli.mission import get_mission
-from cogames.cli.policy import PolicySpec, get_policy_spec, parse_policy_spec
+from cogames.cli.policy import PolicySpec, get_policy_spec
 from mettagrid.config.mettagrid_config import MettaGridConfig
-from mettagrid.policy.prepare_policy_spec import download_policy_spec_from_s3_as_zip
 from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec
 from mettagrid.runner.rollout import run_episode_local
-from mettagrid.util.uri_resolvers.schemes import parse_uri, resolve_uri
+from mettagrid.util.uri_resolvers.schemes import localize_uri, parse_uri
 
 DEFAULT_SUBMIT_SERVER = "https://api.observatory.softmax-research.net"
 
@@ -66,85 +64,11 @@ def validate_paths(paths: list[str], console: Console) -> list[Path]:
     return validated_paths
 
 
-def _maybe_resolve_checkpoint_bundle_uri(policy: str) -> tuple[Path, bool] | None:
-    """Return (local_zip_path, cleanup) if policy points to a checkpoint bundle URI."""
-    first = policy.split(",", 1)[0].strip()
-    parsed = parse_uri(first, allow_none=True, default_scheme=None)
-    if parsed is None or parsed.scheme not in {"file", "s3"}:
-        return None
-
-    resolved = resolve_uri(first)
-    if resolved.scheme == "s3":
-        if not resolved.canonical.endswith(".zip"):
-            raise ValueError("S3 policy specs must be .zip bundles.")
-        return download_policy_spec_from_s3_as_zip(resolved.canonical), False
-
-    local_path = resolved.local_path
-    if local_path is None:
-        raise ValueError(f"Cannot resolve local path for URI: {policy}")
-    if not local_path.exists():
-        raise FileNotFoundError(f"Bundle path not found: {local_path}")
-    if local_path.is_dir():
-        return _zip_directory_bundle(local_path), True
-    if local_path.suffix == ".zip":
-        return local_path, False
-    raise ValueError("Checkpoint bundle must be a directory or .zip file.")
-
-
-def _zip_directory_bundle(bundle_dir: Path) -> Path:
-    zip_fd, zip_path = tempfile.mkstemp(suffix=".zip", prefix="cogames_bundle_")
-    os.close(zip_fd)
-
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for file_path in bundle_dir.rglob("*"):
+def _zip_directory_to(src: Path, dest: Path) -> None:
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for file_path in src.rglob("*"):
             if file_path.is_file():
-                zipf.write(file_path, arcname=file_path.relative_to(bundle_dir))
-
-    return Path(zip_path)
-
-
-def validate_bundle_in_isolation(policy_zip: Path, console: Console, *, season: str, server: str) -> bool:
-    console.print("[dim]Testing policy bundle can run 10 steps...[/dim]")
-
-    temp_dir = create_temp_validation_env()
-    try:
-        bundle_name = policy_zip.name
-        shutil.copy2(policy_zip, temp_dir / bundle_name)
-
-        env = os.environ.copy()
-        env["UV_NO_CACHE"] = "1"
-
-        res = subprocess.run(
-            [
-                "uv",
-                "run",
-                "cogames",
-                "validate-policy",
-                "--season",
-                season,
-                "--server",
-                server,
-                "--policy",
-                f"file://./{bundle_name}",
-            ],
-            cwd=temp_dir,
-            capture_output=True,
-            text=True,
-            timeout=300,
-            env=env,
-        )
-        if res.returncode != 0:
-            console.print("[red]Validation failed[/red]")
-            console.print(f"\n[red]Error:[/red]\n{res.stderr}")
-            if res.stdout:
-                console.print(f"\n[dim]Output:[/dim]\n{res.stdout}")
-            return False
-
-        console.print("[green]Validation passed[/green]")
-        return True
-    finally:
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir)
+                zipf.write(file_path, arcname=file_path.relative_to(src))
 
 
 def get_latest_pypi_version(package: str) -> str:
@@ -190,60 +114,12 @@ build-backend = "setuptools.build_meta"
     return temp_dir
 
 
-def copy_files_maintaining_structure(files: list[Path], dest_dir: Path) -> None:
-    """Copy files to destination, maintaining directory structure.
-
-    If a file is 'train_dir/model.pt', it will be copied to 'dest_dir/train_dir/model.pt'.
-    """
-    for file_path in files:
-        dest_path = dest_dir / file_path
-
-        if file_path.is_dir():
-            shutil.copytree(file_path, dest_path, dirs_exist_ok=True)
-        else:
-            dest_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(file_path, dest_path)
-
-
-_SEASON_VALIDATION_MISSIONS: dict[str, str] = {
-    "beta": "training_facility.harvest",
-    "beta-cogsguard": "cogsguard_arena.basic",
-}
-_DEFAULT_VALIDATION_MISSION = "cogsguard_arena.basic"
-
-
-def get_validation_mission_for_season(season: str | None = None) -> str:
-    """Get the appropriate mission for validating policies in a given season."""
-    if season is None:
-        return _DEFAULT_VALIDATION_MISSION
-    return _SEASON_VALIDATION_MISSIONS.get(season, _DEFAULT_VALIDATION_MISSION)
-
-
 def validate_policy_spec(
     policy_spec: PolicySpec,
-    env_cfg: MettaGridConfig | None = None,
+    env_cfg: MettaGridConfig,
     *,
     device: str = "cpu",
-    season: str | None = None,
 ) -> None:
-    """Validate policy works.
-
-    Runs a single episode (up to 10 steps) using the same alo rollout flow as `cogames eval`.
-
-    Args:
-        policy_spec: The policy to validate.
-        env_cfg: Optional environment config to validate against.
-        device: Target device for policy evaluation (cpu/cuda/auto).
-        season: Optional season name to determine which game to validate against.
-    """
-    if env_cfg is None:
-        mission_name = get_validation_mission_for_season(season)
-        # Legacy seasons (e.g., "beta") use legacy missions that require include_legacy=True
-        include_legacy = season in _SEASON_VALIDATION_MISSIONS
-        _, env_cfg, _ = get_mission(mission_name, include_legacy=include_legacy)
-    else:
-        env_cfg = env_cfg.model_copy()
-
     # Run 1 episode for up to 10 steps to validate the policy works
     env_cfg.game.max_steps = 10
     n = env_cfg.game.num_agents
@@ -263,81 +139,6 @@ def validate_policy_spec(
         max_action_time_ms=10000,
         device=device,
     )
-
-
-def validate_policy_uri(policy_uri: str, env_cfg: MettaGridConfig, *, device: str = "cpu") -> None:
-    policy_spec = parse_policy_spec(policy_uri, device=device).to_policy_spec()
-    validate_policy_spec(policy_spec, env_cfg, device=device)
-
-
-def validate_policy_in_isolation(
-    policy_spec: PolicySpec,
-    include_files: list[Path],
-    console: Console,
-    setup_script: str | None = None,
-    *,
-    season: str,
-    server: str,
-) -> bool:
-    def _format_policy_arg(spec: PolicySpec) -> str:
-        parts = [f"class={spec.class_path}"]
-        if spec.data_path:
-            parts.append(f"data={spec.data_path}")
-        for key, value in spec.init_kwargs.items():
-            parts.append(f"kw.{key}={value}")
-        return ",".join(parts)
-
-    console.print("[dim]Testing policy can run 10 steps...[/dim]")
-
-    temp_dir = create_temp_validation_env()
-    try:
-        copy_files_maintaining_structure(include_files, temp_dir)
-
-        policy_arg = _format_policy_arg(policy_spec)
-
-        def _run_from_tmp_dir(cmd: list[str]) -> subprocess.CompletedProcess[str]:
-            env = os.environ.copy()
-            env["UV_NO_CACHE"] = "1"
-            res = subprocess.run(
-                cmd,
-                cwd=temp_dir,
-                capture_output=True,
-                text=True,
-                timeout=300,
-                env=env,
-            )
-            if not res.returncode == 0:
-                console.print("[red]Validation failed[/red]")
-                console.print(f"\n[red]Error:[/red]\n{res.stderr}")
-                if res.stdout:
-                    console.print(f"\n[dim]Output:[/dim]\n{res.stdout}")
-                raise Exception("Validation failed")
-            return res
-
-        _run_from_tmp_dir(["uv", "run", "cogames", "version"])
-
-        validate_cmd = [
-            "uv",
-            "run",
-            "cogames",
-            "validate-policy",
-            "--policy",
-            policy_arg,
-            "--season",
-            season,
-            "--server",
-            server,
-        ]
-        if setup_script:
-            validate_cmd.extend(["--setup-script", setup_script])
-
-        _run_from_tmp_dir(validate_cmd)
-
-        console.print("[green]Validation passed[/green]")
-        return True
-    finally:
-        if temp_dir.exists():
-            shutil.rmtree(temp_dir)
 
 
 def _collect_ancestor_init_files(include_files: list[Path]) -> list[Path]:
@@ -392,6 +193,132 @@ def create_submission_zip(
     return Path(zip_path)
 
 
+def create_bundle(
+    ctx: typer.Context,
+    policy: str,
+    output: Path,
+    include_files: list[str] | None = None,
+    init_kwargs: dict[str, str] | None = None,
+    setup_script: str | None = None,
+) -> Path:
+    # TODO: Unify the two paths below. For URI inputs, extract the PolicySpec from the
+    # bundle so we can apply init_kwargs/include_files/setup_script, then re-zip.
+    local = localize_uri(policy) if parse_uri(policy, allow_none=True, default_scheme=None) else None
+    if local is not None:
+        if init_kwargs or include_files or setup_script:
+            console.print("[red]Error:[/red] Extra files/kwargs are not supported with bundle URIs.")
+            raise typer.Exit(1)
+        console.print(f"[dim]Packaging existing bundle: {local}[/dim]")
+        if local.is_dir():
+            _zip_directory_to(local, output)
+        else:
+            shutil.copy2(local, output)
+        console.print(f"[dim]Bundle size: {output.stat().st_size / 1024:.0f} KB[/dim]")
+        return output
+
+    policy_spec = get_policy_spec(ctx, policy)
+    console.print(f"[dim]Policy class: {policy_spec.class_path}[/dim]")
+
+    if init_kwargs:
+        merged_kwargs = {**policy_spec.init_kwargs, **init_kwargs}
+        policy_spec = PolicySpec(
+            class_path=policy_spec.class_path,
+            data_path=policy_spec.data_path,
+            init_kwargs=merged_kwargs,
+        )
+
+    if policy_spec.init_kwargs:
+        console.print(f"[dim]Init kwargs: {policy_spec.init_kwargs}[/dim]")
+
+    cwd = Path.cwd().resolve()
+    if policy_spec.data_path:
+        resolved = Path(policy_spec.data_path).expanduser().resolve()
+        if not resolved.is_relative_to(cwd):
+            console.print("[red]Error:[/red] Policy weights path must be within the current directory.")
+            raise typer.Exit(1)
+        data_rel = str(resolved.relative_to(cwd))
+        policy_spec = PolicySpec(
+            class_path=policy_spec.class_path,
+            data_path=data_rel,
+            init_kwargs=policy_spec.init_kwargs,
+        )
+        console.print(f"[dim]Data path: {data_rel}[/dim]")
+
+    setup_script_rel: str | None = None
+    if setup_script:
+        resolved = Path(setup_script).expanduser().resolve()
+        if not resolved.is_relative_to(cwd):
+            console.print("[red]Error:[/red] Setup script path must be within the current directory.")
+            raise typer.Exit(1)
+        setup_script_rel = str(resolved.relative_to(cwd))
+        console.print(f"[dim]Setup script: {setup_script_rel}[/dim]")
+
+    files_to_include = []
+    if policy_spec.data_path:
+        files_to_include.append(policy_spec.data_path)
+    if setup_script_rel:
+        files_to_include.append(setup_script_rel)
+    if include_files:
+        files_to_include.extend(include_files)
+
+    validated_paths: list[Path] = []
+    if files_to_include:
+        validated_paths = validate_paths(files_to_include, console)
+        console.print(f"[dim]Including {len(validated_paths)} file(s)[/dim]")
+
+    tmp_zip = create_submission_zip(validated_paths, policy_spec, setup_script=setup_script_rel)
+    shutil.move(str(tmp_zip), str(output))
+    console.print(f"[dim]Bundle size: {output.stat().st_size / 1024:.0f} KB[/dim]")
+    return output
+
+
+def validate_bundle(bundle_zip: Path, *, season: str, server: str) -> bool:
+    console.print(f"[dim]Validating bundle in isolated environment (season={season})...[/dim]")
+    console.print(f"[dim]Bundle: {bundle_zip} ({bundle_zip.stat().st_size / 1024:.0f} KB)[/dim]")
+
+    console.print("[dim]Creating temp validation env with latest published cogames/cogames-agents...[/dim]")
+    temp_dir = create_temp_validation_env()
+    try:
+        bundle_name = bundle_zip.name
+        shutil.copy2(bundle_zip, temp_dir / bundle_name)
+
+        env = os.environ.copy()
+        env["UV_NO_CACHE"] = "1"
+
+        console.print("[dim]Running: cogames validate-policy in isolated env...[/dim]")
+        res = subprocess.run(
+            [
+                "uv",
+                "run",
+                "cogames",
+                "validate-policy",
+                "--season",
+                season,
+                "--server",
+                server,
+                "--policy",
+                f"file://./{bundle_name}",
+            ],
+            cwd=temp_dir,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env=env,
+        )
+        if res.returncode != 0:
+            console.print("[red]Validation failed[/red]")
+            console.print(f"\n[red]Error:[/red]\n{res.stderr}")
+            if res.stdout:
+                console.print(f"\n[dim]Output:[/dim]\n{res.stdout}")
+            return False
+
+        console.print("[green]Validation passed[/green]")
+        return True
+    finally:
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir)
+
+
 def upload_submission(
     client: TournamentServerClient,
     zip_path: Path,
@@ -443,55 +370,6 @@ def upload_submission(
         raise ValueError(f"Invalid submission ID returned: {submission_id}") from exc
 
 
-def _upload_policy_bundle(
-    bundle_result: tuple[Path, bool],
-    *,
-    client: TournamentServerClient,
-    name: str,
-    console: Console,
-    init_kwargs: dict[str, str] | None,
-    include_files: list[str] | None,
-    setup_script: str | None,
-    skip_validation: bool,
-    dry_run: bool,
-    validation_season: str,
-    server: str,
-    season: str | None = None,
-) -> UploadResult | None:
-    bundle_zip, cleanup_bundle_zip = bundle_result
-
-    try:
-        if init_kwargs or include_files or setup_script:
-            console.print("[red]Error:[/red] Extra files/kwargs are not supported when uploading a bundle URI.")
-            console.print(
-                "Upload the bundle as-is, or use a short policy name or URI with local files to "
-                "build a new submission zip."
-            )
-            return None
-
-        if not skip_validation:
-            if not validate_bundle_in_isolation(bundle_zip, console, season=validation_season, server=server):
-                console.print("\n[red]Upload aborted due to validation failure.[/red]")
-                return None
-        else:
-            console.print("[dim]Skipping validation[/dim]")
-
-        if dry_run:
-            console.print("[green]Dry run complete[/green]")
-            return None
-
-        with client:
-            result = upload_submission(client, bundle_zip, name, console, season=season)
-        if not result:
-            console.print("\n[red]Upload failed.[/red]")
-            return None
-
-        return result
-    finally:
-        if cleanup_bundle_zip and bundle_zip.exists():
-            bundle_zip.unlink()
-
-
 def upload_policy(
     ctx: typer.Context,
     policy: str,
@@ -513,92 +391,29 @@ def upload_policy(
     if not client:
         return None
 
-    bundle_result = _maybe_resolve_checkpoint_bundle_uri(policy)
+    with tempfile.TemporaryDirectory(prefix="cogames_bundle_") as tmp_dir:
+        zip_path = Path(tmp_dir) / "bundle.zip"
 
-    if bundle_result is not None:
-        return _upload_policy_bundle(
-            bundle_result,
-            client=client,
-            name=name,
-            console=console,
-            init_kwargs=init_kwargs,
+        create_bundle(
+            ctx=ctx,
+            policy=policy,
+            output=zip_path,
             include_files=include_files,
+            init_kwargs=init_kwargs,
             setup_script=setup_script,
-            skip_validation=skip_validation,
-            dry_run=dry_run,
-            validation_season=validation_season,
-            server=server,
-            season=season,
         )
 
-    policy_spec = get_policy_spec(ctx, policy)
+        if not skip_validation:
+            if not validate_bundle(zip_path, season=validation_season, server=server):
+                console.print("\n[red]Upload aborted due to validation failure.[/red]")
+                return None
+        else:
+            console.print("[dim]Skipping validation[/dim]")
 
-    if init_kwargs:
-        merged_kwargs = {**policy_spec.init_kwargs, **init_kwargs}
-        policy_spec = PolicySpec(
-            class_path=policy_spec.class_path,
-            data_path=policy_spec.data_path,
-            init_kwargs=merged_kwargs,
-        )
-
-    cwd = Path.cwd().resolve()
-    if policy_spec.data_path:
-        resolved = Path(policy_spec.data_path).expanduser().resolve()
-        if not resolved.is_relative_to(cwd):
-            console.print("[red]Error:[/red] Policy weights path must be within the current directory.")
-            console.print(f"[dim]{policy_spec.data_path}[/dim]")
-            raise ValueError("Policy weights path must be within the current directory.")
-        data_rel = str(resolved.relative_to(cwd))
-        policy_spec = PolicySpec(
-            class_path=policy_spec.class_path,
-            data_path=data_rel,
-            init_kwargs=policy_spec.init_kwargs,
-        )
-
-    setup_script_rel: str | None = None
-    if setup_script:
-        resolved = Path(setup_script).expanduser().resolve()
-        if not resolved.is_relative_to(cwd):
-            console.print("[red]Error:[/red] Setup script path must be within the current directory.")
-            console.print(f"[dim]{setup_script}[/dim]")
-            raise ValueError("Setup script path must be within the current directory.")
-        setup_script_rel = str(resolved.relative_to(cwd))
-
-    files_to_include = []
-    if policy_spec.data_path:
-        files_to_include.append(policy_spec.data_path)
-    if setup_script_rel:
-        files_to_include.append(setup_script_rel)
-    if include_files:
-        files_to_include.extend(include_files)
-
-    validated_paths: list[Path] = []
-    if files_to_include:
-        validated_paths = validate_paths(files_to_include, console)
-
-    if not skip_validation:
-        if not validate_policy_in_isolation(
-            policy_spec,
-            validated_paths,
-            console,
-            setup_script=setup_script_rel,
-            season=validation_season,
-            server=server,
-        ):
-            console.print("\n[red]Upload aborted due to validation failure.[/red]")
+        if dry_run:
+            console.print("[green]Dry run complete[/green]")
             return None
-    else:
-        console.print("[dim]Skipping validation[/dim]")
 
-    zip_path = create_submission_zip(validated_paths, policy_spec, setup_script=setup_script_rel)
-
-    if dry_run:
-        console.print("[green]Dry run complete[/green]")
-        if zip_path.exists():
-            zip_path.unlink()
-        return None
-
-    try:
         with client:
             result = upload_submission(client, zip_path, name, console, season=season)
         if not result:
@@ -606,6 +421,3 @@ def upload_policy(
             return None
 
         return result
-    finally:
-        if zip_path.exists():
-            zip_path.unlink()
