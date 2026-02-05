@@ -261,11 +261,11 @@ uv run cogames play --mission evals.diagnostic_assemble_seeded_search -p baselin
 
 ```bash
 # Run full evaluation suite
-uv run python packages/cogames/scripts/run_evaluation.py
+uv run cogames diagnose ladybug -S all
 
 # Evaluate specific agent
-uv run python packages/cogames/scripts/run_evaluation.py --policy baseline
-uv run python packages/cogames/scripts/run_evaluation.py --policy ladybug
+uv run cogames diagnose baseline
+uv run cogames diagnose ladybug
 ```
 
 ## Evaluation Results

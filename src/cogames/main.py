@@ -8,6 +8,7 @@ from cogames.cli.utils import suppress_noisy_logs
 
 suppress_noisy_logs()
 
+import importlib
 import importlib.metadata
 import importlib.util
 import json
@@ -17,6 +18,7 @@ import subprocess
 import sys
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional, TypeVar
 
@@ -62,6 +64,7 @@ from cogames.cli.policy import (
     policy_arg_w_proportion_example,
 )
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER, results_url_for_season, upload_policy, validate_policy_spec
+from cogames.cogs_vs_clips.mission import CvCMission, NumCogsVariant
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
 from mettagrid.config.mettagrid_config import MettaGridConfig
@@ -84,6 +87,158 @@ logger = logging.getLogger("cogames.main")
 
 
 T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class DiagnoseCase:
+    name: str
+    env_cfg: MettaGridConfig
+
+
+def _load_eval_missions(module_path: str) -> list[CvCMission]:
+    module = importlib.import_module(module_path)
+    missions = getattr(module, "EVAL_MISSIONS", None)
+    if missions is None:
+        raise AttributeError(f"Module '{module_path}' does not define EVAL_MISSIONS")
+    return list(missions)
+
+
+def _load_diagnose_missions(mission_set: str) -> list[CvCMission]:
+    if mission_set == "thinky_evals":
+        return []
+
+    if mission_set == "all":
+        from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS  # noqa: PLC0415
+        from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
+        from cogames.cogs_vs_clips.missions import MISSIONS as ALL_MISSIONS  # noqa: PLC0415
+
+        missions_list: list[CvCMission] = []
+        missions_list.extend(COGSGUARD_EVAL_MISSIONS)
+        missions_list.extend(_load_eval_missions("cogames.cogs_vs_clips.evals.integrated_evals"))
+        missions_list.extend(_load_eval_missions("cogames.cogs_vs_clips.evals.spanning_evals"))
+        missions_list.extend([mission_cls() for mission_cls in DIAGNOSTIC_EVALS])  # type: ignore[call-arg]
+        eval_mission_names = {mission.name for mission in missions_list}
+        for mission in ALL_MISSIONS:
+            if mission.name not in eval_mission_names:
+                missions_list.append(mission)
+        return missions_list
+
+    if mission_set == "cogsguard_evals":
+        from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS  # noqa: PLC0415
+
+        return list(COGSGUARD_EVAL_MISSIONS)
+
+    if mission_set == "diagnostic_evals":
+        from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
+
+        return [mission_cls() for mission_cls in DIAGNOSTIC_EVALS]  # type: ignore[call-arg]
+
+    if mission_set == "tournament":
+        from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
+
+        missions_list = []
+        missions_list.extend(_load_eval_missions("cogames.cogs_vs_clips.evals.integrated_evals"))
+        missions_list.extend([mission_cls() for mission_cls in DIAGNOSTIC_EVALS])  # type: ignore[call-arg]
+        return missions_list
+
+    if mission_set == "integrated_evals":
+        return _load_eval_missions("cogames.cogs_vs_clips.evals.integrated_evals")
+
+    if mission_set == "spanning_evals":
+        return _load_eval_missions("cogames.cogs_vs_clips.evals.spanning_evals")
+
+    raise ValueError(f"Unknown mission set: {mission_set}")
+
+
+def _build_thinky_mission_map() -> dict[str, CvCMission]:
+    from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS  # noqa: PLC0415
+    from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
+    from cogames.cogs_vs_clips.missions import MISSIONS as ALL_MISSIONS  # noqa: PLC0415
+
+    missions: list[CvCMission] = []
+    missions.extend(_load_eval_missions("cogames.cogs_vs_clips.evals.integrated_evals"))
+    missions.extend(_load_eval_missions("cogames.cogs_vs_clips.evals.spanning_evals"))
+    missions.extend([mission_cls() for mission_cls in DIAGNOSTIC_EVALS])  # type: ignore[call-arg]
+    missions.extend(COGSGUARD_EVAL_MISSIONS)
+    missions.extend(ALL_MISSIONS)
+
+    mission_map: dict[str, CvCMission] = {}
+    for mission in missions:
+        mission_map.setdefault(mission.name, mission)
+    return mission_map
+
+
+def _matches_experiment(mission_name: str, experiment_filters: set[str]) -> bool:
+    if not experiment_filters:
+        return True
+    if mission_name in experiment_filters:
+        return True
+    suffix = f".{mission_name}"
+    return any(name.endswith(suffix) for name in experiment_filters)
+
+
+def _cogs_for_mission(mission: CvCMission, cogs_list: list[int], respect_cogs_list: bool) -> list[int]:
+    fixed_cogs = getattr(mission, "num_cogs", None)
+    if fixed_cogs is not None:
+        if respect_cogs_list and fixed_cogs not in cogs_list:
+            return []
+        return [fixed_cogs]
+    site = getattr(mission, "site", None)
+    if site is None:
+        return list(cogs_list)
+    min_cogs = getattr(site, "min_cogs", None)
+    max_cogs = getattr(site, "max_cogs", None)
+    return [
+        num_cogs
+        for num_cogs in cogs_list
+        if (min_cogs is None or num_cogs >= min_cogs) and (max_cogs is None or num_cogs <= max_cogs)
+    ]
+
+
+def _build_diagnose_case(mission: CvCMission, num_cogs: int, steps: int) -> DiagnoseCase:
+    mission_with_cogs = mission.with_variants([NumCogsVariant(num_cogs=num_cogs)])
+    env_cfg = mission_with_cogs.make_env()
+    env_cfg.game.max_steps = steps
+    name = f"{mission.full_name()} (cogs={num_cogs})"
+    return DiagnoseCase(name=name, env_cfg=env_cfg)
+
+
+def _build_diagnose_cases(
+    *,
+    mission_set: str,
+    experiments: Optional[list[str]],
+    cogs: Optional[list[int]],
+    steps: int,
+) -> list[DiagnoseCase]:
+    experiment_filters = set(experiments or [])
+    cogs_list = cogs if cogs else [1, 2, 4]
+    respect_cogs_list = cogs is not None
+    cases: list[DiagnoseCase] = []
+
+    if mission_set == "thinky_evals":
+        from cogames_agents.policy.nim_agents.thinky_eval import EVALS as THINKY_EVALS  # noqa: PLC0415
+
+        mission_map = _build_thinky_mission_map()
+        for exp_name, _tag, num_cogs in THINKY_EVALS:
+            if not _matches_experiment(exp_name, experiment_filters):
+                continue
+            if respect_cogs_list and num_cogs not in cogs_list:
+                continue
+            base_mission = mission_map.get(exp_name)
+            if base_mission is None:
+                logger.warning("Thinky eval mission '%s' not found; skipping.", exp_name)
+                continue
+            cases.append(_build_diagnose_case(base_mission, num_cogs, steps))
+        return cases
+
+    missions = _load_diagnose_missions(mission_set)
+    for mission in missions:
+        if not _matches_experiment(mission.name, experiment_filters):
+            continue
+        for num_cogs in _cogs_for_mission(mission, cogs_list, respect_cogs_list):
+            cases.append(_build_diagnose_case(mission, num_cogs, steps))
+
+    return cases
 
 
 def _resolve_mettascope_script() -> Path:
@@ -1958,6 +2113,7 @@ app.command(
     add_help_option=False,
 )
 def diagnose_cmd(
+    ctx: typer.Context,
     policy: str = typer.Argument(
         ...,
         metavar="POLICY",
@@ -2030,31 +2186,30 @@ def diagnose_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    script_path = Path(__file__).resolve().parents[2] / "scripts" / "run_evaluation.py"
-
     resolved_device = resolve_training_device(console, device)
+    policy_spec = get_policy_spec(ctx, policy, device=str(resolved_device))
 
-    cmd = [sys.executable, str(script_path)]
-    cmd.extend(["--mission-set", mission_set])
+    cases = _build_diagnose_cases(
+        mission_set=mission_set,
+        experiments=experiments,
+        cogs=cogs,
+        steps=steps,
+    )
+    if not cases:
+        console.print("[red]No evaluation cases matched your filters.[/red]")
+        raise typer.Exit(1)
 
-    if experiments:
-        cmd.append("--experiments")
-        cmd.extend(experiments)
-
-    if cogs:
-        cmd.append("--cogs")
-        cmd.extend(str(c) for c in cogs)
-
-    cmd.extend(["--steps", str(steps)])
-    cmd.extend(["--repeats", str(episodes)])
-    cmd.append("--no-plots")
-    cmd.extend(["--device", str(resolved_device)])
-
-    cmd.extend(["--policy", policy])
-
-    console.print("[cyan]Running diagnostic evaluation...[/cyan]")
-    console.print(f"[dim]{' '.join(cmd)}[/dim]")
-    subprocess.run(cmd, check=True)
+    console.print(f"[cyan]Running diagnostic evaluation ({len(cases)} cases)...[/cyan]")
+    evaluate_module.evaluate(
+        console,
+        missions=[(case.name, case.env_cfg) for case in cases],
+        policy_specs=[policy_spec],
+        proportions=[1.0],
+        action_timeout_ms=10000,
+        episodes=episodes,
+        seed=42,
+        device=str(resolved_device),
+    )
 
 
 def _resolve_season(server: str, season_name: str | None = None) -> SeasonInfo:
