@@ -7,7 +7,8 @@ import pytest
 from rich.console import Console
 
 from cogames.cli.policy import PolicySpec
-from cogames.cli.submit import _maybe_resolve_checkpoint_bundle_uri, create_submission_zip, validate_paths
+from cogames.cli.submit import create_submission_zip, validate_paths
+from mettagrid.util.uri_resolvers.schemes import localize_uri
 
 
 def test_validate_paths_accepts_absolute_within_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -32,7 +33,7 @@ def test_validate_paths_rejects_outside_cwd(tmp_path: Path, monkeypatch: pytest.
         validate_paths([str(outside)], console=console)
 
 
-def test_bundle_uri_directory_is_zipped(tmp_path: Path) -> None:
+def test_bundle_uri_directory_is_localized(tmp_path: Path) -> None:
     bundle_dir = tmp_path / "bundle"
     bundle_dir.mkdir()
     (bundle_dir / "policy_spec.json").write_text(
@@ -40,28 +41,19 @@ def test_bundle_uri_directory_is_zipped(tmp_path: Path) -> None:
     )
     (bundle_dir / "weights.safetensors").write_text("ok")
 
-    zip_path = None
-    try:
-        resolved = _maybe_resolve_checkpoint_bundle_uri(bundle_dir.as_uri())
-        assert resolved is not None
-        zip_path, cleanup = resolved
-        assert cleanup is True
-        assert zip_path.exists()
-
-        with zipfile.ZipFile(zip_path) as zf:
-            assert set(zf.namelist()) == {"policy_spec.json", "weights.safetensors"}
-    finally:
-        if zip_path and zip_path.exists():
-            zip_path.unlink()
+    local = localize_uri(bundle_dir.as_uri())
+    assert local is not None
+    assert local == bundle_dir
+    assert local.is_dir()
 
 
-def test_bundle_uri_zip_is_reused(tmp_path: Path) -> None:
+def test_bundle_uri_zip_is_localized(tmp_path: Path) -> None:
     bundle_zip = tmp_path / "bundle.zip"
     with zipfile.ZipFile(bundle_zip, "w") as zf:
         zf.writestr("policy_spec.json", '{"class_path": "foo.Bar", "data_path": null, "init_kwargs": {}}')
 
-    resolved = _maybe_resolve_checkpoint_bundle_uri(bundle_zip.as_uri())
-    assert resolved == (bundle_zip, False)
+    local = localize_uri(bundle_zip.as_uri())
+    assert local == bundle_zip
 
 
 def test_create_submission_zip_includes_ancestor_inits(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -482,13 +482,13 @@ def test_upload_resolves_season_and_validates(
 
     captured: dict[str, Any] = {}
 
-    def fake_validate(policy_zip, console, *, season, server):
+    def fake_validate(bundle_zip, *, season, server):
         captured["season"] = season
         captured["server"] = server
         captured["called"] = True
         return True
 
-    monkeypatch.setattr("cogames.cli.submit.validate_bundle_in_isolation", fake_validate)
+    monkeypatch.setattr("cogames.cli.submit.validate_bundle", fake_validate)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -529,12 +529,12 @@ def test_upload_skips_validation_when_no_entry_config(
 
     validation_called = False
 
-    def fake_validate(policy_zip, console, *, season, server):
+    def fake_validate(bundle_zip, *, season, server):
         nonlocal validation_called
         validation_called = True
         return True
 
-    monkeypatch.setattr("cogames.cli.submit.validate_bundle_in_isolation", fake_validate)
+    monkeypatch.setattr("cogames.cli.submit.validate_bundle", fake_validate)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -588,11 +588,10 @@ def test_validate_policy_fetches_config_and_runs(
 
     captured_args: dict[str, Any] = {}
 
-    def fake_validate_policy_spec(policy_spec, env_cfg, *, device: str = "cpu", season: str | None = None):
+    def fake_validate_policy_spec(policy_spec, env_cfg, *, device: str = "cpu"):
         captured_args["policy_spec"] = policy_spec
         captured_args["env_cfg"] = env_cfg
         captured_args["device"] = device
-        captured_args["season"] = season
 
     monkeypatch.setattr("cogames.main.validate_policy_spec", fake_validate_policy_spec)
 
@@ -619,4 +618,3 @@ def test_validate_policy_fetches_config_and_runs(
     assert captured_args.get("env_cfg") is not None
     assert captured_args["env_cfg"].game.max_steps == default_cfg.game.max_steps
     assert captured_args["device"] == "cpu"
-    assert captured_args["season"] == "test-season"

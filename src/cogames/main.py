@@ -63,7 +63,14 @@ from cogames.cli.policy import (
     policy_arg_example,
     policy_arg_w_proportion_example,
 )
-from cogames.cli.submit import DEFAULT_SUBMIT_SERVER, results_url_for_season, upload_policy, validate_policy_spec
+from cogames.cli.submit import (
+    DEFAULT_SUBMIT_SERVER,
+    create_bundle,
+    results_url_for_season,
+    upload_policy,
+    validate_bundle,
+    validate_policy_spec,
+)
 from cogames.cogs_vs_clips.mission import CvCMission, NumCogsVariant
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
@@ -2228,6 +2235,128 @@ def _resolve_season(server: str, season_name: str | None = None) -> SeasonInfo:
 
 
 @app.command(
+    name="create-bundle",
+    help="Create a submission bundle zip from a policy",
+    rich_help_panel="Policies",
+    add_help_option=False,
+)
+def create_bundle_cmd(
+    ctx: typer.Context,
+    policy: str = typer.Option(
+        ...,
+        "--policy",
+        "-p",
+        metavar="POLICY",
+        help=f"Policy specification: {policy_arg_example}",
+        rich_help_panel="Policy",
+    ),
+    output: Path = typer.Option(  # noqa: B008
+        Path("submission.zip"),
+        "--output",
+        "-o",
+        metavar="PATH",
+        help="Output path for the bundle zip",
+        rich_help_panel="Output",
+    ),
+    init_kwarg: Optional[list[str]] = typer.Option(  # noqa: B008
+        None,
+        "--init-kwarg",
+        "-k",
+        metavar="KEY=VAL",
+        help="Policy init kwargs (can be repeated)",
+        rich_help_panel="Policy",
+    ),
+    include_files: Optional[list[str]] = typer.Option(  # noqa: B008
+        None,
+        "--include-files",
+        "-f",
+        metavar="PATH",
+        help="Files or directories to include (can be repeated)",
+        rich_help_panel="Files",
+    ),
+    setup_script: Optional[str] = typer.Option(
+        None,
+        "--setup-script",
+        metavar="PATH",
+        help="Python setup script to include in the bundle",
+        rich_help_panel="Files",
+    ),
+    _help: bool = typer.Option(
+        False,
+        "--help",
+        "-h",
+        help="Show this message and exit",
+        is_eager=True,
+        callback=_help_callback,
+        rich_help_panel="Other",
+    ),
+) -> None:
+    init_kwargs: dict[str, str] = {}
+    if init_kwarg:
+        for kv in init_kwarg:
+            key, val = _parse_init_kwarg(kv)
+            init_kwargs[key] = val
+
+    result_path = create_bundle(
+        ctx=ctx,
+        policy=policy,
+        output=output.resolve(),
+        include_files=include_files,
+        init_kwargs=init_kwargs if init_kwargs else None,
+        setup_script=setup_script,
+    )
+    console.print(f"[green]Bundle created:[/green] {result_path}")
+
+
+@app.command(
+    name="validate-bundle",
+    help="Validate a submission bundle zip in an isolated environment",
+    rich_help_panel="Policies",
+    add_help_option=False,
+)
+def validate_bundle_cmd(
+    bundle: Path = typer.Argument(  # noqa: B008
+        ...,
+        metavar="BUNDLE",
+        help="Path to the submission bundle zip",
+    ),
+    season: Optional[str] = typer.Option(
+        None,
+        "--season",
+        metavar="SEASON",
+        help="Tournament season (determines which game to validate against)",
+        rich_help_panel="Tournament",
+    ),
+    server: str = typer.Option(
+        DEFAULT_SUBMIT_SERVER,
+        "--server",
+        metavar="URL",
+        help="Tournament server URL (used to resolve default season)",
+        rich_help_panel="Server",
+    ),
+    _help: bool = typer.Option(
+        False,
+        "--help",
+        "-h",
+        help="Show this message and exit",
+        is_eager=True,
+        callback=_help_callback,
+        rich_help_panel="Other",
+    ),
+) -> None:
+    if not bundle.exists():
+        console.print(f"[red]Bundle not found:[/red] {bundle}")
+        raise typer.Exit(1)
+
+    season_info = _resolve_season(server, season)
+
+    if validate_bundle(bundle, season=season_info.name, server=server):
+        raise typer.Exit(0)
+    else:
+        raise typer.Exit(1)
+
+
+@app.command(
     name="validate-policy",
     help="Validate the policy loads and runs for at least a single step",
     rich_help_panel="Policies",
@@ -2318,7 +2447,6 @@ def validate_policy_cmd(
         policy_spec,
         env_cfg,
         device=str(resolved_device),
-        season=season_info.name,
     )
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
