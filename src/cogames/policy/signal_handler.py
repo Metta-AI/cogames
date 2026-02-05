@@ -12,7 +12,7 @@ class DeferSigintContextManager:
     The first observed SIGINT follows python's default behavior (raises a KeyboardInterrupt).
 
     After any subsequent SIGINTs, or when exiting this context manager's suite, any previously
-    active SIGINT handler is re-associated. If a SIGINT was received while the contextmaanger was
+    active SIGINT handler is re-associated. If a SIGINT was received while the context manager was
     active, and if the previously-active handler was not the default or the IGNORE handler, it is
     called once.
     """
