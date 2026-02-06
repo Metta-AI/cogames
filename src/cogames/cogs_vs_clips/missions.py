@@ -2,6 +2,7 @@ from functools import lru_cache
 
 from cogames.cogs_vs_clips.miner_tutorial import MinerTutorialMission
 from cogames.cogs_vs_clips.mission import CvCMission
+from cogames.cogs_vs_clips.scout_tutorial import ScoutTutorialMission
 from cogames.cogs_vs_clips.sites import (
     COGSGUARD_ARENA,
     COGSGUARD_MACHINA_1,
@@ -44,6 +45,7 @@ _CORE_MISSIONS: list[CvCMission] = [
     CogsGuardMachina1Mission,
     CogsGuardBasicMission,
     MinerTutorialMission,
+    ScoutTutorialMission,
 ]
 
 
