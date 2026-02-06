@@ -130,6 +130,15 @@ def _apply_miner(rewards: dict[str, AgentReward]) -> None:
         rewards[f"collective_{element}_deposited"] = reward(stat(f"collective.{element}.deposited"), weight=w_deposit)
 
 
+def _apply_scout(rewards: dict[str, AgentReward]) -> None:
+    """Add scout-focused shaping rewards."""
+    # Scout gear acquisition/loss
+    rewards["scout_gained"] = reward(stat("scout.gained"), weight=10.0)
+    rewards["scout_lost"] = reward(stat("scout.lost"), weight=-10.0)
+
+    rewards["cell_visited"] = reward(stat("cell.visited"), weight=0.00001)
+
+
 def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str] | None = None) -> None:
     """Apply CogsGuard reward variants to `env`.
 
