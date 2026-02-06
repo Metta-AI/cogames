@@ -106,7 +106,11 @@ class CvCMission(CoGameMission):
                     for resource in CvCConfig.ELEMENTS
                 },
                 **{
-                    f"{t.short_name}:hub": CvCHubConfig().station_cfg(team=t.short_name, collective=t.name)
+                    f"{t.short_name}:hub": CvCHubConfig(
+                        initial_hearts=(
+                            t.initial_hearts if t.initial_hearts is not None else CvCConfig.INITIAL_HEARTS * t.wealth
+                        )
+                    ).station_cfg(team=t.short_name, collective=t.name)
                     for t in team_objs
                 },
                 **{

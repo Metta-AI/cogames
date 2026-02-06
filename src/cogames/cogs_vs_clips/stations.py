@@ -20,6 +20,7 @@ from mettagrid.config.handler_config import (
     isNeutral,
     removeAlignment,
     targetCollectiveHas,
+    targetHas,
     updateActor,
     updateTarget,
     updateTargetCollective,
@@ -123,6 +124,7 @@ class CvCHubConfig(CvCStationConfig):
     attack_deltas: dict[str, int] = Field(default_factory=lambda: {"hp": -1, "influence": -100})
     elements: list[str] = Field(default_factory=lambda: CvCConfig.ELEMENTS)
     heart_cost: dict[str, int] = Field(default_factory=lambda: CvCConfig.HEART_COST)
+    initial_hearts: int = Field(default=CvCConfig.INITIAL_HEARTS, description="Initial hearts in hub inventory")
 
     def station_cfg(self, team: str, collective: str | None = None) -> GridObjectConfig:
         return GridObjectConfig(
@@ -130,6 +132,7 @@ class CvCHubConfig(CvCStationConfig):
             render_name="hub",
             render_symbol="📦",
             collective=collective or team,
+            inventory=InventoryConfig(initial={"heart": self.initial_hearts}),
             aoes={
                 "influence": AOEConfig(
                     radius=self.aoe_range,
@@ -148,15 +151,20 @@ class CvCHubConfig(CvCStationConfig):
                     mutations=[collectiveDeposit({resource: 100 for resource in self.elements})],
                 ),
                 "get_heart": Handler(
-                    filters=[isAlignedToActor(), targetCollectiveHas({"heart": 1})],
-                    mutations=[collectiveWithdraw({"heart": 1})],
+                    filters=[isAlignedToActor(), targetHas({"heart": 2})],
+                    mutations=[withdraw({"heart": 1})],
+                ),
+                "get_and_make_heart": Handler(
+                    filters=[isAlignedToActor(), targetHas({"heart": 1}), targetCollectiveHas(self.heart_cost)],
+                    mutations=[updateTargetCollective(_neg(self.heart_cost)), updateActor({"heart": 1})],
+                ),
+                "get_last_heart": Handler(
+                    filters=[isAlignedToActor(), targetHas({"heart": 1})],
+                    mutations=[withdraw({"heart": 1})],
                 ),
                 "make_heart": Handler(
                     filters=[isAlignedToActor(), targetCollectiveHas(self.heart_cost)],
-                    mutations=[
-                        updateTargetCollective(_neg(self.heart_cost)),
-                        updateActor({"heart": 1}),
-                    ],
+                    mutations=[updateTargetCollective(_neg(self.heart_cost)), updateTarget({"heart": 1})],
                 ),
             },
         )

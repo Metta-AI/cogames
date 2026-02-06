@@ -29,20 +29,17 @@ class CogTeam(Config):
         Returns:
             CollectiveConfig with resource limits and initial inventory.
         """
-        hearts = self.initial_hearts if self.initial_hearts is not None else 5 * self.wealth
         return CollectiveConfig(
             name=self.name,
             inventory=InventoryConfig(
                 limits={
                     "resources": ResourceLimitsConfig(min=10000, resources=CvCConfig.ELEMENTS),
-                    "hearts": ResourceLimitsConfig(min=65535, resources=["heart"]),
                 },
                 initial={
                     "carbon": 10 * self.wealth,
                     "oxygen": 10 * self.wealth,
                     "germanium": 10 * self.wealth,
                     "silicon": 10 * self.wealth,
-                    "heart": hearts,
                 },
             ),
         )
