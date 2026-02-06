@@ -22,10 +22,11 @@ from cogames.cli.policy import PolicySpec, get_policy_spec
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec
 from mettagrid.runner.episode_runner import run_episode_isolated
-from mettagrid.runner.types import EpisodeSpec
+from mettagrid.runner.types import EpisodeSpec, PureSingleEpisodeResult, SingleEpisodeJob
 from mettagrid.util.uri_resolvers.schemes import localize_uri, parse_uri
 
 DEFAULT_SUBMIT_SERVER = "https://api.observatory.softmax-research.net"
+DEFAULT_EPISODE_RUNNER_IMAGE = "ghcr.io/metta-ai/episode-runner:latest"
 RESULTS_URL = "https://www.softmax.com/alignmentleague"
 
 
@@ -191,15 +192,9 @@ def create_bundle(
     return output
 
 
-def validate_bundle(policy_uri: str, env_cfg: MettaGridConfig) -> None:
-    """Validate a policy bundle by running a short episode in process isolation.
-
-    Policy servers run in an isolated environment with the latest published
-    mettagrid + torch, ensuring validation matches the production environment.
-    """
+def _validation_spec(policy_uri: str, env_cfg: MettaGridConfig) -> EpisodeSpec:
     env_cfg.game.max_steps = 10
-
-    spec = EpisodeSpec(
+    return EpisodeSpec(
         policy_uris=[policy_uri],
         assignments=[0] * env_cfg.game.num_agents,
         env=env_cfg,
@@ -207,16 +202,79 @@ def validate_bundle(policy_uri: str, env_cfg: MettaGridConfig) -> None:
         max_action_time_ms=10000,
     )
 
+
+def _check_results(res: PureSingleEpisodeResult) -> None:
+    console.print(f"[dim]Ran for {res.steps} steps[/dim]")
+    non_noop_actions = sum(v for k, v in res.stats["agent"][0].items() if k.startswith("action.") and ".noop." not in k)
+    if non_noop_actions == 0:
+        console.print("[yellow]Warning: Policy took no actions (all no-ops)[/yellow]")
+        raise typer.Exit(1)
+
+
+def validate_bundle(policy_uri: str, env_cfg: MettaGridConfig) -> None:
+    spec = _validation_spec(policy_uri, env_cfg)
     with tempfile.NamedTemporaryFile(suffix=".json", delete=True) as results_file:
         res = run_episode_isolated(spec, Path(results_file.name))
-        console.print(f"[dim]Ran for {res.steps} steps[/dim]")
+        _check_results(res)
 
-        non_noop_actions = sum(
-            v for k, v in res.stats["agent"][0].items() if k.startswith("action.") and ".noop." not in k
-        )
-        if non_noop_actions == 0:
-            console.print("[yellow]Warning: Policy took no actions (all no-ops)[/yellow]")
-            raise typer.Exit(1)
+
+def validate_bundle_docker(policy_uri: str, env_cfg: MettaGridConfig, image: str) -> None:
+    local_path = localize_uri(policy_uri)
+    if local_path is None:
+        raise ValueError(f"Cannot localize policy URI: {policy_uri}")
+
+    if local_path.is_dir():
+        container_policy_uri = "file:///workspace/policy"
+        container_mount_target = "/workspace/policy"
+    else:
+        container_policy_uri = f"file:///workspace/policy/{local_path.name}"
+        container_mount_target = f"/workspace/policy/{local_path.name}"
+
+    spec = _validation_spec(container_policy_uri, env_cfg)
+    job = SingleEpisodeJob(
+        policy_uris=spec.policy_uris,
+        assignments=spec.assignments,
+        env=spec.env,
+        seed=spec.seed,
+        max_action_time_ms=spec.max_action_time_ms,
+        results_uri="file:///workspace/io/results.json",
+    )
+
+    with tempfile.TemporaryDirectory(prefix="cogames_docker_validate_") as workspace:
+        spec_path = Path(workspace) / "spec.json"
+        results_path = Path(workspace) / "results.json"
+        spec_path.write_text(job.model_dump_json())
+
+        cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "--platform",
+            "linux/amd64",
+            "-e",
+            "JOB_SPEC_URI=file:///workspace/io/spec.json",
+            "-e",
+            "RESULTS_URI=file:///workspace/io/results.json",
+            "-v",
+            f"{local_path.resolve()}:{container_mount_target}:ro",
+            "-v",
+            f"{workspace}:/workspace/io:rw",
+            image,
+        ]
+
+        console.print(f"[dim]Pulling latest image ({image})...[/dim]")
+        subprocess.run(["docker", "pull", "--platform", "linux/amd64", image], text=True, timeout=300)
+
+        console.print(f"[dim]Running validation in Docker ({image})...[/dim]")
+        result = subprocess.run(cmd, text=True, timeout=300)
+        if result.returncode != 0:
+            raise RuntimeError(f"Docker validation failed (exit {result.returncode})")
+
+        if not results_path.exists():
+            raise RuntimeError("Docker validation produced no results file")
+
+        res = PureSingleEpisodeResult.model_validate_json(results_path.read_text())
+        _check_results(res)
 
 
 def upload_submission(
@@ -281,6 +339,8 @@ def upload_policy(
     skip_validation: bool = False,
     setup_script: str | None = None,
     season: str | None = None,
+    validation_mode: str = "local",
+    image: str = DEFAULT_EPISODE_RUNNER_IMAGE,
 ) -> UploadResult | None:
     if dry_run:
         console.print("[dim]Dry run mode - no upload[/dim]\n")
@@ -314,6 +374,10 @@ def upload_policy(
             ]
             if season:
                 cmd.extend(["--season", season])
+            if validation_mode != "local":
+                cmd.extend(["--validation-mode", validation_mode])
+            if image != DEFAULT_EPISODE_RUNNER_IMAGE:
+                cmd.extend(["--image", image])
             result = subprocess.run(cmd, text=True, timeout=300)
             if result.returncode != 0:
                 console.print("[red]Validation failed[/red]")

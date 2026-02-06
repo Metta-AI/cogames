@@ -64,11 +64,13 @@ from cogames.cli.policy import (
     policy_arg_w_proportion_example,
 )
 from cogames.cli.submit import (
+    DEFAULT_EPISODE_RUNNER_IMAGE,
     DEFAULT_SUBMIT_SERVER,
     RESULTS_URL,
     create_bundle,
     upload_policy,
     validate_bundle,
+    validate_bundle_docker,
 )
 from cogames.cogs_vs_clips.mission import CvCMission, NumCogsVariant
 from cogames.curricula import make_rotation
@@ -2335,6 +2337,18 @@ def validate_bundle_cmd(
         help="Tournament server URL (used to resolve default season)",
         rich_help_panel="Server",
     ),
+    validation_mode: str = typer.Option(
+        "local",
+        "--validation-mode",
+        help="Validation mode: 'local' (in-process) or 'docker' (in container)",
+        rich_help_panel="Validation",
+    ),
+    image: str = typer.Option(
+        DEFAULT_EPISODE_RUNNER_IMAGE,
+        "--image",
+        help="Docker image for container validation (only used with --validation-mode docker)",
+        rich_help_panel="Validation",
+    ),
     _help: bool = typer.Option(
         False,
         "--help",
@@ -2354,7 +2368,11 @@ def validate_bundle_cmd(
     with TournamentServerClient(server_url=server) as client:
         config_data = client.get_config(entry_pool_info.config_id)
     env_cfg = MettaGridConfig.model_validate(config_data)
-    validate_bundle(policy, env_cfg)
+
+    if validation_mode == "docker":
+        validate_bundle_docker(policy, env_cfg, image)
+    else:
+        validate_bundle(policy, env_cfg)
 
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
@@ -2454,6 +2472,18 @@ def upload_cmd(
         help="Skip policy validation in isolated environment",
         rich_help_panel="Validation",
     ),
+    validation_mode: str = typer.Option(
+        "local",
+        "--validation-mode",
+        help="Validation mode: 'local' (in-process) or 'docker' (in container)",
+        rich_help_panel="Validation",
+    ),
+    image: str = typer.Option(
+        DEFAULT_EPISODE_RUNNER_IMAGE,
+        "--image",
+        help="Docker image for container validation (only used with --validation-mode docker)",
+        rich_help_panel="Validation",
+    ),
     # --- Server ---
     login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
@@ -2500,6 +2530,8 @@ def upload_cmd(
         init_kwargs=init_kwargs if init_kwargs else None,
         setup_script=setup_script,
         season=season_info.name if not no_submit else None,
+        validation_mode=validation_mode,
+        image=image,
     )
 
     if result:
