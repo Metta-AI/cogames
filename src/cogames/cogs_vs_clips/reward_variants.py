@@ -17,6 +17,7 @@ from mettagrid.config.reward_config import AgentReward, reward
 CogsGuardRewardVariant = Literal[
     "credit",
     "milestones",
+    "miner",
     "no_objective",
     "penalize_vibe_change",
     "objective",
@@ -27,6 +28,7 @@ AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = (
     "no_objective",
     "milestones",
     "credit",
+    "miner",
     "penalize_vibe_change",
 )
 
@@ -111,6 +113,23 @@ def _apply_credit(rewards: dict[str, AgentReward]) -> None:
     rewards.update(deposit_rewards)
 
 
+def _apply_miner(rewards: dict[str, AgentReward]) -> None:
+    """Add miner-focused shaping rewards."""
+    # Miner gear acquisition/loss
+    rewards["miner_gained"] = reward(stat("miner.gained"), weight=10.0)
+    rewards["miner_lost"] = reward(stat("miner.lost"), weight=-10.0)
+
+    # Resource extraction rewards
+    w_resource_gain = 0.05
+    for element in ["carbon", "oxygen", "germanium", "silicon"]:
+        rewards[f"{element}_gained"] = reward(stat(f"{element}.gained"), weight=w_resource_gain)
+
+    # Resource deposit rewards
+    w_deposit = 1.0
+    for element in ["carbon", "oxygen", "germanium", "silicon"]:
+        rewards[f"collective_{element}_deposited"] = reward(stat(f"collective.{element}.deposited"), weight=w_deposit)
+
+
 def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str] | None = None) -> None:
     """Apply CogsGuard reward variants to `env`.
 
@@ -160,6 +179,8 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
         _apply_milestones(rewards)
     if "credit" in enabled:
         _apply_credit(rewards)
+    if "miner" in enabled:
+        _apply_miner(rewards)
     if "penalize_vibe_change" in enabled:
         _apply_penalize_vibe_change(rewards)
 
