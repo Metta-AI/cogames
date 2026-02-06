@@ -35,4 +35,5 @@ CvCConfig = SimpleNamespace(
     RESOURCES=["energy", "heart", "hp", "influence", "solar", *_ELEMENTS, *_GEAR],
     VIBES=_VIBES,
     VIBE_NAMES=[vibe.name for vibe in _VIBES],
+    JUNCTION_AOE_RANGE=10,
 )

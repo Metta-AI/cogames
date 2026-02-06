@@ -358,7 +358,6 @@ class MultiTeamVariant(CoGameMissionVariant):
             instance_names=[t.short_name for t in mission.teams.values()],
             instance_object_remap={
                 "c:hub": "{instance_name}:hub",
-                "c:chest": "{instance_name}:chest",
                 **{f"c:{g}": f"{{instance_name}}:{g}" for g in CvCConfig.GEAR},
             },
             # Connect instances: no added borders, clear walls at boundary
