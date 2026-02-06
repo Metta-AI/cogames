@@ -15,6 +15,7 @@ from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.reward_config import AgentReward, reward
 
 CogsGuardRewardVariant = Literal[
+    "aligner",
     "credit",
     "milestones",
     "miner",
@@ -28,6 +29,7 @@ AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = (
     "no_objective",
     "milestones",
     "credit",
+    "aligner",
     "miner",
     "penalize_vibe_change",
 )
@@ -113,6 +115,20 @@ def _apply_credit(rewards: dict[str, AgentReward]) -> None:
     rewards.update(deposit_rewards)
 
 
+def _apply_aligner(rewards: dict[str, AgentReward]) -> None:
+    """Add aligner-focused shaping rewards."""
+    # Aligner gear acquisition/loss (aligners are needed to align junctions)
+    rewards["aligner_gained"] = reward(stat("aligner.gained"), weight=10.0)
+    rewards["aligner_lost"] = reward(stat("aligner.lost"), weight=-10.0)
+
+    # Heart acquisition/loss (hearts are consumed to align junctions)
+    rewards["heart_gained"] = reward(stat("heart.gained"), weight=5.0)
+    rewards["heart_lost"] = reward(stat("heart.lost"), weight=-5.0)
+
+    # Junction alignment (the primary aligner objective)
+    rewards["junction_aligned_by_agent"] = reward(stat("junction.aligned_by_agent"), weight=20.0)
+
+
 def _apply_miner(rewards: dict[str, AgentReward]) -> None:
     """Add miner-focused shaping rewards."""
     # Miner gear acquisition/loss
@@ -188,6 +204,8 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
         _apply_milestones(rewards)
     if "credit" in enabled:
         _apply_credit(rewards)
+    if "aligner" in enabled:
+        _apply_aligner(rewards)
     if "miner" in enabled:
         _apply_miner(rewards)
     if "penalize_vibe_change" in enabled:
