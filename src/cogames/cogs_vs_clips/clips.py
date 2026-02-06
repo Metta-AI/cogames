@@ -40,7 +40,7 @@ class ClipsConfig(Config):
     # Clips Behavior - presence check for re-invasion
     presence_end: Optional[int] = Field(default=None)
 
-    def events(self, max_steps: int) -> dict[str, EventConfig]:
+    def events(self, cog_teams: list[str], max_steps: int) -> dict[str, EventConfig]:
         """Create all clips events for a mission.
 
         Returns:
@@ -79,7 +79,16 @@ class ClipsConfig(Config):
                 timesteps=periodic(start=self.align_start, period=self.align_interval, end=align_end),
                 # neutral junctions near a clips-aligned junction
                 filters=[
+                    # near a clip junction
                     isNear(typeTag("junction"), [isAlignedTo("clips")], radius=self.align_radius),
+                    # # not near any cog junction
+                    # isNot(
+                    #     isNear(
+                    #         typeTag("junction"),
+                    #         [anyOf([isAlignedTo(cog_team) for cog_team in cog_teams])],
+                    #         radius=CvCConfig.JUNCTION_AOE_RANGE,
+                    #     )
+                    # ),
                     isNeutral(),
                 ],
                 mutations=[alignTo("clips")],

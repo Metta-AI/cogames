@@ -22,7 +22,6 @@ def make_cogsguard_tutorial_site() -> CoGameSite:
             "c:scrambler",
             "c:miner",
             "c:scout",
-            "c:chest",
         ],
     )
     map_builder = MapGen.Config(

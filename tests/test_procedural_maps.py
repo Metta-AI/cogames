@@ -55,7 +55,7 @@ def test_procedural_builder_builds_and_has_expected_layers(
                 spawn_count=3,
                 base_biome="caves",
                 building_coverage=0.01,
-                building_weights={"c:chest": 1.0, "junction": 0.5},
+                building_weights={"junction": 0.5},
                 biome_weights={"caves": 0.5, "forest": 0.5, "city": 0.5, "desert": 0.5},
                 dungeon_weights={"bsp": 0.6, "maze": 0.2, "radial": 0.2},
                 density_scale=density_scale,
@@ -125,7 +125,7 @@ def test_zone_counts_respect_max_zone_fraction(width: int, height: int, max_biom
 
 
 def test_uniform_extractors_configuration_pass_through():
-    buildings = {"c:chest": 1.0, "junction": 0.3, "carbon_extractor": 0.7}
+    buildings = {"junction": 0.3, "carbon_extractor": 0.7}
     cfg = MapGen.Config(
         width=100,
         height=100,

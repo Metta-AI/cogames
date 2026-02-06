@@ -77,7 +77,6 @@ def _cogsguard_hub_config() -> BaseHubConfig:
         cross_bundle="none",
         cross_distance=7,
         junction_object="junction",
-        heart_chest_object="c:chest",
         stations=[
             "c:aligner",
             "c:scrambler",

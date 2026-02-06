@@ -4,6 +4,7 @@ from pydantic import Field
 
 from cogames.cogs_vs_clips.config import CvCConfig
 from mettagrid.base_config import Config
+from mettagrid.config.filter import actorHasAnyOf
 from mettagrid.config.handler_config import (
     AOEConfig,
     ClearInventoryMutation,
@@ -117,10 +118,11 @@ class CvCJunctionConfig(CvCStationConfig):
 class CvCHubConfig(CvCStationConfig):
     """Hub station that provides AOE influence/attack and accepts deposits."""
 
-    aoe_range: int = Field(default=10, description="Range for AOE effects")
+    aoe_range: int = Field(default=CvCConfig.JUNCTION_AOE_RANGE, description="Range for AOE effects")
     influence_deltas: dict[str, int] = Field(default_factory=lambda: {"influence": 10, "energy": 100, "hp": 100})
     attack_deltas: dict[str, int] = Field(default_factory=lambda: {"hp": -1, "influence": -100})
     elements: list[str] = Field(default_factory=lambda: CvCConfig.ELEMENTS)
+    heart_cost: dict[str, int] = Field(default_factory=lambda: CvCConfig.HEART_COST)
 
     def station_cfg(self, team: str, collective: str | None = None) -> GridObjectConfig:
         return GridObjectConfig(
@@ -142,8 +144,19 @@ class CvCHubConfig(CvCStationConfig):
             },
             on_use_handlers={
                 "deposit": Handler(
-                    filters=[isAlignedToActor()],
+                    filters=[isAlignedToActor(), actorHasAnyOf(self.elements)],
                     mutations=[collectiveDeposit({resource: 100 for resource in self.elements})],
+                ),
+                "get_heart": Handler(
+                    filters=[isAlignedToActor(), targetCollectiveHas({"heart": 1})],
+                    mutations=[collectiveWithdraw({"heart": 1})],
+                ),
+                "make_heart": Handler(
+                    filters=[isAlignedToActor(), targetCollectiveHas(self.heart_cost)],
+                    mutations=[
+                        updateTargetCollective(_neg(self.heart_cost)),
+                        updateActor({"heart": 1}),
+                    ],
                 ),
             },
         )

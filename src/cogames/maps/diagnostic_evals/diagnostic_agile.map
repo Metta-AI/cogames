@@ -2,7 +2,7 @@ type: mettagrid.map_builder.ascii.AsciiMapBuilder.Config
 map_data: |-
   #########################
   #........+++.+++........#
-  #...........=...........#
+  #.......................#
   #.......................#
   #..........+.+..........#
   #..........#.#..........#
@@ -26,7 +26,6 @@ char_to_map_name:
   "G": germanium_extractor
   "+": junction
   "&": c:hub
-  "=": c:chest
   "@": agent.agent
   "1": agent.agent
   "2": agent.agent

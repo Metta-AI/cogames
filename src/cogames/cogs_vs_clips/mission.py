@@ -6,7 +6,6 @@ from cogames.cogs_vs_clips.clips import ClipsConfig
 from cogames.cogs_vs_clips.cog import CogConfig
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.stations import (
-    CvCChestConfig,
     CvCExtractorConfig,
     CvCGearStationConfig,
     CvCHubConfig,
@@ -29,7 +28,7 @@ from mettagrid.config.action_config import (
     NoopActionConfig,
 )
 from mettagrid.config.game_value import inv
-from mettagrid.config.mettagrid_config import CollectiveConfig, GameConfig, MettaGridConfig
+from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
 
@@ -111,10 +110,6 @@ class CvCMission(CoGameMission):
                     for t in team_objs
                 },
                 **{
-                    f"{t.short_name}:chest": CvCChestConfig().station_cfg(team=t.short_name, collective=t.name)
-                    for t in team_objs
-                },
-                **{
                     f"{t.short_name}:{g}": CvCGearStationConfig(gear_type=g).station_cfg(
                         team=t.short_name, collective=t.name
                     )
@@ -125,7 +120,6 @@ class CvCMission(CoGameMission):
             collectives={
                 **{t.name: t.collective_config() for t in team_objs},
                 **self.clips.collectives(),
-                "neutral": CollectiveConfig(name="neutral"),
             },
             events=self._merge_events(),
         )
@@ -144,7 +138,7 @@ class CvCMission(CoGameMission):
 
     def _merge_events(self) -> dict:
         """Merge clips and weather events, raising on key conflicts."""
-        clips_events = self.clips.events(max_steps=self.max_steps)
+        clips_events = self.clips.events(cog_teams=[t.name for t in self.teams.values()], max_steps=self.max_steps)
         weather_events = self.weather.events(max_steps=self.max_steps)
         overlap = set(clips_events) & set(weather_events)
         if overlap:
