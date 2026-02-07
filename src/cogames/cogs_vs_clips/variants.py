@@ -173,6 +173,16 @@ class EnergizedVariant(CoGameMissionVariant):
         mission.weather.night_deltas = {"solar": 255}
 
 
+class NoWeatherVariant(CoGameMissionVariant):
+    name: str = "no_weather"
+    description: str = "Disable the day/night weather cycle."
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        mission.weather.day_deltas = {}
+        mission.weather.night_deltas = {}
+
+
 class Small50Variant(CoGameMissionVariant):
     name: str = "small_50"
     description: str = "Set map size to 50x50 for quick runs."
@@ -380,6 +390,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     CavesVariant(),
     CityVariant(),
     DarkSideVariant(),
+    NoWeatherVariant(),
     NoClipsVariant(),
     DesertVariant(),
     EmptyBaseVariant(),
