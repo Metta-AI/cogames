@@ -112,9 +112,6 @@ def _load_eval_missions(module_path: str) -> list[CvCMission]:
 
 
 def _load_diagnose_missions(mission_set: str) -> list[CvCMission]:
-    if mission_set == "thinky_evals":
-        return []
-
     if mission_set == "all":
         from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS  # noqa: PLC0415
         from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
@@ -222,22 +219,6 @@ def _build_diagnose_cases(
     cogs_list = cogs if cogs else [1, 2, 4]
     respect_cogs_list = cogs is not None
     cases: list[DiagnoseCase] = []
-
-    if mission_set == "thinky_evals":
-        from cogames_agents.policy.nim_agents.thinky_eval import EVALS as THINKY_EVALS  # noqa: PLC0415
-
-        mission_map = _build_thinky_mission_map()
-        for exp_name, _tag, num_cogs in THINKY_EVALS:
-            if not _matches_experiment(exp_name, experiment_filters):
-                continue
-            if respect_cogs_list and num_cogs not in cogs_list:
-                continue
-            base_mission = mission_map.get(exp_name)
-            if base_mission is None:
-                logger.warning("Thinky eval mission '%s' not found; skipping.", exp_name)
-                continue
-            cases.append(_build_diagnose_case(base_mission, num_cogs, steps))
-        return cases
 
     missions = _load_diagnose_missions(mission_set)
     for mission in missions:
@@ -2133,7 +2114,6 @@ def diagnose_cmd(
         "diagnostic_evals",
         "integrated_evals",
         "spanning_evals",
-        "thinky_evals",
         "tournament",
         "all",
     ] = typer.Option(
