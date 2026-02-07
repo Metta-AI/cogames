@@ -43,16 +43,19 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         self,
         policy_env_info: PolicyEnvInterface,
         agent_id: int,
+        preferred_gear: Optional[str] = None,
     ):
         self._agent_id = agent_id
         self._policy_env_info = policy_env_info
+        self._preferred_gear = preferred_gear
 
         self._action_names = policy_env_info.action_names
         self._action_name_set = set(self._action_names)
         self._fallback_action_name = "noop" if "noop" in self._action_name_set else self._action_names[0]
         self._center = (policy_env_info.obs_height // 2, policy_env_info.obs_width // 2)
         self._tag_name_to_id = {name: idx for idx, name in enumerate(policy_env_info.tags)}
-        self._gear_station_tags = self._resolve_tag_ids([f"{gear}_station" for gear in GEAR])
+        self._gear_station_tags_by_gear = {gear: self._resolve_tag_ids([f"{gear}_station"]) for gear in GEAR}
+        self._gear_station_tags = set().union(*self._gear_station_tags_by_gear.values())
         self._extractor_tags = self._resolve_tag_ids([f"{element}_extractor" for element in ELEMENTS])
         self._junction_tags = self._resolve_tag_ids(["junction"])
         self._chest_tags = self._resolve_tag_ids(["chest"])
@@ -141,7 +144,9 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         has_heart = "heart" in items
         has_influence = "influence" in items
 
-        if gear is None:
+        if self._preferred_gear is not None and gear != self._preferred_gear:
+            target_tags = self._gear_station_tags_by_gear.get(self._preferred_gear, set())
+        elif gear is None:
             target_tags = self._gear_station_tags
         elif gear == "aligner":
             if has_heart and has_influence:
