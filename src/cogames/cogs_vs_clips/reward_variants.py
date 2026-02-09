@@ -195,23 +195,24 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
     if enabled <= {"objective"}:
         return
 
-    # Start from the mission's existing objective baseline to preserve its scaling.
-    rewards = dict(env.game.agent.rewards)
+    agent_cfgs = env.game.agents if env.game.agents else [env.game.agent]
+    for agent_cfg in agent_cfgs:
+        rewards = dict(agent_cfg.rewards)
 
-    if "no_objective" in enabled:
-        rewards.pop(_OBJECTIVE_STAT_KEY, None)
-    if "milestones" in enabled:
-        _apply_milestones(rewards)
-    if "credit" in enabled:
-        _apply_credit(rewards)
-    if "aligner" in enabled:
-        _apply_aligner(rewards)
-    if "miner" in enabled:
-        _apply_miner(rewards)
-    if "penalize_vibe_change" in enabled:
-        _apply_penalize_vibe_change(rewards)
+        if "no_objective" in enabled:
+            rewards.pop(_OBJECTIVE_STAT_KEY, None)
+        if "milestones" in enabled:
+            _apply_milestones(rewards)
+        if "credit" in enabled:
+            _apply_credit(rewards)
+        if "aligner" in enabled:
+            _apply_aligner(rewards)
+        if "miner" in enabled:
+            _apply_miner(rewards)
+        if "penalize_vibe_change" in enabled:
+            _apply_penalize_vibe_change(rewards)
 
-    env.game.agent.rewards = rewards
+        agent_cfg.rewards = rewards
 
     # Deterministic label suffix order (exclude "objective").
     for variant in AVAILABLE_REWARD_VARIANTS:
