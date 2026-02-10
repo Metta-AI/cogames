@@ -29,17 +29,15 @@ class CogTeam(Config):
         Returns:
             CollectiveConfig with resource limits and initial inventory.
         """
+        # Worst case: all agents pick the gear with the highest cost for a single element.
+        max_element_cost = max(cost for gear in CvCConfig.GEAR_COSTS.values() for cost in gear.values())
+        per_element = self.num_agents * max_element_cost * self.wealth
         return CollectiveConfig(
             name=self.name,
             inventory=InventoryConfig(
                 limits={
                     "resources": ResourceLimitsConfig(min=10000, resources=CvCConfig.ELEMENTS),
                 },
-                initial={
-                    "carbon": 10 * self.wealth,
-                    "oxygen": 10 * self.wealth,
-                    "germanium": 10 * self.wealth,
-                    "silicon": 10 * self.wealth,
-                },
+                initial={element: per_element for element in CvCConfig.ELEMENTS},
             ),
         )
