@@ -22,6 +22,9 @@ CogsGuardRewardVariant = Literal[
     "no_objective",
     "penalize_vibe_change",
     "objective",
+    "role_conditional",
+    "scout",
+    "scrambler",
 ]
 
 AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = (
@@ -29,12 +32,26 @@ AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = (
     "no_objective",
     "milestones",
     "credit",
-    "aligner",
     "miner",
+    "aligner",
+    "scrambler",
+    "scout",
+    "role_conditional",
     "penalize_vibe_change",
 )
 
 _OBJECTIVE_STAT_KEY = "aligned_junction_held"
+_ROLE_ORDER: tuple[str, ...] = ("miner", "aligner", "scrambler", "scout")
+_ROLE_NAMES = set(_ROLE_ORDER)
+
+
+def _role_name_from_vibe(env: MettaGridConfig, vibe_id: int) -> str | None:
+    if vibe_id < 0 or vibe_id >= len(env.game.vibe_names):
+        return None
+    vibe_name = env.game.vibe_names[vibe_id]
+    if vibe_name not in _ROLE_NAMES:
+        return None
+    return vibe_name
 
 
 def _apply_milestones(rewards: dict[str, AgentReward], *, max_junctions: int = 100) -> None:
@@ -155,6 +172,15 @@ def _apply_scout(rewards: dict[str, AgentReward]) -> None:
     rewards["cell_visited"] = reward(stat("cell.visited"), weight=0.00001)
 
 
+def _apply_scrambler(rewards: dict[str, AgentReward]) -> None:
+    """Add scrambler-focused shaping rewards."""
+    rewards["scrambler_gained"] = reward(stat("scrambler.gained"), weight=10.0)
+    rewards["scrambler_lost"] = reward(stat("scrambler.lost"), weight=-10.0)
+
+    # Dense "doing the scrambler thing" signal.
+    rewards["junction_scrambled_by_agent"] = reward(stat("junction.scrambled_by_agent"), weight=20.0)
+
+
 def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str] | None = None) -> None:
     """Apply CogsGuard reward variants to `env`.
 
@@ -163,6 +189,11 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
     - `no_objective`: disables the objective stat reward (`junction.held`).
     - `milestones`: adds shaped rewards for aligning/scrambling junctions and holding more junctions.
     - `credit`: adds additional dense shaping for precursor behaviors (resources/gear/deposits).
+    - `miner`: add miner-focused shaping rewards.
+    - `aligner`: add aligner-focused shaping rewards.
+    - `scrambler`: add scrambler-focused shaping rewards.
+    - `scout`: add scout-focused shaping rewards.
+    - `role_conditional`: apply one of the 4 role shapers per agent (Miner/Aligner/Scrambler/Scout).
     - `penalize_vibe_change`: adds a penalty for vibe changes to discourage spamming.
     """
     if not variants:
@@ -196,6 +227,28 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
         return
 
     agent_cfgs = env.game.agents if env.game.agents else [env.game.agent]
+    if "role_conditional" in enabled and not env.game.agents:
+        raise ValueError("role_conditional reward variant requires env.game.agents (per-agent configs)")
+
+    role_by_agent_idx: list[str] = []
+    if "role_conditional" in enabled:
+        counters: dict[str | int, int] = {}
+        for agent_cfg in agent_cfgs:
+            group_key: str | int = agent_cfg.collective if agent_cfg.collective is not None else agent_cfg.team_id
+            idx_within_group = counters.get(group_key, 0)
+            counters[group_key] = idx_within_group + 1
+
+            role_name = _role_name_from_vibe(env, agent_cfg.vibe)
+            if role_name is None:
+                explicit_role_id = agent_cfg.inventory.initial.get("role_id")
+                if explicit_role_id is not None:
+                    role_id = int(explicit_role_id)
+                else:
+                    role_id = idx_within_group
+                role_name = _ROLE_ORDER[role_id % len(_ROLE_ORDER)]
+
+            role_by_agent_idx.append(role_name)
+
     for agent_cfg in agent_cfgs:
         rewards = dict(agent_cfg.rewards)
 
@@ -209,6 +262,20 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
             _apply_aligner(rewards)
         if "miner" in enabled:
             _apply_miner(rewards)
+        if "scrambler" in enabled:
+            _apply_scrambler(rewards)
+        if "scout" in enabled:
+            _apply_scout(rewards)
+        if "role_conditional" in enabled:
+            role = role_by_agent_idx.pop(0)
+            if role == "miner":
+                _apply_miner(rewards)
+            elif role == "aligner":
+                _apply_aligner(rewards)
+            elif role == "scrambler":
+                _apply_scrambler(rewards)
+            else:
+                _apply_scout(rewards)
         if "penalize_vibe_change" in enabled:
             _apply_penalize_vibe_change(rewards)
 
