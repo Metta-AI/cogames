@@ -22,6 +22,9 @@ CogsGuardRewardVariant = Literal[
     "no_objective",
     "penalize_vibe_change",
     "objective",
+    "role_conditional",
+    "scout",
+    "scrambler",
 ]
 
 AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = (
@@ -29,8 +32,11 @@ AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = (
     "no_objective",
     "milestones",
     "credit",
-    "aligner",
     "miner",
+    "aligner",
+    "scrambler",
+    "scout",
+    "role_conditional",
     "penalize_vibe_change",
 )
 
@@ -115,44 +121,63 @@ def _apply_credit(rewards: dict[str, AgentReward]) -> None:
     rewards.update(deposit_rewards)
 
 
-def _apply_aligner(rewards: dict[str, AgentReward]) -> None:
+def _apply_aligner(rewards: dict[str, AgentReward], *, key_prefix: str = "") -> None:
     """Add aligner-focused shaping rewards."""
     # Aligner gear acquisition/loss (aligners are needed to align junctions)
-    rewards["aligner_gained"] = reward(stat("aligner.gained"), weight=10.0)
-    rewards["aligner_lost"] = reward(stat("aligner.lost"), weight=-10.0)
+    rewards[f"{key_prefix}aligner_gained"] = reward(stat("aligner.gained"), weight=10.0)
+    rewards[f"{key_prefix}aligner_lost"] = reward(stat("aligner.lost"), weight=-10.0)
 
     # Heart acquisition/loss (hearts are consumed to align junctions)
-    rewards["heart_gained"] = reward(stat("heart.gained"), weight=5.0)
-    rewards["heart_lost"] = reward(stat("heart.lost"), weight=-5.0)
+    rewards[f"{key_prefix}heart_gained"] = reward(stat("heart.gained"), weight=5.0)
+    rewards[f"{key_prefix}heart_lost"] = reward(stat("heart.lost"), weight=-5.0)
 
     # Junction alignment (the primary aligner objective)
-    rewards["junction_aligned_by_agent"] = reward(stat("junction.aligned_by_agent"), weight=20.0)
+    rewards[f"{key_prefix}junction_aligned_by_agent"] = reward(stat("junction.aligned_by_agent"), weight=20.0)
 
 
-def _apply_miner(rewards: dict[str, AgentReward]) -> None:
+def _apply_miner(rewards: dict[str, AgentReward], *, key_prefix: str = "") -> None:
     """Add miner-focused shaping rewards."""
     # Miner gear acquisition/loss
-    rewards["miner_gained"] = reward(stat("miner.gained"), weight=10.0)
-    rewards["miner_lost"] = reward(stat("miner.lost"), weight=-10.0)
+    rewards[f"{key_prefix}miner_gained"] = reward(stat("miner.gained"), weight=10.0)
+    rewards[f"{key_prefix}miner_lost"] = reward(stat("miner.lost"), weight=-10.0)
 
     # Resource extraction rewards
     w_resource_gain = 0.05
     for element in ["carbon", "oxygen", "germanium", "silicon"]:
-        rewards[f"{element}_gained"] = reward(stat(f"{element}.gained"), weight=w_resource_gain)
+        rewards[f"{key_prefix}{element}_gained"] = reward(stat(f"{element}.gained"), weight=w_resource_gain)
 
     # Resource deposit rewards
     w_deposit = 1.0
     for element in ["carbon", "oxygen", "germanium", "silicon"]:
-        rewards[f"collective_{element}_deposited"] = reward(stat(f"collective.{element}.deposited"), weight=w_deposit)
+        rewards[f"{key_prefix}collective_{element}_deposited"] = reward(
+            stat(f"collective.{element}.deposited"), weight=w_deposit
+        )
 
 
-def _apply_scout(rewards: dict[str, AgentReward]) -> None:
+def _apply_scrambler(rewards: dict[str, AgentReward], *, key_prefix: str = "") -> None:
+    """Add scrambler-focused shaping rewards."""
+    rewards[f"{key_prefix}scrambler_gained"] = reward(stat("scrambler.gained"), weight=10.0)
+    rewards[f"{key_prefix}scrambler_lost"] = reward(stat("scrambler.lost"), weight=-10.0)
+
+    # Dense "doing the scrambler thing" signal.
+    rewards[f"{key_prefix}junction_scrambled_by_agent"] = reward(stat("junction.scrambled_by_agent"), weight=20.0)
+
+
+def _apply_scout(rewards: dict[str, AgentReward], *, key_prefix: str = "") -> None:
     """Add scout-focused shaping rewards."""
     # Scout gear acquisition/loss
-    rewards["scout_gained"] = reward(stat("scout.gained"), weight=10.0)
-    rewards["scout_lost"] = reward(stat("scout.lost"), weight=-10.0)
+    rewards[f"{key_prefix}scout_gained"] = reward(stat("scout.gained"), weight=10.0)
+    rewards[f"{key_prefix}scout_lost"] = reward(stat("scout.lost"), weight=-10.0)
 
-    rewards["cell_visited"] = reward(stat("cell.visited"), weight=0.00001)
+    rewards[f"{key_prefix}cell_visited"] = reward(stat("cell.visited"), weight=0.00001)
+
+
+def _apply_role_conditional(rewards: dict[str, AgentReward]) -> None:
+    """Apply the 4 role shapers, gated by `agent_id % 4` (Miner/Aligner/Scrambler/Scout)."""
+    _apply_miner(rewards, key_prefix="role:miner:")
+    _apply_aligner(rewards, key_prefix="role:aligner:")
+    _apply_scrambler(rewards, key_prefix="role:scrambler:")
+    _apply_scout(rewards, key_prefix="role:scout:")
 
 
 def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str] | None = None) -> None:
@@ -163,6 +188,11 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
     - `no_objective`: disables the objective stat reward (`junction.held`).
     - `milestones`: adds shaped rewards for aligning/scrambling junctions and holding more junctions.
     - `credit`: adds additional dense shaping for precursor behaviors (resources/gear/deposits).
+    - `aligner`: add aligner-focused shaping rewards.
+    - `miner`: add miner-focused shaping rewards.
+    - `scrambler`: add scrambler-focused shaping rewards.
+    - `scout`: add scout-focused shaping rewards.
+    - `role_conditional`: add all four role shapers with `role:{role}:` key prefixes.
     - `penalize_vibe_change`: adds a penalty for vibe changes to discourage spamming.
     """
     if not variants:
@@ -197,6 +227,7 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
 
     agent_cfgs = env.game.agents if env.game.agents else [env.game.agent]
     for agent_cfg in agent_cfgs:
+        # Start from the mission's existing objective baseline to preserve its scaling.
         rewards = dict(agent_cfg.rewards)
 
         if "no_objective" in enabled:
@@ -209,6 +240,12 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
             _apply_aligner(rewards)
         if "miner" in enabled:
             _apply_miner(rewards)
+        if "scrambler" in enabled:
+            _apply_scrambler(rewards)
+        if "scout" in enabled:
+            _apply_scout(rewards)
+        if "role_conditional" in enabled:
+            _apply_role_conditional(rewards)
         if "penalize_vibe_change" in enabled:
             _apply_penalize_vibe_change(rewards)
 
