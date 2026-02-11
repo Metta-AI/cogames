@@ -135,41 +135,44 @@ def _apply_credit(rewards: dict[str, AgentReward]) -> None:
 def _apply_aligner(rewards: dict[str, AgentReward]) -> None:
     """Add aligner-focused shaping rewards."""
     # Aligner gear acquisition/loss (aligners are needed to align junctions)
-    rewards["aligner_gained"] = reward(stat("aligner.gained"), weight=10.0)
-    rewards["aligner_lost"] = reward(stat("aligner.lost"), weight=-10.0)
+    rewards["aligner_gained"] = reward(stat("aligner.gained"), weight=2.0)
+    rewards["aligner_lost"] = reward(stat("aligner.lost"), weight=-2.0)
 
     # Heart acquisition/loss (hearts are consumed to align junctions)
-    rewards["heart_gained"] = reward(stat("heart.gained"), weight=5.0)
-    rewards["heart_lost"] = reward(stat("heart.lost"), weight=-5.0)
+    rewards["heart_gained"] = reward(stat("heart.gained"), weight=0.5)
+    rewards["heart_lost"] = reward(stat("heart.lost"), weight=-0.5)
 
     # Junction alignment (the primary aligner objective)
-    rewards["junction_aligned_by_agent"] = reward(stat("junction.aligned_by_agent"), weight=20.0)
+    rewards["junction_aligned_by_agent"] = reward(stat("junction.aligned_by_agent"), weight=1.0)
 
 
 def _apply_miner(rewards: dict[str, AgentReward]) -> None:
     """Add miner-focused shaping rewards."""
     # Miner gear acquisition/loss
-    rewards["miner_gained"] = reward(stat("miner.gained"), weight=10.0)
-    rewards["miner_lost"] = reward(stat("miner.lost"), weight=-10.0)
+    rewards["miner_gained"] = reward(stat("miner.gained"), weight=2.0)
+    rewards["miner_lost"] = reward(stat("miner.lost"), weight=-2.0)
 
-    # Resource extraction rewards
+    # Resource extraction rewards (capped per element to avoid reward domination)
     w_resource_gain = 0.05
+    max_resource_gain = 1.0
     for element in ["carbon", "oxygen", "germanium", "silicon"]:
-        rewards[f"{element}_gained"] = reward(stat(f"{element}.gained"), weight=w_resource_gain)
+        rewards[f"{element}_gained"] = reward(stat(f"{element}.gained"), weight=w_resource_gain, max=max_resource_gain)
 
-    # Resource deposit rewards
+    # Resource deposit rewards (delta=True to exclude initial map deposits, capped per element)
     w_deposit = 1.0
+    max_deposit = 2.0
     for element in ["carbon", "oxygen", "germanium", "silicon"]:
-        rewards[f"collective_{element}_deposited"] = reward(stat(f"collective.{element}.deposited"), weight=w_deposit)
+        deposited = stat(f"collective.{element}.deposited", delta=True)
+        rewards[f"collective_{element}_deposited"] = reward(deposited, weight=w_deposit, max=max_deposit)
 
 
 def _apply_scout(rewards: dict[str, AgentReward]) -> None:
     """Add scout-focused shaping rewards."""
     # Scout gear acquisition/loss
-    rewards["scout_gained"] = reward(stat("scout.gained"), weight=10.0)
-    rewards["scout_lost"] = reward(stat("scout.lost"), weight=-10.0)
+    rewards["scout_gained"] = reward(stat("scout.gained"), weight=2.0)
+    rewards["scout_lost"] = reward(stat("scout.lost"), weight=-2.0)
 
-    rewards["cell_visited"] = reward(stat("cell.visited"), weight=0.00001)
+    rewards["cell_visited"] = reward(stat("cell.visited"), weight=0.0001)
 
 
 def _apply_scrambler(rewards: dict[str, AgentReward]) -> None:
