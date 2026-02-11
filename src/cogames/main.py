@@ -2490,6 +2490,13 @@ def upload_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
+    if ":" in name:
+        console.print("[red]Policy name must not contain ':'[/red]")
+        raise typer.Exit(1)
+    if len(name) > 64:
+        console.print("[red]Policy name must be at most 64 characters[/red]")
+        raise typer.Exit(1)
+
     season_info = _resolve_season(server, season)
 
     init_kwargs: dict[str, str] = {}
