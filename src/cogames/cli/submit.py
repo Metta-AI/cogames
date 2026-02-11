@@ -237,7 +237,6 @@ def validate_bundle_docker(policy_uri: str, env_cfg: MettaGridConfig, image: str
         env=spec.env,
         seed=spec.seed,
         max_action_time_ms=spec.max_action_time_ms,
-        results_uri="file:///workspace/io/results.json",
     )
 
     with tempfile.TemporaryDirectory(prefix="cogames_docker_validate_") as workspace:
