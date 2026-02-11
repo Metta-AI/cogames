@@ -32,6 +32,9 @@ RUN --mount=type=bind,target=/ctx \
         echo "ERROR: provide .whl in build context or set COGAMES_VERSION" && exit 1; \
     fi
 
+# Freeze executor packages so policy venvs get the same set (cogames, mettagrid, etc).
+RUN uv pip list --python /opt/executor/bin/python --format=freeze > /opt/policy-requirements.txt
+
 # Pre-warm uv cache with torch so per-policy venv creation is near-instant.
 # mettagrid is already cached from the install above. Install torch into a
 # throwaway venv just to populate the cache, then delete it.
