@@ -384,7 +384,11 @@ def train(
             )
             console.print("=" * 80, style="bold green")
 
-        run_dir = checkpoints_path / trainer.logger.run_id
+        trainer_logger = trainer.logger
+        if trainer_logger is None:
+            raise RuntimeError("Trainer logger was not initialized; cannot locate checkpoint run directory")
+
+        run_dir = checkpoints_path / trainer_logger.run_id
         checkpoints = sorted(run_dir.glob("model_*.pt"), key=lambda path: path.stat().st_mtime)
 
         if checkpoints and not training_diverged:
