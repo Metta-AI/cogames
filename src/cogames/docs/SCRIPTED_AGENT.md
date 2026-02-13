@@ -19,10 +19,10 @@ Location: `cogames.policy.role_policies`
 
 Short names:
 
-- `role_miner`
-- `role_scout`
-- `role_aligner`
-- `role_scrambler`
+- `miner`
+- `scout`
+- `aligner`
+- `scrambler`
 
 These are thin wrappers around the starter logic that try to acquire a specific gear type first.
 
@@ -41,7 +41,7 @@ A simple CNN + LSTM policy used in CoGames tutorials.
 uv run cogames play --mission evals.diagnostic_radial -p starter --cogs 4
 
 # Force a fixed role
-uv run cogames play --mission evals.diagnostic_radial -p role_miner --cogs 4
+uv run cogames play --mission evals.diagnostic_radial -p miner --cogs 4
 ```
 
 ## More Advanced Agents

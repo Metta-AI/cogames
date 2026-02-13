@@ -24,20 +24,20 @@ class _StarterRolePolicy(MultiAgentPolicy):
 
 
 class MinerRolePolicy(_StarterRolePolicy):
-    short_names = ["role_miner"]
+    short_names = ["miner"]
     _preferred_gear = "miner"
 
 
 class ScoutRolePolicy(_StarterRolePolicy):
-    short_names = ["role_scout"]
+    short_names = ["scout"]
     _preferred_gear = "scout"
 
 
 class AlignerRolePolicy(_StarterRolePolicy):
-    short_names = ["role_aligner"]
+    short_names = ["aligner"]
     _preferred_gear = "aligner"
 
 
 class ScramblerRolePolicy(_StarterRolePolicy):
-    short_names = ["role_scrambler"]
+    short_names = ["scrambler"]
     _preferred_gear = "scrambler"
