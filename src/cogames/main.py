@@ -13,11 +13,10 @@ import importlib.metadata
 import importlib.util
 import json
 import logging
+import os
 import shutil
 import subprocess
 import sys
-import threading
-import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, Optional, TypeVar
@@ -296,21 +295,21 @@ def tutorial_cmd(
     ctx: typer.Context,
 ) -> None:
     """Run the CoGames tutorial."""
-    # Suppress logs during tutorial to keep instructions visible
+    # Suppress logs during tutorial to keep output focused.
     logging.getLogger().setLevel(logging.ERROR)
+    os.environ["METTASCOPE_SHOW_VALIDATION"] = "0"
 
     console.print(
         Panel.fit(
-            "[bold cyan]MISSION BRIEFING: CogsGuard Training Sector[/bold cyan]\n\n"
-            "Welcome, Cognitive. This simulation mirrors frontline CogsGuard ops.\n"
-            "We will launch the Mettascope visual interface now.\n\n"
-            "When you are ready to deploy, press Enter below and then return here to receive instructions.",
-            title="Mission Briefing",
+            "[bold cyan]CoGames Tutorial[/bold cyan]\n\n"
+            "Mission: stabilize Machina by gathering resources, crafting hearts, and securing junctions.\n"
+            "Guidance appears in-game. Press Enter or click Next to advance each tutorial phase.",
+            title="Tutorial Briefing",
             border_style="green",
         )
     )
 
-    Prompt.ask("[dim]Press Enter to launch simulation[/dim]", default="", show_default=False)
+    Prompt.ask("[dim]Press Enter to launch tutorial[/dim]", default="", show_default=False)
     console.print("[dim]Initializing Mettascope...[/dim]")
 
     # Load tutorial mission (CogsGuard)
@@ -318,123 +317,21 @@ def tutorial_cmd(
 
     # Create environment config
     env_cfg = make_cogsguard_mission(num_agents=1, max_steps=1000).make_env()
-
-    stop_event = threading.Event()
-
-    def _wait_for_enter(prompt: str) -> bool:
-        if stop_event.is_set():
-            return False
-        try:
-            Prompt.ask(prompt, default="", show_default=False)
-        except (KeyboardInterrupt, EOFError):
-            stop_event.set()
-            return False
-        return True
-
-    def run_tutorial_steps():
-        # Wait a moment for the window to appear
-        time.sleep(3)
-
-        tutorial_steps = (
-            {
-                "title": "Step 1 — Interface & Controls",
-                "lines": (
-                    "Left Pane (Intel): Shows details for selected objects (Stations, Tiles, Cogs).",
-                    "Right Pane (Vibe Deck): Select icons here to change your Cog's broadcast resonance.",
-                    "Zoom/Pan: Scroll or pinch to zoom the arena; drag to pan.",
-                    "Click various buildings to view their details in the Left Pane.",
-                    "Look for the Hub (Hub), Junctions, Gear Stations, and Extractors.",
-                    "Click your Cog to assume control.",
-                ),
-            },
-            {
-                "title": "Step 2 — Movement & Energy",
-                "lines": (
-                    "Use WASD or Arrow Keys to move your Cog.",
-                    "Every move costs Energy, and aligned hubs/junctions recharge you.",
-                    "Watch your battery bar on the Cog or in the HUD.",
-                    "If low, rest (skip turn), lean against a wall (walk into it), or",
-                    "stand near the Hub or an aligned Junction.",
-                ),
-            },
-            {
-                "title": "Step 3 — Gear Up",
-                "lines": (
-                    "Primary interaction mode is WALKING INTO things.",
-                    "Locate a Gear Station and walk into it to equip a role:",
-                    "  [yellow]⛏ Miner[/yellow], [yellow]🔭 Scout[/yellow],",
-                    "  [yellow]🔗 Aligner[/yellow], [yellow]🌀 Scrambler[/yellow].",
-                    "Gear costs are paid from the team commons.",
-                ),
-            },
-            {
-                "title": "Step 4 — Resources & Hearts",
-                "lines": (
-                    "Find an Extractor station to gather elements:",
-                    "  [yellow]C[/yellow] (Carbon), [yellow]O[/yellow] (Oxygen),",
-                    "  [yellow]G[/yellow] (Germanium), [yellow]S[/yellow] (Silicon).",
-                    "Visit the Chest to assemble or withdraw Hearts from the commons.",
-                ),
-            },
-            {
-                "title": "Step 5 — Junction Control",
-                "lines": (
-                    "Junctions (junctions) can be aligned to your team.",
-                    "As an Aligner: get Influence (stand near the Hub) + a Heart, then bump a neutral junction.",
-                    "As a Scrambler: get a Heart, then bump an enemy-aligned junction to neutralize it.",
-                    "Aligned junctions recharge energy for your team.",
-                ),
-            },
-            {
-                "title": "Step 6 — Objective Complete",
-                "lines": (
-                    "[bold green]🎉 Congratulations![/bold green] You have completed the tutorial.",
-                    "You've mastered movement, gear, resources, and junction control.",
-                    "[bold cyan]You're now ready to tackle the full CogsGuard arena![/bold cyan]",
-                ),
-            },
-        )
-
-        for idx, step in enumerate(tutorial_steps):
-            if stop_event.is_set():
-                return
-            console.print()
-            console.print(f"[bold cyan]{step['title']}[/bold cyan]")
-            console.print()
-            for line in step["lines"]:
-                console.print(f"  • {line}")
-            console.print()
-            if idx < len(tutorial_steps) - 1:
-                if not _wait_for_enter("[dim]Press Enter for next step[/dim]"):
-                    return
-
-        console.print(
-            "[bold green]REFERENCE DOSSIERS[/bold green]\n"
-            "- [link=packages/cogames/MISSION.md]MISSION.md[/link]: CogsGuard deployment orders.\n"
-            "- [link=packages/cogames/README.md]README.md[/link]: System overview and CLI quick start.\n"
-            "- [link=packages/cogames/TECHNICAL_MANUAL.md]TECHNICAL_MANUAL.md[/link]: FACE sensor/command schematics."
-        )
-        console.print()
-        console.print("[dim]Tutorial briefing complete. Good luck, Cognitive.[/dim]")
-        console.print("[dim]Close the Mettascope window to exit the tutorial.[/dim]")
-
-    # Start tutorial interaction in a background thread
-    tutorial_thread = threading.Thread(target=run_tutorial_steps, daemon=True)
-    tutorial_thread.start()
+    console.print("[dim]Tutorial phases appear in-game. Press Enter or click Next to advance.[/dim]")
+    console.print("[dim]Close the Mettascope window to exit.[/dim]")
 
     # Run play (blocks main thread)
     try:
         play_module.play(
             console,
             env_cfg=env_cfg,
-            policy_spec=get_policy_spec(ctx, "class=noop"),  # Default to noop, assuming human control
+            policy_spec=get_policy_spec(ctx, "class=tutorial_noop,kw.tutorial=play"),
             game_name="tutorial",
             render_mode="gui",
+            autostart=True,
         )
     except KeyboardInterrupt:
         logger.info("Tutorial interrupted; exiting.")
-    finally:
-        stop_event.set()
 
 
 @tutorial_app.command(
@@ -446,21 +343,21 @@ def cogsguard_tutorial_cmd(
     ctx: typer.Context,
 ) -> None:
     """Run the CogsGuard tutorial."""
-    # Suppress logs during tutorial to keep instructions visible
+    # Suppress logs during tutorial to keep output focused.
     logging.getLogger().setLevel(logging.ERROR)
+    os.environ["METTASCOPE_SHOW_VALIDATION"] = "0"
 
     console.print(
         Panel.fit(
-            "[bold cyan]MISSION BRIEFING: CogsGuard Training[/bold cyan]\n\n"
-            "Welcome, Cognitive. This simulation introduces you to CogsGuard operations.\n"
-            "You will learn about specialized gear, resource management, and territory control.\n\n"
-            "When you are ready to deploy, press Enter below and then return here to receive instructions.",
-            title="CogsGuard Briefing",
+            "[bold cyan]CogsGuard Tutorial[/bold cyan]\n\n"
+            "Mission: outscore Clips by sustaining junction control under pressure.\n"
+            "Guidance appears in-game. Press Enter or click Next to advance each tutorial phase.",
+            title="Tutorial Briefing",
             border_style="green",
         )
     )
 
-    Prompt.ask("[dim]Press Enter to launch simulation[/dim]", default="", show_default=False)
+    Prompt.ask("[dim]Press Enter to launch tutorial[/dim]", default="", show_default=False)
     console.print("[dim]Initializing Mettascope...[/dim]")
 
     # Load CogsGuard tutorial mission
@@ -468,148 +365,21 @@ def cogsguard_tutorial_cmd(
 
     # Create environment config
     env_cfg = CogsGuardTutorialMission.make_env()
-
-    stop_event = threading.Event()
-
-    def _wait_for_enter(prompt: str) -> bool:
-        if stop_event.is_set():
-            return False
-        try:
-            Prompt.ask(prompt, default="", show_default=False)
-        except (KeyboardInterrupt, EOFError):
-            stop_event.set()
-            return False
-        return True
-
-    def run_cogsguard_tutorial_steps():
-        # Wait a moment for the window to appear
-        time.sleep(3)
-
-        tutorial_steps = (
-            {
-                "title": "Step 1 — Objective & Scoring",
-                "lines": (
-                    "CogsGuard is a territory control game. Your team earns points by holding junctions.",
-                    "[bold]Reward per tick[/bold] = junctions held / max_steps / num_cogs",
-                    "Control more junctions, earn more points. You start in your Hub (center).",
-                ),
-                "task": "Click your Cog to select it, then explore your Hub and familiarize yourself with the area.",
-            },
-            {
-                "title": "Step 2 — The Clips Threat",
-                "lines": (
-                    "[bold red]WARNING:[/bold red] Clips are automated enemies that expand territory!",
-                    "Every ~300 steps, Clips [yellow]scramble[/yellow] nearby Cog junctions to neutral.",
-                    "Every ~300 steps, Clips [yellow]capture[/yellow] nearby neutral junctions.",
-                    "Clips expansion has a 25-cell radius. You must actively defend or be overrun!",
-                ),
-            },
-            {
-                "title": "Step 3 — Territory & Resources",
-                "lines": (
-                    "Junctions and Hubs project effects in a [bold]10-cell radius[/bold]:",
-                    "[green]Friendly territory:[/green] Restores +100 HP, +100 energy, +10 influence per tick.",
-                    "[red]Enemy territory:[/red] Drains -1 HP and -100 influence per tick.",
-                    "[bold]HP:[/bold] Base 100. You lose -1 HP/tick outside friendly territory.",
-                    "  At 0 HP, gear and hearts are [bold red]destroyed[/bold red].",
-                    "[bold]Energy:[/bold] Base 20. Moving costs [yellow]3 energy[/yellow]. Regens +1/tick.",
-                    "[yellow]Key insight:[/yellow] Aligners can't capture in enemy AOE (influence drains too fast).",
-                ),
-                "task": "Walk outside your Hub, watch your HP drain, then return to heal.",
-            },
-            {
-                "title": "Step 4 — Gear Stations",
-                "lines": (
-                    "Equip gear at stations. Each costs 6 collective resources (different mixes):",
-                    "[yellow]Miner[/yellow]: +40 cargo, 10x extraction. Cost: 1C/1O/[bold]3G[/bold]/1S",
-                    "[yellow]Aligner[/yellow]: +20 influence cap, captures territory. Cost: [bold]3C[/bold]/1O/1G/1S",
-                    "[yellow]Scrambler[/yellow]: +200 HP, disrupts enemy junctions. Cost: 1C/[bold]3O[/bold]/1G/1S",
-                    "[yellow]Scout[/yellow]: +400 HP, +100 energy, mobile recon. Cost: 1C/1O/1G/[bold]3S[/bold]",
-                    "Switching gear replaces your current gear (only hold one at a time).",
-                ),
-                "task": "Find a Gear Station in your base and equip Miner gear (walk into it).",
-            },
-            {
-                "title": "Step 5 — Capturing & Scrambling",
-                "lines": (
-                    "[bold]To capture a neutral junction (Aligner only):[/bold]",
-                    "  • Requires: Aligner gear + [yellow]1 heart[/yellow] + [yellow]1 influence[/yellow]",
-                    "  • Must NOT be in enemy AOE (influence would be drained)",
-                    "[bold]To scramble an enemy junction (Scrambler only):[/bold]",
-                    "  • Requires: Scrambler gear + [yellow]1 heart[/yellow]",
-                    "  • Converts enemy junction to neutral (then Aligners can capture it)",
-                ),
-            },
-            {
-                "title": "Step 6 — Resources & Hearts",
-                "lines": (
-                    "[bold]Extractors:[/bold] Walk into them to gather resources (1 per use, 10 with Miner gear).",
-                    "[bold]Deposit:[/bold] Walk into the Hub (center of Hub) to deposit resources.",
-                    "[bold]Hearts:[/bold] At the Chest, convert [yellow]1C + 1O + 1G + 1S[/yellow] into 1 heart.",
-                    "  Hearts are spent to capture/scramble junctions.",
-                    "[bold]Aligning:[/bold] Switch to Aligner gear, then walk into a neutral junction to capture it.",
-                    "Team coordination: Miners gather → deposit → make hearts → Aligners/Scramblers use them.",
-                ),
-                "task": (
-                    "Extract resources (C/O/G/S), deposit at the Hub, craft a heart, "
-                    "then switch to Aligner and capture a junction."
-                ),
-            },
-            {
-                "title": "Step 7 — Tutorial Complete",
-                "lines": (
-                    "[bold green]Congratulations![/bold green] You've completed the CogsGuard tutorial.",
-                    "",
-                    "[bold]Remember the core loop:[/bold]",
-                    "  1. Miners gather resources and deposit at the Hub",
-                    "  2. Convert resources to hearts at the Chest",
-                    "  3. Scramblers neutralize enemy junctions (1 heart each)",
-                    "  4. Aligners capture neutral junctions (1 heart + 1 influence each)",
-                    "  5. Defend against Clips expansion!",
-                    "",
-                    "[bold cyan]You're ready for full CogsGuard missions![/bold cyan]",
-                ),
-            },
-        )
-
-        for idx, step in enumerate(tutorial_steps):
-            if stop_event.is_set():
-                return
-            console.print()
-            console.print(f"[bold cyan]{step['title']}[/bold cyan]")
-            console.print()
-            for line in step["lines"]:
-                console.print(f"  • {line}")
-            # Display task if present
-            if "task" in step:
-                console.print()
-                console.print(f"  [bold yellow]TASK:[/bold yellow] {step['task']}")
-            console.print()
-            if idx < len(tutorial_steps) - 1:
-                console.print("[dim]Press Enter to continue...[/dim]")
-                if not _wait_for_enter(""):
-                    return
-
-        console.print("[dim]CogsGuard tutorial briefing complete. Good luck, Cognitive.[/dim]")
-        console.print("[dim]Close the Mettascope window to exit the tutorial.[/dim]")
-
-    # Start tutorial interaction in a background thread
-    tutorial_thread = threading.Thread(target=run_cogsguard_tutorial_steps, daemon=True)
-    tutorial_thread.start()
+    console.print("[dim]Tutorial phases appear in-game. Press Enter or click Next to advance.[/dim]")
+    console.print("[dim]Close the Mettascope window to exit.[/dim]")
 
     # Run play (blocks main thread)
     try:
         play_module.play(
             console,
             env_cfg=env_cfg,
-            policy_spec=get_policy_spec(ctx, "class=noop"),
+            policy_spec=get_policy_spec(ctx, "class=tutorial_noop,kw.tutorial=cogsguard"),
             game_name="cogsguard_tutorial",
             render_mode="gui",
+            autostart=True,
         )
     except KeyboardInterrupt:
         logger.info("CogsGuard tutorial interrupted; exiting.")
-    finally:
-        stop_event.set()
 
 
 app.add_typer(tutorial_app, name="tutorial", rich_help_panel="Tutorials")
