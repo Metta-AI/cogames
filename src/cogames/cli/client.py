@@ -26,9 +26,9 @@ def fetch_default_season(server_url: str) -> SeasonInfo:
     raise RuntimeError("No seasons available from server")
 
 
-def fetch_season_info(server_url: str, season_name: str) -> SeasonInfo:
+def fetch_season_info(server_url: str, season_name: str, **params: str) -> SeasonInfo:
     with httpx.Client(base_url=server_url, timeout=10.0) as client:
-        resp = client.get(f"/tournament/seasons/{season_name}")
+        resp = client.get(f"/tournament/seasons/{season_name}", params=params or None)
         resp.raise_for_status()
         return SeasonInfo.model_validate(resp.json())
 
@@ -58,6 +58,23 @@ class SeasonInfo(BaseModel):
     leaderboard_pool: str | None = None
     is_default: bool = False
     pools: list[PoolInfo]
+
+
+class MatchPlayerSummary(BaseModel):
+    policy: PolicyVersionSummary
+    policy_index: int
+    score: float | None
+
+
+class SeasonMatchInfo(BaseModel):
+    id: uuid.UUID
+    pool_name: str
+    status: str
+    assignments: list[int]
+    players: list[MatchPlayerSummary]
+    job_id: uuid.UUID | None
+    episode_id: str | None
+    created_at: str
 
 
 class SeasonVersionInfo(BaseModel):
@@ -179,6 +196,23 @@ class TournamentServerClient:
 
     def get_seasons(self) -> list[SeasonInfo]:
         return self._get("/tournament/seasons", list[SeasonInfo])
+
+    def get_season_matches(
+        self, season_name: str, include_hidden_seasons: bool = False, policy_version_ids: list[uuid.UUID] | None = None
+    ) -> list[SeasonMatchInfo]:
+        params: dict[str, str | list[str]] = {}
+
+        if include_hidden_seasons:
+            params["include_hidden"] = "true"
+
+        if policy_version_ids:
+            params["policy_version_ids"] = [str(pvid) for pvid in policy_version_ids]
+
+        return self._get(
+            f"/tournament/seasons/{season_name}/matches",
+            list[SeasonMatchInfo],
+            params=params if params else None,
+        )
 
     def get_config(self, config_id: str) -> dict[str, Any]:
         return self._get(f"/tournament/configs/{config_id}")

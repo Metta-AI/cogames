@@ -2200,10 +2200,11 @@ def diagnose_cmd(
     )
 
 
-def _resolve_season(server: str, season_name: str | None = None) -> SeasonInfo:
+def _resolve_season(server: str, season_name: str | None = None, include_hidden: bool = False) -> SeasonInfo:
     try:
         if season_name is not None:
-            info = fetch_season_info(server, season_name)
+            params = {"include_hidden": "true"} if include_hidden else {}
+            info = fetch_season_info(server, season_name, **params)
             console.print(f"[dim]Using season: {info.name}[/dim]")
         else:
             info = fetch_default_season(server)
@@ -2479,6 +2480,12 @@ def upload_cmd(
         help="Tournament server URL",
         rich_help_panel="Server",
     ),
+    include_hidden: bool = typer.Option(
+        False,
+        "--include-hidden",
+        hidden=True,
+        rich_help_panel="Server",
+    ),
     # --- Help ---
     _help: bool = typer.Option(
         False,
@@ -2497,7 +2504,7 @@ def upload_cmd(
         console.print("[red]Policy name must be at most 64 characters[/red]")
         raise typer.Exit(1)
 
-    season_info = _resolve_season(server, season)
+    season_info = _resolve_season(server, season, include_hidden=include_hidden)
 
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
