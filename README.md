@@ -189,6 +189,11 @@ cogames submissions
 cogames leaderboard --season beta-cogsguard
 ```
 
+## API docs
+
+The tournament API is documented at [softmax.com/api/docs](https://softmax.com/api/docs). The interactive
+OpenAPI spec describes all public endpoints for seasons, matches, leaderboards, and submissions.
+
 # Command Reference
 
 Most commands are of the form `cogames <command> --mission [MISSION] --policy [POLICY] [OPTIONS]`
