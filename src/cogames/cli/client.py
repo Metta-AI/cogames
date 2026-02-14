@@ -13,26 +13,6 @@ from cogames.cli.login import CoGamesAuthenticator
 T = TypeVar("T")
 
 
-def fetch_default_season(server_url: str) -> SeasonInfo:
-    with httpx.Client(base_url=server_url, timeout=10.0) as client:
-        resp = client.get("/tournament/seasons")
-        resp.raise_for_status()
-        seasons = resp.json()
-        for s in seasons:
-            if s.get("is_default"):
-                return SeasonInfo.model_validate(s)
-        if seasons:
-            return SeasonInfo.model_validate(seasons[0])
-    raise RuntimeError("No seasons available from server")
-
-
-def fetch_season_info(server_url: str, season_name: str, **params: str) -> SeasonInfo:
-    with httpx.Client(base_url=server_url, timeout=10.0) as client:
-        resp = client.get(f"/tournament/seasons/{season_name}", params=params or None)
-        resp.raise_for_status()
-        return SeasonInfo.model_validate(resp.json())
-
-
 class PolicyVersionInfo(BaseModel):
     id: uuid.UUID
     policy_id: uuid.UUID
@@ -198,6 +178,19 @@ class TournamentServerClient:
 
     def get_seasons(self) -> list[SeasonInfo]:
         return self._get("/tournament/seasons", list[SeasonInfo])
+
+    def get_season(self, season_name: str, include_hidden: bool = False) -> SeasonInfo:
+        params = {"include_hidden": "true"} if include_hidden else None
+        return self._get(f"/tournament/seasons/{season_name}", SeasonInfo, params=params)
+
+    def get_default_season(self) -> SeasonInfo:
+        seasons = self.get_seasons()
+        for s in seasons:
+            if s.is_default:
+                return s
+        if seasons:
+            return seasons[0]
+        raise RuntimeError("No seasons available from server")
 
     def get_season_matches(
         self, season_name: str, include_hidden_seasons: bool = False, policy_version_ids: list[uuid.UUID] | None = None

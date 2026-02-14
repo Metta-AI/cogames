@@ -152,6 +152,11 @@ Overall, CogsGuard aims to present rich environments with:
 
 # About the tournament
 
+## API Docs
+The tournament API is documented at [api.observatory.softmax-research.net/docs](https://api.observatory.softmax-research.net/docs). The interactive
+OpenAPI spec describes all public endpoints for seasons, matches, leaderboards, and submissions.
+
+
 ## How seasons work
 
 The ALB leaderboard runs in seasons. Each season has two pools:
@@ -188,11 +193,6 @@ To check your submission status and match results:
 cogames submissions
 cogames leaderboard --season beta-cogsguard
 ```
-
-## API docs
-
-The tournament API is documented at [softmax.com/api/docs](https://softmax.com/api/docs). The interactive
-OpenAPI spec describes all public endpoints for seasons, matches, leaderboards, and submissions.
 
 # Command Reference
 
@@ -687,7 +687,7 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Simulation ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--episodes</span>           <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-e</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=1</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold"> </span>  Number of evaluation episodes <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 10]</span>                             <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--steps</span>              <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-s</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=1</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold"> </span>  Max steps per episode <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 1000]</span>                                   <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--steps</span>              <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-s</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=1</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold"> </span>  Max steps per episode <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: (from mission)]</span>                         <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--seed</span>                       <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=0</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold"> </span>  Seed for evaluation RNG <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 42]</span>                                   <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--map-seed</span>                   <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=0</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold"> </span>  MapGen seed for procedural maps <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: (same as --seed)]</span>             <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--action-timeout-ms</span>          <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">MS [x&gt;=1</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span>  Max ms per action before noop <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 250]</span>                            <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
@@ -774,7 +774,7 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Simulation ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--episodes</span>           <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-e</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=1</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold"> </span>  Number of evaluation episodes <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 10]</span>                             <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--steps</span>              <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-s</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=1</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold"> </span>  Max steps per episode <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 1000]</span>                                   <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--steps</span>              <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-s</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=1</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold"> </span>  Max steps per episode <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: (from mission)]</span>                         <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--seed</span>                       <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=0</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold"> </span>  Seed for evaluation RNG <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 42]</span>                                   <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--map-seed</span>                   <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=0</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold"> </span>  MapGen seed for procedural maps <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: (same as --seed)]</span>             <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--action-timeout-ms</span>          <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">MS [x&gt;=1</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span>  Max ms per action before noop <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 250]</span>                            <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
@@ -1098,19 +1098,19 @@ cogames [COMMAND] --help
 
 
 
-### `cogames validate-policy`
+### `cogames create-bundle`
 
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">                                                                                                                   </span>
-<span style="font-weight: bold"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">Usage: </span><span style="font-weight: bold">cogames validate-policy [OPTIONS]                                                                          </span>
+<span style="font-weight: bold"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">Usage: </span><span style="font-weight: bold">cogames create-bundle [OPTIONS]                                                                            </span>
 <span style="font-weight: bold">                                                                                                                   </span>
 </pre>
 
 
 
 
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> Validate the policy loads and runs for at least a single step                                                     
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> Create a submission bundle zip from a policy                                                                      
 
 </pre>
 
@@ -1118,11 +1118,65 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Policy ────────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #800000; text-decoration-color: #800000">*</span>  <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--policy</span>        <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">POLICY</span>  Policy specification: URI (bundle dir or .zip) or NAME or                    <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                    class=NAME[,data=FILE][,kw.x=val]                                            <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                    <span style="color: #bf7f7f; text-decoration-color: #bf7f7f">[required]                                                                  </span> <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>    <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--device</span>                <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">DEVICE</span>  Policy device (auto, cpu, cuda, cuda:0, etc.) <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: auto]</span>                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>    <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--setup-script</span>          <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT  </span>  Path to a Python setup script to run before loading the policy               <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #800000; text-decoration-color: #800000">*</span>  <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--policy</span>      <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">POLICY </span>  Policy specification: URI (bundle dir or .zip) or NAME or                     <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                   class=NAME[,data=FILE][,kw.x=val]                                             <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                   <span style="color: #bf7f7f; text-decoration-color: #bf7f7f">[required]                                                                   </span> <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>    <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--init-kwarg</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-k</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">KEY=VAL</span>  Policy init kwargs (can be repeated)                                          <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
+</pre>
+
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Output ────────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--output</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">PATH</span>  Output path for the bundle zip <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: submission.zip]</span>                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
+</pre>
+
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Files ─────────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--include-files</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-f</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">PATH</span>  Files or directories to include (can be repeated)                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--setup-script</span>           <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">PATH</span>  Python setup script to include in the bundle                                     <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
+</pre>
+
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Other ─────────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--help</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-h</span>        Show this message and exit                                                                    <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
+</pre>
+
+
+
+    
+
+
+
+### `cogames validate-bundle`
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">                                                                                                                   </span>
+<span style="font-weight: bold"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">Usage: </span><span style="font-weight: bold">cogames validate-bundle [OPTIONS]                                                                          </span>
+<span style="font-weight: bold">                                                                                                                   </span>
+</pre>
+
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> Validate a policy bundle runs correctly in process isolation                                                      
+
+</pre>
+
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Options ───────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #800000; text-decoration-color: #800000">*</span>  <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--policy</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">URI</span>  Bundle URI (file://, s3://, or local path to .zip or directory) <span style="color: #bf7f7f; text-decoration-color: #bf7f7f">[required]</span>            <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
 </pre>
 
@@ -1140,6 +1194,17 @@ cogames [COMMAND] --help
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Server ────────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--server</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">URL</span>  Tournament server URL (used to resolve default season)                                     <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                      <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: https://api.observatory.softmax-research.net]</span>                                    <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
+</pre>
+
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Validation ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--validation-mode</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Validation mode: 'local' (in-process) or 'docker' (in container)                 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: local]                                                </span>                 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--image</span>                  <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Docker image for container validation (only used with <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--validation-mode</span> docker)  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: ghcr.io/metta-ai/episode-runner:latest]                              </span>  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
 </pre>
 
@@ -1469,8 +1534,12 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Validation ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>                  Run validation only without uploading                                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--skip-validation</span>          Skip policy validation in isolated environment                                       <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>                <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">    </span>  Run validation only without uploading                                            <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--skip-validation</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">    </span>  Skip policy validation in isolated environment                                   <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--validation-mode</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Validation mode: 'local' (in-process) or 'docker' (in container)                 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: local]                                                </span>                 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--image</span>                  <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Docker image for container validation (only used with <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--validation-mode</span> docker)  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: ghcr.io/metta-ai/episode-runner:latest]                              </span>  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
 </pre>
 
