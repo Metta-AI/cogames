@@ -60,21 +60,23 @@ class SeasonInfo(BaseModel):
     pools: list[PoolInfo]
 
 
-class MatchPlayerSummary(BaseModel):
+class MatchPlayerInfo(BaseModel):
     policy: PolicyVersionSummary
-    policy_index: int
+    num_agents: int
     score: float | None
 
 
-class SeasonMatchInfo(BaseModel):
+class MatchResponse(BaseModel):
     id: uuid.UUID
+    season_name: str
     pool_name: str
     status: str
     assignments: list[int]
-    players: list[MatchPlayerSummary]
-    job_id: uuid.UUID | None
-    episode_id: str | None
-    created_at: str
+    players: list[MatchPlayerInfo]
+    error: str | None
+    episode_id: uuid.UUID | None
+    episode: dict[str, Any] | None = None
+    created_at: datetime
 
 
 class SeasonVersionInfo(BaseModel):
@@ -199,7 +201,7 @@ class TournamentServerClient:
 
     def get_season_matches(
         self, season_name: str, include_hidden_seasons: bool = False, policy_version_ids: list[uuid.UUID] | None = None
-    ) -> list[SeasonMatchInfo]:
+    ) -> list[MatchResponse]:
         params: dict[str, str | list[str]] = {}
 
         if include_hidden_seasons:
@@ -210,7 +212,7 @@ class TournamentServerClient:
 
         return self._get(
             f"/tournament/seasons/{season_name}/matches",
-            list[SeasonMatchInfo],
+            list[MatchResponse],
             params=params if params else None,
         )
 
