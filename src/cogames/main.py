@@ -38,7 +38,7 @@ from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import train as train_module
 from cogames.cli.base import console
-from cogames.cli.client import SeasonInfo, TournamentServerClient, fetch_default_season, fetch_season_info
+from cogames.cli.client import SeasonInfo, TournamentServerClient
 from cogames.cli.leaderboard import (
     leaderboard_cmd,
     parse_policy_identifier,
@@ -1972,14 +1972,14 @@ def diagnose_cmd(
 
 def _resolve_season(server: str, season_name: str | None = None, include_hidden: bool = False) -> SeasonInfo:
     try:
-        if season_name is not None:
-            params = {"include_hidden": "true"} if include_hidden else {}
-            info = fetch_season_info(server, season_name, **params)
-            console.print(f"[dim]Using season: {info.name}[/dim]")
-        else:
-            info = fetch_default_season(server)
-            console.print(f"[dim]Using default season: {info.name}[/dim]")
-        return info
+        with TournamentServerClient(server_url=server) as client:
+            if season_name is not None:
+                info = client.get_season(season_name, include_hidden=include_hidden)
+                console.print(f"[dim]Using season: {info.name}[/dim]")
+            else:
+                info = client.get_default_season()
+                console.print(f"[dim]Using default season: {info.name}[/dim]")
+            return info
     except Exception as e:
         console.print(f"[red]Could not fetch season from server:[/red] {e}")
         console.print("Specify a season explicitly with [cyan]--season[/cyan]")
