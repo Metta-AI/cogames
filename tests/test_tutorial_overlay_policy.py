@@ -21,8 +21,8 @@ def test_tutorial_overlay_policy_play_emits_mission_phases() -> None:
     infos = _step_tutorial_policy("play")
     phases = cast(list[str], infos["tutorial_overlay_phases"])
 
-    assert phases[0].startswith("Mission briefing: CogsGuard training overview")
-    assert phases[1].startswith("Step 1 - Interface and controls")
+    assert phases[0].startswith("Welcome to CogsGuard")
+    assert phases[1].startswith("Camera and selection")
     assert "WASD" in phases[2]
     assert len(phases) == 7
     assert "tutorial_overlay" not in infos
@@ -32,6 +32,6 @@ def test_tutorial_overlay_policy_cogsguard_emits_mission_phases() -> None:
     infos = _step_tutorial_policy("cogsguard")
     phases = cast(list[str], infos["tutorial_overlay_phases"])
 
-    assert phases[0].startswith("Mission briefing:")
+    assert phases[0].startswith("CogsGuard:")
     assert "clips" in phases[0].lower()
     assert "tutorial_overlay" not in infos

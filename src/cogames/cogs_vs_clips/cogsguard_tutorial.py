@@ -11,6 +11,7 @@ from mettagrid.mapgen.scenes.base_hub import BaseHubConfig
 def make_cogsguard_tutorial_site() -> CoGameSite:
     """Create a smaller, simpler CogsGuard arena for the tutorial."""
     hub_config = BaseHubConfig(
+        hub_object="c:hub",
         corner_bundle="extractors",
         cross_bundle="none",
         cross_distance=5,
