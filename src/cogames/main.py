@@ -328,7 +328,7 @@ def tutorial_cmd(
             policy_spec=get_policy_spec(ctx, "class=tutorial_noop,kw.tutorial=play"),
             game_name="tutorial",
             render_mode="gui",
-            autostart=True,
+            autostart=False,
         )
     except KeyboardInterrupt:
         logger.info("Tutorial interrupted; exiting.")
@@ -376,7 +376,7 @@ def cogsguard_tutorial_cmd(
             policy_spec=get_policy_spec(ctx, "class=tutorial_noop,kw.tutorial=cogsguard"),
             game_name="cogsguard_tutorial",
             render_mode="gui",
-            autostart=True,
+            autostart=False,
         )
     except KeyboardInterrupt:
         logger.info("CogsGuard tutorial interrupted; exiting.")

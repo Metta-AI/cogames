@@ -22,14 +22,14 @@ Your onboard battery stores limited energy; manage it wisely.
 - Your onboard battery has a base capacity of **20** energy; Scouts get **+100**.
 - Passive solar equipment regenerates **+1** energy per turn.
 - Being within friendly territory (near aligned junctions or your hub) fully restores energy.
-- Being in enemy territory drains influence (not energy).
+- Outside friendly territory, energy drains over time.
 
 #### Health Points
 
 You have limited hitpoints that determine your survival.
 
 - Agents heal rapidly within their own territory.
-- Agents take damage in enemy-controlled territory (-1 HP per tick).
+- Agents take damage outside friendly territory (-1 HP per tick).
 - When HP reaches zero, your gear and hearts are destroyed. You must return to base.
 
 #### Cargo Limits
@@ -95,9 +95,10 @@ Facilities (Hub, Junction) project area-of-effect (AOE) in a radius (default 10 
 - Energy fully restored
 - HP fully restored
 
-**Within enemy territory:**
+**Outside friendly territory:**
 
 - -1 HP per tick
+- Energy drained
 - Influence drained
 
 ### Capturing Territory
@@ -115,7 +116,7 @@ neutralize nearby enemy junctions to stop the influence drain before Aligners ca
 Your team shares a collective inventory:
 
 - **Deposit resources** at aligned junctions and hubs
-- **Withdraw hearts** from collective chests
+- **Craft hearts** at the Assembler
 - Hearts are required for capturing and disrupting junctions
 
 This creates interdependence: Miners gather resources for the team, while Aligners and Scramblers consume hearts to

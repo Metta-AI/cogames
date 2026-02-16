@@ -94,22 +94,16 @@ The game will open in a new window, and the terminal will give you instructions 
     cogames login
     ```
 
-2. Upload one of our starter policies under your name.
+2. Upload a starter policy and submit it to the tournament.
 
     ```bash
-    cogames upload --policy "class=cogames.policy.scripted_agent.starter_agent.StarterPolicy" --name "$USER.README-quickstart-starter-policy"
+    cogames upload --policy "class=cogames.policy.starter_agent.StarterPolicy" --name "$USER.README-quickstart-starter-policy" --season beta-cvc-no-clips --skip-validation
     ```
 
-3. List the seasons currently running.
+3. Check your submission on the leaderboard.
 
     ```bash
-    cogames seasons
-    ```
-
-4. Submit the policy to one of the running seasons.
-
-    ```bash
-    cogames submit "$USER.README-quickstart-starter-policy:v1" --season beta-cogsguard
+    cogames leaderboard --season beta-cvc-no-clips
     ```
 
 # Tutorials
@@ -191,7 +185,7 @@ cogames pickup --policy <YOUR_POLICY> --pool <POOL_POLICY>
 To check your submission status and match results:
 ```bash
 cogames submissions
-cogames leaderboard --season beta-cogsguard
+cogames leaderboard --season beta-cvc-no-clips
 ```
 
 # Command Reference

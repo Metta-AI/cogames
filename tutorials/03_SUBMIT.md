@@ -27,17 +27,16 @@ cogames login
 ## Step 2 — Choose a policy to submit
 
 You can submit either:
-- A **checkpoint bundle** (directory or .zip with `policy_spec.json`), or
-- A **policy class + weights** using `class=...` and `data=...`.
+- A **policy class + weights** using `class=...` and `data=...`, or
+- A **checkpoint bundle** (directory with `policy_spec.json`).
 
 Examples below use placeholders. Replace them with your actual paths.
 
-
-Tip: find your run id and checkpoint by listing `./train_dir` and inspecting the latest run folder. For example:
+Tip: find your run id and checkpoint by listing `./train_dir`:
 
 ```bash
 ls -lt train_dir
-ls -lt train_dir/<RUN_ID>/checkpoints
+ls -lt train_dir/<RUN_ID>
 ```
 
 Expected output (example):
@@ -48,146 +47,76 @@ train_dir/
   176850219234/
 ```
 
-What this shows:
-- The newest folder name is your `RUN_ID`.
-
-Then, inside that run:
+The newest folder name is your `RUN_ID`. Inside that run:
 
 ```text
-train_dir/176850340101/checkpoints/
+train_dir/176850340101/
   model_000001.pt
-  trainer_state.pt
+  policy_spec.json
 ```
 
-What this shows:
-- `model_*.pt` is the weights file you can submit with `class=... ,data=...`.
+`model_*.pt` is the weights file you can submit with `class=...,data=...`.
 
 
-### Option A — Submit a checkpoint bundle
+### Option A — Upload with class + weights
 
 ```bash
-cogames upload -p ./train_dir/<RUN_ID>/checkpoints/<RUN_ID>:<CHECKPOINT> -n my_policy_name
+cogames upload -p class=my_policy.MyTrainablePolicy,data=./train_dir/<RUN_ID>/model_000001.pt -n my_policy_name --skip-validation
 ```
 
-Replace `<RUN_ID>` with your run name and `<CHECKPOINT>` with the checkpoint version.
 
+### Option B — Upload a checkpoint bundle
 
-### Option B — Submit a policy class + weights
+If your training run produced a `policy_spec.json`, you can upload the run directory directly:
 
 ```bash
-cogames upload -p class=my_policy.MyTrainablePolicy,data=./train_dir/<run_id>/model_000001.pt -n my_policy_name
+cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --skip-validation
 ```
 
-Use this form if your training output is `model_*.pt` (not a bundle).
 
+## Step 3 — Dry run (optional)
 
-Tip: Use `--dry-run` first to validate your policy bundle before uploading.
-
-
-Note: Scores can take a while to appear after submission (pending → scored).
-
-
-Tip: It can take a while for scores to appear after submission.
-
-
-## Step 3 — Dry run upload (recommended)
-
-Validate the upload package without sending it.
-
-
+Validate the upload package without sending it:
 
 ```bash
-cogames upload -p ./train_dir/{RUN_ID}/checkpoints/{RUN_ID}:{CHECKPOINT} -n {POLICY_NAME} --dry-run
+cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --dry-run --skip-validation
 ```
 
 
-Expected output (example):
-```text
-Dry run complete - validation passed, zip created!
-```
+## Step 4 — Submit to a season
 
-
-## Step 4 — Upload policy
-
-Upload the policy bundle to CoGames.
-
-
+By default, `cogames upload` both uploads and submits to a season. You can specify a season explicitly:
 
 ```bash
-cogames upload -p ./train_dir/{RUN_ID}/checkpoints/{RUN_ID}:{CHECKPOINT} -n {POLICY_NAME}
+cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --season beta-cvc-no-clips --skip-validation
 ```
 
+Or submit a previously uploaded policy to a season:
 
-Expected output (example):
-```text
-Upload complete: my_policy_name:v1
-To submit to a tournament: cogames submit my_policy_name:v1 --season <SEASON>
+```bash
+cogames submit my_policy_name --season beta-cvc-no-clips
 ```
 
-
-## Step 5 — Submit to a season
-
-Once uploaded, submit the policy version to a season.
-
-
-Pick a season from the list below, then submit your policy to that season.
-
+List available seasons:
 
 ```bash
 cogames seasons
 ```
-```
-                               Tournament Seasons                               
-                                                                                
- Season           Description                           Pools                   
- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 
- beta             Policies start in qualifying;         qualifying, competition 
-                  promoted to competition if score                              
-                  meets threshold                                               
-```
 
-```bash
-cogames submit {POLICY_NAME} --season {SEASON}
-```
+Note: Scores can take a while to appear after submission.
 
 
-Expected output (example):
-```text
-Submitted successfully!
-Submission ID: <uuid>
-```
-
-
-## Step 6 — View your submissions
-
-List your submissions and see when scores appear.
-
-
+## Step 5 — View your submissions
 
 ```bash
 cogames submissions
 ```
 
-Expected output
-```
-                             Your Uploaded Policies                             
-                                                                                
- Policy                                              Uploaded           Seasons 
- ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 
- your-name.2026-01-16.test-starter-policy.14:48:00…   2026-01-16 22:49   beta    
-```
 
-## Step 7 — View the leaderboard
-
-View the leaderboard.
-
-
-
-
-Then run:
+## Step 6 — View the leaderboard
 
 ```bash
-cogames leaderboard --season {SEASON}
+cogames leaderboard --season beta-cvc-no-clips
 ```
 
 
@@ -195,15 +124,5 @@ cogames leaderboard --season {SEASON}
 
 - **Auth errors**: run `cogames login` again.
 - **Module not found**: use `class=...` with a fully qualified path or include the file in submission.
-- **Invalid policy path**: ensure `-p` points to an actual bundle or weights file.
-
-
-## Common submission issues
-- **Module not found**: use a fully qualified class path or include the policy file in your submission.
 - **Invalid policy path**: ensure `-p` points to an existing bundle or weights file.
-
-
-## Local vs S3 checkpoints
-- Local training usually saves files under `./train_dir/`.
-- If you trained in a sandbox or cloud job, you may need to download or reference the S3 bundle.
-
+- **Local vs S3 checkpoints**: local training saves files under `./train_dir/`. Cloud training may require downloading or referencing the S3 bundle.

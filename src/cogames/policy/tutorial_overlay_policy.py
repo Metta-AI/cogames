@@ -13,80 +13,98 @@ from mettagrid.simulator import Action, AgentObservation
 
 _PLAY_PHASES: tuple[str, ...] = (
     (
-        "Mission briefing: CogsGuard training overview\n"
-        "Welcome. This simulation mirrors core CogsGuard operations. "
-        "We will launch the Mettascope visual interface now."
+        "Welcome to CogsGuard\n"
+        "Your goal: control junctions to outscore the opposing Clips team.\n"
+        "Explore the arena using the controls in the next step."
     ),
     (
-        "Step 1 - Interface and controls\n"
-        "Left Pane (Intel): Shows details for selected objects (Stations, Tiles, Cogs).\n"
-        "Right Pane (Vibe Deck): Select icons here to change your Cog's broadcast resonance.\n"
-        "Zoom/Pan: Scroll or pinch to zoom the arena; drag to pan.\n"
-        "Click various buildings to view details in the Left Pane.\n"
-        "Look for the Hub (Hub), Junctions, Gear Stations, and Extractors.\n"
-        "Click your Cog to assume control."
+        "Camera and selection\n"
+        "Scroll or pinch to zoom. Drag to pan.\n"
+        "Click buildings to inspect them in the left pane.\n"
+        "Click your Cog to take control of it."
     ),
     (
-        "Step 2 - Movement and energy\n"
-        "Use WASD or Arrow Keys to move your Cog.\n"
-        "Every move costs Energy, and aligned hubs/junctions recharge you.\n"
-        "Watch your battery bar on the Cog or in the HUD.\n"
-        "If low, rest (skip turn), lean against a wall (walk into it), or\n"
-        "stand near the Hub or an aligned Junction."
+        "Movement and energy\n"
+        "Use WASD or Arrow Keys to move.\n"
+        "Movement costs energy. Your battery bar shows how much you have.\n"
+        "Stand near the Hub or a friendly junction to recharge.\n"
+        "You lose health when away from the Hub and your junctions, so don't stray too far."
     ),
     (
-        "Step 3 - Gear up\n"
-        "Primary interaction mode is walking into things.\n"
-        "Locate a Gear Station and walk into it to equip a role:\n"
-        "Miner, Scout, Aligner, or Scrambler.\n"
-        "Gear costs are paid from the team commons."
+        "Gear up\n"
+        "Walk into a Gear Station to pick a role.\n"
+        "From left to right:\n"
+        "  Aligner - captures neutral junctions for your team\n"
+        "  Scrambler - neutralizes enemy junctions\n"
+        "  Miner - gathers resources\n"
+        "  Scout - explores fast\n"
+        "Try equipping one now."
     ),
     (
-        "Step 4 - Resources and hearts\n"
-        "Find an Extractor station to gather elements:\n"
-        "C (Carbon), O (Oxygen), G (Germanium), S (Silicon).\n"
-        "Visit the Chest to assemble or withdraw Hearts from the commons."
+        "Resources and hearts\n"
+        "Walk into an Extractor to gather resources (Carbon, Oxygen, Germanium, Silicon).\n"
+        "Visit the Assembler to craft Hearts from resources.\n"
+        "Hearts are needed to capture and scramble junctions."
     ),
     (
-        "Step 5 - Junction control\n"
-        "Junctions can be aligned to your team.\n"
-        "As an Aligner: get Influence (stand near the Hub) and a Heart, then bump a neutral junction.\n"
-        "As a Scrambler: get a Heart, then bump an enemy-aligned junction to neutralize it.\n"
-        "Aligned junctions recharge energy for your team."
+        "Junction control\n"
+        "Junctions are the key to winning.\n"
+        "As an Aligner: get Influence from the Hub, carry a Heart, then walk into a neutral junction.\n"
+        "As a Scrambler: carry a Heart, walk into an enemy junction to neutralize it.\n"
+        "Friendly junctions recharge your team's energy."
     ),
     (
-        "Step 6 - Objective complete\n"
-        "Congratulations. You have completed the tutorial.\n"
-        "You've mastered movement, gear, resources, and junction control.\n"
-        "You're now ready to tackle the full CogsGuard arena."
+        "Tutorial complete\n"
+        "You know the basics: move, gear up, gather, craft, and control junctions.\n"
+        "Close this overlay and try it all together."
     ),
 )
 
 
 _COGSGUARD_PHASES: tuple[str, ...] = (
     (
-        "Mission briefing: CogsGuard stabilization sim\n"
-        "Objective: outscore Clips by sustaining junction control under constant pressure."
-    ),
-    ("Phase 1: Open safely\nExpand from the hub to two nearby lanes and secure your first neutral junction."),
-    (
-        "Phase 2: Manage Clips pressure\n"
-        "Clips will scramble nearby junctions in waves. Retake quickly to prevent score drift."
+        "CogsGuard: stabilization sim\n"
+        "Outscore Clips by controlling more junctions over time.\n"
+        "Each phase introduces a new layer of strategy."
     ),
     (
-        "Phase 3: Use territory effects\n"
-        "Friendly territory restores HP, energy, and influence; enemy territory drains HP and influence."
+        "Phase 1: Gear up and get a heart\n"
+        "Grab the Aligner gear to capture neutral junctions.\n"
+        "Then grab the Scrambler gear to neutralize Clip junctions.\n"
+        "Craft a heart at the Assembler - you need one for each capture or scramble."
     ),
     (
-        "Phase 4: Coordinate roles\n"
-        "Keep miners feeding the hub while aligners and scramblers rotate across contested lanes."
+        "Phase 2: Expand from the Hub\n"
+        "Move out to nearby neutral junctions and capture them.\n"
+        "Stay close to the Hub early so you can recharge."
     ),
     (
-        "Phase 5: Maintain heart economy\n"
-        "Convert resources into hearts continuously so capture and scramble actions never stall."
+        "Phase 3: Handle Clips pressure\n"
+        "Clips will scramble your junctions in waves.\n"
+        "Retake them quickly - every moment without control costs you points."
     ),
-    ("Phase 6: Win the control cycle\nRun the loop every minute: scout -> gather -> craft -> capture -> defend."),
-    ("Mission complete\nYou are ready for full CogsGuard missions."),
+    (
+        "Phase 4: Use territory\n"
+        "The Hub and your junctions form safe territory - they restore energy and influence.\n"
+        "You lose health when away from them, so expand your junction network to push further."
+    ),
+    (
+        "Phase 5: Coordinate roles\n"
+        "Miners feed resources to the Hub.\n"
+        "Aligners and Scramblers rotate across contested junctions.\n"
+        "Keep all roles active."
+    ),
+    (
+        "Phase 6: Keep crafting hearts\n"
+        "Hearts fuel captures and scrambles.\n"
+        "Convert resources into hearts continuously so you never stall."
+    ),
+    (
+        "Phase 7: The control loop\n"
+        "Repeat: scout the map, gather resources, craft hearts, capture junctions, defend them.\n"
+        "Run this loop faster than Clips to win."
+    ),
+    ("Mission complete\nYou're ready for full CogsGuard missions."),
 )
 
 
