@@ -10,11 +10,11 @@ from pydantic import Field
 
 from mettagrid.base_config import Config
 from mettagrid.config.event_config import EventConfig, once, periodic
-from mettagrid.config.filter import isAlignedTo, isNear
+from mettagrid.config.filter import hasTag, isNear
 from mettagrid.config.filter.alignment_filter import isNeutral, isNotAlignedTo, isNotNeutral
 from mettagrid.config.mettagrid_config import CollectiveConfig
 from mettagrid.config.mutation import alignTo, removeAlignment
-from mettagrid.config.tag import typeTag
+from mettagrid.config.tag import Tag, typeTag
 
 
 class ClipsConfig(Config):
@@ -66,7 +66,7 @@ class ClipsConfig(Config):
                 timesteps=periodic(start=self.scramble_start, period=self.scramble_interval, end=scramble_end),
                 # near a clips-aligned junction
                 filters=[
-                    isNear(typeTag("junction"), [isAlignedTo("clips")], radius=self.scramble_radius),
+                    isNear(typeTag("junction"), [hasTag(Tag("collective:clips"))], radius=self.scramble_radius),
                     isNotAlignedTo("clips"),
                     isNotNeutral(),
                 ],
@@ -80,7 +80,7 @@ class ClipsConfig(Config):
                 # neutral junctions near a clips-aligned junction
                 filters=[
                     # near a clip junction
-                    isNear(typeTag("junction"), [isAlignedTo("clips")], radius=self.align_radius),
+                    isNear(typeTag("junction"), [hasTag(Tag("collective:clips"))], radius=self.align_radius),
                     # # not near any cog junction
                     # isNot(
                     #     isNear(
@@ -99,7 +99,7 @@ class ClipsConfig(Config):
                 name="presence_check",
                 target_tag=typeTag("junction"),
                 timesteps=periodic(start=self.initial_clips_start, period=self.scramble_interval * 2, end=presence_end),
-                filters=[isNear(typeTag("junction"), [isAlignedTo("clips")], radius=1000)],
+                filters=[isNear(typeTag("junction"), [hasTag(Tag("collective:clips"))], radius=1000)],
                 max_targets=1,
                 fallback="initial_clips",
             ),
