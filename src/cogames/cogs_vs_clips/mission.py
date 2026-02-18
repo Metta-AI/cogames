@@ -84,7 +84,7 @@ class CvCMission(CoGameMission):
                 "name": "c:junction",
                 "map_name": "c:junction",
                 # Keep this junction behaving like a "junction" for type-tag filters (e.g. clips events).
-                "tags": base_junction_cfg.tags + [typeTag("junction")],
+                "tags": base_junction_cfg.tags + [typeTag("junction").name],
             }
         )
         game = GameConfig(

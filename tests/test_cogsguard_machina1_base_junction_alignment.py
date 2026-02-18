@@ -16,7 +16,7 @@ def test_cogsguard_machina1_base_junction_starts_aligned_to_cogs() -> None:
 
     base_junction = env.game.objects["c:junction"]
     assert base_junction.collective == "cogs"
-    assert typeTag("junction") in base_junction.tags
+    assert typeTag("junction").name in base_junction.tags
 
 
 def test_cogsguard_machina1_site_places_c_junction_in_base_hub() -> None:

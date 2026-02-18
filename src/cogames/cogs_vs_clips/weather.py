@@ -8,7 +8,7 @@ from pydantic import Field
 from mettagrid.base_config import Config
 from mettagrid.config.event_config import EventConfig, periodic
 from mettagrid.config.mutation import updateTarget
-from mettagrid.config.tag import typeTag
+from mettagrid.config.query import query
 
 
 class WeatherConfig(Config):
@@ -26,7 +26,7 @@ class WeatherConfig(Config):
             Dictionary of event name to EventConfig.
         """
         events: dict[str, EventConfig] = {}
-        tag = typeTag(self.target_tag)
+        target = query(f"type:{self.target_tag}")
         half = self.day_length // 2
 
         def _merge(apply: dict[str, int], reverse: dict[str, int]) -> dict[str, int]:
@@ -36,7 +36,7 @@ class WeatherConfig(Config):
         # Dawn: reverse night deltas, apply day deltas
         events["weather_day"] = EventConfig(
             name="weather_day",
-            target_tag=tag,
+            target_query=target,
             timesteps=periodic(start=0, period=self.day_length, end=max_steps),
             mutations=[updateTarget(_merge(self.day_deltas, self.night_deltas))],
         )
@@ -44,7 +44,7 @@ class WeatherConfig(Config):
         # Dusk: reverse day deltas, apply night deltas
         events["weather_night"] = EventConfig(
             name="weather_night",
-            target_tag=tag,
+            target_query=target,
             timesteps=periodic(start=half, period=self.day_length, end=max_steps),
             mutations=[updateTarget(_merge(self.night_deltas, self.day_deltas))],
         )
