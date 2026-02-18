@@ -313,6 +313,15 @@ class SingleResourceUniformVariant(MachinaArenaVariant):
         node.distribution = DistributionConfig(type=DistributionType.UNIFORM)
 
 
+class RandomizeSpawnsVariant(BaseHubVariant):
+    name: str = "randomize_spawns"
+    description: str = "Randomize agent spawn positions within the hub instead of fixed cardinal directions."
+
+    @override
+    def modify_node(self, node):
+        node.randomize_spawn_positions = True
+
+
 class EmptyBaseVariant(BaseHubVariant):
     name: str = "empty_base"
     description: str = "Base hub with extractors removed from the four corners."
@@ -451,6 +460,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     NoClipsVariant(),
     DesertVariant(),
     EmptyBaseVariant(),
+    RandomizeSpawnsVariant(),
     EnergizedVariant(),
     ForestVariant(),
     MultiTeamVariant(),
