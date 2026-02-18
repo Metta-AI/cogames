@@ -452,12 +452,22 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
             env.game.actions.change_vibe.enabled = False
 
 
+class ThickSkinnedVariant(CoGameMissionVariant):
+    name: str = "thick_skinned"
+    description: str = "No passive HP drain. Agents only lose HP in enemy territory."
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        mission.cog.hp_regen = 0
+
+
 VARIANTS: list[CoGameMissionVariant] = [
     CavesVariant(),
     CityVariant(),
     DarkSideVariant(),
     NoWeatherVariant(),
     NoClipsVariant(),
+    ThickSkinnedVariant(),
     DesertVariant(),
     EmptyBaseVariant(),
     RandomizeSpawnsVariant(),
