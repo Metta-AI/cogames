@@ -23,6 +23,7 @@ RUN curl -fsSL "https://github.com/treeform/nimby/releases/download/${NIMBY_VERS
 ENV PATH="/root/.nimby/nim/bin:$PATH"
 
 # Install Python and create the executor venv with cogames (pulls in mettagrid).
+ENV UV_HTTP_TIMEOUT=300
 RUN uv python install 3.12 && uv venv /opt/executor
 RUN --mount=type=bind,target=/ctx \
     if ls /ctx/*.whl 1>/dev/null 2>&1; then \
