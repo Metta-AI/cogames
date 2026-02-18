@@ -39,6 +39,7 @@ from cogames import play as play_module
 from cogames import train as train_module
 from cogames.cli.base import console
 from cogames.cli.client import SeasonInfo, TournamentServerClient
+from cogames.cli.compat import check_compat_version
 from cogames.cli.leaderboard import (
     leaderboard_cmd,
     parse_policy_identifier,
@@ -2116,6 +2117,9 @@ def validate_bundle_cmd(
         console.print("[red]No entry config found for season[/red]")
         raise typer.Exit(1)
 
+    if validation_mode == "docker" and image == DEFAULT_EPISODE_RUNNER_IMAGE and season_info.compat_version is not None:
+        image = f"ghcr.io/metta-ai/episode-runner:compat-v{season_info.compat_version}"
+
     with TournamentServerClient(server_url=server) as client:
         config_data = client.get_config(entry_pool_info.config_id)
     env_cfg = MettaGridConfig.model_validate(config_data)
@@ -2276,6 +2280,8 @@ def upload_cmd(
 
     season_info = _resolve_season(server, season, include_hidden=include_hidden)
 
+    check_compat_version(season_info)
+
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
         for kv in init_kwarg:
@@ -2359,6 +2365,7 @@ def submit_cmd(
     import httpx  # noqa: PLC0415
 
     season_info = _resolve_season(server, season)
+    check_compat_version(season_info)
     season_name = season_info.name
 
     client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
