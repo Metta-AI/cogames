@@ -24,7 +24,7 @@ class MinerRewardsVariant(CoGameMissionVariant):
 
         for agent_cfg in env.game.agents:
             rewards = dict(agent_cfg.rewards)
-            _apply_miner(rewards)
+            _apply_miner(rewards, agent_cfg)
             agent_cfg.rewards = rewards
 
 

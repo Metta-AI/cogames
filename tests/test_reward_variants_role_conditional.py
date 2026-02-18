@@ -19,7 +19,7 @@ def test_role_conditional_applies_per_agent_shaping_using_role_id_when_present()
 
     rewards_by_agent = [agent.rewards for agent in env.game.agents]
 
-    assert "carbon_gained" in rewards_by_agent[0]  # miner
+    assert "gain_diversity" in rewards_by_agent[0]  # miner
     assert "junction_aligned_by_agent" in rewards_by_agent[1]  # aligner
     assert "junction_scrambled_by_agent" in rewards_by_agent[2]  # scrambler
     assert "cell_visited" in rewards_by_agent[3]  # scout
@@ -40,6 +40,6 @@ def test_role_conditional_respects_custom_role_order_from_forced_vibes() -> None
     rewards_by_agent = [agent.rewards for agent in env.game.agents]
 
     assert "cell_visited" in rewards_by_agent[0]  # scout
-    assert "carbon_gained" in rewards_by_agent[1]  # miner
+    assert "gain_diversity" in rewards_by_agent[1]  # miner
     assert "junction_aligned_by_agent" in rewards_by_agent[2]  # aligner
     assert "junction_scrambled_by_agent" in rewards_by_agent[3]  # scrambler

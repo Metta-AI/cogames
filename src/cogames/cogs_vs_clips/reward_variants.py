@@ -11,7 +11,7 @@ import json
 from typing import Literal, Sequence, cast
 
 from mettagrid.config.game_value import stat
-from mettagrid.config.mettagrid_config import MettaGridConfig
+from mettagrid.config.mettagrid_config import AgentConfig, LogSumStatConfig, MettaGridConfig
 from mettagrid.config.reward_config import AgentReward, reward
 
 CogsGuardRewardVariant = Literal[
@@ -143,27 +143,37 @@ def _apply_aligner(rewards: dict[str, AgentReward]) -> None:
     rewards["heart_lost"] = reward(stat("heart.lost"), weight=-0.5)
 
     # Junction alignment (the primary aligner objective)
-    rewards["junction_aligned_by_agent"] = reward(stat("junction.aligned_by_agent"), weight=1.0)
+    rewards["junction_aligned_by_agent"] = reward(stat("junction.aligned_by_agent"), weight=5.0)
 
 
-def _apply_miner(rewards: dict[str, AgentReward]) -> None:
+_MINER_ELEMENTS = ("carbon", "oxygen", "germanium", "silicon")
+
+_MINER_GAIN_LOG_SUM = LogSumStatConfig(
+    stat_name="gain_diversity",
+    stat_suffix=".gained",
+    resources=list(_MINER_ELEMENTS),
+)
+
+_MINER_DEPOSIT_LOG_SUM = LogSumStatConfig(
+    stat_name="deposit_diversity",
+    stat_suffix=".deposited",
+    resources=list(_MINER_ELEMENTS),
+)
+
+
+def _apply_miner(rewards: dict[str, AgentReward], agent_cfg: AgentConfig) -> None:
     """Add miner-focused shaping rewards."""
-    # Miner gear acquisition/loss
-    rewards["miner_gained"] = reward(stat("miner.gained"), weight=2.0)
-    rewards["miner_lost"] = reward(stat("miner.lost"), weight=-2.0)
+    # Gear acquisition/retention
+    rewards["miner_gained"] = reward(stat("miner.gained"), weight=1.0)
+    rewards["miner_lost"] = reward(stat("miner.lost"), weight=-1.0)
+    rewards["heart_gained"] = reward(stat("heart.gained"), weight=-0.1)
+    for other_role in ("aligner", "scout", "scrambler"):
+        rewards[f"{other_role}_gained"] = reward(stat(f"{other_role}.gained"), weight=-1.0)
 
-    # Resource extraction rewards (capped per element to avoid reward domination)
-    w_resource_gain = 0.05
-    max_resource_gain = 1.0
-    for element in ["carbon", "oxygen", "germanium", "silicon"]:
-        rewards[f"{element}_gained"] = reward(stat(f"{element}.gained"), weight=w_resource_gain, max=max_resource_gain)
-
-    # Resource deposit rewards (delta=True to exclude initial map deposits, capped per element)
-    w_deposit = 1.0
-    max_deposit = 2.0
-    for element in ["carbon", "oxygen", "germanium", "silicon"]:
-        deposited = stat(f"collective.{element}.deposited", delta=True)
-        rewards[f"collective_{element}_deposited"] = reward(deposited, weight=w_deposit, max=max_deposit)
+    # Balanced resource gain/deposit (log-product gives diminishing returns, encouraging diversity)
+    agent_cfg.log_sum_stats = list(agent_cfg.log_sum_stats) + [_MINER_GAIN_LOG_SUM, _MINER_DEPOSIT_LOG_SUM]
+    rewards["gain_diversity"] = reward(stat("gain_diversity"), weight=0.5)
+    rewards["deposit_diversity"] = reward(stat("deposit_diversity"), weight=0.5)
 
 
 def _apply_scout(rewards: dict[str, AgentReward]) -> None:
@@ -264,7 +274,7 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
         if "aligner" in enabled:
             _apply_aligner(rewards)
         if "miner" in enabled:
-            _apply_miner(rewards)
+            _apply_miner(rewards, agent_cfg)
         if "scrambler" in enabled:
             _apply_scrambler(rewards)
         if "scout" in enabled:
@@ -272,7 +282,7 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
         if "role_conditional" in enabled:
             role = role_by_agent_idx.pop(0)
             if role == "miner":
-                _apply_miner(rewards)
+                _apply_miner(rewards, agent_cfg)
             elif role == "aligner":
                 _apply_aligner(rewards)
             elif role == "scrambler":
