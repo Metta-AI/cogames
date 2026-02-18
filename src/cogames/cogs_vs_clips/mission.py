@@ -30,6 +30,7 @@ from mettagrid.config.action_config import (
 from mettagrid.config.game_value import inv
 from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
+from mettagrid.config.tag import typeTag
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
 
 __all__ = [
@@ -77,6 +78,15 @@ class CvCMission(CoGameMission):
             MettaGridConfig ready for environment creation
         """
         team_objs = list(self.teams.values())
+        base_junction_cfg = CvCJunctionConfig().station_cfg(team="cogs")
+        base_junction = base_junction_cfg.model_copy(
+            update={
+                "name": "c:junction",
+                "map_name": "c:junction",
+                # Keep this junction behaving like a "junction" for type-tag filters (e.g. clips events).
+                "tags": base_junction_cfg.tags + [typeTag("junction")],
+            }
+        )
         game = GameConfig(
             map_builder=self.map_builder(),
             max_steps=self.max_steps,
@@ -85,8 +95,12 @@ class CvCMission(CoGameMission):
             vibe_names=CvCConfig.VIBE_NAMES,
             obs=ObsConfig(
                 global_obs=GlobalObsConfig(
-                    obs=[inv(f"collective.{resource}") for resource in CvCConfig.ELEMENTS], local_position=True
-                )
+                    obs=[inv(f"collective.{resource}") for resource in CvCConfig.ELEMENTS],
+                    local_position=True,
+                    last_action_move=True,
+                ),
+                aoe_mask=True,
+                territory_map=True,
             ),
             actions=ActionsConfig(
                 move=MoveActionConfig(consumed_resources=self.cog.action_cost),
@@ -101,6 +115,7 @@ class CvCMission(CoGameMission):
             objects={
                 "wall": CvCWallConfig().station_cfg(),
                 "junction": CvCJunctionConfig().station_cfg(),
+                "c:junction": base_junction,
                 **{
                     f"{resource}_extractor": CvCExtractorConfig(resource=resource).station_cfg()
                     for resource in CvCConfig.ELEMENTS

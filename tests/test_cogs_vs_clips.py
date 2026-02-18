@@ -1,4 +1,5 @@
 from cogames.cogs_vs_clips.missions import (
+    CogsGuardMachina1Mission,
     make_game,
 )
 from mettagrid.config.mettagrid_config import MettaGridConfig
@@ -11,6 +12,15 @@ def test_make_cogs_vs_clips_scenario():
 
     # Verify it returns a MettaGridConfig
     assert isinstance(config, MettaGridConfig)
+
+
+def test_cogsguard_enables_aoe_mask_observation() -> None:
+    env = CogsGuardMachina1Mission.make_env()
+    assert env.game.obs.aoe_mask is True
+    # Ensure feature exists when enabled.
+    env.game.id_map().feature_id("aoe_mask")
+    assert env.game.obs.territory_map is True
+    env.game.id_map().feature_id("territory")
 
 
 def test_alignment_mutations_reference_valid_collectives():

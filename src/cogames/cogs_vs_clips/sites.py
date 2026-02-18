@@ -3,11 +3,12 @@
 from pathlib import Path
 from typing import cast
 
-from cogames.cogs_vs_clips.terrain import MachinaArena, RandomTransform, SequentialMachinaArena
+from cogames.cogs_vs_clips.terrain import MachinaArena, MachinaArenaConfig, RandomTransform, SequentialMachinaArena
 from cogames.core import CoGameSite
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen, MapGenConfig
 from mettagrid.mapgen.scenes.base_hub import BaseHub, BaseHubConfig
+from mettagrid.mapgen.scenes.building_distributions import DistributionConfig, DistributionType
 
 MAPS_DIR = Path(__file__).resolve().parent.parent / "maps"
 
@@ -105,6 +106,10 @@ def make_cogsguard_arena_site(num_agents: int = 10) -> CoGameSite:
         instance=MachinaArena.Config(
             spawn_count=num_agents,
             building_coverage=0.1,
+            building_distributions={
+                # Avoid "junction clusters" that can become unassailable when captured.
+                "junction": DistributionConfig(type=DistributionType.POISSON),
+            },
             hub=_cogsguard_hub_config(),
         ),
     )
@@ -121,12 +126,24 @@ def _build_cogsguard_machina1_map_builder(spawn_count: int) -> MapGenConfig:
     map_builder = cast(MapGenConfig, MACHINA_1.map_builder).model_copy(deep=True)
     instance = map_builder.instance
     assert instance is not None
+    assert isinstance(instance, MachinaArenaConfig)
+    existing_building_distributions = instance.building_distributions or {}
+    existing_building_distributions = {
+        k: (DistributionConfig.model_validate(v) if isinstance(v, dict) else v)
+        for k, v in existing_building_distributions.items()
+    }
     return map_builder.model_copy(
         update={
             "instance": instance.model_copy(
                 update={
                     "spawn_count": spawn_count,
-                    "hub": _cogsguard_hub_config(),
+                    # The hub's junction should start aligned to cogs (only the base-hub junction).
+                    "hub": _cogsguard_hub_config().model_copy(update={"junction_object": "c:junction"}),
+                    # Avoid "junction clusters" that can become unassailable when captured.
+                    "building_distributions": {
+                        **existing_building_distributions,
+                        "junction": DistributionConfig(type=DistributionType.POISSON),
+                    },
                 }
             ),
         }
@@ -163,6 +180,10 @@ COGSGUARD_ARENA = CoGameSite(
         instance=MachinaArena.Config(
             spawn_count=20,
             building_coverage=0.1,
+            building_distributions={
+                # Avoid "junction clusters" that can become unassailable when captured.
+                "junction": DistributionConfig(type=DistributionType.POISSON),
+            },
             hub=_cogsguard_hub_config(),
         ),
     ),

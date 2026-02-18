@@ -92,11 +92,15 @@ class CvCJunctionConfig(CvCStationConfig):
                     radius=self.aoe_range,
                     filters=[isAlignedToActor()],
                     mutations=[updateTarget(self.influence_deltas)],
+                    is_round=True,
+                    territory_mode=True,
                 ),
                 "attack": AOEConfig(
                     radius=self.aoe_range,
                     filters=[isEnemy()],
                     mutations=[updateTarget(self.attack_deltas)],
+                    is_round=True,
+                    territory_mode=True,
                 ),
             },
             on_use_handlers={
@@ -138,11 +142,15 @@ class CvCHubConfig(CvCStationConfig):
                     radius=self.aoe_range,
                     filters=[isAlignedToActor()],
                     mutations=[updateTarget(self.influence_deltas)],
+                    is_round=True,
+                    territory_mode=True,
                 ),
                 "attack": AOEConfig(
                     radius=self.aoe_range,
                     filters=[isEnemy()],
                     mutations=[updateTarget(self.attack_deltas)],
+                    is_round=True,
+                    territory_mode=True,
                 ),
             },
             on_use_handlers={
