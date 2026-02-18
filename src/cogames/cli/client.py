@@ -37,6 +37,7 @@ class SeasonInfo(BaseModel):
     entry_pool: str | None = None
     leaderboard_pool: str | None = None
     is_default: bool = False
+    compat_version: str | None = None
     pools: list[PoolInfo]
 
 
@@ -64,6 +65,7 @@ class SeasonVersionInfo(BaseModel):
     canonical: bool
     disabled_at: str | None
     created_at: str
+    compat_version: str | None = None
 
 
 class LeaderboardEntry(BaseModel):
