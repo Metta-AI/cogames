@@ -881,7 +881,7 @@ class TestAOE:
         harness.close()
 
     def test_multiple_aoe_sources_stack(self):
-        """Effects from multiple AOE sources stack."""
+        """Territory-mode effects do not stack across multiple sources."""
         station = CvCHubConfig(
             aoe_range=5,
             influence_deltas={"hp": 5, "energy": 5, "influence": 5},
@@ -945,7 +945,8 @@ class TestAOE:
 
         inv = sim.agent(0).inventory
 
-        # With 2 hubs, each giving +5 hp per tick, after 5 ticks = 50 hp
-        assert inv.get("hp", 0) >= 50, f"Expected hp >= 50 from 2 stacking AOEs, got {inv.get('hp', 0)}"
+        # Hubs use territory-mode AOEs (collapse to one effective source per tile/target),
+        # so two overlapping hubs should apply like one.
+        assert inv.get("hp", 0) == 25, f"Expected hp=25 from collapsed AOEs, got {inv.get('hp', 0)}"
 
         sim.close()
