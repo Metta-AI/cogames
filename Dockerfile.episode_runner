@@ -2,6 +2,7 @@ FROM ubuntu:24.04
 
 ARG COGAMES_VERSION=""
 ARG GIT_COMMIT=""
+ENV COGAMES_VERSION=${COGAMES_VERSION}
 ENV GIT_COMMIT=${GIT_COMMIT}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
