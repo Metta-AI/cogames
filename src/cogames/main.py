@@ -2082,6 +2082,12 @@ def validate_bundle_cmd(
         help="Tournament season (determines which game to validate against)",
         rich_help_panel="Tournament",
     ),
+    include_hidden: bool = typer.Option(
+        False,
+        "--include-hidden",
+        hidden=True,
+        rich_help_panel="Tournament",
+    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -2111,7 +2117,7 @@ def validate_bundle_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    season_info = _resolve_season(server, season)
+    season_info = _resolve_season(server, season, include_hidden=include_hidden)
     entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool), None)
     if not entry_pool_info or not entry_pool_info.config_id:
         console.print("[red]No entry config found for season[/red]")
@@ -2300,6 +2306,7 @@ def upload_cmd(
         init_kwargs=init_kwargs if init_kwargs else None,
         setup_script=setup_script,
         season=season_info.name if not no_submit else None,
+        include_hidden=include_hidden,
         validation_mode=validation_mode,
         image=image,
     )
