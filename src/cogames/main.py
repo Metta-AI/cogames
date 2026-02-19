@@ -1038,7 +1038,7 @@ def train_cmd(
     ),
     # --- Hardware ---
     device: str = typer.Option(
-        "cpu",
+        "auto",
         "--device",
         metavar="DEVICE",
         help="Device to train on (auto, cpu, cuda, mps)",
