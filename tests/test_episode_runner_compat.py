@@ -1,3 +1,4 @@
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -7,7 +8,13 @@ import pytest
 from cogames.cogs_vs_clips.missions import make_game
 from mettagrid.runner.types import SingleEpisodeJob
 
-IMAGE = "ghcr.io/metta-ai/episode-runner:latest"
+
+def _compat_image() -> str:
+    compat_version = (Path(__file__).resolve().parents[3] / "COMPAT_VERSION").read_text().strip()
+    return f"ghcr.io/metta-ai/episode-runner:compat-v{compat_version}"
+
+
+IMAGE = os.environ.get("EPISODE_RUNNER_IMAGE", _compat_image())
 
 
 def _docker_available() -> bool:
@@ -19,7 +26,7 @@ def _docker_available() -> bool:
 
 
 @pytest.mark.skipif(not _docker_available(), reason="Docker not available")
-def test_job_runs_on_latest_episode_runner():
+def test_job_runs_on_compat_episode_runner():
     env_cfg = make_game()
     env_cfg.game.max_steps = 10
 
