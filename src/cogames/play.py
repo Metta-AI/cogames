@@ -26,6 +26,8 @@ def _print_episode_stats(console: Console, results: PureSingleEpisodeResult) -> 
     """Print episode statistics in a formatted table."""
     stats = results.stats
     total_reward = sum(results.rewards)
+    num_agents = len(results.rewards)
+    avg_reward_per_agent = total_reward / num_agents if num_agents > 0 else 0.0
 
     # Aggregate agent stats
     agent_stats = stats.get("agent", [])
@@ -41,10 +43,10 @@ def _print_episode_stats(console: Console, results: PureSingleEpisodeResult) -> 
 
     if cogs_stats or clips_stats:
         # CogsGuard mission - show relevant stats
-        _print_cogsguard_stats(console, totals, cogs_stats, clips_stats, total_reward)
+        _print_cogsguard_stats(console, totals, cogs_stats, clips_stats, avg_reward_per_agent)
     else:
         # Standard mission - show basic stats
-        _print_standard_stats(console, totals, total_reward)
+        _print_standard_stats(console, totals, avg_reward_per_agent)
 
 
 def _print_cogsguard_stats(
@@ -52,7 +54,7 @@ def _print_cogsguard_stats(
     agent_totals: dict[str, float],
     cogs_stats: dict[str, float],
     clips_stats: dict[str, float],
-    total_reward: float,
+    avg_reward_per_agent: float,
 ) -> None:
     """Print CogsGuard-specific statistics."""
     table = Table(title="Episode Stats", box=box.ROUNDED, show_header=True, header_style="bold cyan")
@@ -125,15 +127,15 @@ def _print_cogsguard_stats(
                 sections_added += 1
             table.add_row("", resource, str(gained), str(lost), str(final))
 
-    # Total reward at bottom
+    # Score at bottom
     if sections_added > 0:
         table.add_section()
-    table.add_row("[bold]Reward[/bold]", "total", f"{total_reward:.2f}", "", "")
+    table.add_row("[bold]Score[/bold]", "per cog", "", "", f"{avg_reward_per_agent:.2f}")
 
     console.print(table)
 
 
-def _print_standard_stats(console: Console, agent_totals: dict[str, float], total_reward: float) -> None:
+def _print_standard_stats(console: Console, agent_totals: dict[str, float], avg_reward_per_agent: float) -> None:
     """Print standard statistics for non-CogsGuard missions."""
     # Filter for interesting stats
     interesting = {}
@@ -148,10 +150,10 @@ def _print_standard_stats(console: Console, agent_totals: dict[str, float], tota
     for key in sorted(interesting.keys()):
         table.add_row(key, f"{int(interesting[key])}")
 
-    # Total reward at bottom
+    # Score at bottom
     if interesting:
         table.add_section()
-    table.add_row("[bold]Reward (total)[/bold]", f"{total_reward:.2f}")
+    table.add_row("[bold]Score (per cog)[/bold]", f"{avg_reward_per_agent:.2f}")
 
     console.print(table)
 
