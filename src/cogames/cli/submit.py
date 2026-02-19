@@ -347,7 +347,7 @@ def upload_policy(
 
     client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
     if not client:
-        return None
+        raise typer.Exit(1)
 
     with tempfile.TemporaryDirectory(prefix="cogames_bundle_") as tmp_dir:
         zip_path = Path(tmp_dir) / "bundle.zip"
@@ -383,7 +383,7 @@ def upload_policy(
             result = subprocess.run(cmd, text=True, timeout=300)
             if result.returncode != 0:
                 console.print("[red]Validation failed[/red]")
-                return None
+                raise typer.Exit(1)
             console.print("[green]Validation passed[/green]")
         else:
             console.print("[dim]Skipping validation[/dim]")
@@ -396,6 +396,6 @@ def upload_policy(
             result = upload_submission(client, zip_path, name, season=season)
         if not result:
             console.print("\n[red]Upload failed.[/red]")
-            return None
+            raise typer.Exit(1)
 
         return result

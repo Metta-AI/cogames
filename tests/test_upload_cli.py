@@ -520,6 +520,48 @@ def test_upload_resolves_season_and_validates(
     assert len(httpserver.log) == 4
 
 
+def test_upload_returns_nonzero_when_validation_fails(
+    httpserver: HTTPServer,
+    fake_home: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _setup_mock_upload_server_with_season(httpserver, _SEASON_WITH_ENTRY_CONFIG)
+
+    bundle_dir = tmp_path / "my_bundle"
+    bundle_dir.mkdir()
+    (bundle_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
+
+    def fake_subprocess_run(cmd, **kwargs):
+        print("invalid season not found")
+        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="invalid season not found")
+
+    monkeypatch.setattr("cogames.cli.submit.subprocess.run", fake_subprocess_run)
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "upload",
+            "--policy",
+            bundle_dir.as_uri(),
+            "--name",
+            "test-policy",
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "http://fake-login-server",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Validation failed" in result.output
+    assert "invalid season not found" in result.output
+
+    # Only season lookup should happen before validation fails.
+    assert len(httpserver.log) == 1
+
+
 def test_upload_skips_validation_when_no_entry_config(
     httpserver: HTTPServer,
     fake_home: Path,
