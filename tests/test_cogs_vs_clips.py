@@ -19,6 +19,8 @@ def test_make_cogs_vs_clips_scenario():
 
 def test_cogsguard_enables_territory_observation() -> None:
     env = CogsGuardMachina1Mission.make_env()
+    assert env.game.obs.width == 13
+    assert env.game.obs.height == 13
     assert env.game.obs.territory is True
     # Ensure feature exists when enabled.
     env.game.id_map().feature_id("territory")
