@@ -19,8 +19,6 @@ def test_cogsguard_enables_aoe_mask_observation() -> None:
     assert env.game.obs.aoe_mask is True
     # Ensure feature exists when enabled.
     env.game.id_map().feature_id("aoe_mask")
-    assert env.game.obs.territory_map is True
-    env.game.id_map().feature_id("territory")
 
 
 def test_alignment_mutations_reference_valid_collectives():

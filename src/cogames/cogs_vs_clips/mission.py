@@ -100,7 +100,6 @@ class CvCMission(CoGameMission):
                     last_action_move=True,
                 ),
                 aoe_mask=True,
-                territory_map=True,
             ),
             actions=ActionsConfig(
                 move=MoveActionConfig(consumed_resources=self.cog.action_cost),
