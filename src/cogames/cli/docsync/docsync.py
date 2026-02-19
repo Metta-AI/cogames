@@ -32,10 +32,10 @@ Placeholders (in markdown cells):
 
 @app.command()
 def nb_to_md(
-    nb_path: Annotated[Path, typer.Argument(help="Path to .ipynb file")],
-    skip_rerun: Annotated[bool, typer.Option("--skip-rerun", help="Skip re-running notebook")] = False,
+    nb_path: Annotated[Path, typer.Argument(help="Path to .ipynb file.")],
+    skip_rerun: Annotated[bool, typer.Option("--skip-rerun", help="Skip re-running notebook.")] = False,
     cogames_root_raw: Annotated[
-        Path | None, typer.Option("--cogames-root", hidden=True, help="Override root path (for testing)")
+        Path | None, typer.Option("--cogames-root", hidden=True, help="Override root path (for testing).")
     ] = None,
 ):
     """Convert .ipynb to .md (reruns notebook by default to update outputs)."""
@@ -54,7 +54,7 @@ def nb_to_md(
 
 @app.command()
 def nb_to_py(
-    nb_path: Annotated[Path, typer.Argument(help="Path to .ipynb file")],
+    nb_path: Annotated[Path, typer.Argument(help="Path to .ipynb file.")],
 ):
     """Convert notebook to .py percent format (ignores outputs, keeps code)."""
 
@@ -73,8 +73,8 @@ def nb_to_py(
 
 @app.command()
 def py_to_nb(
-    py_path: Annotated[Path, typer.Argument(help="Path to .py file")],
-    skip_rerun: Annotated[bool, typer.Option("--skip-rerun", help="Skip re-running notebook")] = False,
+    py_path: Annotated[Path, typer.Argument(help="Path to .py file.")],
+    skip_rerun: Annotated[bool, typer.Option("--skip-rerun", help="Skip re-running notebook.")] = False,
 ):
     """Convert .py percent format to .ipynb (runs notebook by default to populate outputs)."""
 
@@ -93,9 +93,9 @@ def py_to_nb(
 
 @app.command()
 def check(
-    skip_rerun: Annotated[bool, typer.Option("--skip-rerun", help="Skip re-running notebooks")] = False,
+    skip_rerun: Annotated[bool, typer.Option("--skip-rerun", help="Skip re-running notebooks.")] = False,
     cogames_root_raw: Annotated[
-        Path | None, typer.Option("--cogames-root", hidden=True, help="Override root path (for testing)")
+        Path | None, typer.Option("--cogames-root", hidden=True, help="Override root path (for testing).")
     ] = None,
 ):
     """Verify that .py, .ipynb, and .md files are all in sync (without modifying files)."""
@@ -134,9 +134,9 @@ def check(
 
 @app.command()
 def all(
-    skip_rerun: Annotated[bool, typer.Option("--skip-rerun", help="Skip re-running notebooks")] = False,
+    skip_rerun: Annotated[bool, typer.Option("--skip-rerun", help="Skip re-running notebooks.")] = False,
     cogames_root_raw: Annotated[
-        Path | None, typer.Option("--cogames-root", hidden=True, help="Override root path (for testing)")
+        Path | None, typer.Option("--cogames-root", hidden=True, help="Override root path (for testing).")
     ] = None,
 ):
     """Resyncs README and tutorials/ .py and .ipynb files with each other and exports to .md files."""
