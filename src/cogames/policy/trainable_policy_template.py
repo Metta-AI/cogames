@@ -155,8 +155,8 @@ class MyTrainablePolicy(MultiAgentPolicy):
         super().__init__(policy_env_info, **kwargs)
 
         self._obs_shape = policy_env_info.observation_space.shape
-        self._non_vibe_action_names = policy_env_info.non_vibe_action_names or policy_env_info.action_names
-        num_actions = len(self._non_vibe_action_names)
+        self._action_names = policy_env_info.action_names
+        num_actions = len(self._action_names)
         self._network = MyNetwork(self._obs_shape, num_actions, hidden_size)
 
         if device is not None:
@@ -165,9 +165,7 @@ class MyTrainablePolicy(MultiAgentPolicy):
     def agent_policy(self, agent_id: int) -> AgentPolicy:
         """Return an AgentPolicy instance for the given agent."""
         current_device = next(self._network.parameters()).device
-        return MyAgentPolicy(
-            self._policy_env_info, self._network, current_device, self._obs_shape, self._non_vibe_action_names
-        )
+        return MyAgentPolicy(self._policy_env_info, self._network, current_device, self._obs_shape, self._action_names)
 
     def network(self) -> nn.Module:
         """Return the neural network module for training."""
