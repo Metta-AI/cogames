@@ -338,6 +338,7 @@ def upload_policy(
     skip_validation: bool = False,
     setup_script: str | None = None,
     season: str | None = None,
+    include_hidden: bool = False,
     validation_mode: str = "local",
     image: str = DEFAULT_EPISODE_RUNNER_IMAGE,
 ) -> UploadResult | None:
@@ -373,6 +374,8 @@ def upload_policy(
             ]
             if season:
                 cmd.extend(["--season", season])
+            if include_hidden:
+                cmd.append("--include-hidden")
             if validation_mode != "local":
                 cmd.extend(["--validation-mode", validation_mode])
             if image != DEFAULT_EPISODE_RUNNER_IMAGE:
