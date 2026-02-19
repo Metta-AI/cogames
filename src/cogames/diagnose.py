@@ -1713,12 +1713,14 @@ def select_replay_exemplars(
         mission_scores.sort(key=lambda item: item[1])
         worst_mission, _ = mission_scores[0]
         best_mission, _ = mission_scores[-1]
-        matched_best = next(iter(sorted(mission_replay_refs.get(best_mission, []))), None)
-        matched_worst = next(iter(sorted(mission_replay_refs.get(worst_mission, []))), None)
-        if matched_best is None:
-            matched_best = _mission_replay_ref(replay_refs=sorted_refs, mission_name=best_mission)
-        if matched_worst is None:
-            matched_worst = _mission_replay_ref(replay_refs=sorted_refs, mission_name=worst_mission)
+        matched_best = next(iter(sorted(mission_replay_refs.get(best_mission, []))), None) or _mission_replay_ref(
+            replay_refs=sorted_refs,
+            mission_name=best_mission,
+        )
+        matched_worst = next(iter(sorted(mission_replay_refs.get(worst_mission, []))), None) or _mission_replay_ref(
+            replay_refs=sorted_refs,
+            mission_name=worst_mission,
+        )
         if matched_best is not None:
             best_ref = matched_best
         if matched_worst is not None:
@@ -1738,9 +1740,9 @@ def select_replay_exemplars(
                 None,
             )
             if probe_mission is not None:
-                most_diagnostic_ref = next(iter(sorted(mission_replay_refs.get(probe_mission, []))), None)
-                if most_diagnostic_ref is None:
-                    most_diagnostic_ref = _mission_replay_ref(replay_refs=sorted_refs, mission_name=probe_mission)
+                most_diagnostic_ref = next(iter(sorted(mission_replay_refs.get(probe_mission, []))), None) or (
+                    _mission_replay_ref(replay_refs=sorted_refs, mission_name=probe_mission)
+                )
     if most_diagnostic_ref is None:
         most_diagnostic_ref = worst_ref
 
