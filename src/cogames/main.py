@@ -120,7 +120,7 @@ def _register_policies_callback() -> None:
 
 
 app = typer.Typer(
-    help="CoGames - Multi-agent cooperative and competitive games",
+    help="CoGames - Multi-agent cooperative and competitive games.",
     context_settings={"help_option_names": ["-h", "--help"]},
     no_args_is_help=True,
     rich_markup_mode="rich",
@@ -129,7 +129,7 @@ app = typer.Typer(
 )
 
 tutorial_app = typer.Typer(
-    help="Tutorial commands to help you get started with CoGames",
+    help="Tutorial commands to help you get started with CoGames.",
     context_settings={"help_option_names": ["-h", "--help"]},
     no_args_is_help=True,
     rich_markup_mode="rich",
@@ -153,7 +153,7 @@ def docsync_cmd(ctx: typer.Context) -> None:
 
 
 @tutorial_app.command(
-    name="play", help="Interactive tutorial - learn to play Cogs vs Clips", rich_help_panel="Tutorial"
+    name="play", help="Interactive tutorial - learn to play Cogs vs Clips.", rich_help_panel="Tutorial"
 )
 def tutorial_cmd(
     ctx: typer.Context,
@@ -200,7 +200,7 @@ def tutorial_cmd(
 
 @tutorial_app.command(
     name="cogsguard",
-    help="Interactive CogsGuard tutorial - learn roles and territory control",
+    help="Interactive CogsGuard tutorial - learn roles and territory control.",
     rich_help_panel="Tutorial",
 )
 def cogsguard_tutorial_cmd(
@@ -288,7 +288,7 @@ def games_cmd(
     site: Optional[str] = typer.Argument(
         None,
         metavar="SITE",
-        help="Filter by site (e.g., cogsguard_machina_1)",
+        help="Filter by site (e.g., cogsguard_machina_1).",
     ),
     # --- Describe (requires -m) ---
     mission: Optional[str] = typer.Option(
@@ -296,14 +296,14 @@ def games_cmd(
         "--mission",
         "-m",
         metavar="MISSION",
-        help="Mission to describe",
+        help="Mission to describe.",
         rich_help_panel="Describe",
     ),
     cogs: Optional[int] = typer.Option(
         None,
         "--cogs",
         "-c",
-        help="Override agent count (requires -m)",
+        help="Override agent count (requires -m).",
         rich_help_panel="Describe",
     ),
     variant: Optional[list[str]] = typer.Option(  # noqa: B008
@@ -311,20 +311,20 @@ def games_cmd(
         "--variant",
         "-v",
         metavar="VARIANT",
-        help="Apply variant (requires -m, repeatable)",
+        help="Apply variant (requires -m, repeatable).",
         rich_help_panel="Describe",
     ),
     difficulty: Optional[str] = typer.Option(
         None,
         "--difficulty",
         metavar="LEVEL",
-        help="Difficulty (easy, medium, hard) controlling clips events (requires -m)",
+        help="Difficulty (easy, medium, hard) controlling clips events (requires -m).",
         rich_help_panel="Describe",
     ),
     format_: Optional[Literal["yaml", "json"]] = typer.Option(
         None,
         "--format",
-        help="Output format (requires -m)",
+        help="Output format (requires -m).",
         rich_help_panel="Describe",
     ),
     save: Optional[Path] = typer.Option(  # noqa: B008
@@ -332,20 +332,20 @@ def games_cmd(
         "--save",
         "-s",
         metavar="PATH",
-        help="Save config to file (requires -m)",
+        help="Save config to file (requires -m).",
         rich_help_panel="Describe",
     ),
     # --- Debug ---
     print_cvc_config: bool = typer.Option(
         False,
         "--print-cvc-config",
-        help="Print CVC mission config (requires -m)",
+        help="Print CVC mission config (requires -m).",
         hidden=True,
     ),
     print_mg_config: bool = typer.Option(
         False,
         "--print-mg-config",
-        help="Print MettaGrid config (requires -m)",
+        help="Print MettaGrid config (requires -m).",
         hidden=True,
     ),
     # --- Help ---
@@ -353,7 +353,7 @@ def games_cmd(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -411,19 +411,19 @@ def games_cmd(
         raise typer.Exit(1) from exc
 
 
-@app.command("evals", help="List all eval missions", rich_help_panel="Missions")
+@app.command("evals", help="List all eval missions.", rich_help_panel="Missions")
 def evals_cmd() -> None:
     list_evals()
 
 
-@app.command("variants", help="List all available mission variants", rich_help_panel="Missions")
+@app.command("variants", help="List all available mission variants.", rich_help_panel="Missions")
 def variants_cmd() -> None:
     list_variants()
 
 
 @app.command(
     name="describe",
-    help="Describe a mission and its configuration",
+    help="Describe a mission and its configuration.",
     rich_help_panel="Missions",
     epilog="""[dim]Examples:[/dim]
 
@@ -437,13 +437,13 @@ def describe_cmd(
     mission: str = typer.Argument(
         ...,
         metavar="MISSION",
-        help="Mission name (e.g., hello_world.open_world)",
+        help="Mission name (e.g., hello_world.open_world).",
     ),
     cogs: Optional[int] = typer.Option(
         None,
         "--cogs",
         "-c",
-        help="Number of cogs (agents)",
+        help="Number of cogs (agents).",
         rich_help_panel="Configuration",
     ),
     variant: Optional[list[str]] = typer.Option(  # noqa: B008
@@ -451,21 +451,21 @@ def describe_cmd(
         "--variant",
         "-v",
         metavar="VARIANT",
-        help="Apply variant (repeatable)",
+        help="Apply variant (repeatable).",
         rich_help_panel="Configuration",
     ),
     difficulty: Optional[str] = typer.Option(
         None,
         "--difficulty",
         metavar="LEVEL",
-        help="Difficulty (easy, medium, hard) controlling clips events",
+        help="Difficulty (easy, medium, hard) controlling clips events.",
         rich_help_panel="Configuration",
     ),
     _help: bool = typer.Option(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -516,7 +516,7 @@ def play_cmd(
         "--mission",
         "-m",
         metavar="MISSION",
-        help="Mission to play (run [bold]cogames missions[/bold] to list)",
+        help="Mission to play (run [bold]cogames missions[/bold] to list).",
         rich_help_panel="Game Setup",
     ),
     variant: Optional[list[str]] = typer.Option(  # noqa: B008
@@ -524,14 +524,14 @@ def play_cmd(
         "--variant",
         "-v",
         metavar="VARIANT",
-        help="Apply variant modifier (repeatable)",
+        help="Apply variant modifier (repeatable).",
         rich_help_panel="Game Setup",
     ),
     difficulty: Optional[str] = typer.Option(
         None,
         "--difficulty",
         metavar="LEVEL",
-        help="Difficulty (easy, medium, hard) controlling clips events",
+        help="Difficulty (easy, medium, hard) controlling clips events.",
         rich_help_panel="Game Setup",
     ),
     cogs: Optional[int] = typer.Option(
@@ -539,7 +539,7 @@ def play_cmd(
         "--cogs",
         "-c",
         metavar="N",
-        help="Number of cogs/agents",
+        help="Number of cogs/agents.",
         show_default="from mission",
         rich_help_panel="Game Setup",
     ),
@@ -549,14 +549,14 @@ def play_cmd(
         "--policy",
         "-p",
         metavar="POLICY",
-        help="Policy controlling cogs ([bold]noop[/bold], [bold]random[/bold], [bold]lstm[/bold], or path)",
+        help="Policy controlling cogs ([bold]noop[/bold], [bold]random[/bold], [bold]lstm[/bold], or path).",
         rich_help_panel="Policy",
     ),
     device: str = typer.Option(
         "auto",
         "--device",
         metavar="DEVICE",
-        help="Policy device (auto, cpu, cuda, cuda:0, etc.)",
+        help="Policy device (auto, cpu, cuda, cuda:0, etc.).",
         rich_help_panel="Policy",
     ),
     # --- Simulation ---
@@ -565,7 +565,7 @@ def play_cmd(
         "--steps",
         "-s",
         metavar="N",
-        help="Max steps per episode",
+        help="Max steps per episode.",
         rich_help_panel="Simulation",
     ),
     render: RenderMode = typer.Option(  # noqa: B008
@@ -574,28 +574,28 @@ def play_cmd(
         "-r",
         help=(
             "[bold]gui[/bold]=MettaScope, [bold]vibescope[/bold]=VibeScope, "
-            "[bold]unicode[/bold]=terminal, [bold]log[/bold]=metrics only"
+            "[bold]unicode[/bold]=terminal, [bold]log[/bold]=metrics only."
         ),
         rich_help_panel="Simulation",
     ),
     seed: int = typer.Option(
         42,
         "--seed",
-        help="RNG seed for reproducibility",
+        help="RNG seed for reproducibility.",
         rich_help_panel="Simulation",
     ),
     map_seed: Optional[int] = typer.Option(
         None,
         "--map-seed",
         metavar="SEED",
-        help="Separate seed for procedural map generation",
+        help="Separate seed for procedural map generation.",
         show_default="same as --seed",
         rich_help_panel="Simulation",
     ),
     autostart: bool = typer.Option(
         False,
         "--autostart",
-        help="Start simulation immediately without waiting for user input",
+        help="Start simulation immediately without waiting for user input.",
         rich_help_panel="Simulation",
     ),
     # --- Output ---
@@ -603,7 +603,7 @@ def play_cmd(
         None,
         "--save-replay-dir",
         metavar="DIR",
-        help="Save replay file for later viewing with [bold]cogames replay[/bold]",
+        help="Save replay file for later viewing with [bold]cogames replay[/bold].",
         rich_help_panel="Output",
     ),
     save_replay_file: Optional[Path] = typer.Option(  # noqa: B008
@@ -617,14 +617,14 @@ def play_cmd(
     print_cvc_config: bool = typer.Option(
         False,
         "--print-cvc-config",
-        help="Print mission config and exit",
+        help="Print mission config and exit.",
         rich_help_panel="Debug",
         hidden=True,
     ),
     print_mg_config: bool = typer.Option(
         False,
         "--print-mg-config",
-        help="Print MettaGrid config and exit",
+        help="Print MettaGrid config and exit.",
         rich_help_panel="Debug",
         hidden=True,
     ),
@@ -633,7 +633,7 @@ def play_cmd(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -693,7 +693,7 @@ def play_cmd(
 
 @app.command(
     name="replay",
-    help="Replay a saved game episode from a file in the GUI",
+    help="Replay a saved game episode from a file in the GUI.",
     rich_help_panel="Play",
     epilog="""[dim]Examples:[/dim]
 
@@ -706,13 +706,13 @@ def replay_cmd(
     replay_path: Path = typer.Argument(  # noqa: B008
         ...,
         metavar="FILE",
-        help="Path to the replay file (.replay or .bin)",
+        help="Path to the replay file (.replay or .bin).",
     ),
     _help: bool = typer.Option(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
     ),
@@ -743,7 +743,7 @@ def replay_cmd(
 
 @app.command(
     name="make-mission",
-    help="Create a custom mission from a base template",
+    help="Create a custom mission from a base template.",
     rich_help_panel="Missions",
     epilog="""[dim]Examples:[/dim]
 
@@ -763,7 +763,7 @@ def make_mission(
         "--mission",
         "-m",
         metavar="MISSION",
-        help="Base mission to start from",
+        help="Base mission to start from.",
         rich_help_panel="Mission",
     ),
     # --- Customization ---
@@ -771,21 +771,21 @@ def make_mission(
         None,
         "--cogs",
         "-c",
-        help="Number of cogs (agents)",
+        help="Number of cogs (agents).",
         min=1,
         rich_help_panel="Customization",
     ),
     width: Optional[int] = typer.Option(
         None,
         "--width",
-        help="Map width",
+        help="Map width.",
         min=1,
         rich_help_panel="Customization",
     ),
     height: Optional[int] = typer.Option(
         None,
         "--height",
-        help="Map height",
+        help="Map height.",
         min=1,
         rich_help_panel="Customization",
     ),
@@ -795,7 +795,7 @@ def make_mission(
         "--output",
         "-o",
         metavar="PATH",
-        help="Output file path (.yml or .json)",
+        help="Output file path (.yml or .json).",
         rich_help_panel="Output",
     ),
     # --- Help ---
@@ -803,7 +803,7 @@ def make_mission(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -862,13 +862,13 @@ def make_policy(
     trainable: bool = typer.Option(
         False,
         "--trainable",
-        help="Create a trainable (neural network) policy",
+        help="Create a trainable (neural network) policy.",
         rich_help_panel="Policy Type",
     ),
     scripted: bool = typer.Option(
         False,
         "--scripted",
-        help="Create a scripted (rule-based) policy",
+        help="Create a scripted (rule-based) policy.",
         rich_help_panel="Policy Type",
     ),
     # --- Output ---
@@ -877,7 +877,7 @@ def make_policy(
         "--output",
         "-o",
         metavar="FILE",
-        help="Output file path",
+        help="Output file path.",
         rich_help_panel="Output",
     ),
     # --- Help ---
@@ -885,7 +885,7 @@ def make_policy(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -989,7 +989,7 @@ def train_cmd(
         "--mission",
         "-m",
         metavar="MISSION",
-        help="Missions to train on (wildcards supported, repeatable for curriculum)",
+        help="Missions to train on (wildcards supported, repeatable for curriculum).",
         rich_help_panel="Mission Setup",
     ),
     cogs: Optional[int] = typer.Option(
@@ -997,7 +997,7 @@ def train_cmd(
         "--cogs",
         "-c",
         metavar="N",
-        help="Number of cogs (agents)",
+        help="Number of cogs (agents).",
         show_default="from mission",
         rich_help_panel="Mission Setup",
     ),
@@ -1006,14 +1006,14 @@ def train_cmd(
         "--variant",
         "-v",
         metavar="VARIANT",
-        help="Mission variant (repeatable)",
+        help="Mission variant (repeatable).",
         rich_help_panel="Mission Setup",
     ),
     difficulty: Optional[str] = typer.Option(
         None,
         "--difficulty",
         metavar="LEVEL",
-        help="Difficulty (easy, medium, hard) controlling clips events",
+        help="Difficulty (easy, medium, hard) controlling clips events.",
         rich_help_panel="Mission Setup",
     ),
     # --- Policy ---
@@ -1022,7 +1022,7 @@ def train_cmd(
         "--policy",
         "-p",
         metavar="POLICY",
-        help=f"Policy to train ({policy_arg_example})",
+        help=f"Policy to train ({policy_arg_example}).",
         rich_help_panel="Policy",
     ),
     # --- Training ---
@@ -1030,7 +1030,7 @@ def train_cmd(
         10_000_000_000,
         "--steps",
         metavar="N",
-        help="Number of training steps",
+        help="Number of training steps.",
         min=1,
         rich_help_panel="Training",
     ),
@@ -1038,7 +1038,7 @@ def train_cmd(
         4096,
         "--batch-size",
         metavar="N",
-        help="Batch size for training",
+        help="Batch size for training.",
         min=1,
         rich_help_panel="Training",
     ),
@@ -1046,7 +1046,7 @@ def train_cmd(
         4096,
         "--minibatch-size",
         metavar="N",
-        help="Minibatch size for training",
+        help="Minibatch size for training.",
         min=1,
         rich_help_panel="Training",
     ),
@@ -1055,14 +1055,14 @@ def train_cmd(
         "auto",
         "--device",
         metavar="DEVICE",
-        help="Device to train on (auto, cpu, cuda, mps)",
+        help="Device to train on (auto, cpu, cuda, mps).",
         rich_help_panel="Hardware",
     ),
     num_workers: Optional[int] = typer.Option(
         None,
         "--num-workers",
         metavar="N",
-        help="Number of worker processes",
+        help="Number of worker processes.",
         show_default="CPU cores",
         min=1,
         rich_help_panel="Hardware",
@@ -1071,7 +1071,7 @@ def train_cmd(
         None,
         "--parallel-envs",
         metavar="N",
-        help="Number of parallel environments",
+        help="Number of parallel environments.",
         min=1,
         rich_help_panel="Hardware",
     ),
@@ -1079,7 +1079,7 @@ def train_cmd(
         None,
         "--vector-batch-size",
         metavar="N",
-        help="Vectorized environment batch size",
+        help="Vectorized environment batch size.",
         min=1,
         rich_help_panel="Hardware",
     ),
@@ -1088,7 +1088,7 @@ def train_cmd(
         42,
         "--seed",
         metavar="N",
-        help="Seed for training RNG",
+        help="Seed for training RNG.",
         min=0,
         rich_help_panel="Reproducibility",
     ),
@@ -1096,7 +1096,7 @@ def train_cmd(
         None,
         "--map-seed",
         metavar="N",
-        help="MapGen seed for procedural map layout",
+        help="MapGen seed for procedural map layout.",
         show_default="same as --seed",
         min=0,
         rich_help_panel="Reproducibility",
@@ -1106,13 +1106,13 @@ def train_cmd(
         "./train_dir",
         "--checkpoints",
         metavar="DIR",
-        help="Path to save training checkpoints",
+        help="Path to save training checkpoints.",
         rich_help_panel="Output",
     ),
     log_outputs: bool = typer.Option(
         False,
         "--log-outputs",
-        help="Log training outputs",
+        help="Log training outputs.",
         rich_help_panel="Output",
     ),
     # --- Help ---
@@ -1120,7 +1120,7 @@ def train_cmd(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -1224,7 +1224,7 @@ def run_cmd(
         "--mission",
         "-m",
         metavar="MISSION",
-        help="Missions to evaluate (supports wildcards)",
+        help="Missions to evaluate (supports wildcards).",
         rich_help_panel="Mission",
     ),
     mission_set: Optional[str] = typer.Option(
@@ -1232,7 +1232,7 @@ def run_cmd(
         "--mission-set",
         "-S",
         metavar="SET",
-        help="Predefined set: integrated_evals, spanning_evals, diagnostic_evals, all",
+        help="Predefined set: integrated_evals, spanning_evals, diagnostic_evals, all.",
         rich_help_panel="Mission",
     ),
     cogs: Optional[int] = typer.Option(
@@ -1240,7 +1240,7 @@ def run_cmd(
         "--cogs",
         "-c",
         metavar="N",
-        help="Number of cogs (agents)",
+        help="Number of cogs (agents).",
         rich_help_panel="Mission",
     ),
     variant: Optional[list[str]] = typer.Option(  # noqa: B008
@@ -1248,14 +1248,14 @@ def run_cmd(
         "--variant",
         "-v",
         metavar="VARIANT",
-        help="Mission variant (repeatable)",
+        help="Mission variant (repeatable).",
         rich_help_panel="Mission",
     ),
     difficulty: Optional[str] = typer.Option(
         None,
         "--difficulty",
         metavar="LEVEL",
-        help="Difficulty (easy, medium, hard) controlling clips events",
+        help="Difficulty (easy, medium, hard) controlling clips events.",
         rich_help_panel="Mission",
     ),
     # --- Policy ---
@@ -1264,14 +1264,14 @@ def run_cmd(
         "--policy",
         "-p",
         metavar="POLICY",
-        help=f"Policies to evaluate: ({policy_arg_w_proportion_example}...)",
+        help=f"Policies to evaluate: ({policy_arg_w_proportion_example}...).",
         rich_help_panel="Policy",
     ),
     device: str = typer.Option(
         "auto",
         "--device",
         metavar="DEVICE",
-        help="Policy device (auto, cpu, cuda, cuda:0, etc.)",
+        help="Policy device (auto, cpu, cuda, cuda:0, etc.).",
         rich_help_panel="Policy",
     ),
     # --- Simulation ---
@@ -1280,7 +1280,7 @@ def run_cmd(
         "--episodes",
         "-e",
         metavar="N",
-        help="Number of evaluation episodes",
+        help="Number of evaluation episodes.",
         min=1,
         rich_help_panel="Simulation",
     ),
@@ -1289,7 +1289,7 @@ def run_cmd(
         "--steps",
         "-s",
         metavar="N",
-        help="Max steps per episode",
+        help="Max steps per episode.",
         min=1,
         show_default="from mission",
         rich_help_panel="Simulation",
@@ -1298,7 +1298,7 @@ def run_cmd(
         42,
         "--seed",
         metavar="N",
-        help="Seed for evaluation RNG",
+        help="Seed for evaluation RNG.",
         min=0,
         rich_help_panel="Simulation",
     ),
@@ -1306,7 +1306,7 @@ def run_cmd(
         None,
         "--map-seed",
         metavar="N",
-        help="MapGen seed for procedural maps",
+        help="MapGen seed for procedural maps.",
         min=0,
         show_default="same as --seed",
         rich_help_panel="Simulation",
@@ -1315,7 +1315,7 @@ def run_cmd(
         250,
         "--action-timeout-ms",
         metavar="MS",
-        help="Max ms per action before noop",
+        help="Max ms per action before noop.",
         min=1,
         rich_help_panel="Simulation",
     ),
@@ -1324,14 +1324,14 @@ def run_cmd(
         None,
         "--format",
         metavar="FMT",
-        help="Output format: yaml or json",
+        help="Output format: yaml or json.",
         rich_help_panel="Output",
     ),
     save_replay_dir: Optional[Path] = typer.Option(  # noqa: B008
         None,
         "--save-replay-dir",
         metavar="DIR",
-        help="Directory to save replays",
+        help="Directory to save replays.",
         rich_help_panel="Output",
     ),
     # --- Help ---
@@ -1339,7 +1339,7 @@ def run_cmd(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -1412,7 +1412,7 @@ def run_cmd(
 
 @app.command(
     name="pickup",
-    help="Evaluate a policy against a pool of other policies and compute VOR",
+    help="Evaluate a policy against a pool of other policies and compute VOR.",
     rich_help_panel="Evaluate",
     epilog="""[dim]Examples:[/dim]
 
@@ -1427,7 +1427,7 @@ def pickup_cmd(
         "--mission",
         "-m",
         metavar="MISSION",
-        help="Mission to evaluate on",
+        help="Mission to evaluate on.",
         rich_help_panel="Mission",
     ),
     cogs: int = typer.Option(
@@ -1435,7 +1435,7 @@ def pickup_cmd(
         "--cogs",
         "-c",
         metavar="N",
-        help="Number of cogs (agents)",
+        help="Number of cogs (agents).",
         min=1,
         rich_help_panel="Mission",
     ),
@@ -1444,14 +1444,14 @@ def pickup_cmd(
         "--variant",
         "-v",
         metavar="VARIANT",
-        help="Mission variant (repeatable)",
+        help="Mission variant (repeatable).",
         rich_help_panel="Mission",
     ),
     difficulty: Optional[str] = typer.Option(
         None,
         "--difficulty",
         metavar="LEVEL",
-        help="Difficulty (easy, medium, hard) controlling clips events",
+        help="Difficulty (easy, medium, hard) controlling clips events.",
         rich_help_panel="Mission",
     ),
     # --- Policy ---
@@ -1460,21 +1460,21 @@ def pickup_cmd(
         "--policy",
         "-p",
         metavar="POLICY",
-        help="Candidate policy to evaluate",
+        help="Candidate policy to evaluate.",
         rich_help_panel="Policy",
     ),
     pool: Optional[list[str]] = typer.Option(  # noqa: B008
         None,
         "--pool",
         metavar="POLICY",
-        help="Pool policy (repeatable)",
+        help="Pool policy (repeatable).",
         rich_help_panel="Policy",
     ),
     device: str = typer.Option(
         "auto",
         "--device",
         metavar="DEVICE",
-        help="Policy device (auto, cpu, cuda, cuda:0, etc.)",
+        help="Policy device (auto, cpu, cuda, cuda:0, etc.).",
         rich_help_panel="Policy",
     ),
     # --- Simulation ---
@@ -1483,7 +1483,7 @@ def pickup_cmd(
         "--episodes",
         "-e",
         metavar="N",
-        help="Episodes per scenario",
+        help="Episodes per scenario.",
         min=1,
         rich_help_panel="Simulation",
     ),
@@ -1492,7 +1492,7 @@ def pickup_cmd(
         "--steps",
         "-s",
         metavar="N",
-        help="Max steps per episode",
+        help="Max steps per episode.",
         min=1,
         rich_help_panel="Simulation",
     ),
@@ -1500,7 +1500,7 @@ def pickup_cmd(
         50,
         "--seed",
         metavar="N",
-        help="Base random seed",
+        help="Base random seed.",
         min=0,
         rich_help_panel="Simulation",
     ),
@@ -1508,7 +1508,7 @@ def pickup_cmd(
         None,
         "--map-seed",
         metavar="N",
-        help="MapGen seed for procedural maps",
+        help="MapGen seed for procedural maps.",
         min=0,
         show_default="same as --seed",
         rich_help_panel="Simulation",
@@ -1517,7 +1517,7 @@ def pickup_cmd(
         250,
         "--action-timeout-ms",
         metavar="MS",
-        help="Max ms per action before noop",
+        help="Max ms per action before noop.",
         min=1,
         rich_help_panel="Simulation",
     ),
@@ -1526,7 +1526,7 @@ def pickup_cmd(
         None,
         "--save-replay-dir",
         metavar="DIR",
-        help="Directory to save replays",
+        help="Directory to save replays.",
         rich_help_panel="Output",
     ),
     # --- Help ---
@@ -1534,7 +1534,7 @@ def pickup_cmd(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -1593,7 +1593,7 @@ def pickup_cmd(
 
 @app.command(
     name="version",
-    help="Show version information for cogames and dependencies",
+    help="Show version information for cogames and dependencies.",
     rich_help_panel="Info",
 )
 def version_cmd() -> None:
@@ -1612,7 +1612,7 @@ def version_cmd() -> None:
 
 @app.command(
     name="policies",
-    help="Show available policy shorthand names",
+    help="Show available policy shorthand names.",
     rich_help_panel="Policies",
     epilog="""[dim]Usage:[/dim]
 
@@ -1637,7 +1637,7 @@ def policies_cmd() -> None:
 
 @app.command(
     name="login",
-    help="Authenticate with CoGames server",
+    help="Authenticate with CoGames server.",
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
@@ -1651,14 +1651,14 @@ def login_cmd(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
         metavar="URL",
-        help="Authentication server URL",
+        help="Authentication server URL.",
         rich_help_panel="Server",
     ),
     force: bool = typer.Option(
         False,
         "--force",
         "-f",
-        help="Re-authenticate even if already logged in",
+        help="Re-authenticate even if already logged in.",
         rich_help_panel="Options",
     ),
     timeout: int = typer.Option(
@@ -1666,14 +1666,14 @@ def login_cmd(
         "--timeout",
         "-t",
         metavar="SECS",
-        help="Authentication timeout in seconds",
+        help="Authentication timeout in seconds.",
         rich_help_panel="Options",
     ),
     _help: bool = typer.Option(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -1704,7 +1704,7 @@ def login_cmd(
 
 app.command(
     name="submissions",
-    help="Show your uploads and tournament submissions",
+    help="Show your uploads and tournament submissions.",
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
@@ -1718,14 +1718,14 @@ app.command(
 
 app.command(
     name="seasons",
-    help="List currently running tournament seasons",
+    help="List currently running tournament seasons.",
     rich_help_panel="Tournament",
     add_help_option=False,
 )(seasons_cmd)
 
 app.command(
     name="leaderboard",
-    help="Show tournament leaderboard for a season",
+    help="Show tournament leaderboard for a season.",
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
@@ -1736,7 +1736,7 @@ app.command(
 
 app.command(
     name="diagnose",
-    help="Run diagnostic evals for a policy checkpoint",
+    help="Run diagnostic evals for a policy checkpoint.",
     rich_help_panel="Evaluate",
     epilog="""[dim]Examples:[/dim]
 
@@ -1769,7 +1769,7 @@ def _resolve_season(server: str, season_name: str | None = None, include_hidden:
 
 @app.command(
     name="create-bundle",
-    help="Create a submission bundle zip from a policy",
+    help="Create a submission bundle zip from a policy.",
     rich_help_panel="Policies",
     add_help_option=False,
 )
@@ -1780,7 +1780,7 @@ def create_bundle_cmd(
         "--policy",
         "-p",
         metavar="POLICY",
-        help=f"Policy specification: {policy_arg_example}",
+        help=f"Policy specification: {policy_arg_example}.",
         rich_help_panel="Policy",
     ),
     output: Path = typer.Option(  # noqa: B008
@@ -1788,7 +1788,7 @@ def create_bundle_cmd(
         "--output",
         "-o",
         metavar="PATH",
-        help="Output path for the bundle zip",
+        help="Output path for the bundle zip.",
         rich_help_panel="Output",
     ),
     init_kwarg: Optional[list[str]] = typer.Option(  # noqa: B008
@@ -1796,7 +1796,7 @@ def create_bundle_cmd(
         "--init-kwarg",
         "-k",
         metavar="KEY=VAL",
-        help="Policy init kwargs (can be repeated)",
+        help="Policy init kwargs (can be repeated).",
         rich_help_panel="Policy",
     ),
     include_files: Optional[list[str]] = typer.Option(  # noqa: B008
@@ -1804,21 +1804,21 @@ def create_bundle_cmd(
         "--include-files",
         "-f",
         metavar="PATH",
-        help="Files or directories to include (can be repeated)",
+        help="Files or directories to include (can be repeated).",
         rich_help_panel="Files",
     ),
     setup_script: Optional[str] = typer.Option(
         None,
         "--setup-script",
         metavar="PATH",
-        help="Python setup script to include in the bundle",
+        help="Python setup script to include in the bundle.",
         rich_help_panel="Files",
     ),
     _help: bool = typer.Option(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -1843,7 +1843,7 @@ def create_bundle_cmd(
 
 @app.command(
     name="validate-bundle",
-    help="Validate a policy bundle runs correctly in process isolation",
+    help="Validate a policy bundle runs correctly in process isolation.",
     rich_help_panel="Policies",
     add_help_option=False,
 )
@@ -1853,13 +1853,13 @@ def validate_bundle_cmd(
         "--policy",
         "-p",
         metavar="URI",
-        help="Bundle URI (file://, s3://, or local path to .zip or directory)",
+        help="Bundle URI (file://, s3://, or local path to .zip or directory).",
     ),
     season: Optional[str] = typer.Option(
         None,
         "--season",
         metavar="SEASON",
-        help="Tournament season (determines which game to validate against)",
+        help="Tournament season (determines which game to validate against).",
         rich_help_panel="Tournament",
     ),
     include_hidden: bool = typer.Option(
@@ -1872,26 +1872,26 @@ def validate_bundle_cmd(
         DEFAULT_SUBMIT_SERVER,
         "--server",
         metavar="URL",
-        help="Tournament server URL (used to resolve default season)",
+        help="Tournament server URL (used to resolve default season).",
         rich_help_panel="Server",
     ),
     validation_mode: str = typer.Option(
         "local",
         "--validation-mode",
-        help="Validation mode: 'local' (in-process) or 'docker' (in container)",
+        help="Validation mode: 'local' (in-process) or 'docker' (in container).",
         rich_help_panel="Validation",
     ),
     image: str = typer.Option(
         DEFAULT_EPISODE_RUNNER_IMAGE,
         "--image",
-        help="Docker image for container validation (only used with --validation-mode docker)",
+        help="Docker image for container validation (only used with --validation-mode docker).",
         rich_help_panel="Validation",
     ),
     _help: bool = typer.Option(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -1929,7 +1929,7 @@ def _parse_init_kwarg(value: str) -> tuple[str, str]:
 
 @app.command(
     name="upload",
-    help="Upload a policy to CoGames",
+    help="Upload a policy to CoGames.",
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
@@ -1950,7 +1950,7 @@ def upload_cmd(
         "--name",
         "-n",
         metavar="NAME",
-        help="Name for your uploaded policy",
+        help="Name for your uploaded policy.",
         rich_help_panel="Upload",
     ),
     # --- Policy ---
@@ -1959,7 +1959,7 @@ def upload_cmd(
         "--policy",
         "-p",
         metavar="POLICY",
-        help=f"Policy specification: {policy_arg_example}",
+        help=f"Policy specification: {policy_arg_example}.",
         rich_help_panel="Policy",
     ),
     init_kwarg: Optional[list[str]] = typer.Option(  # noqa: B008
@@ -1967,7 +1967,7 @@ def upload_cmd(
         "--init-kwarg",
         "-k",
         metavar="KEY=VAL",
-        help="Policy init kwargs (can be repeated)",
+        help="Policy init kwargs (can be repeated).",
         rich_help_panel="Policy",
     ),
     # --- Files ---
@@ -1976,14 +1976,14 @@ def upload_cmd(
         "--include-files",
         "-f",
         metavar="PATH",
-        help="Files or directories to include (can be repeated)",
+        help="Files or directories to include (can be repeated).",
         rich_help_panel="Files",
     ),
     setup_script: Optional[str] = typer.Option(
         None,
         "--setup-script",
         metavar="PATH",
-        help="Python setup script to run before loading the policy",
+        help="Python setup script to run before loading the policy.",
         rich_help_panel="Files",
     ),
     # --- Tournament ---
@@ -1991,38 +1991,38 @@ def upload_cmd(
         None,
         "--season",
         metavar="SEASON",
-        help="Tournament season (default: server's default season)",
+        help="Tournament season (default: server's default season).",
         rich_help_panel="Tournament",
     ),
     no_submit: bool = typer.Option(
         False,
         "--no-submit",
-        help="Upload without submitting to a season",
+        help="Upload without submitting to a season.",
         rich_help_panel="Tournament",
     ),
     # --- Validation ---
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Run validation only without uploading",
+        help="Run validation only without uploading.",
         rich_help_panel="Validation",
     ),
     skip_validation: bool = typer.Option(
         False,
         "--skip-validation",
-        help="Skip policy validation in isolated environment",
+        help="Skip policy validation in isolated environment.",
         rich_help_panel="Validation",
     ),
     validation_mode: str = typer.Option(
         "local",
         "--validation-mode",
-        help="Validation mode: 'local' (in-process) or 'docker' (in container)",
+        help="Validation mode: 'local' (in-process) or 'docker' (in container).",
         rich_help_panel="Validation",
     ),
     image: str = typer.Option(
         DEFAULT_EPISODE_RUNNER_IMAGE,
         "--image",
-        help="Docker image for container validation (only used with --validation-mode docker)",
+        help="Docker image for container validation (only used with --validation-mode docker).",
         rich_help_panel="Validation",
     ),
     # --- Server ---
@@ -2030,14 +2030,14 @@ def upload_cmd(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
         metavar="URL",
-        help="Authentication server URL",
+        help="Authentication server URL.",
         rich_help_panel="Server",
     ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
         metavar="URL",
-        help="Tournament server URL",
+        help="Tournament server URL.",
         rich_help_panel="Server",
     ),
     include_hidden: bool = typer.Option(
@@ -2051,7 +2051,7 @@ def upload_cmd(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -2102,7 +2102,7 @@ def upload_cmd(
 
 @app.command(
     name="submit",
-    help="Submit a policy to a tournament season",
+    help="Submit a policy to a tournament season.",
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
@@ -2115,20 +2115,20 @@ def submit_cmd(
     policy_name: str = typer.Argument(
         ...,
         metavar="POLICY",
-        help="Policy name (e.g., 'my-policy' or 'my-policy:v3' for specific version)",
+        help="Policy name (e.g., 'my-policy' or 'my-policy:v3' for specific version).",
     ),
     season: Optional[str] = typer.Option(
         None,
         "--season",
         metavar="SEASON",
-        help="Tournament season name",
+        help="Tournament season name.",
         rich_help_panel="Tournament",
     ),
     login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
         metavar="URL",
-        help="Authentication server URL",
+        help="Authentication server URL.",
         rich_help_panel="Server",
     ),
     server: str = typer.Option(
@@ -2136,14 +2136,14 @@ def submit_cmd(
         "--server",
         "-s",
         metavar="URL",
-        help="Tournament server URL",
+        help="Tournament server URL.",
         rich_help_panel="Server",
     ),
     _help: bool = typer.Option(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -2200,7 +2200,7 @@ def submit_cmd(
 
 @app.command(
     name="docs",
-    help="Print documentation (run without arguments to see available docs)",
+    help="Print documentation (run without arguments to see available docs).",
     rich_help_panel="Info",
     epilog="""[dim]Examples:[/dim]
 
@@ -2215,13 +2215,13 @@ def docs_cmd(
     doc_name: Optional[str] = typer.Argument(
         None,
         metavar="DOC",
-        help="Document name (readme, mission, technical_manual, scripted_agent, evals, mapgen)",
+        help="Document name (readme, mission, technical_manual, scripted_agent, evals, mapgen).",
     ),
     _help: bool = typer.Option(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
     ),
@@ -2284,4 +2284,4 @@ def docs_cmd(
 
 
 if __name__ == "__main__":
-    app()
+    app(prog_name="cogames")

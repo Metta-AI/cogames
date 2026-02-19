@@ -93,14 +93,14 @@ def submissions_cmd(
         "--policy",
         "-p",
         metavar="POLICY",
-        help="Filter by policy name (e.g., 'my-policy' or 'my-policy:v3')",
+        help="Filter by policy name (e.g., 'my-policy' or 'my-policy:v3').",
         rich_help_panel="Filter",
     ),
     season: Optional[str] = typer.Option(
         None,
         "--season",
         metavar="SEASON",
-        help="Filter by tournament season",
+        help="Filter by tournament season.",
         rich_help_panel="Filter",
     ),
     login_server: str = typer.Option(
@@ -121,14 +121,14 @@ def submissions_cmd(
     json_output: bool = typer.Option(
         False,
         "--json",
-        help="Print raw JSON instead of table",
+        help="Print raw JSON instead of table.",
         rich_help_panel="Output",
     ),
     _help: bool = typer.Option(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -258,7 +258,7 @@ def leaderboard_cmd(
         "beta-cogsguard",
         "--season",
         metavar="SEASON",
-        help="Tournament season name",
+        help="Tournament season name.",
         rich_help_panel="Tournament",
     ),
     login_server: str = typer.Option(
@@ -279,14 +279,14 @@ def leaderboard_cmd(
     json_output: bool = typer.Option(
         False,
         "--json",
-        help="Print raw JSON instead of table",
+        help="Print raw JSON instead of table.",
         rich_help_panel="Output",
     ),
     _help: bool = typer.Option(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
@@ -337,8 +337,8 @@ def leaderboard_cmd(
 
 
 def seasons_cmd(
-    season_name: Optional[str] = typer.Argument(None, help="Show versions of a specific season"),
-    versions: bool = typer.Option(False, "--versions", "-v", help="List all versions of the season"),
+    season_name: Optional[str] = typer.Argument(None, help="Show versions of a specific season."),
+    versions: bool = typer.Option(False, "--versions", "-v", help="List all versions of the season."),
     login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
@@ -357,14 +357,14 @@ def seasons_cmd(
     json_output: bool = typer.Option(
         False,
         "--json",
-        help="Print raw JSON instead of table",
+        help="Print raw JSON instead of table.",
         rich_help_panel="Output",
     ),
     _help: bool = typer.Option(
         False,
         "--help",
         "-h",
-        help="Show this message and exit",
+        help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
         rich_help_panel="Other",
