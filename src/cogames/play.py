@@ -167,6 +167,7 @@ def play(
     device: str = "cpu",
     render_mode: RenderMode = "gui",
     save_replay: Optional[Path] = None,
+    save_replay_file: Optional[Path] = None,
     autostart: bool = False,
 ) -> None:
     """Play a single game episode with a policy.
@@ -180,12 +181,17 @@ def play(
         render_mode: Render mode - "gui", "vibescope", "unicode", or "none"
         save_replay: Optional directory path to save replay. Directory will be created if it doesn't exist.
             Replay will be saved with a unique UUID-based filename.
+        save_replay_file: Optional file path to save replay to. Parent directory will be created
+            if needed, and existing file is overwritten.
     """
 
     logger.debug("Starting play session", extra={"game_name": game_name})
 
     replay_path = None
-    if save_replay:
+    if save_replay_file:
+        save_replay_file.parent.mkdir(parents=True, exist_ok=True)
+        replay_path = save_replay_file
+    elif save_replay:
         save_replay.mkdir(parents=True, exist_ok=True)
         replay_path = save_replay / f"{uuid.uuid4()}.json.z"
 

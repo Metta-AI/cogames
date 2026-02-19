@@ -503,6 +503,8 @@ Log mode is non-interactive and doesn't support manual control.
 
 [cyan]cogames play -m cogsguard_machina_1.basic -c 4 -p class=baseline[/cyan] Baseline, 4 cogs
 
+[cyan]cogames play -m cogsguard_machina_1.basic --save-replay-file ./latest.json.z[/cyan] Overwrite fixed replay file
+
 [cyan]cogames play -m cogsguard_machina_1 -r unicode[/cyan]                   Terminal mode""",
     add_help_option=False,
 )
@@ -604,6 +606,13 @@ def play_cmd(
         help="Save replay file for later viewing with [bold]cogames replay[/bold]",
         rich_help_panel="Output",
     ),
+    save_replay_file: Optional[Path] = typer.Option(  # noqa: B008
+        None,
+        "--save-replay-file",
+        metavar="FILE",
+        help="Save replay to a fixed file path (overwrites existing file)",
+        rich_help_panel="Output",
+    ),
     # --- Debug (hidden from casual users) ---
     print_cvc_config: bool = typer.Option(
         False,
@@ -630,6 +639,10 @@ def play_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
+    if save_replay_dir is not None and save_replay_file is not None:
+        console.print("[red]Error: Use only one of --save-replay-dir or --save-replay-file.[/red]")
+        raise typer.Exit(1)
+
     resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(
         ctx,
         mission,
@@ -673,6 +686,7 @@ def play_cmd(
         render_mode=render,
         game_name=resolved_mission,
         save_replay=save_replay_dir,
+        save_replay_file=save_replay_file,
         autostart=autostart,
     )
 
