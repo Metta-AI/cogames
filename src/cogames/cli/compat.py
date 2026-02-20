@@ -5,7 +5,7 @@ import typer
 from packaging.version import InvalidVersion, Version
 from rich.console import Console
 
-from cogames.cli.client import SeasonInfo
+from cogames.cli.client import SeasonSummary
 
 console = Console(stderr=True)
 
@@ -32,7 +32,7 @@ def _get_installed_compat() -> str | None:
     return f"{v.major}.{v.minor}"
 
 
-def check_compat_version(season: SeasonInfo) -> None:
+def check_compat_version(season: SeasonSummary) -> None:
     if season.compat_version is None:
         return
 

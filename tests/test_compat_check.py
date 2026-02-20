@@ -1,3 +1,5 @@
+from uuid import UUID
+
 import pytest
 from click.exceptions import Exit
 
@@ -7,12 +9,21 @@ from cogames.cli.compat import _get_installed_compat, check_compat_version
 
 def _season(compat_version: str | None) -> SeasonInfo:
     return SeasonInfo(
+        id=UUID("00000000-0000-0000-0000-000000000001"),
         name="test",
         version=1,
         canonical=True,
         summary="test",
+        is_default=False,
         pools=[PoolInfo(name="p", description="d")],
         compat_version=compat_version,
+        status="not_started",
+        display_name="Test Season",
+        tournament_type="policy",
+        entrant_count=0,
+        active_entrant_count=0,
+        match_count=0,
+        stage_count=1,
     )
 
 
