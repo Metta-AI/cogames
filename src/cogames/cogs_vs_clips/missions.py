@@ -4,6 +4,7 @@ from cogames.cogs_vs_clips.aligner_tutorial import AlignerTutorialMission
 from cogames.cogs_vs_clips.miner_tutorial import MinerTutorialMission
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.scout_tutorial import ScoutTutorialMission
+from cogames.cogs_vs_clips.scrambler_tutorial import ScramblerTutorialMission
 from cogames.cogs_vs_clips.sites import (
     COGSGUARD_ARENA,
     COGSGUARD_MACHINA_1,
@@ -48,6 +49,7 @@ _CORE_MISSIONS: list[CvCMission] = [
     AlignerTutorialMission,
     MinerTutorialMission,
     ScoutTutorialMission,
+    ScramblerTutorialMission,
 ]
 
 

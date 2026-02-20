@@ -396,6 +396,15 @@ class NoClipsVariant(CoGameMissionVariant):
         mission.clips.disabled = True
 
 
+class NoVibesVariant(CoGameMissionVariant):
+    name: str = "no_vibes"
+    description: str = "Disable change_vibe action."
+
+    @override
+    def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
+        env.game.actions.change_vibe.enabled = False
+
+
 class ForcedRoleVibesVariant(CoGameMissionVariant):
     name: str = "forced_role_vibes"
     description: str = "Assign per-agent roles as a global observation and force each agent's initial vibe by role."
@@ -461,12 +470,24 @@ class ThickSkinnedVariant(CoGameMissionVariant):
         mission.cog.hp_regen = 0
 
 
+class BraveheartVariant(CoGameMissionVariant):
+    name: str = "braveheart"
+    description: str = "Hub starts with 255 hearts — enough to align every junction on the map."
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        for team in mission.teams.values():
+            team.initial_hearts = 255
+
+
 VARIANTS: list[CoGameMissionVariant] = [
+    BraveheartVariant(),
     CavesVariant(),
     CityVariant(),
     DarkSideVariant(),
     NoWeatherVariant(),
     NoClipsVariant(),
+    NoVibesVariant(),
     ThickSkinnedVariant(),
     DesertVariant(),
     EmptyBaseVariant(),
