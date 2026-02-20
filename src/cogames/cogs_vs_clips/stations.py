@@ -37,26 +37,6 @@ def _neg(recipe: dict[str, int]) -> dict[str, int]:
     return {k: -v for k, v in recipe.items()}
 
 
-def _territory_combat_aoes(
-    aoe_range: int,
-    influence_deltas: dict[str, int],
-    attack_deltas: dict[str, int],
-) -> dict[str, AOEConfig]:
-    return {
-        "territory": AOEConfig(radius=aoe_range, filters=[]),
-        "influence": AOEConfig(
-            radius=aoe_range,
-            filters=[isAlignedToActor()],
-            mutations=[updateTarget(influence_deltas)],
-        ),
-        "attack": AOEConfig(
-            radius=aoe_range,
-            filters=[isEnemy()],
-            mutations=[updateTarget(attack_deltas)],
-        ),
-    }
-
-
 class CvCStationConfig(Config):
     def station_cfg(self) -> GridObjectConfig:
         raise NotImplementedError("Subclasses must implement this method")
@@ -107,7 +87,18 @@ class CvCJunctionConfig(CvCStationConfig):
             render_name="junction",
             render_symbol="📦",
             collective=team,
-            aoes=_territory_combat_aoes(self.aoe_range, self.influence_deltas, self.attack_deltas),
+            aoes={
+                "influence": AOEConfig(
+                    radius=self.aoe_range,
+                    filters=[isAlignedToActor()],
+                    mutations=[updateTarget(self.influence_deltas)],
+                ),
+                "attack": AOEConfig(
+                    radius=self.aoe_range,
+                    filters=[isEnemy()],
+                    mutations=[updateTarget(self.attack_deltas)],
+                ),
+            },
             on_use_handlers={
                 "deposit": Handler(
                     filters=[isAlignedToActor()],
@@ -142,7 +133,18 @@ class CvCHubConfig(CvCStationConfig):
             render_symbol="📦",
             collective=collective or team,
             inventory=InventoryConfig(initial={"heart": self.initial_hearts}),
-            aoes=_territory_combat_aoes(self.aoe_range, self.influence_deltas, self.attack_deltas),
+            aoes={
+                "influence": AOEConfig(
+                    radius=self.aoe_range,
+                    filters=[isAlignedToActor()],
+                    mutations=[updateTarget(self.influence_deltas)],
+                ),
+                "attack": AOEConfig(
+                    radius=self.aoe_range,
+                    filters=[isEnemy()],
+                    mutations=[updateTarget(self.attack_deltas)],
+                ),
+            },
             on_use_handlers={
                 "deposit": Handler(
                     filters=[isAlignedToActor(), actorHasAnyOf(self.elements)],
