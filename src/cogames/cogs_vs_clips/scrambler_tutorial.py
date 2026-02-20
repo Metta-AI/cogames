@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, override
 
-from cogames.cogs_vs_clips.clip_difficulty import EASY
+from cogames.cogs_vs_clips.cog import CogConfig
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
 from cogames.cogs_vs_clips.team import CogTeam
@@ -12,6 +12,30 @@ from cogames.core import CoGameMissionVariant
 
 if TYPE_CHECKING:
     from mettagrid.config.mettagrid_config import MettaGridConfig
+
+
+class AllJunctionsClipsAligned(CoGameMissionVariant):
+    name: str = "all_clips"
+    description: str = "All junctions start clips-aligned (except hub), no further clips spread."
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        mission.clips.disabled = False
+        mission.clips.initial_clips_start = 1
+        mission.clips.initial_clips_spots = 1000
+        # Disable further clips spread
+        disable_start = mission.max_steps + 1
+        mission.clips.scramble_start = disable_start
+        mission.clips.scramble_interval = disable_start
+        mission.clips.align_start = disable_start
+        mission.clips.align_interval = disable_start
+
+    @override
+    def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
+        from mettagrid.config.filter.alignment_filter import isNeutral  # noqa: PLC0415
+
+        # Only align neutral junctions — skip the hub junction which is already cogs-aligned.
+        env.game.events["initial_clips"].filters = [*env.game.events["initial_clips"].filters, isNeutral()]
 
 
 class ScramblerRewardsVariant(CoGameMissionVariant):
@@ -30,10 +54,11 @@ class ScramblerRewardsVariant(CoGameMissionVariant):
 
 ScramblerTutorialMission = CvCMission(
     name="scrambler_tutorial",
-    description="Learn scrambler role - scramble enemy junctions (no clips).",
+    description="Learn scrambler role - acquire scrambler gear and scramble enemy junctions.",
     site=COGSGUARD_ARENA,
     num_cogs=4,
     max_steps=1000,
+    cog=CogConfig(heart_limit=3),
     teams={"cogs": CogTeam(name="cogs", num_agents=4, wealth=3, initial_hearts=120)},
-    variants=[EASY, ScramblerRewardsVariant()],
+    variants=[AllJunctionsClipsAligned(), ScramblerRewardsVariant()],
 )
