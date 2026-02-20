@@ -38,6 +38,7 @@ from cogames import game, verbose
 from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import train as train_module
+from cogames.cli.auth import auth_app
 from cogames.cli.base import console
 from cogames.cli.client import SeasonInfo, TournamentServerClient
 from cogames.cli.compat import check_compat_version
@@ -47,7 +48,7 @@ from cogames.cli.leaderboard import (
     seasons_cmd,
     submissions_cmd,
 )
-from cogames.cli.login import DEFAULT_COGAMES_SERVER, perform_login
+from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.mission import (
     describe_mission,
     get_mission_name_and_config,
@@ -248,6 +249,7 @@ def cogsguard_tutorial_cmd(
 
 
 app.add_typer(tutorial_app, name="tutorial", rich_help_panel="Tutorials")
+app.add_typer(auth_app, name="auth", rich_help_panel="Tournament")
 
 
 def _help_callback(ctx: typer.Context, value: bool) -> None:
@@ -1638,13 +1640,8 @@ def policies_cmd() -> None:
 
 @app.command(
     name="login",
-    help="Authenticate with CoGames server.",
+    help="Shortcut for `cogames auth login`.",
     rich_help_panel="Tournament",
-    epilog="""[dim]Examples:[/dim]
-
-[cyan]cogames login[/cyan]                       Authenticate with default server
-
-[cyan]cogames login --force[/cyan]               Re-authenticate even if already logged in""",
     add_help_option=False,
 )
 def login_cmd(
@@ -1680,27 +1677,9 @@ def login_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    from urllib.parse import urlparse  # noqa: PLC0415
+    from cogames.cli.auth import login_cmd as auth_login  # noqa: PLC0415
 
-    # Check if we already have a token
-    from cogames.auth import BaseCLIAuthenticator  # noqa: PLC0415
-
-    temp_auth = BaseCLIAuthenticator(
-        token_file_name="cogames.yaml",
-        token_storage_key="login_tokens",
-    )
-
-    if temp_auth.has_saved_token(server) and not force:
-        console.print(f"[green]Already authenticated with {urlparse(server).hostname}[/green]")
-        return
-
-    # Perform authentication
-    console.print(f"[cyan]Authenticating with {server}...[/cyan]")
-    if perform_login(auth_server_url=server, force=force, timeout=timeout):
-        console.print("[green]Authentication successful![/green]")
-    else:
-        console.print("[red]Authentication failed![/red]")
-        raise typer.Exit(1)
+    auth_login(server=server, force=force, timeout=timeout)
 
 
 app.command(
