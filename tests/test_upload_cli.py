@@ -20,6 +20,30 @@ from cogames.main import app
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.runner.types import PureSingleEpisodeResult
 
+_SEASON_ID = "11111111-1111-1111-1111-111111111111"
+_ENTRY_CONFIG_ID = "22222222-2222-2222-2222-222222222222"
+
+
+def _season_info_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": summary["id"],
+        "name": summary["name"],
+        "version": summary["version"],
+        "canonical": summary["canonical"],
+        "is_default": summary["is_default"],
+        "status": "in_progress",
+        "display_name": summary["name"],
+        "tournament_type": "policy",
+        "entrant_count": 1,
+        "active_entrant_count": 1,
+        "match_count": 0,
+        "stage_count": 1,
+        "entry_pool": summary["entry_pool"],
+        "leaderboard_pool": summary["leaderboard_pool"],
+        "summary": summary["summary"],
+        "pools": summary["pools"],
+    }
+
 
 @pytest.fixture
 def fake_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -69,19 +93,19 @@ def test_upload_command_sends_correct_requests(
     assert "my-test-policy:v1" in result.stdout
 
     # Verify the requests that were made
-    # 0: /tournament/seasons, 1: presigned-url, 2: upload, 3: complete
-    assert len(httpserver.log) == 4, f"Expected 4 requests, got {len(httpserver.log)}"
+    # 0: /tournament/seasons, 1: /tournament/seasons/{name}, 2: presigned-url, 3: upload, 4: complete
+    assert len(httpserver.log) == 5, f"Expected 5 requests, got {len(httpserver.log)}"
 
-    presign_req, _ = httpserver.log[1]
+    presign_req, _ = httpserver.log[2]
     assert presign_req.headers.get("X-Auth-Token") == "test-token-12345"
 
-    upload_req, _ = httpserver.log[2]
+    upload_req, _ = httpserver.log[3]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         spec = json.loads(zf.read("policy_spec.json"))
         assert spec["class_path"] == "cogames.policy.starter_agent.StarterPolicy"
 
-    complete_req, _ = httpserver.log[3]
+    complete_req, _ = httpserver.log[4]
     complete_body = complete_req.json
     assert complete_body["upload_id"] == upload_id
     assert complete_body["name"] == "my-test-policy"
@@ -92,23 +116,26 @@ def test_upload_command_fails_without_auth(
     tmp_path: Path,
 ) -> None:
     """Test that 'cogames upload' fails gracefully when not authenticated."""
+    season_summary = {
+        "id": _SEASON_ID,
+        "name": "test-season",
+        "version": 1,
+        "canonical": True,
+        "is_default": True,
+        "entry_pool": None,
+        "leaderboard_pool": None,
+        "summary": "",
+        "pools": [],
+    }
+
     httpserver.expect_request(
         "/tournament/seasons",
         method="GET",
-    ).respond_with_json(
-        [
-            {
-                "name": "test-season",
-                "version": 1,
-                "canonical": True,
-                "is_default": True,
-                "entry_pool": None,
-                "leaderboard_pool": None,
-                "summary": "",
-                "pools": [],
-            }
-        ]
-    )
+    ).respond_with_json([season_summary])
+    httpserver.expect_request(
+        "/tournament/seasons/test-season",
+        method="GET",
+    ).respond_with_json(_season_info_from_summary(season_summary))
 
     # Use tmp_path as HOME but don't create any token file
     result = subprocess.run(
@@ -145,23 +172,26 @@ def _setup_mock_upload_server(
     upload_id: str = "test-upload-id",
 ) -> None:
     """Configure httpserver with the endpoints needed for upload."""
+    season_summary = {
+        "id": _SEASON_ID,
+        "name": "test-season",
+        "version": 1,
+        "canonical": True,
+        "is_default": True,
+        "entry_pool": None,
+        "leaderboard_pool": None,
+        "summary": "",
+        "pools": [],
+    }
+
     httpserver.expect_request(
         "/tournament/seasons",
         method="GET",
-    ).respond_with_json(
-        [
-            {
-                "name": "test-season",
-                "version": 1,
-                "canonical": True,
-                "is_default": True,
-                "entry_pool": None,
-                "leaderboard_pool": None,
-                "summary": "",
-                "pools": [],
-            }
-        ]
-    )
+    ).respond_with_json([season_summary])
+    httpserver.expect_request(
+        "/tournament/seasons/test-season",
+        method="GET",
+    ).respond_with_json(_season_info_from_summary(season_summary))
 
     httpserver.expect_request(
         "/stats/policies/submit/presigned-url",
@@ -243,8 +273,8 @@ def test_upload_directory_bundle(
     assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
     # Verify the uploaded zip contains all files from the directory
-    assert len(httpserver.log) == 4
-    upload_req, _ = httpserver.log[2]
+    assert len(httpserver.log) == 5
+    upload_req, _ = httpserver.log[3]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         assert "weights.pt" in zf.namelist()
@@ -301,8 +331,8 @@ def test_upload_zip_bundle(
     assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
     # Verify the uploaded zip contains all files
-    assert len(httpserver.log) == 4
-    upload_req, _ = httpserver.log[2]
+    assert len(httpserver.log) == 5
+    upload_req, _ = httpserver.log[3]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         assert "model.safetensors" in zf.namelist()
@@ -372,15 +402,15 @@ def test_upload_s3_bundle(
 
     assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
 
-    # Verify: seasons + S3 download + 3 upload requests = 5 total
-    assert len(httpserver.log) == 5, f"Expected 5 requests, got {len(httpserver.log)}"
+    # Verify: seasons list + season detail + S3 download + 3 upload requests = 6 total
+    assert len(httpserver.log) == 6, f"Expected 6 requests, got {len(httpserver.log)}"
 
-    # Second request should be the S3 GetObject (after seasons)
-    s3_req, _ = httpserver.log[1]
+    # Third request should be the S3 GetObject (after seasons list + season detail)
+    s3_req, _ = httpserver.log[2]
     assert s3_req.path == f"/test-bucket/{unique_key}"
 
     # Verify the uploaded zip contains the files from S3
-    upload_req, _ = httpserver.log[3]  # After seasons, S3 download, presigned URL, then upload
+    upload_req, _ = httpserver.log[4]  # After seasons list/detail, S3 download, presigned URL, then upload
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         assert "checkpoint.pt" in zf.namelist()
@@ -396,6 +426,7 @@ def test_upload_s3_bundle(
 
 _SEASON_WITH_ENTRY_CONFIG: list[dict[str, Any]] = [
     {
+        "id": _SEASON_ID,
         "name": "test-season",
         "version": 1,
         "canonical": True,
@@ -404,7 +435,7 @@ _SEASON_WITH_ENTRY_CONFIG: list[dict[str, Any]] = [
         "leaderboard_pool": "ranked",
         "summary": "",
         "pools": [
-            {"name": "qualifying", "description": "entry pool", "config_id": "cfg-123"},
+            {"name": "qualifying", "description": "entry pool", "config_id": _ENTRY_CONFIG_ID},
             {"name": "ranked", "description": "ranked pool", "config_id": None},
         ],
     }
@@ -412,6 +443,7 @@ _SEASON_WITH_ENTRY_CONFIG: list[dict[str, Any]] = [
 
 _SEASON_NO_ENTRY_CONFIG: list[dict[str, Any]] = [
     {
+        "id": _SEASON_ID,
         "name": "test-season",
         "version": 1,
         "canonical": True,
@@ -431,13 +463,19 @@ def _setup_mock_upload_server_with_season(
     seasons: list[dict[str, Any]],
     upload_id: str = "test-upload-id",
 ) -> None:
+    season_summary = seasons[0]
+
     httpserver.expect_request(
         "/tournament/seasons",
         method="GET",
     ).respond_with_json(seasons)
+    httpserver.expect_request(
+        f"/tournament/seasons/{season_summary['name']}",
+        method="GET",
+    ).respond_with_json(_season_info_from_summary(season_summary))
 
     httpserver.expect_request(
-        "/tournament/configs/cfg-123",
+        f"/tournament/configs/{_ENTRY_CONFIG_ID}",
         method="GET",
     ).respond_with_json(MettaGridConfig().model_dump(mode="json"))
 
@@ -516,8 +554,8 @@ def test_upload_resolves_season_and_validates(
     assert captured.get("called") is True
     assert "validate-bundle" in captured["cmd"]
 
-    # seasons + presigned-url + s3 upload + complete = 4 requests
-    assert len(httpserver.log) == 4
+    # seasons list + season detail + presigned-url + s3 upload + complete = 5 requests
+    assert len(httpserver.log) == 5
 
 
 def test_upload_returns_nonzero_when_validation_fails(
@@ -558,8 +596,8 @@ def test_upload_returns_nonzero_when_validation_fails(
     assert "Validation failed" in result.output
     assert "invalid season not found" in result.output
 
-    # Only season lookup should happen before validation fails.
-    assert len(httpserver.log) == 1
+    # Only season lookups should happen before validation fails.
+    assert len(httpserver.log) == 2
 
 
 def test_upload_skips_validation_when_no_entry_config(
@@ -614,22 +652,30 @@ def test_validate_bundle_fetches_config_and_runs(
         method="GET",
     ).respond_with_json(
         {
+            "id": _SEASON_ID,
             "name": "test-season",
             "version": 1,
             "canonical": True,
             "is_default": True,
+            "status": "in_progress",
+            "display_name": "Test Season",
+            "tournament_type": "policy",
+            "entrant_count": 1,
+            "active_entrant_count": 1,
+            "match_count": 0,
+            "stage_count": 1,
             "entry_pool": "qualifying",
             "leaderboard_pool": "ranked",
             "summary": "",
             "pools": [
-                {"name": "qualifying", "description": "entry pool", "config_id": "cfg-abc"},
+                {"name": "qualifying", "description": "entry pool", "config_id": _ENTRY_CONFIG_ID},
                 {"name": "ranked", "description": "ranked pool", "config_id": None},
             ],
         }
     )
 
     httpserver.expect_request(
-        "/tournament/configs/cfg-abc",
+        f"/tournament/configs/{_ENTRY_CONFIG_ID}",
         method="GET",
     ).respond_with_json(default_cfg.model_dump(mode="json"))
 
