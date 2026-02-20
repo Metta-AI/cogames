@@ -48,8 +48,8 @@ _CORE_MISSIONS: list[CvCMission] = [
     CogsGuardBasicMission,
     AlignerTutorialMission,
     MinerTutorialMission,
-    ScoutTutorialMission,
     ScramblerTutorialMission,
+    ScoutTutorialMission,
 ]
 
 
