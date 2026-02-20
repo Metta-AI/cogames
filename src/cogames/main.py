@@ -5,6 +5,7 @@
 """CLI for CoGames - collection of environments for multi-agent cooperative and competitive games."""
 
 from cogames.cli.utils import suppress_noisy_logs
+from mettagrid.base_config import LENIENT_CONTEXT
 
 suppress_noisy_logs()
 
@@ -1754,12 +1755,10 @@ app.command(
 def _resolve_season(server: str, season_name: str | None = None, include_hidden: bool = False) -> SeasonInfo:
     try:
         with TournamentServerClient(server_url=server) as client:
-            if season_name is not None:
-                info = client.get_season(season_name, include_hidden=include_hidden)
-                console.print(f"[dim]Using season: {info.name}[/dim]")
-            else:
-                info = client.get_default_season()
-                console.print(f"[dim]Using default season: {info.name}[/dim]")
+            if season_name is None:
+                season_name = client.get_default_season().name
+            info = client.get_season(season_name, include_hidden=include_hidden)
+            console.print(f"[dim]Using season: {info.name}[/dim]")
             return info
     except Exception as e:
         console.print(f"[red]Could not fetch season from server:[/red] {e}")
@@ -1908,7 +1907,7 @@ def validate_bundle_cmd(
 
     with TournamentServerClient(server_url=server) as client:
         config_data = client.get_config(entry_pool_info.config_id)
-    env_cfg = MettaGridConfig.model_validate(config_data)
+    env_cfg = MettaGridConfig.model_validate(config_data, context=LENIENT_CONTEXT)
 
     if validation_mode == "docker":
         validate_bundle_docker(policy, env_cfg, image)

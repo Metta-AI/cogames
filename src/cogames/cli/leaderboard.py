@@ -379,7 +379,7 @@ def seasons_cmd(
             if season_name and versions:
                 season_versions = client.get_season_versions(season_name)
                 if json_output:
-                    console.print(json.dumps([v.model_dump() for v in season_versions], indent=2))
+                    console.print(json.dumps([v.model_dump(mode="json") for v in season_versions], indent=2))
                     return
 
                 if not season_versions:
@@ -404,7 +404,7 @@ def seasons_cmd(
         raise typer.Exit(1) from exc
 
     if json_output:
-        console.print(json.dumps([s.model_dump() for s in seasons], indent=2))
+        console.print(json.dumps([s.model_dump(mode="json") for s in seasons], indent=2))
         return
 
     if not seasons:
@@ -414,11 +414,8 @@ def seasons_cmd(
     table = Table(title="Tournament Seasons", box=box.SIMPLE_HEAVY, show_lines=False, pad_edge=False)
     table.add_column("Season", style="bold cyan")
     table.add_column("Description", style="white")
-    table.add_column("Pools", style="dim")
 
     for season in seasons:
-        pool_names = [p.name for p in season.pools]
-        pools_str = ", ".join(pool_names) if pool_names else "—"
-        table.add_row(season.name, season.summary, pools_str)
+        table.add_row(season.name, season.summary)
 
     console.print(table)

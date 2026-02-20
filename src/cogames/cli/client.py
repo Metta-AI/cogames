@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, TypeVar, overload
+from typing import Any, Literal, TypeVar, overload
 
 import httpx
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from cogames.cli.base import console
 from cogames.cli.login import CoGamesAuthenticator
@@ -13,7 +13,11 @@ from cogames.cli.login import CoGamesAuthenticator
 T = TypeVar("T")
 
 
-class PolicyVersionInfo(BaseModel):
+class CLIModel(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+
+class PolicyVersionInfo(CLIModel):
     id: uuid.UUID
     policy_id: uuid.UUID
     created_at: datetime
@@ -23,31 +27,44 @@ class PolicyVersionInfo(BaseModel):
     version: int
 
 
-class PoolInfo(BaseModel):
+class PoolInfo(CLIModel):
+    id: uuid.UUID | None = None
     name: str
     description: str
-    config_id: str | None = None
+    config_id: uuid.UUID | None = None
 
 
-class SeasonInfo(BaseModel):
-    name: str
-    version: int
-    canonical: bool
-    summary: str
-    entry_pool: str | None = None
-    leaderboard_pool: str | None = None
-    is_default: bool = False
-    compat_version: str | None = None
-    pools: list[PoolInfo]
+class SeasonSummary(CLIModel):
+    id: uuid.UUID = Field(description="Unique season identifier")
+    name: str = Field(description="Short name of the season")
+    version: int = Field(description="Season version number")
+    canonical: bool = Field(description="Whether this is the canonical (active) version")
+    summary: str = Field(description="Human-readable description of the season")
+    entry_pool: str | None = Field(default=None, description="Name of the pool where new policies are submitted")
+    leaderboard_pool: str | None = Field(default=None, description="Name of the pool used for the leaderboard")
+    is_default: bool = Field(description="Whether this is the default season")
+    compat_version: str | None = Field(default=None, description="Compatibility version string (e.g. '0.4')")
+    pools: list[PoolInfo] = Field(description="Pools in this season")
 
 
-class MatchPlayerInfo(BaseModel):
+class SeasonInfo(SeasonSummary):
+    status: Literal["not_started", "in_progress", "complete"]
+    display_name: str
+    started_at: str | None = None
+    tournament_type: Literal["policy", "team"]
+    entrant_count: int
+    active_entrant_count: int
+    match_count: int
+    stage_count: int
+
+
+class MatchPlayerInfo(CLIModel):
     policy: PolicyVersionSummary
     num_agents: int
     score: float | None
 
 
-class MatchResponse(BaseModel):
+class MatchResponse(CLIModel):
     id: uuid.UUID
     season_name: str
     pool_name: str
@@ -60,7 +77,7 @@ class MatchResponse(BaseModel):
     created_at: datetime
 
 
-class SeasonVersionInfo(BaseModel):
+class SeasonVersionInfo(CLIModel):
     version: int
     canonical: bool
     disabled_at: str | None
@@ -68,24 +85,24 @@ class SeasonVersionInfo(BaseModel):
     compat_version: str | None = None
 
 
-class LeaderboardEntry(BaseModel):
+class LeaderboardEntry(CLIModel):
     rank: int
     policy: PolicyVersionSummary
     score: float
     matches: int
 
 
-class PolicyVersionSummary(BaseModel):
+class PolicyVersionSummary(CLIModel):
     id: uuid.UUID
     name: str | None
     version: int | None
 
 
-class SubmitToSeasonResponse(BaseModel):
+class SubmitToSeasonResponse(CLIModel):
     pools: list[str]
 
 
-class PoolMembership(BaseModel):
+class PoolMembership(CLIModel):
     pool_name: str
     active: bool
     completed: int
@@ -93,10 +110,19 @@ class PoolMembership(BaseModel):
     pending: int
 
 
-class SeasonPolicyEntry(BaseModel):
+class SeasonPolicyEntry(CLIModel):
     policy: PolicyVersionSummary
     pools: list[PoolMembership]
     entered_at: str
+
+
+class MembershipHistoryEntry(CLIModel):
+    season_name: str
+    season_version: int | None
+    pool_name: str
+    action: str
+    notes: str | None
+    created_at: str
 
 
 class TournamentServerClient:
@@ -178,14 +204,14 @@ class TournamentServerClient:
     def _put(self, path: str, response_type: type[T] | None = None, **kwargs: Any) -> T | dict[str, Any]:
         return self._request("PUT", path, response_type, **kwargs)
 
-    def get_seasons(self) -> list[SeasonInfo]:
-        return self._get("/tournament/seasons", list[SeasonInfo])
+    def get_seasons(self) -> list[SeasonSummary]:
+        return self._get("/tournament/seasons", list[SeasonSummary])
 
     def get_season(self, season_name: str, include_hidden: bool = False) -> SeasonInfo:
         params = {"include_hidden": "true"} if include_hidden else None
         return self._get(f"/tournament/seasons/{season_name}", SeasonInfo, params=params)
 
-    def get_default_season(self) -> SeasonInfo:
+    def get_default_season(self) -> SeasonSummary:
         seasons = self.get_seasons()
         for s in seasons:
             if s.is_default:
@@ -211,7 +237,7 @@ class TournamentServerClient:
             params=params if params else None,
         )
 
-    def get_config(self, config_id: str) -> dict[str, Any]:
+    def get_config(self, config_id: uuid.UUID | str) -> dict[str, Any]:
         return self._get(f"/tournament/configs/{config_id}")
 
     def get_season_versions(self, season_name: str) -> list[SeasonVersionInfo]:
@@ -284,8 +310,8 @@ class TournamentServerClient:
             json=payload,
         )
 
-    def get_policy_memberships(self, policy_version_id: uuid.UUID) -> list[dict[str, Any]]:
-        return self._get(f"/tournament/policies/{policy_version_id}/memberships", list[dict[str, Any]])
+    def get_policy_memberships(self, policy_version_id: uuid.UUID) -> list[MembershipHistoryEntry]:
+        return self._get(f"/tournament/policies/{policy_version_id}/memberships", list[MembershipHistoryEntry])
 
     def get_my_memberships(self) -> dict[str, list[str]]:
         """Get all season memberships for the user's policy versions.
