@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=ghcr.io/astral-sh/uv:0.9.5 /uv /uvx /bin/
 
 # Install Nim via nimby (matches .nim-version / .nimby-version).
-ARG NIMBY_VERSION=0.1.19
+ARG NIMBY_VERSION=0.1.26
 ARG NIM_VERSION=2.2.6
 RUN curl -fsSL "https://github.com/treeform/nimby/releases/download/${NIMBY_VERSION}/nimby-Linux-X64" \
         -o /usr/local/bin/nimby && \
