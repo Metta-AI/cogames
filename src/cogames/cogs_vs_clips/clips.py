@@ -15,7 +15,7 @@ from mettagrid.config.filter.alignment_filter import isNeutral, isNotAlignedTo, 
 from mettagrid.config.mettagrid_config import CollectiveConfig
 from mettagrid.config.mutation import alignTo, removeAlignment
 from mettagrid.config.query import query
-from mettagrid.config.tag import tag, typeTag
+from mettagrid.config.tag import typeTag
 
 
 class ClipsConfig(Config):
@@ -53,7 +53,7 @@ class ClipsConfig(Config):
         align_end = max_steps if self.align_end is None else min(self.align_end, max_steps)
         presence_end = max_steps if self.presence_end is None else min(self.presence_end, max_steps)
 
-        clips_junction = query(typeTag("junction"), [hasTag(tag("collective:clips"))])
+        clips_junction = query(typeTag("junction"), [hasTag("collective:clips")])
         return {
             "initial_clips": EventConfig(
                 name="initial_clips",
