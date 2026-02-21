@@ -19,11 +19,8 @@ from mettagrid.config.filter import (
     isNear,
     isNot,
     maxDistance,
-    sharedTagPrefix,
 )
-from mettagrid.config.handler_config import updateTarget
 from mettagrid.config.mettagrid_config import (
-    AOEConfig,
     CollectiveConfig,
     GridObjectConfig,
     InventoryConfig,
@@ -44,7 +41,6 @@ class TeamConfig(Config):
     name: str = Field(description="Team name used for tags and team identity")
     short_name: str = Field(description="Short prefix used for map object names")
     team_id: int = Field(default=0, description="Numeric id for this team (set when building game config)")
-    base_aoe_range: int = Field(default=CvCConfig.JUNCTION_DISTANCE, description="Range for AOE effects")
     base_aoe_deltas: dict[str, int] = Field(default_factory=lambda: {"energy": 100, "hp": 100})
 
     def team_tag(self) -> str:
@@ -58,22 +54,6 @@ class TeamConfig(Config):
             self.team_tag(),
             "immune",
         ]
-
-    def base_aoe(self) -> dict[str, AOEConfig]:
-        return {
-            "influence": AOEConfig(
-                radius=self.base_aoe_range,
-                filters=[sharedTagPrefix("team:")],
-                mutations=[updateTarget(self.base_aoe_deltas)],
-                controls_territory=True,
-            ),
-            "attack": AOEConfig(
-                radius=self.base_aoe_range,
-                filters=[hasTagPrefix("team:"), isNot(sharedTagPrefix("team:"))],
-                mutations=[updateTarget({"hp": -1})],
-                controls_territory=True,
-            ),
-        }
 
     def materialized_queries(self) -> list[MaterializedQuery]:
         return [

@@ -38,7 +38,7 @@ class ClipsConfig(TeamConfig):
 
     scramble_start: int = Field(default=50)
     scramble_interval: int = Field(default=100)
-    scramble_radius: int = Field(default=2 * CvCConfig.JUNCTION_DISTANCE)
+    scramble_radius: int | None = Field(default=None)
     scramble_end: Optional[int] = Field(default=None)
 
     align_start: int = Field(default=100)
@@ -50,6 +50,7 @@ class ClipsConfig(TeamConfig):
     def events(self, max_steps: int) -> dict[str, EventConfig]:
         if self.disabled:
             return {}
+        scramble_radius = 2 * CvCConfig.JUNCTION_DISTANCE if self.scramble_radius is None else self.scramble_radius
         scramble_end = max_steps if self.scramble_end is None else min(self.scramble_end, max_steps)
         align_end = max_steps if self.align_end is None else min(self.align_end, max_steps)
 
@@ -75,7 +76,7 @@ class ClipsConfig(TeamConfig):
                     "type:junction",
                     filters=[
                         isNot(hasTag(self.team_tag())),
-                        isNear(query(self.net_tag()), radius=self.scramble_radius),
+                        isNear(query(self.net_tag()), radius=scramble_radius),
                     ],
                 ),
                 timesteps=periodic(start=self.scramble_start, period=self.scramble_interval, end=scramble_end),

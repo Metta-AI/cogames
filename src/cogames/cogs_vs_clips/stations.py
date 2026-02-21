@@ -4,7 +4,7 @@ from pydantic import Field
 
 from cogames.cogs_vs_clips.config import CvCConfig
 from mettagrid.base_config import Config
-from mettagrid.config.filter import sharedTagPrefix
+from mettagrid.config.filter import hasTagPrefix, isNot, sharedTagPrefix
 from mettagrid.config.handler_config import (
     Handler,
     actorHas,
@@ -23,6 +23,10 @@ from mettagrid.config.mettagrid_config import (
 
 def _neg(recipe: dict[str, int]) -> dict[str, int]:
     return {k: -v for k, v in recipe.items()}
+
+
+def _opposing_team_filters():
+    return [hasTagPrefix("team:"), isNot(sharedTagPrefix("team:"))]
 
 
 class CvCStationConfig(Config):
