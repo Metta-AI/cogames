@@ -89,6 +89,7 @@ class LeaderboardEntry(CLIModel):
     rank: int
     policy: PolicyVersionSummary
     score: float
+    score_stddev: float | None = None
     matches: int
 
 
