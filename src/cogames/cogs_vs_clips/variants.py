@@ -29,7 +29,6 @@ def _apply_clips_settings(
     scramble_radius: int | None = None,
     align_start: int | None = None,
     align_interval: int | None = None,
-    align_radius: int | None = None,
 ) -> None:
     clips = mission.clips
     if initial_clips_start is not None:
@@ -46,8 +45,6 @@ def _apply_clips_settings(
         clips.align_start = align_start
     if align_interval is not None:
         clips.align_interval = align_interval
-    if align_radius is not None:
-        clips.align_radius = align_radius
 
 
 class NumCogsVariant(CoGameMissionVariant):
@@ -81,7 +78,6 @@ class ClipsEasyVariant(CoGameMissionVariant):
             scramble_radius=15,
             align_start=300,
             align_interval=250,
-            align_radius=15,
         )
 
 
@@ -100,13 +96,12 @@ class ClipsMediumVariant(CoGameMissionVariant):
             scramble_radius=25,
             align_start=100,
             align_interval=100,
-            align_radius=25,
         )
 
 
 class ClipsHardVariant(CoGameMissionVariant):
     name: str = "clips_hard"
-    description: str = "Fast clips pressure with wider influence."
+    description: str = "Fast clips pressure with wider territory."
 
     @override
     def modify_mission(self, mission: CvCMission) -> None:
@@ -119,7 +114,6 @@ class ClipsHardVariant(CoGameMissionVariant):
             scramble_radius=35,
             align_start=50,
             align_interval=50,
-            align_radius=35,
         )
 
 
@@ -139,7 +133,6 @@ class ClipsWaveOnlyVariant(CoGameMissionVariant):
             align_start=disable_start,
             align_interval=disable_start,
             scramble_radius=25,
-            align_radius=25,
         )
 
 
@@ -412,7 +405,7 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
     role_order: list[str] = Field(default_factory=lambda: ["miner", "aligner", "scrambler", "scout"])
     role_id_item: str = Field(default="role_id", description="Inventory item used for the global role_id token.")
     disable_change_vibe: bool = Field(default=True, description="Disable change_vibe so role vibes are forced.")
-    per_collective: bool = Field(default=True, description="Assign roles by index-within-collective (team).")
+    per_team: bool = Field(default=True, description="Assign roles by index-within-team.")
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
@@ -442,10 +435,10 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
             )
 
         # Assign roles and force initial vibe.
-        counters: dict[str | int, int] = {}
+        counters: dict[int, int] = {}
         for agent in env.game.agents:
-            if self.per_collective:
-                group_key: str | int = agent.collective if agent.collective is not None else agent.team_id
+            if self.per_team:
+                group_key: int = agent.team_id
             else:
                 group_key = 0
             idx = counters.get(group_key, 0)

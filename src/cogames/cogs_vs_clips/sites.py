@@ -65,7 +65,14 @@ HELLO_WORLD = CoGameSite(
 MACHINA_1 = CoGameSite(
     name="machina_1",
     description="Your first mission. Collect resources and assemble HEARTs.",
-    map_builder=MapGen.Config(width=88, height=88, instance=SequentialMachinaArena.Config(spawn_count=20)),
+    map_builder=MapGen.Config(
+        width=88,
+        height=88,
+        instance=SequentialMachinaArena.Config(
+            spawn_count=20,
+            map_corner_placements=[("clips:hub", 0)],
+        ),
+    ),
     min_cogs=1,
     max_cogs=20,
 )

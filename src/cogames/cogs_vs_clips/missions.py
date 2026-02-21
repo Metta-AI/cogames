@@ -1,15 +1,14 @@
 from functools import lru_cache
 
-from cogames.cogs_vs_clips.aligner_tutorial import AlignerTutorialMission
-from cogames.cogs_vs_clips.miner_tutorial import MinerTutorialMission
 from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.scout_tutorial import ScoutTutorialMission
-from cogames.cogs_vs_clips.scrambler_tutorial import ScramblerTutorialMission
 from cogames.cogs_vs_clips.sites import (
     COGSGUARD_ARENA,
     COGSGUARD_MACHINA_1,
     make_cogsguard_machina1_site,
 )
+from cogames.cogs_vs_clips.tutorials.aligner_tutorial import AlignerTutorialMission
+from cogames.cogs_vs_clips.tutorials.miner_tutorial import MinerTutorialMission
+from cogames.cogs_vs_clips.tutorials.scout_tutorial import ScoutTutorialMission
 from mettagrid.config.mettagrid_config import MettaGridConfig
 
 # CogsGuard Missions
@@ -48,7 +47,6 @@ _CORE_MISSIONS: list[CvCMission] = [
     CogsGuardBasicMission,
     AlignerTutorialMission,
     MinerTutorialMission,
-    ScramblerTutorialMission,
     ScoutTutorialMission,
 ]
 

@@ -85,7 +85,7 @@ _COGSGUARD_PHASES: tuple[str, ...] = (
     ),
     (
         "Phase 4: Use territory\n"
-        "The Hub and your junctions form safe territory - they restore energy and influence.\n"
+        "The Hub and your junctions form safe territory - they restore energy and health.\n"
         "You lose health when away from them, so expand your junction network to push further."
     ),
     (

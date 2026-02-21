@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, override
 
-from cogames.cogs_vs_clips.cog import CogConfig
+from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
-from cogames.cogs_vs_clips.team import CogTeam
 from cogames.core import CoGameMissionVariant
 
 if TYPE_CHECKING:

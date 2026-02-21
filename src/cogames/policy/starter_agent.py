@@ -3,7 +3,7 @@ Sample policy for the CoGames CogsGuard environment.
 
 This starter policy uses simple heuristics:
 - If the agent has no gear, head toward the nearest gear station.
-- If the agent has aligner or scrambler gear, try to get hearts (and influence for aligner) then head to junctions.
+- If the agent has aligner or scrambler gear, try to get hearts then head to junctions.
 - If the agent has miner gear, head to extractors.
 - If the agent has scout gear, explore in a simple pattern.
 
@@ -59,7 +59,6 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         self._extractor_tags = self._resolve_tag_ids([f"{element}_extractor" for element in ELEMENTS])
         self._junction_tags = self._resolve_tag_ids(["junction"])
         self._chest_tags = self._resolve_tag_ids(["chest"])
-        self._hub_tags = self._resolve_tag_ids(["hub"])
 
     def _resolve_tag_ids(self, names: Iterable[str]) -> set[int]:
         tag_ids: set[int] = set()
@@ -142,19 +141,13 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         items = self._inventory_items(obs)
         gear = self._current_gear(items)
         has_heart = "heart" in items
-        has_influence = "influence" in items
 
         if self._preferred_gear is not None and gear != self._preferred_gear:
             target_tags = self._gear_station_tags_by_gear.get(self._preferred_gear, set())
         elif gear is None:
             target_tags = self._gear_station_tags
         elif gear == "aligner":
-            if has_heart and has_influence:
-                target_tags = self._junction_tags
-            elif not has_heart:
-                target_tags = self._chest_tags
-            else:
-                target_tags = self._hub_tags
+            target_tags = self._junction_tags if has_heart else self._chest_tags
         elif gear == "scrambler":
             target_tags = self._junction_tags if has_heart else self._chest_tags
         elif gear == "miner":

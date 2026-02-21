@@ -8,15 +8,16 @@ from mettagrid.mapgen.mapgen import MapGenConfig
 from mettagrid.mapgen.scenes.building_distributions import DistributionType
 
 
-def test_cogsguard_machina1_base_junction_starts_aligned_to_cogs() -> None:
+def test_cogsguard_machina1_neutral_junction_has_no_team_tag() -> None:
     env = CogsGuardMachina1Mission.make_env()
 
-    # Only the base-hub junction starts aligned; regular junctions remain neutral.
-    assert env.game.objects["junction"].collective is None
-
-    base_junction = env.game.objects["c:junction"]
-    assert base_junction.collective == "cogs"
-    assert typeTag("junction") in base_junction.tags
+    junction = env.game.objects["junction"]
+    assert not any(t.startswith("team:") for t in junction.tags), (
+        f"Neutral junction should have no team tags, got {junction.tags}"
+    )
+    assert typeTag("junction") not in junction.tags, (
+        "Junction type tag is auto-generated, should not be in explicit tags"
+    )
 
 
 def test_cogsguard_machina1_site_places_c_junction_in_base_hub() -> None:
