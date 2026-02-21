@@ -41,6 +41,30 @@ from mettagrid.mapgen.scenes.random_scene import RandomScene, RandomSceneCandida
 HubBundle = Literal["extractors", "none", "custom"]
 
 
+class MapCornerPlacementsConfig(SceneConfig):
+    """Place objects at map corners. Corner indices: 0=TL, 1=TR, 2=BL, 3=BR."""
+
+    placements: list[tuple[str, int]] = []
+
+
+class MapCornerPlacements(Scene[MapCornerPlacementsConfig]):
+    def render(self) -> None:
+        cfg = self.config
+        h, w = self.height, self.width
+        offset = 2
+        corners = [
+            (offset, offset),
+            (offset, w - 1 - offset),
+            (h - 1 - offset, offset),
+            (h - 1 - offset, w - 1 - offset),
+        ]
+        for obj_name, corner_idx in cfg.placements:
+            if 0 <= corner_idx < 4 and obj_name:
+                r, c = corners[corner_idx]
+                if 0 <= r < h and 0 <= c < w:
+                    self.grid[r, c] = obj_name
+
+
 class MachinaArenaConfig(SceneConfig):
     # Core composition
     spawn_count: int
@@ -67,6 +91,7 @@ class MachinaArenaConfig(SceneConfig):
 
     # Hub config. `spawn_count` will be set based on `spawn_count` in this config.
     hub: BaseHubConfig = BaseHubConfig(
+        hub_object="c:hub",
         corner_bundle="extractors",
         cross_bundle="none",
         cross_distance=7,
@@ -75,6 +100,10 @@ class MachinaArenaConfig(SceneConfig):
 
     # Optional asteroid-shaped boundary mask.
     asteroid_mask: AsteroidMaskConfig | None = None
+
+    # Objects to place at map corners (not BaseHub corners). List of (object_name, corner_index).
+    # Corner indices: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right.
+    map_corner_placements: list[tuple[str, int]] = []
 
     #### Layers ####
 
@@ -528,6 +557,13 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
                 where="full",
             )
         )
+        if cfg.map_corner_placements:
+            children.append(
+                ChildrenAction(
+                    scene=MapCornerPlacements.Config(placements=cfg.map_corner_placements),
+                    where="full",
+                )
+            )
 
         return children
 

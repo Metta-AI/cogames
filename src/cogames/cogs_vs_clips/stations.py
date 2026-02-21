@@ -1,28 +1,16 @@
-from typing import Optional
+from __future__ import annotations
 
 from pydantic import Field
 
 from cogames.cogs_vs_clips.config import CvCConfig
 from mettagrid.base_config import Config
-from mettagrid.config.filter import actorHasAnyOf
+from mettagrid.config.filter import sharedTagPrefix
 from mettagrid.config.handler_config import (
-    AOEConfig,
-    ClearInventoryMutation,
-    EntityTarget,
     Handler,
-    actorCollectiveHas,
     actorHas,
-    alignToActor,
-    collectiveDeposit,
     collectiveWithdraw,
-    isAlignedToActor,
-    isEnemy,
-    isNeutral,
-    removeAlignment,
     targetCollectiveHas,
-    targetHas,
     updateActor,
-    updateTarget,
     updateTargetCollective,
     withdraw,
 )
@@ -74,154 +62,38 @@ class CvCExtractorConfig(CvCStationConfig):
         )
 
 
-class CvCJunctionConfig(CvCStationConfig):
-    """Supply depot that receives element resources via default vibe into collective."""
-
-    aoe_range: int = Field(default=10, description="Range for AOE effects")
-    influence_deltas: dict[str, int] = Field(default_factory=lambda: {"influence": 10, "energy": 100, "hp": 100})
-    attack_deltas: dict[str, int] = Field(default_factory=lambda: {"hp": -1, "influence": -100})
-
-    def station_cfg(self, team: Optional[str] = None) -> GridObjectConfig:
-        return GridObjectConfig(
-            name="junction",
-            render_name="junction",
-            render_symbol="📦",
-            collective=team,
-            aoes={
-                "influence": AOEConfig(
-                    radius=self.aoe_range,
-                    filters=[isAlignedToActor()],
-                    mutations=[updateTarget(self.influence_deltas)],
-                ),
-                "attack": AOEConfig(
-                    radius=self.aoe_range,
-                    filters=[isEnemy()],
-                    mutations=[updateTarget(self.attack_deltas)],
-                ),
-            },
-            on_use_handlers={
-                "deposit": Handler(
-                    filters=[isAlignedToActor()],
-                    mutations=[collectiveDeposit({resource: 100 for resource in CvCConfig.ELEMENTS})],
-                ),
-                "align": Handler(
-                    filters=[isNeutral(), actorHas({"aligner": 1, "influence": 1, **CvCConfig.ALIGN_COST})],
-                    mutations=[updateActor(_neg(CvCConfig.ALIGN_COST)), alignToActor()],
-                ),
-                "scramble": Handler(
-                    filters=[isEnemy(), actorHas({"scrambler": 1, **CvCConfig.SCRAMBLE_COST})],
-                    mutations=[removeAlignment(), updateActor(_neg(CvCConfig.SCRAMBLE_COST))],
-                ),
-            },
-        )
-
-
-class CvCHubConfig(CvCStationConfig):
-    """Hub station that provides AOE influence/attack and accepts deposits."""
-
-    aoe_range: int = Field(default=CvCConfig.JUNCTION_AOE_RANGE, description="Range for AOE effects")
-    influence_deltas: dict[str, int] = Field(default_factory=lambda: {"influence": 10, "energy": 100, "hp": 100})
-    attack_deltas: dict[str, int] = Field(default_factory=lambda: {"hp": -1, "influence": -100})
-    elements: list[str] = Field(default_factory=lambda: CvCConfig.ELEMENTS)
-    heart_cost: dict[str, int] = Field(default_factory=lambda: CvCConfig.HEART_COST)
-    initial_hearts: int = Field(default=CvCConfig.INITIAL_HEARTS, description="Initial hearts in hub inventory")
-
-    def station_cfg(self, team: str, collective: str | None = None) -> GridObjectConfig:
-        return GridObjectConfig(
-            name=f"{team}:hub",
-            render_name="hub",
-            render_symbol="📦",
-            collective=collective or team,
-            inventory=InventoryConfig(initial={"heart": self.initial_hearts}),
-            aoes={
-                "influence": AOEConfig(
-                    radius=self.aoe_range,
-                    filters=[isAlignedToActor()],
-                    mutations=[updateTarget(self.influence_deltas)],
-                ),
-                "attack": AOEConfig(
-                    radius=self.aoe_range,
-                    filters=[isEnemy()],
-                    mutations=[updateTarget(self.attack_deltas)],
-                ),
-            },
-            on_use_handlers={
-                "deposit": Handler(
-                    filters=[isAlignedToActor(), actorHasAnyOf(self.elements)],
-                    mutations=[collectiveDeposit({resource: 100 for resource in self.elements})],
-                ),
-                "get_heart": Handler(
-                    filters=[isAlignedToActor(), targetHas({"heart": 2})],
-                    mutations=[withdraw({"heart": 1})],
-                ),
-                "get_and_make_heart": Handler(
-                    filters=[isAlignedToActor(), targetHas({"heart": 1}), targetCollectiveHas(self.heart_cost)],
-                    mutations=[updateTargetCollective(_neg(self.heart_cost)), updateActor({"heart": 1})],
-                ),
-                "get_last_heart": Handler(
-                    filters=[isAlignedToActor(), targetHas({"heart": 1})],
-                    mutations=[withdraw({"heart": 1})],
-                ),
-                "make_heart": Handler(
-                    filters=[isAlignedToActor(), targetCollectiveHas(self.heart_cost)],
-                    mutations=[updateTargetCollective(_neg(self.heart_cost)), updateTarget({"heart": 1})],
-                ),
-            },
-        )
-
-
 class CvCChestConfig(CvCStationConfig):
-    """Chest station for heart management."""
+    """Chest station for heart management.
+
+    Uses collective operations to access the team's shared inventory.
+    """
 
     heart_cost: dict[str, int] = Field(default_factory=lambda: CvCConfig.HEART_COST)
 
-    def station_cfg(self, team: str, collective: str | None = None) -> GridObjectConfig:
+    def station_cfg(self, team: str, team_name: str | None = None) -> GridObjectConfig:
+        tag_team = team_name or team
+        # hub_query = query(f"type:{team}:hub")
         return GridObjectConfig(
             name=f"{team}:chest",
             render_name="chest",
             render_symbol="📦",
-            collective=collective or team,
+            tags=[f"team:{tag_team}"],
+            collective=tag_team,
             on_use_handlers={
+                # Using collective-based operations (query-based alternatives commented out)
                 "get_heart": Handler(
-                    filters=[isAlignedToActor(), targetCollectiveHas({"heart": 1})],
+                    filters=[sharedTagPrefix("team:"), targetCollectiveHas({"heart": 1})],
+                    # query-based: filters=[sharedTagPrefix("team:"), queryHas(hub_query, {"heart": 1})],
                     mutations=[collectiveWithdraw({"heart": 1})],
+                    # query-based: mutations=[queryWithdraw(hub_query, {"heart": 1})],
                 ),
                 "make_heart": Handler(
-                    filters=[isAlignedToActor(), targetCollectiveHas(self.heart_cost)],
+                    filters=[sharedTagPrefix("team:"), targetCollectiveHas(self.heart_cost)],
+                    # query-based: filters=[sharedTagPrefix("team:"), queryHas(hub_query, self.heart_cost)],
                     mutations=[
                         updateTargetCollective(_neg(self.heart_cost)),
+                        # query-based: queryDelta(hub_query, _neg(self.heart_cost)),
                         updateActor({"heart": 1}),
-                    ],
-                ),
-            },
-        )
-
-
-class CvCGearStationConfig(CvCStationConfig):
-    """Gear station that clears all gear and adds the specified gear type."""
-
-    gear_type: str = Field(description="Type of gear this station provides")
-    gear_costs: dict[str, dict[str, int]] = Field(default_factory=lambda: CvCConfig.GEAR_COSTS)
-    gear_symbols: dict[str, str] = Field(default_factory=lambda: CvCConfig.GEAR_SYMBOLS)
-
-    def station_cfg(self, team: str, collective: str | None = None) -> GridObjectConfig:
-        cost = self.gear_costs.get(self.gear_type, {})
-        return GridObjectConfig(
-            name=f"{team}:{self.gear_type}",
-            render_name=f"{self.gear_type}_station",
-            render_symbol=self.gear_symbols[self.gear_type],
-            collective=collective or team,
-            on_use_handlers={
-                "keep_gear": Handler(
-                    filters=[isAlignedToActor(), actorHas({self.gear_type: 1})],
-                    mutations=[],
-                ),
-                "change_gear": Handler(
-                    filters=[isAlignedToActor(), actorCollectiveHas(cost)],
-                    mutations=[
-                        ClearInventoryMutation(target=EntityTarget.ACTOR, limit_name="gear"),
-                        updateTargetCollective(_neg(cost)),
-                        updateActor({self.gear_type: 1}),
                     ],
                 ),
             },

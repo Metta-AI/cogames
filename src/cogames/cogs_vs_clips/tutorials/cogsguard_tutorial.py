@@ -1,7 +1,7 @@
 """CogsGuard tutorial mission configuration."""
 
+from cogames.cogs_vs_clips.cog import CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.team import CogTeam
 from cogames.cogs_vs_clips.terrain import MachinaArena
 from cogames.core import CoGameSite
 from mettagrid.mapgen.mapgen import MapGen

@@ -251,9 +251,9 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
 
     role_by_agent_idx: list[str] = []
     if "role_conditional" in enabled:
-        counters: dict[str | int, int] = {}
+        counters: dict[int, int] = {}
         for agent_cfg in agent_cfgs:
-            group_key: str | int = agent_cfg.collective if agent_cfg.collective is not None else agent_cfg.team_id
+            group_key = agent_cfg.team_id
             idx_within_group = counters.get(group_key, 0)
             counters[group_key] = idx_within_group + 1
 

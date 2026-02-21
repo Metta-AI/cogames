@@ -1,6 +1,6 @@
+from cogames.cogs_vs_clips.cog import CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.sites import make_cogsguard_arena_site
-from cogames.cogs_vs_clips.team import CogTeam
 from cogames.cogs_vs_clips.variants import ForcedRoleVibesVariant
 from mettagrid.config.game_value import InventoryValue, Scope
 

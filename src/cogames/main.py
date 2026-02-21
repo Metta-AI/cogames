@@ -227,7 +227,7 @@ def cogsguard_tutorial_cmd(
     console.print("[dim]Initializing Mettascope...[/dim]")
 
     # Load CogsGuard tutorial mission
-    from cogames.cogs_vs_clips.cogsguard_tutorial import CogsGuardTutorialMission  # noqa: PLC0415
+    from cogames.cogs_vs_clips.tutorials.cogsguard_tutorial import CogsGuardTutorialMission  # noqa: PLC0415
 
     # Create environment config
     env_cfg = CogsGuardTutorialMission.make_env()

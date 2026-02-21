@@ -5,11 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, override
 
 from cogames.cogs_vs_clips.clip_difficulty import EASY
-from cogames.cogs_vs_clips.cog import CogConfig
+from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
-from cogames.cogs_vs_clips.team import CogTeam
-from cogames.cogs_vs_clips.variants import BraveheartVariant
 from cogames.core import CoGameMissionVariant
 
 if TYPE_CHECKING:
@@ -38,5 +36,5 @@ AlignerTutorialMission = CvCMission(
     max_steps=1000,
     cog=CogConfig(heart_limit=3),
     teams={"cogs": CogTeam(name="cogs", num_agents=4, wealth=3, initial_hearts=120)},
-    variants=[EASY, AlignerRewardsVariant(), BraveheartVariant()],
+    variants=[EASY, AlignerRewardsVariant()],
 )

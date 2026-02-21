@@ -3,16 +3,13 @@ from __future__ import annotations
 from pydantic import Field
 
 from cogames.cogs_vs_clips.clips import ClipsConfig
-from cogames.cogs_vs_clips.cog import CogConfig
+from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.config import CvCConfig
+from cogames.cogs_vs_clips.junction import CvCJunctionConfig
 from cogames.cogs_vs_clips.stations import (
     CvCExtractorConfig,
-    CvCGearStationConfig,
-    CvCHubConfig,
-    CvCJunctionConfig,
     CvCWallConfig,
 )
-from cogames.cogs_vs_clips.team import CogTeam
 from cogames.cogs_vs_clips.variants import NumCogsVariant
 from cogames.cogs_vs_clips.weather import WeatherConfig
 from cogames.core import (
@@ -30,7 +27,6 @@ from mettagrid.config.action_config import (
 from mettagrid.config.game_value import inv
 from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
-from mettagrid.config.tag import typeTag
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
 
 __all__ = [
@@ -78,15 +74,12 @@ class CvCMission(CoGameMission):
             MettaGridConfig ready for environment creation
         """
         team_objs = list(self.teams.values())
-        base_junction_cfg = CvCJunctionConfig().station_cfg(team="cogs")
-        base_junction = base_junction_cfg.model_copy(
-            update={
-                "name": "c:junction",
-                "map_name": "c:junction",
-                # Keep this junction behaving like a "junction" for type-tag filters (e.g. clips events).
-                "tags": base_junction_cfg.tags + [typeTag("junction")],
-            }
-        )
+        for i, t in enumerate(team_objs):
+            t.team_id = i
+        self.clips.team_id = len(team_objs)
+
+        all_teams = [*team_objs, self.clips]
+
         game = GameConfig(
             map_builder=self.map_builder(),
             max_steps=self.max_steps,
@@ -107,39 +100,24 @@ class CvCMission(CoGameMission):
                 change_vibe=ChangeVibeActionConfig(vibes=CvCConfig.VIBES),
             ),
             agents=[
-                self.cog.agent_config(team=t.name, max_steps=self.max_steps)
-                for t in team_objs
-                for _ in range(t.num_agents)
+                self.cog.agent_config(team=t, max_steps=self.max_steps) for t in team_objs for _ in range(t.num_agents)
             ],
             objects={
                 "wall": CvCWallConfig().station_cfg(),
-                "junction": CvCJunctionConfig().station_cfg(),
-                "c:junction": base_junction,
+                "junction": CvCJunctionConfig().station_cfg(teams=all_teams),
+                "c:junction": CvCJunctionConfig().station_cfg(
+                    teams=all_teams, owner_team_name="cogs", map_name="c:junction"
+                ),
                 **{
                     f"{resource}_extractor": CvCExtractorConfig(resource=resource).station_cfg()
                     for resource in CvCConfig.ELEMENTS
                 },
-                **{
-                    f"{t.short_name}:hub": CvCHubConfig(
-                        initial_hearts=(
-                            t.initial_hearts if t.initial_hearts is not None else CvCConfig.INITIAL_HEARTS * t.wealth
-                        )
-                    ).station_cfg(team=t.short_name, collective=t.name)
-                    for t in team_objs
-                },
-                **{
-                    f"{t.short_name}:{g}": CvCGearStationConfig(gear_type=g).station_cfg(
-                        team=t.short_name, collective=t.name
-                    )
-                    for t in team_objs
-                    for g in CvCConfig.GEAR
-                },
+                **{name: cfg for team in all_teams for name, cfg in team.stations().items()},
             },
-            collectives={
-                **{t.name: t.collective_config() for t in team_objs},
-                **self.clips.collectives(),
-            },
+            collectives={t.name: t.collective_config() for t in all_teams},
             events=self._merge_events(),
+            tags=[tag for t in all_teams for tag in t.all_tags()],
+            materialize_queries=[mq for t in all_teams for mq in t.materialized_queries()],
         )
 
         env = MettaGridConfig(game=game)
@@ -156,7 +134,7 @@ class CvCMission(CoGameMission):
 
     def _merge_events(self) -> dict:
         """Merge clips and weather events, raising on key conflicts."""
-        clips_events = self.clips.events(cog_teams=[t.name for t in self.teams.values()], max_steps=self.max_steps)
+        clips_events = self.clips.events(max_steps=self.max_steps)
         weather_events = self.weather.events(max_steps=self.max_steps)
         overlap = set(clips_events) & set(weather_events)
         if overlap:

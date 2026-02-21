@@ -27,7 +27,6 @@ _GENEROUS_COG = CogConfig(
     initial_energy=255,
     initial_hp=100,
     hp_regen=0,
-    influence_regen=0,
 )
 
 
