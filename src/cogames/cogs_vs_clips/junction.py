@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 from pydantic import Field
 
 from cogames.cogs_vs_clips.config import CvCConfig
-from cogames.cogs_vs_clips.stations import CvCStationConfig
+from cogames.cogs_vs_clips.stations import CvCStationConfig, _neg, _opposing_team_filters
 from mettagrid.config.filter import actorHasAnyOf, actorHasTag, hasTagPrefix, sharedTagPrefix
 from mettagrid.config.handler_config import (
     AOEConfig,
@@ -24,16 +24,11 @@ if TYPE_CHECKING:
     from cogames.cogs_vs_clips.team import TeamConfig
 
 
-def _neg(recipe: dict[str, int]) -> dict[str, int]:
-    return {k: -v for k, v in recipe.items()}
-
-
 class CvCJunctionConfig(CvCStationConfig):
     """Supply depot that receives element resources via default vibe into collective."""
 
-    aoe_range: int = Field(default=CvCConfig.JUNCTION_DISTANCE, description="Range for AOE effects")
-    heal_deltas: dict[str, int] = Field(default_factory=lambda: {"energy": 100, "hp": 100})
-    attack_deltas: dict[str, int] = Field(default_factory=lambda: {"hp": -1})
+    influence_deltas: dict[str, int] = Field(default_factory=lambda: {"influence": 10, "energy": 100, "hp": 100})
+    attack_deltas: dict[str, int] = Field(default_factory=lambda: CvCConfig.ATTACK_DELTAS.copy())
 
     def station_cfg(
         self,
@@ -64,12 +59,18 @@ class CvCJunctionConfig(CvCStationConfig):
                 for t in teams
             },
             aoes={
-                "base": AOEConfig(
-                    radius=self.aoe_range,
+                "territory": AOEConfig(
+                    radius=CvCConfig.JUNCTION_DISTANCE,
+                ),
+                "influence": AOEConfig(
+                    radius=CvCConfig.JUNCTION_DISTANCE,
                     filters=[sharedTagPrefix("team:")],
-                    mutations=[updateTarget(self.heal_deltas)],
-                    presence_deltas={"influence": 1},
-                    controls_territory=True,
+                    mutations=[updateTarget(self.influence_deltas)],
+                ),
+                "attack": AOEConfig(
+                    radius=CvCConfig.JUNCTION_DISTANCE,
+                    filters=_opposing_team_filters(),
+                    mutations=[updateTarget(self.attack_deltas)],
                 ),
             },
             on_use_handlers={

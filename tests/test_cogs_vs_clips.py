@@ -16,8 +16,6 @@ def test_make_cogs_vs_clips_scenario():
 
 def test_cogsguard_enables_aoe_mask_observation() -> None:
     env = CogsGuardMachina1Mission.make_env()
-    assert env.game.obs.width == 11
-    assert env.game.obs.height == 11
     assert env.game.obs.aoe_mask is True
     env.game.id_map().feature_id("aoe_mask")
 

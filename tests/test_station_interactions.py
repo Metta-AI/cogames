@@ -384,7 +384,7 @@ class TestHub:
 
     def test_hub_heal_aoe_heals_aligned(self):
         """Hub AOE heals aligned agents."""
-        team = TeamConfig(name="cogs", short_name="c", base_aoe_range=5, base_aoe_deltas={"hp": 10, "energy": 10})
+        team = TeamConfig(name="cogs", short_name="c", base_aoe_deltas={"hp": 10, "energy": 10})
         station = CvCHubConfig().station_cfg(team=team)
 
         harness = StationTestHarness.create(
@@ -658,7 +658,7 @@ class TestAOE:
 
     def test_heal_aoe_heals_aligned_agent(self):
         """Hub heal AOE heals agents with same team tag."""
-        team = TeamConfig(name="cogs", short_name="c", base_aoe_range=5, base_aoe_deltas={"hp": 10, "energy": 10})
+        team = TeamConfig(name="cogs", short_name="c", base_aoe_deltas={"hp": 10, "energy": 10})
         station = CvCHubConfig().station_cfg(team=team)
 
         harness = StationTestHarness.create(
@@ -678,7 +678,7 @@ class TestAOE:
 
     def test_multiple_aoe_sources_stack(self):
         """Mutating AOE effects stack across multiple overlapping sources."""
-        team = TeamConfig(name="cogs", short_name="c", base_aoe_range=5, base_aoe_deltas={"hp": 5, "energy": 5})
+        team = TeamConfig(name="cogs", short_name="c", base_aoe_deltas={"hp": 5, "energy": 5})
         station = CvCHubConfig().station_cfg(team=team)
 
         station_map_name = station.map_name or station.name
@@ -737,7 +737,7 @@ class TestAOE:
 
         inv = sim.agent(0).inventory
 
-        # Territory-mode resolves winning side, but same-side mutating AOEs still stack
+        # Weighted territory picks the winning side, but same-side mutating AOEs still stack
         assert inv.get("hp", 0) == 50, f"Expected hp=50 from stacked friendly AOEs, got {inv.get('hp', 0)}"
 
         sim.close()

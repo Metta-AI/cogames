@@ -37,4 +37,5 @@ CvCConfig = SimpleNamespace(
     VIBE_NAMES=[vibe.name for vibe in _VIBES],
     INITIAL_HEARTS=5,
     JUNCTION_DISTANCE=15,
+    ATTACK_DELTAS={"hp": -1, "influence": -100},
 )

@@ -57,7 +57,7 @@ Your observation window uses a packed coordinate system to efficiently encode sp
 - **Special value `0xFF`**: Empty/invalid coordinate
 - **Special value `0xFE`**: Global token (non-spatial observation)
 
-Observation windows are typically 11x11 centered on your position; you are located at `0x55` (row 5, column 5).
+Observation windows are typically 13x13 centered on your position; you are located at `0x66` (row 6, column 6).
 Coordinates are **egocentric** (relative to your position), not absolute map coordinates.
 
 #### Coordinate System
