@@ -8,7 +8,7 @@ from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.evals.difficulty_variants import DIFFICULTY_VARIANTS
 from cogames.cogs_vs_clips.terrain import BaseHubVariant, MachinaArenaVariant
 from cogames.core import CoGameMissionVariant
-from mettagrid.config.game_value import InventoryValue, Scope, inv
+from mettagrid.config.game_value import inv
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen
@@ -420,11 +420,9 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
         if self.role_id_item not in env.game.resource_names:
             env.game.resource_names = [*env.game.resource_names, self.role_id_item]
 
-        role_obs = InventoryValue(item=self.role_id_item, scope=Scope.AGENT)
-        global_obs = list(env.game.obs.global_obs.obs)
-        if role_obs not in global_obs:
-            global_obs.append(inv(f"agent.{self.role_id_item}"))
-            env.game.obs.global_obs.obs = global_obs
+        obs_key = f"inv:own:{self.role_id_item}"
+        if obs_key not in env.game.obs.global_obs.obs:
+            env.game.obs.global_obs.obs[obs_key] = inv(f"agent.{self.role_id_item}")
 
         vibe_id_by_name = {name: idx for idx, name in enumerate(env.game.vibe_names)}
         missing_vibes = [r for r in set(self.role_order) if r not in vibe_id_by_name]

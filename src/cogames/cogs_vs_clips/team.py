@@ -2,7 +2,6 @@
 
 Teams are identified by tags (e.g., "team:cogs").
 Each team's hub holds the shared inventory.
-Collectives are kept for shared resource pools.
 """
 
 from typing import Iterator
@@ -14,20 +13,21 @@ from cogames.cogs_vs_clips.hub import CvCHubConfig
 from mettagrid.base_config import Config
 from mettagrid.config.filter import (
     AnyFilter,
+    GameValueFilter,
+    HandlerTarget,
     hasTag,
     hasTagPrefix,
     isNear,
     isNot,
     maxDistance,
 )
+from mettagrid.config.game_value import QueryInventoryValue
 from mettagrid.config.mettagrid_config import (
-    CollectiveConfig,
     GridObjectConfig,
     InventoryConfig,
 )
 from mettagrid.config.mutation import addTag, recomputeMaterializedQuery
-from mettagrid.config.mutation.alignment_mutation import alignTo
-from mettagrid.config.query import ClosureQuery, MaterializedQuery, materializedQuery, query
+from mettagrid.config.query import ClosureQuery, MaterializedQuery, Query, materializedQuery, query
 from mettagrid.config.tag import typeTag
 
 
@@ -41,7 +41,6 @@ class TeamConfig(Config):
     name: str = Field(description="Team name used for tags and team identity")
     short_name: str = Field(description="Short prefix used for map object names")
     team_id: int = Field(default=0, description="Numeric id for this team (set when building game config)")
-    base_aoe_deltas: dict[str, int] = Field(default_factory=lambda: {"energy": 100, "hp": 100})
 
     def team_tag(self) -> str:
         return f"team:{self.name}"
@@ -65,31 +64,38 @@ class TeamConfig(Config):
                         hasTag(self.team_tag()),
                     ),
                     candidates=query(typeTag("junction"), hasTag(self.team_tag())),
-                    edge_filters=[maxDistance(CvCConfig.JUNCTION_DISTANCE)],
+                    edge_filters=[maxDistance(CvCConfig.JUNCTION_ALIGN_DISTANCE)],
                 ),
             )
         ]
 
-    def collective_config(self) -> CollectiveConfig:
-        return CollectiveConfig(name=self.name)
+    def hub_query(self) -> Query:
+        return query(typeTag("hub"), hasTag(self.team_tag()))
 
     def junction_is_alignable(self) -> list[AnyFilter]:
         return [
             isNot(hasTagPrefix("team:")),
-            isNear(query(self.net_tag()), radius=CvCConfig.JUNCTION_DISTANCE),
+            isNear(query(self.net_tag()), radius=CvCConfig.JUNCTION_ALIGN_DISTANCE),
         ]
 
     def junction_align_mutations(self) -> list:
         return [
             addTag(self.team_tag()),
             addTag(self.net_tag()),
-            alignTo(self.name),
             recomputeMaterializedQuery(self.net_tag()),
         ]
 
-    # def inventory_value(self, resource: str) -> QueryInventoryValue:
-    #     """GameValue that reads a resource from this team's hub inventory."""
-    #     return QueryInventoryValue(query=query(typeTag(f"{self.short_name}:hub")), resource=resource)
+    def hub_has(self, resources: dict[str, int]) -> list[GameValueFilter]:
+        """Filters: team's hub has at least the given amount of each resource."""
+        hq = self.hub_query()
+        return [
+            GameValueFilter(
+                target=HandlerTarget.TARGET,
+                value=QueryInventoryValue(query=hq, item=resource),
+                min=amount,
+            )
+            for resource, amount in resources.items()
+        ]
 
     def stations(self) -> dict[str, GridObjectConfig]:
         return {

@@ -62,20 +62,11 @@ def _apply_milestones(rewards: dict[str, AgentReward], *, max_junctions: int = 1
         max_junctions: Maximum expected number of junctions for capping rewards.
             Defaults to 100 as a reasonable upper bound for most maps.
     """
-    w_junction_aligned = 1.0
     w_scramble_act = 0.5
     w_align_act = 1.0
 
-    # Max caps based on expected junction counts
-    max_junction_aligned = w_junction_aligned * max_junctions
     max_scramble = w_scramble_act * max_junctions
     max_align = w_align_act * max_junctions
-
-    rewards["aligned_junctions"] = reward(
-        stat("collective.junction"),
-        weight=w_junction_aligned,
-        max=max_junction_aligned,
-    )
 
     rewards["junction_scrambled_by_agent"] = reward(
         stat("junction.scrambled_by_agent"),
@@ -119,17 +110,6 @@ def _apply_credit(rewards: dict[str, AgentReward]) -> None:
         "silicon_gained": reward(stat("silicon.gained"), weight=w_element_gain, max=cap_element_gain),
     }
     rewards.update(gain_rewards)
-
-    # Collective deposit rewards
-    w_deposit = 0.002
-    cap_deposit = 0.2
-    deposit_rewards: dict[str, AgentReward] = {
-        f"collective_{element}_deposited": reward(
-            stat(f"collective.{element}.deposited"), weight=w_deposit, max=cap_deposit
-        )
-        for element in ["carbon", "oxygen", "germanium", "silicon"]
-    }
-    rewards.update(deposit_rewards)
 
 
 def _apply_aligner(rewards: dict[str, AgentReward]) -> None:

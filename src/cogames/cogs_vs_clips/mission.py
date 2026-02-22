@@ -24,9 +24,12 @@ from mettagrid.config.action_config import (
     MoveActionConfig,
     NoopActionConfig,
 )
-from mettagrid.config.game_value import inv
+from mettagrid.config.filter import sharedTagPrefix
+from mettagrid.config.game_value import QueryInventoryValue
 from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
+from mettagrid.config.query import query
+from mettagrid.config.tag import typeTag
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
 
 __all__ = [
@@ -88,7 +91,13 @@ class CvCMission(CoGameMission):
             vibe_names=CvCConfig.VIBE_NAMES,
             obs=ObsConfig(
                 global_obs=GlobalObsConfig(
-                    obs=[inv(f"collective.{resource}") for resource in CvCConfig.ELEMENTS],
+                    obs={
+                        f"team:{resource}": QueryInventoryValue(
+                            query=query(typeTag("hub"), sharedTagPrefix("team:")),
+                            item=resource,
+                        )
+                        for resource in CvCConfig.ELEMENTS
+                    },
                     local_position=True,
                     last_action_move=True,
                 ),
@@ -114,7 +123,6 @@ class CvCMission(CoGameMission):
                 },
                 **{name: cfg for team in all_teams for name, cfg in team.stations().items()},
             },
-            collectives={t.name: t.collective_config() for t in all_teams},
             events=self._merge_events(),
             tags=[tag for t in all_teams for tag in t.all_tags()],
             materialize_queries=[mq for t in all_teams for mq in t.materialized_queries()],
