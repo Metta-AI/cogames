@@ -1,3 +1,17 @@
+---
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .md
+      format_name: markdown
+      format_version: '1.3'
+      jupytext_version: 1.19.1
+  kernelspec:
+    display_name: Python 3
+    language: python
+    name: python3
+---
+
 # CoGames Puffer Training - Scout Tutorial
 
 This notebook replicates the training setup from:
@@ -18,11 +32,9 @@ Scouts have massively increased HP (+400) and energy (+100), making them
 the most durable and mobile agents. They earn a steady reward for visiting
 new cells, discovering resources and junctions for the team.
 
-
 ```python
 %pip install mettagrid cogames pufferlib-core --quiet
 ```
-
 
 ```python
 import torch
@@ -39,11 +51,12 @@ from mettagrid.envs.stats_tracker import StatsTracker
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Simulator
+from mettagrid.simulator.replay_log_writer import InMemoryReplayWriter
 from mettagrid.util.stats_writer import NoopStatsWriter
 
 from cogames.cogs_vs_clips.clip_difficulty import EASY
 from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.scout_tutorial import ScoutRewardsVariant
+from cogames.cogs_vs_clips.tutorials.scout_tutorial import ScoutRewardsVariant
 from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
 from cogames.cogs_vs_clips.team import CogTeam
 ```
@@ -54,7 +67,6 @@ from cogames.cogs_vs_clips.team import CogTeam
 - **EASY difficulty**: No clips pressure
 - **initial_hearts=0**: Scouts don't need hearts
 - **1000 max steps** per episode
-
 
 ```python
 NUM_AGENTS = 4
@@ -76,13 +88,12 @@ print(f"Map builder: {type(env_cfg.game.map_builder).__name__}")
 print(f"Max steps: {env_cfg.game.max_steps}")
 print(f"Num agents: {env_cfg.game.num_agents}")
 print(f"Events: {list(env_cfg.game.events.keys())}")
-print(f"Teams: {[t for t in env_cfg.game.tags if t.startswith('team:')]}")
+print(f"Collectives: {list(env_cfg.game.collectives.keys())}")
 ```
 
 ## 2. Create a single environment
 
 MettaGridPufferEnv wraps the C++ simulator with PufferLib's PufferEnv interface.
-
 
 ```python
 SEED = 42
@@ -121,7 +132,6 @@ MettaGrid observations are sparse tokens `[B, T, 3]` where each token is `[packe
 The packed byte encodes grid coordinates as nibbles: `y = byte >> 4, x = byte & 0x0F`.
 
 We scatter these into a dense spatial grid `[B, C, H, W]` so a CNN can process them.
-
 
 ```python
 def tokens_to_grid(
@@ -169,7 +179,6 @@ CNN + LSTM actor-critic:
 - **LSTM**: 512 hidden units, 1 layer
 - **Action head**: Linear → num_actions logits
 - **Value head**: Linear → scalar value
-
 
 ```python
 if torch.cuda.is_available():
@@ -266,7 +275,6 @@ print(f"\nTotal parameters: {total_params:,}")
 
 ## 5. Vectorize environments with PufferLib
 
-
 ```python
 NUM_ENVS = 4
 
@@ -286,9 +294,8 @@ print(f"Agents per env: {total_agents // NUM_ENVS}")
 
 ## 6. Configure and run PuffeRL training
 
-
 ```python
-TOTAL_TIMESTEPS = 100_000
+TOTAL_TIMESTEPS = 10_000_000
 BPTT_HORIZON = 64
 BATCH_SIZE = max(4096, total_agents * BPTT_HORIZON)
 MINIBATCH_SIZE = min(4096, BATCH_SIZE)
@@ -335,14 +342,12 @@ for k, v in train_config.items():
     print(f"  {k}: {v}")
 ```
 
-
 ```python
 trainer = pufferl.PuffeRL(train_config, vecenv, net)
 print(f"Model size: {trainer.model_size:,} params")
 print(f"Batch size: {trainer.config['batch_size']}")
 print(f"Total epochs: {trainer.total_epochs}")
 ```
-
 
 ```python
 from IPython.display import clear_output
@@ -366,46 +371,27 @@ trainer.close()
 print(f"Training complete. Steps: {trainer.global_step}, Epochs: {trainer.epoch}")
 ```
 
-
 ```python
 save_path = "./train_dir/tutorial_scout.pt"
 torch.save(net.state_dict(), save_path)
 print(f"Saved to {save_path}")
 ```
 
-## 7. Watch the trained policy
+## 7. Watch the trained policy in MettaScope
 
-Run the trained network in a fresh environment and render each step as a Unicode grid.
-
+Run the trained network for a full episode and view the replay in the interactive MettaScope viewer.
 
 ```python
-import time
-from IPython.display import clear_output
-from mettagrid.renderer.miniscope.buffer import MapBuffer
-from mettagrid.renderer.miniscope.symbol import DEFAULT_SYMBOL_MAP
+import base64
+import json
+import zlib
+from IPython.display import HTML, Javascript, display
 
-VIEWPORT_HEIGHT = 25
-VIEWPORT_WIDTH = 35
-
+# Run an episode and capture replay
+replay_writer = InMemoryReplayWriter()
 render_env = make_env(seed=99)
+render_env._simulator.add_event_handler(replay_writer)
 obs, _ = render_env.reset()
-
-# Build symbol map (same as render_env.render() does internally)
-symbol_map = DEFAULT_SYMBOL_MAP.copy()
-for obj in render_env._current_cfg.game.objects.values():
-    if obj.render_name:
-        symbol_map[obj.render_name] = obj.render_symbol
-    symbol_map[obj.name] = obj.render_symbol
-
-sim = render_env._sim
-
-# Center viewport on hub (fall back to map center)
-grid_objects = sim._c_sim.grid_objects()
-hub_r, hub_c = sim.map_height // 2, sim.map_width // 2
-for obj in grid_objects.values():
-    if "hub" in obj["type_name"]:
-        hub_r, hub_c = obj["r"], obj["c"]
-        break
 
 num_agents = render_env.num_agents
 state = {
@@ -414,27 +400,58 @@ state = {
 }
 
 net.eval()
-for step in range(200):
+num_steps = 0
+for _step in range(MAX_STEPS):
     obs_tensor = torch.from_numpy(obs).to(DEVICE)
     with torch.no_grad():
         logits, _ = net(obs_tensor, state)
     actions = torch.distributions.Categorical(logits=logits).sample().cpu().numpy()
     obs, rewards, terms, truncs, infos = render_env.step(actions)
+    num_steps += 1
+    if terms.all() or truncs.all():
+        break
 
-    clear_output(wait=True)
-    buf = MapBuffer(
-        symbol_map=symbol_map,
-        initial_height=sim.map_height,
-        initial_width=sim.map_width,
-    )
-    buf.set_viewport(hub_r, hub_c, VIEWPORT_HEIGHT, VIEWPORT_WIDTH)
-    rendered = buf.render(sim._c_sim.grid_objects())
-    print(f"Step {step}")
-    print(rendered)
-    time.sleep(0.05)
+print(f"Episode finished after {num_steps} steps")
 
+# Get replay data before closing (needs live simulation for episode stats)
+replays = replay_writer.get_completed_replays()
+replay_data = json.dumps(replays[0].get_replay_data())
 render_env.close()
-print("Done")
+
+# Compress and encode
+compressed = zlib.compress(replay_data.encode("utf-8"))
+b64 = base64.b64encode(compressed).decode("utf-8")
+
+# Display MettaScope iframe
+iframe_src = "https://metta-ai.github.io/metta/mettascope/mettascope.html"
+iframe_id = "mettascope_iframe"
+
+display(HTML(f'''
+<div>
+    <iframe id="{iframe_id}" src="{iframe_src}" width="100%" height="800"
+            style="border: 1px solid #ccc; border-radius: 4px;"></iframe>
+</div>
+'''))
+
+b64_escaped = b64.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n')
+display(Javascript(f'''
+(function() {{
+    const iframe = document.getElementById('{iframe_id}');
+    const base64Data = '{b64_escaped}';
+    function sendReplayData() {{
+        iframe.contentWindow.postMessage({{
+            type: 'replayData',
+            base64: base64Data,
+            fileName: 'tutorial_replay.json.z'
+        }}, '*');
+    }}
+    window.addEventListener('message', function(event) {{
+        if (event.data.type === 'mettascopeReady') {{
+            sendReplayData();
+        }}
+    }});
+}})();
+'''))
 ```
 
 ## 8. Upload to the leaderboard
@@ -443,7 +460,6 @@ Submit the trained weights to the CoGames tournament. This uses the `tutorial` p
 (same architecture as `ScoutPolicyNet`) with our saved weights.
 
 Prerequisites: run `cogames login` in a terminal first to authenticate.
-
 
 ```python
 POLICY_NAME = "my-scout"  # Change this to your desired policy name
