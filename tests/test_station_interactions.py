@@ -13,7 +13,6 @@ from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.hub import CvCHubConfig
 from cogames.cogs_vs_clips.junction import CvCJunctionConfig
 from cogames.cogs_vs_clips.stations import (
-    CvCChestConfig,
     CvCExtractorConfig,
 )
 from cogames.cogs_vs_clips.team import TeamConfig
@@ -22,7 +21,6 @@ from mettagrid.config.handler_config import Handler, actorHas, updateActor
 from mettagrid.config.mettagrid_config import (
     ActionsConfig,
     AgentConfig,
-    CollectiveConfig,
     GameConfig,
     GridObjectConfig,
     InventoryConfig,
@@ -61,9 +59,9 @@ def _team_tags(*teams: TeamConfig) -> list[str]:
 def _hub_object(team: str, initial: dict[str, int]) -> GridObjectConfig:
     """Create a hub GridObjectConfig with the given team tag and initial inventory."""
     return GridObjectConfig(
-        name=f"{team}:hub",
+        name="hub",
+        map_name=f"{team}:hub",
         tags=[f"team:{team}"],
-        collective=team,
         inventory=InventoryConfig(initial=initial, limits=_resource_limits()),
     )
 
@@ -98,7 +96,6 @@ class StationTestHarness:
         agent_team: str | None = None,
         tags: list[str] | None = None,
         extra_objects: list[GridObjectConfig] | None = None,
-        collective_initial: dict[str, int] | None = None,
         materialize_queries: list[MaterializedQuery] | None = None,
         extra_resources: list[str] | None = None,
     ) -> "StationTestHarness":
@@ -137,30 +134,8 @@ class StationTestHarness:
                 map_data[r][c] = char
                 char_to_map_name[char] = obj_name
 
-        collective_names: set[str] = set()
-        if agent_team:
-            collective_names.add(agent_team)
-        if station.collective:
-            collective_names.add(station.collective)
-        if extra_objects:
-            for obj in extra_objects:
-                if obj.collective:
-                    collective_names.add(obj.collective)
-
-        collectives = {
-            name: CollectiveConfig(
-                name=name,
-                inventory=InventoryConfig(
-                    initial=collective_initial or {},
-                    limits=_resource_limits(),
-                ),
-            )
-            for name in collective_names
-        }
-
         agent_cfg = AgentConfig(
             tags=[f"team:{agent_team}"] if agent_team else [],
-            collective=agent_team,
             inventory=InventoryConfig(
                 initial=agent_inventory or {},
                 limits=_resource_limits(),
@@ -179,7 +154,6 @@ class StationTestHarness:
                     move=MoveActionConfig(),
                 ),
                 agent=agent_cfg,
-                collectives=collectives,
                 objects=objects,
                 tags=tags or [],
                 materialize_queries=materialize_queries or [],
@@ -232,11 +206,6 @@ class StationTestHarness:
                 raw_inv = obj.get("inventory", {})
                 return {resource_names[idx]: amount for idx, amount in raw_inv.items() if amount != 0}
         return {}
-
-    def collective_inventory(self, name: str) -> dict[str, int]:
-        """Get collective's resource pool."""
-        inventories = self.simulation._c_sim.get_collective_inventories()
-        return inventories.get(name, {})
 
     def close(self) -> None:
         """Close the simulation."""
@@ -337,7 +306,7 @@ class TestHub:
     """Test CvCHubConfig station interactions."""
 
     def test_deposit_resources(self):
-        """Aligned agent deposits resources to hub collective."""
+        """Aligned agent deposits resources to hub inventory."""
         station = CvCHubConfig().station_cfg(team=TeamConfig(name="cogs", short_name="c"))
 
         harness = StationTestHarness.create(
@@ -350,12 +319,10 @@ class TestHub:
         harness.move_onto_station()
 
         inv = harness.agent_inventory()
-        collective_inv = harness.collective_inventory("cogs")
+        hub_inv = harness.object_inventory("hub")
 
         assert inv.get("oxygen", 0) == 0, f"Agent should have 0 oxygen after deposit, got {inv.get('oxygen', 0)}"
-        assert collective_inv.get("oxygen", 0) == 50, (
-            f"Collective should have 50 oxygen, got {collective_inv.get('oxygen', 0)}"
-        )
+        assert hub_inv.get("oxygen", 0) == 50, f"Hub should have 50 oxygen, got {hub_inv.get('oxygen', 0)}"
 
         harness.close()
 
@@ -373,19 +340,17 @@ class TestHub:
         harness.move_onto_station()
 
         inv = harness.agent_inventory()
-        collective_inv = harness.collective_inventory("cogs")
+        hub_inv = harness.object_inventory("hub")
 
         assert inv.get("oxygen", 0) == 50, f"Unaligned agent should keep oxygen, got {inv.get('oxygen', 0)}"
-        assert collective_inv.get("oxygen", 0) == 0, (
-            f"Collective should have 0 oxygen (no deposit), got {collective_inv.get('oxygen', 0)}"
-        )
+        assert hub_inv.get("oxygen", 0) == 0, f"Hub should have 0 oxygen (no deposit), got {hub_inv.get('oxygen', 0)}"
 
         harness.close()
 
     def test_hub_heal_aoe_heals_aligned(self):
         """Hub AOE heals aligned agents."""
-        team = TeamConfig(name="cogs", short_name="c", base_aoe_deltas={"hp": 10, "energy": 10})
-        station = CvCHubConfig().station_cfg(team=team)
+        team = TeamConfig(name="cogs", short_name="c")
+        station = CvCHubConfig(aoe_range=5, heal_deltas={"hp": 10, "energy": 10}).station_cfg(team=team)
 
         harness = StationTestHarness.create(
             station=station,
@@ -452,20 +417,19 @@ class TestGearStation:
     """Test CogTeam.gear_station() interactions."""
 
     def test_change_gear_costs_resources(self):
-        """Agent pays collective resources to get gear."""
+        """Agent pays hub resources to get gear."""
         cogs = CogTeam()
         station = cogs.gear_station("miner")
 
         miner_cost = CvCConfig.GEAR_COSTS["miner"]
-        initial_collective = {k: v * 10 for k, v in miner_cost.items()}
+        hub_initial = {k: v * 10 for k, v in miner_cost.items()}
 
         harness = StationTestHarness.create(
             station=station,
             agent_inventory={},
             agent_team="cogs",
             tags=cogs.all_tags(),
-            extra_objects=[_hub_object("cogs", {})],
-            collective_initial=initial_collective,
+            extra_objects=[_hub_object("cogs", hub_initial)],
         )
 
         harness.move_onto_station()
@@ -481,26 +445,25 @@ class TestGearStation:
         station = cogs.gear_station("miner")
 
         miner_cost = CvCConfig.GEAR_COSTS["miner"]
-        initial_collective = {k: 100 for k in miner_cost}
+        hub_initial = {k: 100 for k in miner_cost}
 
         harness = StationTestHarness.create(
             station=station,
             agent_inventory={"miner": 1},
             agent_team="cogs",
             tags=cogs.all_tags(),
-            extra_objects=[_hub_object("cogs", {})],
-            collective_initial=initial_collective,
+            extra_objects=[_hub_object("cogs", hub_initial)],
         )
 
         harness.move_onto_station()
 
         inv = harness.agent_inventory()
-        collective_inv = harness.collective_inventory("cogs")
+        hub_inv = harness.object_inventory("hub")
 
         assert inv.get("miner", 0) == 1, f"Should still have miner, got {inv.get('miner', 0)}"
-        for resource, initial in initial_collective.items():
-            assert collective_inv.get(resource, 0) == initial, (
-                f"Collective {resource} should be unchanged at {initial}, got {collective_inv.get(resource, 0)}"
+        for resource, initial in hub_initial.items():
+            assert hub_inv.get(resource, 0) == initial, (
+                f"Hub {resource} should be unchanged at {initial}, got {hub_inv.get(resource, 0)}"
             )
 
         harness.close()
@@ -511,15 +474,14 @@ class TestGearStation:
         station = cogs.gear_station("miner")
 
         miner_cost = CvCConfig.GEAR_COSTS["miner"]
-        initial_collective = {k: 100 for k in miner_cost}
+        hub_initial = {k: 100 for k in miner_cost}
 
         harness = StationTestHarness.create(
             station=station,
             agent_inventory={"scrambler": 1},
             agent_team="cogs",
             tags=cogs.all_tags(),
-            extra_objects=[_hub_object("cogs", {})],
-            collective_initial=initial_collective,
+            extra_objects=[_hub_object("cogs", hub_initial)],
         )
 
         harness.move_onto_station()
@@ -531,7 +493,7 @@ class TestGearStation:
         harness.close()
 
     def test_insufficient_resources_no_change(self):
-        """Agent cannot get gear if collective lacks resources."""
+        """Agent cannot get gear if hub lacks resources."""
         cogs = CogTeam()
         station = cogs.gear_station("miner")
 
@@ -551,115 +513,13 @@ class TestGearStation:
         harness.close()
 
 
-class TestChest:
-    """Test CvCChestConfig station interactions."""
-
-    def test_get_heart_from_hub(self):
-        """Aligned agent gets heart when hub collective has hearts."""
-        station = CvCChestConfig().station_cfg(team="c", team_name="cogs")
-        hub = _hub_object("cogs", {})
-
-        harness = StationTestHarness.create(
-            station=station,
-            agent_inventory={"heart": 0},
-            agent_team="cogs",
-            tags=["team:cogs"],
-            extra_objects=[hub],
-            collective_initial={"heart": 10},
-        )
-
-        harness.move_onto_station()
-
-        inv = harness.agent_inventory()
-        collective_inv = harness.collective_inventory("cogs")
-
-        assert inv.get("heart", 0) == 1, f"Expected 1 heart, got {inv.get('heart', 0)}"
-        assert collective_inv.get("heart", 0) == 9, (
-            f"Collective should have 9 hearts, got {collective_inv.get('heart', 0)}"
-        )
-
-        harness.close()
-
-    def test_make_heart_costs_elements(self):
-        """Collective with elements can make heart."""
-        station = CvCChestConfig().station_cfg(team="c", team_name="cogs")
-        hub = _hub_object("cogs", {})
-
-        harness = StationTestHarness.create(
-            station=station,
-            agent_inventory={"heart": 0},
-            agent_team="cogs",
-            tags=["team:cogs"],
-            extra_objects=[hub],
-            collective_initial={**CvCConfig.HEART_COST, "heart": 0},
-        )
-
-        harness.move_onto_station()
-
-        inv = harness.agent_inventory()
-        assert inv.get("heart", 0) == 1, f"Expected 1 heart from making, got {inv.get('heart', 0)}"
-
-        harness.close()
-
-    def test_make_heart_requires_all_elements(self):
-        """Cannot make heart without all required elements."""
-        station = CvCChestConfig().station_cfg(team="c", team_name="cogs")
-        hub = _hub_object("cogs", {})
-
-        partial_cost = {k: v for k, v in CvCConfig.HEART_COST.items()}
-        missing_element = list(partial_cost.keys())[0]
-        del partial_cost[missing_element]
-
-        harness = StationTestHarness.create(
-            station=station,
-            agent_inventory={"heart": 0},
-            agent_team="cogs",
-            tags=["team:cogs"],
-            extra_objects=[hub],
-            collective_initial={**partial_cost, "heart": 0},
-        )
-
-        harness.move_onto_station()
-
-        inv = harness.agent_inventory()
-        assert inv.get("heart", 0) == 0, f"Should not make heart (missing element), got {inv.get('heart', 0)}"
-
-        harness.close()
-
-    def test_get_heart_requires_team_tag(self):
-        """Agent without team tag cannot get heart."""
-        station = CvCChestConfig().station_cfg(team="c", team_name="cogs")
-        hub = _hub_object("cogs", {})
-
-        harness = StationTestHarness.create(
-            station=station,
-            agent_inventory={"heart": 0},
-            agent_team=None,
-            tags=["team:cogs"],
-            extra_objects=[hub],
-            collective_initial={"heart": 10},
-        )
-
-        harness.move_onto_station()
-
-        inv = harness.agent_inventory()
-        collective_inv = harness.collective_inventory("cogs")
-
-        assert inv.get("heart", 0) == 0, f"Unaligned should not get heart, got {inv.get('heart', 0)}"
-        assert collective_inv.get("heart", 0) == 10, (
-            f"Collective should still have 10 hearts, got {collective_inv.get('heart', 0)}"
-        )
-
-        harness.close()
-
-
 class TestAOE:
     """Test AOE (Area of Effect) station behaviors."""
 
     def test_heal_aoe_heals_aligned_agent(self):
         """Hub heal AOE heals agents with same team tag."""
-        team = TeamConfig(name="cogs", short_name="c", base_aoe_deltas={"hp": 10, "energy": 10})
-        station = CvCHubConfig().station_cfg(team=team)
+        team = TeamConfig(name="cogs", short_name="c")
+        station = CvCHubConfig(aoe_range=5, heal_deltas={"hp": 10, "energy": 10}).station_cfg(team=team)
 
         harness = StationTestHarness.create(
             station=station,
@@ -678,8 +538,8 @@ class TestAOE:
 
     def test_multiple_aoe_sources_stack(self):
         """Mutating AOE effects stack across multiple overlapping sources."""
-        team = TeamConfig(name="cogs", short_name="c", base_aoe_deltas={"hp": 5, "energy": 5})
-        station = CvCHubConfig().station_cfg(team=team)
+        team = TeamConfig(name="cogs", short_name="c")
+        station = CvCHubConfig(aoe_range=5, heal_deltas={"hp": 5, "energy": 5}).station_cfg(team=team)
 
         station_map_name = station.map_name or station.name
 
@@ -702,15 +562,11 @@ class TestAOE:
                 ),
                 agent=AgentConfig(
                     tags=["team:cogs"],
-                    collective="cogs",
                     inventory=InventoryConfig(
                         initial={"hp": 0, "energy": 0},
                         limits=_resource_limits(),
                     ),
                 ),
-                collectives={
-                    "cogs": CollectiveConfig(inventory=InventoryConfig(limits=_resource_limits())),
-                },
                 tags=["team:cogs"],
                 objects={
                     "wall": WallConfig(),
@@ -737,7 +593,7 @@ class TestAOE:
 
         inv = sim.agent(0).inventory
 
-        # Weighted territory picks the winning side, but same-side mutating AOEs still stack
+        # Territory-mode resolves winning side, but same-side mutating AOEs still stack
         assert inv.get("hp", 0) == 50, f"Expected hp=50 from stacked friendly AOEs, got {inv.get('hp', 0)}"
 
         sim.close()
@@ -775,7 +631,6 @@ def _make_junction_sim(
             name="hub",
             map_name=f"{t.short_name}:hub",
             tags=[t.team_tag()],
-            collective=t.name,
         )
 
     junction = CvCJunctionConfig().station_cfg(teams)
@@ -789,14 +644,6 @@ def _make_junction_sim(
     for t in teams:
         mat_queries.extend(t.materialized_queries())
 
-    collectives = {
-        t.name: CollectiveConfig(
-            name=t.name,
-            inventory=InventoryConfig(initial={}, limits=_resource_limits()),
-        )
-        for t in teams
-    }
-
     cfg = MettaGridConfig(
         game=GameConfig(
             num_agents=1,
@@ -808,13 +655,11 @@ def _make_junction_sim(
             ),
             agent=AgentConfig(
                 tags=[f"team:{agent_team}"],
-                collective=agent_team,
                 inventory=InventoryConfig(
                     initial=agent_inventory,
                     limits=_resource_limits(),
                 ),
             ),
-            collectives=collectives,
             objects=objects,
             tags=all_tags,
             materialize_queries=mat_queries,
@@ -923,7 +768,7 @@ class TestJunctionAlignment:
                         actorHasTag("team:cogs"),
                         actorHas({"aligner": 1, **CvCConfig.ALIGN_COST}),
                         isNot(hasTagPrefix("team:")),
-                        isNear(make_query(cogs.net_tag()), radius=CvCConfig.JUNCTION_DISTANCE),
+                        isNear(make_query(cogs.net_tag()), radius=CvCConfig.JUNCTION_ALIGN_DISTANCE),
                     ],
                     mutations=[
                         updateActor({k: -v for k, v in CvCConfig.ALIGN_COST.items()}),
@@ -938,7 +783,6 @@ class TestJunctionAlignment:
             name="hub",
             map_name=f"{cogs.short_name}:hub",
             tags=[cogs.team_tag()],
-            collective=cogs.name,
         )
 
         harness = StationTestHarness.create(
@@ -969,7 +813,7 @@ class TestJunctionAlignment:
                         actorHasTag("team:cogs"),
                         actorHas({"aligner": 1, **CvCConfig.ALIGN_COST}),
                         isNot(hasTagPrefix("team:")),
-                        isNear(make_query(cogs.net_tag()), radius=CvCConfig.JUNCTION_DISTANCE),
+                        isNear(make_query(cogs.net_tag()), radius=CvCConfig.JUNCTION_ALIGN_DISTANCE),
                     ],
                     mutations=[
                         updateActor({k: -v for k, v in CvCConfig.ALIGN_COST.items()}),
@@ -984,7 +828,6 @@ class TestJunctionAlignment:
             name="hub",
             map_name=f"{cogs.short_name}:hub",
             tags=[cogs.team_tag()],
-            collective=cogs.name,
         )
 
         harness = StationTestHarness.create(
@@ -1073,7 +916,6 @@ class TestJunctionAlignment:
             name="hub",
             map_name="clips:hub",
             tags=[clips.team_tag()],
-            collective=clips.name,
         )
         objects[junction_cfg.map_name] = junction_cfg
 
@@ -1084,14 +926,6 @@ class TestJunctionAlignment:
         mat_queries: list[MaterializedQuery] = []
         for t in [cogs, clips]:
             mat_queries.extend(t.materialized_queries())
-
-        collectives = {
-            t.name: CollectiveConfig(
-                name=t.name,
-                inventory=InventoryConfig(initial={}, limits=_resource_limits()),
-            )
-            for t in [cogs, clips]
-        }
 
         cfg = MettaGridConfig(
             game=GameConfig(
@@ -1104,13 +938,11 @@ class TestJunctionAlignment:
                 ),
                 agent=AgentConfig(
                     tags=["team:cogs"],
-                    collective="cogs",
                     inventory=InventoryConfig(
                         initial={"scrambler": 1, "heart": 5, "hp": 100, "energy": 100},
                         limits=_resource_limits(),
                     ),
                 ),
-                collectives=collectives,
                 objects=objects,
                 tags=all_tags,
                 materialize_queries=mat_queries,

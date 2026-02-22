@@ -2,16 +2,10 @@ from __future__ import annotations
 
 from pydantic import Field
 
-from cogames.cogs_vs_clips.config import CvCConfig
 from mettagrid.base_config import Config
-from mettagrid.config.filter import hasTagPrefix, isNot, sharedTagPrefix
 from mettagrid.config.handler_config import (
     Handler,
     actorHas,
-    collectiveWithdraw,
-    targetCollectiveHas,
-    updateActor,
-    updateTargetCollective,
     withdraw,
 )
 from mettagrid.config.mettagrid_config import (
@@ -23,10 +17,6 @@ from mettagrid.config.mettagrid_config import (
 
 def _neg(recipe: dict[str, int]) -> dict[str, int]:
     return {k: -v for k, v in recipe.items()}
-
-
-def _opposing_team_filters():
-    return [hasTagPrefix("team:"), isNot(sharedTagPrefix("team:"))]
 
 
 class CvCStationConfig(Config):
@@ -63,42 +53,4 @@ class CvCExtractorConfig(CvCStationConfig):
                 ),
             },
             inventory=InventoryConfig(initial={self.resource: self.initial_amount}),
-        )
-
-
-class CvCChestConfig(CvCStationConfig):
-    """Chest station for heart management.
-
-    Uses collective operations to access the team's shared inventory.
-    """
-
-    heart_cost: dict[str, int] = Field(default_factory=lambda: CvCConfig.HEART_COST)
-
-    def station_cfg(self, team: str, team_name: str | None = None) -> GridObjectConfig:
-        tag_team = team_name or team
-        # hub_query = query(f"type:{team}:hub")
-        return GridObjectConfig(
-            name=f"{team}:chest",
-            render_name="chest",
-            render_symbol="📦",
-            tags=[f"team:{tag_team}"],
-            collective=tag_team,
-            on_use_handlers={
-                # Using collective-based operations (query-based alternatives commented out)
-                "get_heart": Handler(
-                    filters=[sharedTagPrefix("team:"), targetCollectiveHas({"heart": 1})],
-                    # query-based: filters=[sharedTagPrefix("team:"), queryHas(hub_query, {"heart": 1})],
-                    mutations=[collectiveWithdraw({"heart": 1})],
-                    # query-based: mutations=[queryWithdraw(hub_query, {"heart": 1})],
-                ),
-                "make_heart": Handler(
-                    filters=[sharedTagPrefix("team:"), targetCollectiveHas(self.heart_cost)],
-                    # query-based: filters=[sharedTagPrefix("team:"), queryHas(hub_query, self.heart_cost)],
-                    mutations=[
-                        updateTargetCollective(_neg(self.heart_cost)),
-                        # query-based: queryDelta(hub_query, _neg(self.heart_cost)),
-                        updateActor({"heart": 1}),
-                    ],
-                ),
-            },
         )

@@ -88,7 +88,7 @@ print(f"Max steps: {env_cfg.game.max_steps}")
 print(f"Num agents: {env_cfg.game.num_agents}")
 print(f"Actions: {[a for a in env_cfg.game.actions.model_fields if getattr(env_cfg.game.actions, a).enabled]}")
 print(f"Events: {list(env_cfg.game.events.keys())}")
-print(f"Collectives: {list(env_cfg.game.collectives.keys())}")
+print(f"Teams: {[t for t in env_cfg.game.tags if t.startswith('team:')]}")
 ```
 
 ## 2. Create a single environment

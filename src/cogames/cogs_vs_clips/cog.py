@@ -13,14 +13,12 @@ from mettagrid.config.handler_config import (
     ClearInventoryMutation,
     EntityTarget,
     Handler,
-    actorCollectiveHas,
     actorHas,
+    queryDelta,
     updateActor,
-    updateTargetCollective,
 )
 from mettagrid.config.mettagrid_config import (
     AgentConfig,
-    CollectiveConfig,
     GridObjectConfig,
     InventoryConfig,
     ResourceLimitsConfig,
@@ -53,7 +51,6 @@ class CogConfig(Config):
         return AgentConfig(
             team_id=team.team_id,
             tags=[team.team_tag()],
-            collective=team.name,
             inventory=InventoryConfig(
                 limits={
                     "hp": ResourceLimitsConfig(min=self.hp_limit, resources=["hp"], modifiers=self.hp_modifiers),
@@ -99,37 +96,24 @@ class CogTeam(TeamConfig):
     initial_hearts: int | None = Field(default=None, description="Override initial hearts (default: 20 * wealth)")
     num_agents: int = Field(default=8, ge=1, description="Number of agents in the team")
 
-    def collective_config(self) -> CollectiveConfig:
-        max_element_cost = max(cost for gear in CvCConfig.GEAR_COSTS.values() for cost in gear.values())
-        per_element = self.num_agents * max_element_cost * self.wealth
-        return CollectiveConfig(
-            name=self.name,
-            inventory=InventoryConfig(
-                limits={
-                    "resources": ResourceLimitsConfig(min=10000, resources=CvCConfig.ELEMENTS),
-                },
-                initial={element: per_element for element in CvCConfig.ELEMENTS},
-            ),
-        )
-
     def gear_station(self, gear_type: str) -> GridObjectConfig:
         cost = CvCConfig.GEAR_COSTS[gear_type]
+        hq = self.hub_query()
         return GridObjectConfig(
             name=f"{self.short_name}:{gear_type}",
             render_name=f"{gear_type}_station",
             render_symbol=CvCConfig.GEAR_SYMBOLS[gear_type],
             tags=[f"team:{self.name}"],
-            collective=self.name,
             on_use_handlers={
                 "keep_gear": Handler(
                     filters=[sharedTagPrefix("team:"), actorHas({gear_type: 1})],
                     mutations=[],
                 ),
                 "change_gear": Handler(
-                    filters=[sharedTagPrefix("team:"), actorCollectiveHas(cost)],
+                    filters=[sharedTagPrefix("team:"), *self.hub_has(cost)],
                     mutations=[
                         ClearInventoryMutation(target=EntityTarget.ACTOR, limit_name="gear"),
-                        updateTargetCollective({k: -v for k, v in cost.items()}),
+                        queryDelta(hq, {k: -v for k, v in cost.items()}),
                         updateActor({gear_type: 1}),
                     ],
                 ),

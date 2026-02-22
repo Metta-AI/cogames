@@ -5,30 +5,36 @@ from typing import TYPE_CHECKING, Optional
 from pydantic import Field
 
 from cogames.cogs_vs_clips.config import CvCConfig
-from cogames.cogs_vs_clips.stations import CvCStationConfig, _neg, _opposing_team_filters
-from mettagrid.config.filter import actorHasAnyOf, actorHasTag, hasTagPrefix, sharedTagPrefix
+from cogames.cogs_vs_clips.stations import CvCStationConfig
+from mettagrid.config.filter import actorHasAnyOf, actorHasTag, hasTag, hasTagPrefix, sharedTagPrefix
 from mettagrid.config.handler_config import (
     AOEConfig,
     Handler,
     actorHas,
-    collectiveDeposit,
+    queryDeposit,
     updateActor,
     updateTarget,
 )
 from mettagrid.config.mettagrid_config import GridObjectConfig
 from mettagrid.config.mutation import recomputeMaterializedQuery, removeTag, removeTagPrefix
-from mettagrid.config.mutation.alignment_mutation import removeAlignment
 from mettagrid.config.mutation.stats_mutation import logActorAgentStat
+from mettagrid.config.query import query
+from mettagrid.config.tag import typeTag
 
 if TYPE_CHECKING:
     from cogames.cogs_vs_clips.team import TeamConfig
 
 
-class CvCJunctionConfig(CvCStationConfig):
-    """Supply depot that receives element resources via default vibe into collective."""
+def _neg(recipe: dict[str, int]) -> dict[str, int]:
+    return {k: -v for k, v in recipe.items()}
 
-    influence_deltas: dict[str, int] = Field(default_factory=lambda: {"influence": 10, "energy": 100, "hp": 100})
-    attack_deltas: dict[str, int] = Field(default_factory=lambda: CvCConfig.ATTACK_DELTAS.copy())
+
+class CvCJunctionConfig(CvCStationConfig):
+    """Junction station that can be aligned to a team via tags."""
+
+    aoe_range: int = Field(default=10, description="Range for AOE effects")
+    heal_deltas: dict[str, int] = Field(default_factory=lambda: {"energy": 100, "hp": 100})
+    attack_deltas: dict[str, int] = Field(default_factory=lambda: {"hp": -1})
 
     def station_cfg(
         self,
@@ -46,31 +52,24 @@ class CvCJunctionConfig(CvCStationConfig):
             ]
             if owner_team_name
             else [],
-            collective=owner_team_name,
             on_tag_remove={
                 f"net:{t.name}": Handler(
                     filters=[],
                     mutations=[
                         removeTag(f"team:{t.name}"),
-                        removeTag(f"collective:{t.name}"),
-                        removeAlignment(),
                     ],
                 )
                 for t in teams
             },
             aoes={
                 "territory": AOEConfig(
-                    radius=CvCConfig.JUNCTION_DISTANCE,
+                    radius=self.aoe_range,
                 ),
-                "influence": AOEConfig(
-                    radius=CvCConfig.JUNCTION_DISTANCE,
+                "junction_heal": AOEConfig(
+                    radius=self.aoe_range,
                     filters=[sharedTagPrefix("team:")],
-                    mutations=[updateTarget(self.influence_deltas)],
-                ),
-                "attack": AOEConfig(
-                    radius=CvCConfig.JUNCTION_DISTANCE,
-                    filters=_opposing_team_filters(),
-                    mutations=[updateTarget(self.attack_deltas)],
+                    mutations=[updateTarget(self.heal_deltas)],
+                    presence_deltas={"influence": 1},
                 ),
             },
             on_use_handlers={
@@ -82,7 +81,10 @@ class CvCJunctionConfig(CvCStationConfig):
                             actorHasAnyOf(CvCConfig.ELEMENTS),
                         ],
                         mutations=[
-                            collectiveDeposit({resource: 100 for resource in CvCConfig.ELEMENTS}),
+                            queryDeposit(
+                                query(typeTag("hub"), hasTag(t.team_tag())),
+                                {resource: 100 for resource in CvCConfig.ELEMENTS},
+                            ),
                         ],
                     )
                     for t in teams

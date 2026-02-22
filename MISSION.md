@@ -111,9 +111,9 @@ neutralize nearby enemy junctions to stop the influence drain before Aligners ca
 
 ---
 
-## COLLECTIVE INVENTORY
+## TEAM HUB
 
-Your team shares a collective inventory:
+Your team shares a hub inventory:
 
 - **Deposit resources** at aligned junctions and hubs
 - **Craft hearts** at the Assembler

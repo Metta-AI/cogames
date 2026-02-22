@@ -36,14 +36,9 @@ def _print_episode_stats(console: Console, results: PureSingleEpisodeResult) -> 
         for key, value in agent.items():
             totals[key] = totals.get(key, 0) + value
 
-    # Check if this is a CogsGuard mission (has collective stats)
-    collective_stats = stats.get("collective", {})
-    cogs_stats = collective_stats.get("cogs", {})
-    clips_stats = collective_stats.get("clips", {})
-
-    if cogs_stats or clips_stats:
-        # CogsGuard mission - show relevant stats
-        _print_cogsguard_stats(console, totals, cogs_stats, clips_stats, avg_reward_per_agent)
+    has_gear_stats = any(f"{gear}.gained" in totals for gear in GEAR)
+    if has_gear_stats:
+        _print_cogsguard_stats(console, totals, avg_reward_per_agent)
     else:
         # Standard mission - show basic stats
         _print_standard_stats(console, totals, avg_reward_per_agent)
@@ -52,8 +47,6 @@ def _print_episode_stats(console: Console, results: PureSingleEpisodeResult) -> 
 def _print_cogsguard_stats(
     console: Console,
     agent_totals: dict[str, float],
-    cogs_stats: dict[str, float],
-    clips_stats: dict[str, float],
     avg_reward_per_agent: float,
 ) -> None:
     """Print CogsGuard-specific statistics."""
@@ -65,25 +58,6 @@ def _print_cogsguard_stats(
     table.add_column("Final", style="cyan", justify="right")
 
     sections_added = 0
-
-    # Junctions: gained (aligned) | lost | final (current count)
-    junctions_added = False
-    for team, team_stats, color in [("cogs", cogs_stats, "green"), ("clips", clips_stats, "red")]:
-        gained = int(team_stats.get("junction.gained", 0))
-        lost = int(team_stats.get("junction.lost", 0))
-        final = int(team_stats.get("junction", 0))
-        if gained > 0 or lost > 0 or final > 0:
-            if not junctions_added:
-                table.add_row("[bold]Junctions[/bold]", "", "", "", "")
-                junctions_added = True
-                sections_added += 1
-            table.add_row(
-                "",
-                f"[{color}]{team}[/{color}]",
-                f"[{color}]{gained}[/{color}]",
-                f"[{color}]{lost}[/{color}]",
-                f"[{color}]{final}[/{color}]",
-            )
 
     # Gear: gained | lost | final (net = gained - lost)
     gear_added = False
@@ -111,21 +85,6 @@ def _print_cogsguard_stats(
             gear_added = True
             sections_added += 1
         table.add_row("", "hearts", str(hearts_gained), str(hearts_lost), "")
-
-    # Resources: gained (deposited) | lost (withdrawn) | final (current amount)
-    resources_added = False
-    for resource in ELEMENTS:
-        gained = int(cogs_stats.get(f"collective.{resource}.deposited", 0))
-        lost = int(cogs_stats.get(f"collective.{resource}.withdrawn", 0))
-        final = int(cogs_stats.get(f"collective.{resource}.amount", 0))
-        if gained > 0 or lost > 0 or final > 0:
-            if not resources_added:
-                if sections_added > 0:
-                    table.add_section()
-                table.add_row("[bold]Resources[/bold]", "", "", "", "")
-                resources_added = True
-                sections_added += 1
-            table.add_row("", resource, str(gained), str(lost), str(final))
 
     # Score at bottom
     if sections_added > 0:
