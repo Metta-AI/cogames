@@ -8,18 +8,17 @@ from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.stations import CvCStationConfig
 from mettagrid.config.filter import actorHasAnyOf, actorHasTag, hasTag, hasTagPrefix, sharedTagPrefix
 from mettagrid.config.handler_config import (
-    AOEConfig,
     Handler,
     actorHas,
     queryDeposit,
     updateActor,
-    updateTarget,
 )
 from mettagrid.config.mettagrid_config import GridObjectConfig
 from mettagrid.config.mutation import recomputeMaterializedQuery, removeTag, removeTagPrefix
 from mettagrid.config.mutation.stats_mutation import logActorAgentStat
 from mettagrid.config.query import query
 from mettagrid.config.tag import typeTag
+from mettagrid.config.territory_config import TerritoryControlConfig
 
 if TYPE_CHECKING:
     from cogames.cogs_vs_clips.team import TeamConfig
@@ -32,9 +31,7 @@ def _neg(recipe: dict[str, int]) -> dict[str, int]:
 class CvCJunctionConfig(CvCStationConfig):
     """Junction station that can be aligned to a team via tags."""
 
-    aoe_range: int = Field(default=10, description="Range for AOE effects")
-    heal_deltas: dict[str, int] = Field(default_factory=lambda: {"energy": 100, "hp": 100})
-    attack_deltas: dict[str, int] = Field(default_factory=lambda: {"hp": -1})
+    control_range: int = Field(default=CvCConfig.TERRITORY_CONTROL_RADIUS, description="Range for territory control")
 
     def station_cfg(
         self,
@@ -61,17 +58,9 @@ class CvCJunctionConfig(CvCStationConfig):
                 )
                 for t in teams
             },
-            aoes={
-                "territory": AOEConfig(
-                    radius=self.aoe_range,
-                ),
-                "junction_heal": AOEConfig(
-                    radius=self.aoe_range,
-                    filters=[sharedTagPrefix("team:")],
-                    mutations=[updateTarget(self.heal_deltas)],
-                    presence_deltas={"influence": 1},
-                ),
-            },
+            territory_controls=[
+                TerritoryControlConfig(territory="team_territory", strength=self.control_range),
+            ],
             on_use_handlers={
                 **{
                     f"deposit_{t.name}": Handler(

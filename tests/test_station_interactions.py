@@ -16,8 +16,8 @@ from cogames.cogs_vs_clips.stations import (
     CvCExtractorConfig,
 )
 from cogames.cogs_vs_clips.team import TeamConfig
-from mettagrid.config.filter import actorHasTag, hasTagPrefix, isNear, isNot
-from mettagrid.config.handler_config import Handler, actorHas, updateActor
+from mettagrid.config.filter import actorHasTag, hasTagPrefix, isNear, isNot, sharedTagPrefix
+from mettagrid.config.handler_config import Handler, actorHas, updateActor, updateTarget
 from mettagrid.config.mettagrid_config import (
     ActionsConfig,
     AgentConfig,
@@ -33,6 +33,7 @@ from mettagrid.config.mettagrid_config import (
 from mettagrid.config.mutation import addTag, recomputeMaterializedQuery, removeTag
 from mettagrid.config.query import MaterializedQuery
 from mettagrid.config.query import query as make_query
+from mettagrid.config.territory_config import TerritoryConfig
 from mettagrid.map_builder.ascii import AsciiMapBuilder
 from mettagrid.simulator import Simulation
 
@@ -98,6 +99,7 @@ class StationTestHarness:
         extra_objects: list[GridObjectConfig] | None = None,
         materialize_queries: list[MaterializedQuery] | None = None,
         extra_resources: list[str] | None = None,
+        territories: dict[str, TerritoryConfig] | None = None,
     ) -> "StationTestHarness":
         """Create a 5x5 map with agent at (1,2) and station at (2,2).
 
@@ -149,6 +151,7 @@ class StationTestHarness:
                 num_agents=1,
                 max_steps=100,
                 resource_names=resource_names,
+                territories=territories or {"team_territory": TerritoryConfig(tag_prefix="team:")},
                 actions=ActionsConfig(
                     noop=NoopActionConfig(),
                     move=MoveActionConfig(),
@@ -347,23 +350,36 @@ class TestHub:
 
         harness.close()
 
-    def test_hub_heal_aoe_heals_aligned(self):
-        """Hub AOE heals aligned agents."""
+    def test_hub_territory_heals_aligned(self):
+        """Friendly territory heals aligned agents via presence handler."""
         team = TeamConfig(name="cogs", short_name="c")
-        station = CvCHubConfig(aoe_range=5, heal_deltas={"hp": 10, "energy": 10}).station_cfg(team=team)
+        station = CvCHubConfig(control_range=5).station_cfg(team=team)
+
+        heal_territory = {
+            "team_territory": TerritoryConfig(
+                tag_prefix="team:",
+                presence={
+                    "heal": Handler(
+                        filters=[sharedTagPrefix("team:")],
+                        mutations=[updateTarget({"hp": 10, "energy": 10})],
+                    )
+                },
+            ),
+        }
 
         harness = StationTestHarness.create(
             station=station,
             agent_inventory={"hp": 50, "energy": 0},
             agent_team="cogs",
             tags=["team:cogs"],
+            territories=heal_territory,
         )
 
         harness.step(5)
 
         inv = harness.agent_inventory()
-        assert inv.get("hp", 0) >= 100, f"Expected hp >= 100 after AOE healing, got {inv.get('hp', 0)}"
-        assert inv.get("energy", 0) >= 50, f"Expected energy >= 50 after AOE, got {inv.get('energy', 0)}"
+        assert inv.get("hp", 0) >= 100, f"Expected hp >= 100 from territory healing, got {inv.get('hp', 0)}"
+        assert inv.get("energy", 0) >= 50, f"Expected energy >= 50 from territory, got {inv.get('energy', 0)}"
 
         harness.close()
 
@@ -513,13 +529,25 @@ class TestGearStation:
         harness.close()
 
 
-class TestAOE:
-    """Test AOE (Area of Effect) station behaviors."""
+class TestTerritoryHealing:
+    """Test territory presence healing behaviors."""
 
-    def test_heal_aoe_heals_aligned_agent(self):
-        """Hub heal AOE heals agents with same team tag."""
+    def test_territory_heals_aligned_agent(self):
+        """Friendly territory presence heals agents with same team tag."""
         team = TeamConfig(name="cogs", short_name="c")
-        station = CvCHubConfig(aoe_range=5, heal_deltas={"hp": 10, "energy": 10}).station_cfg(team=team)
+        station = CvCHubConfig(control_range=5).station_cfg(team=team)
+
+        heal_territory = {
+            "team_territory": TerritoryConfig(
+                tag_prefix="team:",
+                presence={
+                    "heal": Handler(
+                        filters=[sharedTagPrefix("team:")],
+                        mutations=[updateTarget({"hp": 10, "energy": 10})],
+                    )
+                },
+            ),
+        }
 
         harness = StationTestHarness.create(
             station=station,
@@ -527,6 +555,7 @@ class TestAOE:
             agent_team="cogs",
             tags=["team:cogs"],
             extra_resources=["influence:cogs"],
+            territories=heal_territory,
         )
 
         harness.step(5)
@@ -536,10 +565,10 @@ class TestAOE:
 
         harness.close()
 
-    def test_multiple_aoe_sources_stack(self):
-        """Mutating AOE effects stack across multiple overlapping sources."""
+    def test_territory_heal_fires_once_per_tick(self):
+        """Territory presence heal fires once per tick regardless of source count."""
         team = TeamConfig(name="cogs", short_name="c")
-        station = CvCHubConfig(aoe_range=5, heal_deltas={"hp": 5, "energy": 5}).station_cfg(team=team)
+        station = CvCHubConfig(control_range=5).station_cfg(team=team)
 
         station_map_name = station.map_name or station.name
 
@@ -556,6 +585,17 @@ class TestAOE:
                 num_agents=1,
                 max_steps=100,
                 resource_names=CvCConfig.RESOURCES,
+                territories={
+                    "team_territory": TerritoryConfig(
+                        tag_prefix="team:",
+                        presence={
+                            "heal": Handler(
+                                filters=[sharedTagPrefix("team:")],
+                                mutations=[updateTarget({"hp": 5, "energy": 5})],
+                            )
+                        },
+                    ),
+                },
                 actions=ActionsConfig(
                     noop=NoopActionConfig(),
                     move=MoveActionConfig(),
@@ -593,8 +633,8 @@ class TestAOE:
 
         inv = sim.agent(0).inventory
 
-        # Territory-mode resolves winning side, but same-side mutating AOEs still stack
-        assert inv.get("hp", 0) == 50, f"Expected hp=50 from stacked friendly AOEs, got {inv.get('hp', 0)}"
+        # Territory presence fires once per tick: 5hp × 5 ticks = 25
+        assert inv.get("hp", 0) == 25, f"Expected hp=25 from territory presence, got {inv.get('hp', 0)}"
 
         sim.close()
 
@@ -649,6 +689,7 @@ def _make_junction_sim(
             num_agents=1,
             max_steps=100,
             resource_names=CvCConfig.RESOURCES,
+            territories={"team_territory": TerritoryConfig(tag_prefix="team:")},
             actions=ActionsConfig(
                 noop=NoopActionConfig(),
                 move=MoveActionConfig(),
@@ -768,7 +809,7 @@ class TestJunctionAlignment:
                         actorHasTag("team:cogs"),
                         actorHas({"aligner": 1, **CvCConfig.ALIGN_COST}),
                         isNot(hasTagPrefix("team:")),
-                        isNear(make_query(cogs.net_tag()), radius=CvCConfig.JUNCTION_ALIGN_DISTANCE),
+                        isNear(make_query(cogs.net_tag()), radius=CvCConfig.TERRITORY_CONTROL_RADIUS),
                     ],
                     mutations=[
                         updateActor({k: -v for k, v in CvCConfig.ALIGN_COST.items()}),
@@ -813,7 +854,7 @@ class TestJunctionAlignment:
                         actorHasTag("team:cogs"),
                         actorHas({"aligner": 1, **CvCConfig.ALIGN_COST}),
                         isNot(hasTagPrefix("team:")),
-                        isNear(make_query(cogs.net_tag()), radius=CvCConfig.JUNCTION_ALIGN_DISTANCE),
+                        isNear(make_query(cogs.net_tag()), radius=CvCConfig.TERRITORY_CONTROL_RADIUS),
                     ],
                     mutations=[
                         updateActor({k: -v for k, v in CvCConfig.ALIGN_COST.items()}),
@@ -932,6 +973,7 @@ class TestJunctionAlignment:
                 num_agents=1,
                 max_steps=100,
                 resource_names=CvCConfig.RESOURCES,
+                territories={"team_territory": TerritoryConfig(tag_prefix="team:")},
                 actions=ActionsConfig(
                     noop=NoopActionConfig(),
                     move=MoveActionConfig(),

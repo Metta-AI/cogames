@@ -26,10 +26,12 @@ from mettagrid.config.action_config import (
 )
 from mettagrid.config.filter import sharedTagPrefix
 from mettagrid.config.game_value import QueryInventoryValue
+from mettagrid.config.handler_config import Handler, updateTarget
 from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
 from mettagrid.config.query import query
 from mettagrid.config.tag import typeTag
+from mettagrid.config.territory_config import TerritoryConfig
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
 
 __all__ = [
@@ -88,6 +90,17 @@ class CvCMission(CoGameMission):
             max_steps=self.max_steps,
             num_agents=self.num_agents,
             resource_names=CvCConfig.RESOURCES,
+            territories={
+                "team_territory": TerritoryConfig(
+                    tag_prefix="team:",
+                    presence={
+                        "heal": Handler(
+                            filters=[sharedTagPrefix("team:")],
+                            mutations=[updateTarget({"energy": 100, "hp": 100})],
+                        ),
+                    },
+                ),
+            },
             vibe_names=CvCConfig.VIBE_NAMES,
             obs=ObsConfig(
                 global_obs=GlobalObsConfig(

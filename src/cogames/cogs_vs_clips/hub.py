@@ -8,18 +8,17 @@ from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.stations import CvCStationConfig
 from mettagrid.config.filter import actorHasAnyOf, sharedTagPrefix
 from mettagrid.config.handler_config import (
-    AOEConfig,
     Handler,
     queryDelta,
     queryDeposit,
     queryWithdraw,
     updateActor,
-    updateTarget,
 )
 from mettagrid.config.mettagrid_config import (
     GridObjectConfig,
     InventoryConfig,
 )
+from mettagrid.config.territory_config import TerritoryControlConfig
 
 if TYPE_CHECKING:
     from cogames.cogs_vs_clips.team import TeamConfig
@@ -34,8 +33,7 @@ class CvCHubConfig(CvCStationConfig):
 
     elements: list[str] = Field(default_factory=lambda: CvCConfig.ELEMENTS)
     heart_cost: dict[str, int] = Field(default_factory=lambda: CvCConfig.HEART_COST)
-    aoe_range: int = Field(default=10, description="Range for AOE effects")
-    heal_deltas: dict[str, int] = Field(default_factory=lambda: {"energy": 100, "hp": 100})
+    control_range: int = Field(default=CvCConfig.TERRITORY_CONTROL_RADIUS, description="Range for territory control")
 
     def station_cfg(
         self, team: TeamConfig, inventory: Optional[InventoryConfig] = None, map_name: Optional[str] = None
@@ -50,17 +48,9 @@ class CvCHubConfig(CvCStationConfig):
                 team.team_tag(),
             ],
             inventory=inventory or InventoryConfig(initial={}),
-            aoes={
-                "territory": AOEConfig(
-                    radius=self.aoe_range,
-                ),
-                "hub_heal": AOEConfig(
-                    radius=self.aoe_range,
-                    filters=[sharedTagPrefix("team:")],
-                    mutations=[updateTarget(self.heal_deltas)],
-                    presence_deltas={"influence": 1},
-                ),
-            },
+            territory_controls=[
+                TerritoryControlConfig(territory="team_territory", strength=self.control_range),
+            ],
             on_use_handlers={
                 "deposit": Handler(
                     filters=[sharedTagPrefix("team:"), actorHasAnyOf(self.elements)],
