@@ -48,7 +48,7 @@ The arena contains:
 
 ### Cooperation Loop
 
-1. **Miners** extract resources and deposit them into the collective pool
+1. **Miners** extract resources and deposit them into their team hub inventory
 2. The **Assembler** crafts hearts from pooled resources
 3. **Aligners** spend hearts to capture neutral junctions → expand territory
 4. **Scramblers** spend hearts to neutralize enemy junctions → push the front line

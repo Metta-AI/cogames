@@ -31,10 +31,11 @@ class AllJunctionsClipsAligned(CoGameMissionVariant):
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
-        from mettagrid.config.filter.alignment_filter import isNeutral  # noqa: PLC0415
+        from mettagrid.config.filter import hasTagPrefix, isNot  # noqa: PLC0415
 
-        # Only align neutral junctions — skip the hub junction which is already cogs-aligned.
-        env.game.events["initial_clips"].filters = [*env.game.events["initial_clips"].filters, isNeutral()]
+        # Only align junctions without a team — skip the hub junction which is already cogs-aligned.
+        clip_event = env.game.events["initial_clips"]
+        clip_event.filters = [*clip_event.filters, isNot(hasTagPrefix("team"))]
 
 
 class ScramblerRewardsVariant(CoGameMissionVariant):
