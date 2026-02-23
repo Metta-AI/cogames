@@ -6,7 +6,7 @@ from pydantic import Field
 
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.stations import CvCStationConfig
-from mettagrid.config.filter import actorHasAnyOf, actorHasTag, hasTag, hasTagPrefix, sharedTagPrefix
+from mettagrid.config.filter import actorHasAnyOf, actorHasTag, hasTag, hasTagPrefix, isNot, sharedTagPrefix
 from mettagrid.config.handler_config import (
     Handler,
     actorHas,
@@ -81,6 +81,7 @@ class CvCJunctionConfig(CvCStationConfig):
                 "scramble": Handler(
                     filters=[
                         hasTagPrefix("team:"),
+                        isNot(sharedTagPrefix("team:")),
                         actorHas({"scrambler": 1, **CvCConfig.SCRAMBLE_COST}),
                     ],
                     mutations=[
