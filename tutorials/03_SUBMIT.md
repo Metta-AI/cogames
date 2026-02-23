@@ -120,9 +120,14 @@ cogames leaderboard --season beta-cvc-no-clips
 ```
 
 
+## Limits
+
+- **Max upload size**: 500 MB. Submissions exceeding this limit are rejected with an HTTP 413 error. If your submission is too large, try excluding unnecessary files or compressing model weights.
+
 ## Troubleshooting
 
 - **Auth errors**: run `cogames login` again.
 - **Module not found**: use `class=...` with a fully qualified path or include the file in submission.
 - **Invalid policy path**: ensure `-p` points to an existing bundle or weights file.
 - **Local vs S3 checkpoints**: local training saves files under `./train_dir/`. Cloud training may require downloading or referencing the S3 bundle.
+- **Policy too large**: the server enforces a 500 MB upload limit. Reduce your submission size by removing unnecessary files from your checkpoint directory before uploading.

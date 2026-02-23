@@ -94,7 +94,7 @@ The game will open in a new window, and the terminal will give you instructions 
     cogames login
     ```
 
-2. Upload a starter policy and submit it to the tournament.
+2. Upload a starter policy and submit it to the tournament. Uploads are limited to 500 MB.
 
     ```bash
     cogames upload --policy "class=cogames.policy.starter_agent.StarterPolicy" --name "$USER.README-quickstart-starter-policy" --season beta-cvc-no-clips --skip-validation
