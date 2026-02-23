@@ -27,7 +27,7 @@ from mettagrid.config.action_config import (
 from mettagrid.config.filter import sharedTagPrefix
 from mettagrid.config.game_value import QueryInventoryValue
 from mettagrid.config.handler_config import Handler, updateTarget
-from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig
+from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig, RenderConfig
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
 from mettagrid.config.query import query
 from mettagrid.config.tag import typeTag
@@ -90,6 +90,7 @@ class CvCMission(CoGameMission):
             max_steps=self.max_steps,
             num_agents=self.num_agents,
             resource_names=CvCConfig.RESOURCES,
+            render=RenderConfig(hud_1="hp", hud_2="carbon"),
             territories={
                 "team_territory": TerritoryConfig(
                     tag_prefix="team:",
