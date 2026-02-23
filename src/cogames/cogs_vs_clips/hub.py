@@ -49,7 +49,7 @@ class CvCHubConfig(CvCStationConfig):
             ],
             inventory=inventory or InventoryConfig(initial={}),
             territory_controls=[
-                TerritoryControlConfig(territory="team_territory", strength=self.control_range),
+                TerritoryControlConfig(territory="team_territory", strength=self.control_range * 2),
             ],
             on_use_handlers={
                 "deposit": Handler(

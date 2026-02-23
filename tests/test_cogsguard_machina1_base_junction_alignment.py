@@ -20,11 +20,10 @@ def test_cogsguard_machina1_neutral_junction_has_no_team_tag() -> None:
     )
 
 
-def test_cogsguard_machina1_site_places_c_junction_in_base_hub() -> None:
+def test_cogsguard_machina1_site_has_no_home_junction() -> None:
     map_builder = cast(MapGenConfig, COGSGUARD_MACHINA_1.map_builder)
     instance = map_builder.instance
     assert instance is not None
     assert isinstance(instance, MachinaArenaConfig)
-    assert instance.hub.junction_object == "c:junction"
     assert instance.building_distributions is not None
     assert instance.building_distributions["junction"].type == DistributionType.POISSON

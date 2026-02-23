@@ -46,7 +46,6 @@ TRAINING_FACILITY = CoGameSite(
                     "silicon_extractor",
                 ],
                 cross_bundle="none",
-                junction_object="junction",
             )
         ),
     ),
@@ -84,7 +83,6 @@ def _cogsguard_hub_config() -> BaseHubConfig:
         corner_bundle="extractors",
         cross_bundle="none",
         cross_distance=7,
-        junction_object="junction",
         stations=[
             "c:aligner",
             "c:scrambler",
@@ -144,8 +142,7 @@ def _build_cogsguard_machina1_map_builder(spawn_count: int) -> MapGenConfig:
             "instance": instance.model_copy(
                 update={
                     "spawn_count": spawn_count,
-                    # The hub's junction should start aligned to cogs (only the base-hub junction).
-                    "hub": _cogsguard_hub_config().model_copy(update={"junction_object": "c:junction"}),
+                    "hub": _cogsguard_hub_config(),
                     # Avoid "junction clusters" that can become unassailable when captured.
                     "building_distributions": {
                         **existing_building_distributions,

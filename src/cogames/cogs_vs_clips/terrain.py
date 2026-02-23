@@ -95,7 +95,6 @@ class MachinaArenaConfig(SceneConfig):
         corner_bundle="extractors",
         cross_bundle="none",
         cross_distance=7,
-        junction_object="junction",
     )
 
     # Optional asteroid-shaped boundary mask.

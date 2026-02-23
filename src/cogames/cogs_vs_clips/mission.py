@@ -90,7 +90,7 @@ class CvCMission(CoGameMission):
             max_steps=self.max_steps,
             num_agents=self.num_agents,
             resource_names=CvCConfig.RESOURCES,
-            render=RenderConfig(hud1="hp", hud2="carbon"),
+            render=RenderConfig(hud1="hp", hud2="energy"),
             territories={
                 "team_territory": TerritoryConfig(
                     tag_prefix="team:",
@@ -128,9 +128,6 @@ class CvCMission(CoGameMission):
             objects={
                 "wall": CvCWallConfig().station_cfg(),
                 "junction": CvCJunctionConfig().station_cfg(teams=all_teams),
-                "c:junction": CvCJunctionConfig().station_cfg(
-                    teams=all_teams, owner_team_name="cogs", map_name="c:junction"
-                ),
                 **{
                     f"{resource}_extractor": CvCExtractorConfig(resource=resource).station_cfg()
                     for resource in CvCConfig.ELEMENTS
