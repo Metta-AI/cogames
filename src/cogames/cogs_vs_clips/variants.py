@@ -6,7 +6,11 @@ from pydantic import Field
 
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.evals.difficulty_variants import DIFFICULTY_VARIANTS
-from cogames.cogs_vs_clips.terrain import BaseHubVariant, MachinaArenaVariant
+from cogames.cogs_vs_clips.terrain import (
+    BaseHubVariant,
+    MachinaArenaConfig,
+    MachinaArenaVariant,
+)
 from cogames.core import CoGameMissionVariant
 from mettagrid.config.game_value import inv
 from mettagrid.config.mettagrid_config import MettaGridConfig
@@ -17,6 +21,16 @@ from mettagrid.mapgen.scenes.building_distributions import DistributionConfig, D
 
 if TYPE_CHECKING:
     from cogames.cogs_vs_clips.mission import CvCMission
+
+
+def _set_spawn_count(builder: MapBuilderConfig, spawn_count: int) -> None:
+    """Set spawn_count in nested MachinaArenaConfig so map cells match agent count."""
+    if isinstance(builder, MapGen.Config) and builder.instance is not None:
+        inst = builder.instance
+        if isinstance(inst, MachinaArenaConfig):
+            builder.instance = inst.model_copy(update={"spawn_count": spawn_count})
+        elif isinstance(inst, MapGen.Config) and inst.instance is not None:
+            _set_spawn_count(inst, spawn_count)
 
 
 def _apply_clips_settings(
@@ -361,9 +375,13 @@ class MultiTeamVariant(CoGameMissionVariant):
 
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
         original_builder = env.game.map_builder
+        agents_per_team = mission.num_agents // self.num_teams
         # Shrink inner instance borders so teams are close together
         if isinstance(original_builder, MapGen.Config):
+            original_builder = original_builder.model_copy(deep=True)
             original_builder.border_width = 1
+            # Set spawn_count to match agents per team so map cells match agent count
+            _set_spawn_count(original_builder, agents_per_team)
         env.game.map_builder = MapGen.Config(
             instance=original_builder,
             instances=self.num_teams,
