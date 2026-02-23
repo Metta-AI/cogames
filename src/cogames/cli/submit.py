@@ -308,7 +308,16 @@ def upload_submission(
     else:
         console.print(f"[dim]Uploading policy and submitting to season {season}...[/dim]")
 
-    result = client.complete_policy_upload(upload_id, submission_name, season=season)
+    # Server checks actual S3 object size (catches old clients or misreported sizes). Only
+    # the server knows the real size, so this try/except can't be replaced by a client-side check.
+    try:
+        result = client.complete_policy_upload(upload_id, submission_name, season=season)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 413:
+            detail = e.response.json().get("detail", "Policy too large")
+            console.print(f"[red]{detail}[/red]")
+            raise typer.Exit(1) from None
+        raise
     submission_id = result.get("id")
     name = result.get("name")
     version = result.get("version")

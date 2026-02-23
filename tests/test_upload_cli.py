@@ -227,7 +227,7 @@ def _setup_mock_upload_server(
     ).respond_with_handler(handle_complete)
 
 
-def test_upload_directory_bundle(
+def test_upload_directory_policy(
     httpserver: HTTPServer,
     fake_home: Path,
     tmp_path: Path,
@@ -235,24 +235,24 @@ def test_upload_directory_bundle(
     """Test uploading a policy from a local directory."""
     _setup_mock_upload_server(httpserver)
 
-    # Create a bundle directory with policy_spec.json
-    bundle_dir = tmp_path / "my_bundle"
-    bundle_dir.mkdir()
+    # Create a policy directory with policy_spec.json
+    policy_dir = tmp_path / "my_policy"
+    policy_dir.mkdir()
     policy_spec = {
         "class_path": "my_policies.CustomAgent",
         "data_path": "weights.pt",
         "init_kwargs": {"hidden_size": 256},
     }
-    (bundle_dir / "policy_spec.json").write_text(json.dumps(policy_spec))
-    (bundle_dir / "weights.pt").write_bytes(b"fake weights data")
-    (bundle_dir / "config.yaml").write_text("learning_rate: 0.001\nbatch_size: 32\n")
+    (policy_dir / "policy_spec.json").write_text(json.dumps(policy_spec))
+    (policy_dir / "weights.pt").write_bytes(b"fake weights data")
+    (policy_dir / "config.yaml").write_text("learning_rate: 0.001\nbatch_size: 32\n")
 
     result = subprocess.run(
         [
             "cogames",
             "upload",
             "--policy",
-            bundle_dir.as_uri(),
+            policy_dir.as_uri(),
             "--name",
             "test-policy",
             "--server",
@@ -285,7 +285,7 @@ def test_upload_directory_bundle(
         assert zf.read("config.yaml").decode() == "learning_rate: 0.001\nbatch_size: 32\n"
 
 
-def test_upload_zip_bundle(
+def test_upload_zip_policy(
     httpserver: HTTPServer,
     fake_home: Path,
     tmp_path: Path,
@@ -293,14 +293,14 @@ def test_upload_zip_bundle(
     """Test uploading a policy from a local zip file."""
     _setup_mock_upload_server(httpserver)
 
-    # Create a bundle zip file with policy_spec.json and model weights
-    bundle_zip = tmp_path / "my_bundle.zip"
+    # Create a policy zip file with policy_spec.json and model weights
+    policy_zip = tmp_path / "my_policy.zip"
     policy_spec = {
         "class_path": "my_policies.TrainedAgent",
         "data_path": "model.safetensors",
         "init_kwargs": {"num_layers": 4},
     }
-    with zipfile.ZipFile(bundle_zip, "w") as zf:
+    with zipfile.ZipFile(policy_zip, "w") as zf:
         zf.writestr("policy_spec.json", json.dumps(policy_spec))
         zf.writestr("model.safetensors", b"fake model data")
         zf.writestr("hyperparams.json", json.dumps({"lr": 1e-4, "epochs": 100}))
@@ -310,7 +310,7 @@ def test_upload_zip_bundle(
             "cogames",
             "upload",
             "--policy",
-            bundle_zip.as_uri(),
+            policy_zip.as_uri(),
             "--name",
             "test-policy",
             "--server",
@@ -344,7 +344,7 @@ def test_upload_zip_bundle(
         assert hyperparams == {"lr": 1e-4, "epochs": 100}
 
 
-def test_upload_s3_bundle(
+def test_upload_s3_policy(
     httpserver: HTTPServer,
     fake_home: Path,
     tmp_path: Path,
@@ -355,24 +355,24 @@ def test_upload_s3_bundle(
     # Use a unique S3 key to avoid caching across test runs
     unique_key = f"policies/agent-{uuid.uuid4().hex[:8]}.zip"
 
-    # Create a bundle zip in memory
+    # Create a policy zip in memory
     policy_spec = {
         "class_path": "my_policies.S3Agent",
         "data_path": "checkpoint.pt",
         "init_kwargs": {"from_s3": True},
     }
-    bundle_bytes = io.BytesIO()
-    with zipfile.ZipFile(bundle_bytes, "w") as zf:
+    policy_bytes = io.BytesIO()
+    with zipfile.ZipFile(policy_bytes, "w") as zf:
         zf.writestr("policy_spec.json", json.dumps(policy_spec))
         zf.writestr("checkpoint.pt", b"fake checkpoint data")
         zf.writestr("training_config.yaml", "epochs: 50\nlr: 0.0003\n")
-    bundle_bytes.seek(0)
+    policy_bytes.seek(0)
 
     # Mock S3 GetObject endpoint (path-style: GET /bucket/key)
     httpserver.expect_request(
         f"/test-bucket/{unique_key}",
         method="GET",
-    ).respond_with_data(bundle_bytes.read(), content_type="application/zip")
+    ).respond_with_data(policy_bytes.read(), content_type="application/zip")
 
     result = subprocess.run(
         [
@@ -521,9 +521,9 @@ def test_upload_resolves_season_and_validates(
 ) -> None:
     _setup_mock_upload_server_with_season(httpserver, _SEASON_WITH_ENTRY_CONFIG)
 
-    bundle_dir = tmp_path / "my_bundle"
-    bundle_dir.mkdir()
-    (bundle_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
+    policy_dir = tmp_path / "my_policy"
+    policy_dir.mkdir()
+    (policy_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
 
     captured: dict[str, Any] = {}
 
@@ -540,7 +540,7 @@ def test_upload_resolves_season_and_validates(
         [
             "upload",
             "--policy",
-            bundle_dir.as_uri(),
+            policy_dir.as_uri(),
             "--name",
             "test-policy",
             "--server",
@@ -566,9 +566,9 @@ def test_upload_returns_nonzero_when_validation_fails(
 ) -> None:
     _setup_mock_upload_server_with_season(httpserver, _SEASON_WITH_ENTRY_CONFIG)
 
-    bundle_dir = tmp_path / "my_bundle"
-    bundle_dir.mkdir()
-    (bundle_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
+    policy_dir = tmp_path / "my_policy"
+    policy_dir.mkdir()
+    (policy_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
 
     def fake_subprocess_run(cmd, **kwargs):
         print("invalid season not found")
@@ -582,7 +582,7 @@ def test_upload_returns_nonzero_when_validation_fails(
         [
             "upload",
             "--policy",
-            bundle_dir.as_uri(),
+            policy_dir.as_uri(),
             "--name",
             "test-policy",
             "--server",
@@ -608,9 +608,9 @@ def test_upload_skips_validation_when_no_entry_config(
 ) -> None:
     _setup_mock_upload_server_with_season(httpserver, _SEASON_NO_ENTRY_CONFIG)
 
-    bundle_dir = tmp_path / "my_bundle"
-    bundle_dir.mkdir()
-    (bundle_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
+    policy_dir = tmp_path / "my_policy"
+    policy_dir.mkdir()
+    (policy_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
 
     validation_called = False
 
@@ -627,7 +627,7 @@ def test_upload_skips_validation_when_no_entry_config(
         [
             "upload",
             "--policy",
-            bundle_dir.as_uri(),
+            policy_dir.as_uri(),
             "--name",
             "test-policy",
             "--server",
@@ -642,7 +642,7 @@ def test_upload_skips_validation_when_no_entry_config(
     assert not validation_called, "Validation should be skipped"
 
 
-def test_validate_bundle_fetches_config_and_runs(
+def test_validate_policy_fetches_config_and_runs(
     httpserver: HTTPServer,
 ) -> None:
     default_cfg = MettaGridConfig()
@@ -714,3 +714,68 @@ def test_validate_bundle_fetches_config_and_runs(
 
     assert captured_args.get("called") is True
     assert captured_args["spec"].env.game.max_steps == 10
+
+
+# --- Policy Size Rejection Tests ---
+
+
+def test_upload_rejects_oversized_at_completion(
+    httpserver: HTTPServer,
+    fake_home: Path,
+    tmp_path: Path,
+) -> None:
+    """Server returns 413 at completion stage → clean error after upload."""
+    season_summary = {
+        "id": _SEASON_ID,
+        "name": "test-season",
+        "version": 1,
+        "canonical": True,
+        "is_default": True,
+        "entry_pool": None,
+        "leaderboard_pool": None,
+        "summary": "",
+        "pools": [],
+    }
+
+    httpserver.expect_request("/tournament/seasons", method="GET").respond_with_json([season_summary])
+    httpserver.expect_request("/tournament/seasons/test-season", method="GET").respond_with_json(
+        _season_info_from_summary(season_summary)
+    )
+    httpserver.expect_request("/stats/policies/submit/presigned-url", method="POST").respond_with_json(
+        {"upload_url": httpserver.url_for("/fake-s3-upload"), "upload_id": "test-upload-id"}
+    )
+    httpserver.expect_request("/fake-s3-upload", method="PUT").respond_with_data("")
+    httpserver.expect_request("/stats/policies/submit/complete", method="POST").respond_with_json(
+        {"detail": "Policy too large: 600 MB (max 500 MB)"},
+        status=413,
+    )
+
+    policy_dir = tmp_path / "my_policy"
+    policy_dir.mkdir()
+    (policy_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
+
+    result = subprocess.run(
+        [
+            "cogames",
+            "upload",
+            "--policy",
+            policy_dir.as_uri(),
+            "--name",
+            "test-policy",
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "http://fake-login-server",
+            "--skip-validation",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        env={
+            "HOME": str(fake_home),
+            "PATH": os.environ.get("PATH", ""),
+        },
+    )
+
+    assert result.returncode != 0
+    assert "Policy too large" in result.stdout or "Policy too large" in result.stderr
