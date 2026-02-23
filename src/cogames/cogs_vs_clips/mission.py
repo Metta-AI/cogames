@@ -90,7 +90,7 @@ class CvCMission(CoGameMission):
             max_steps=self.max_steps,
             num_agents=self.num_agents,
             resource_names=CvCConfig.RESOURCES,
-            render=RenderConfig(hud_1="hp", hud_2="carbon"),
+            render=RenderConfig(hud1="hp", hud2="carbon"),
             territories={
                 "team_territory": TerritoryConfig(
                     tag_prefix="team:",
