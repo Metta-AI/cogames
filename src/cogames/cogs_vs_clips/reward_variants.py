@@ -124,6 +124,8 @@ def _apply_aligner(rewards: dict[str, AgentReward]) -> None:
 
     # Junction alignment (the primary aligner objective)
     rewards["junction_aligned_by_agent"] = reward(stat("junction.aligned_by_agent"), weight=5.0)
+    for other_role in ("miner", "scout", "scrambler"):
+        rewards[f"{other_role}_gained"] = reward(stat(f"{other_role}.gained"), weight=-1.0)
 
 
 _MINER_ELEMENTS = ("carbon", "oxygen", "germanium", "silicon")
@@ -138,14 +140,15 @@ def _apply_miner(rewards: dict[str, AgentReward]) -> None:
     for other_role in ("aligner", "scout", "scrambler"):
         rewards[f"{other_role}_gained"] = reward(stat(f"{other_role}.gained"), weight=-1.0)
 
-    # Balanced resource gain/deposit (log-product gives diminishing returns, encouraging diversity)
+    # Balanced resource gain/loss (loss tracks hub deposits in current env plumbing;
+    # keep deposited metrics in role-percentile parsing for historical episodes).
     rewards["gain_diversity"] = reward(
         [stat(f"{e}.gained") for e in _MINER_ELEMENTS],
         aggregation=Aggregation.SUM_LOGS,
         weight=0.5,
     )
-    rewards["deposit_diversity"] = reward(
-        [stat(f"{e}.deposited") for e in _MINER_ELEMENTS],
+    rewards["loss_diversity"] = reward(
+        [stat(f"{e}.lost") for e in _MINER_ELEMENTS],
         aggregation=Aggregation.SUM_LOGS,
         weight=0.5,
     )
@@ -158,6 +161,8 @@ def _apply_scout(rewards: dict[str, AgentReward]) -> None:
     rewards["scout_lost"] = reward(stat("scout.lost"), weight=-2.0)
 
     rewards["cell_visited"] = reward(stat("cell.visited"), weight=0.0001)
+    for other_role in ("miner", "scrambler", "aligner"):
+        rewards[f"{other_role}_gained"] = reward(stat(f"{other_role}.gained"), weight=-1.0)
 
 
 def _apply_scrambler(rewards: dict[str, AgentReward]) -> None:
@@ -173,6 +178,8 @@ def _apply_scrambler(rewards: dict[str, AgentReward]) -> None:
 
     # Junction scrambling (the primary scrambler objective)
     rewards["junction_scrambled_by_agent"] = reward(stat("junction.scrambled_by_agent"), weight=5.0)
+    for other_role in ("miner", "scout", "aligner"):
+        rewards[f"{other_role}_gained"] = reward(stat(f"{other_role}.gained"), weight=-1.0)
 
 
 def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str] | None = None) -> None:
