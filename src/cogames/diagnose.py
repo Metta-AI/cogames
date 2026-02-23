@@ -3050,7 +3050,7 @@ def diagnose_cmd(
     cases = _build_diagnose_cases(
         mission_set=mission_set,
         experiments=experiments,
-        cogs=resolved_cogs,
+        cogs=cogs,
         steps=steps,
     )
     if not cases:
