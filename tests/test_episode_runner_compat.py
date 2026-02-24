@@ -1,3 +1,15 @@
+# This test serializes a job spec from the CURRENT code and runs it on an OLD episode-runner
+# Docker image. If this test fails, it means you broke backwards compatibility.
+#
+# The WRONG fix is to modify the job/env/config in this test to strip out or scrub fields
+# that the old image doesn't understand. That defeats the entire purpose — this test is
+# supposed to catch exactly that situation. If the old runner can't deserialize what the
+# current code produces, the schemas are not backwards compatible.
+#
+# The RIGHT fix is one of:
+#   1. Make your schema change backwards compatible (e.g. optional fields with defaults).
+#   2. Bump COMPAT_VERSION and publish a new compat image that includes your changes.
+
 import os
 import subprocess
 import tempfile
@@ -29,12 +41,6 @@ def _docker_available() -> bool:
 def test_job_runs_on_compat_episode_runner():
     env_cfg = make_game()
     env_cfg.game.max_steps = 10
-    # Keep this smoke test pinned to features supported by compat images.
-    env_cfg.game.events = {}
-    env_cfg.game.materialize_queries = []
-    map_builder_instance = getattr(env_cfg.game.map_builder, "instance", None)
-    if map_builder_instance is not None and hasattr(map_builder_instance, "map_perimeter_placements"):
-        map_builder_instance.map_perimeter_placements = []
 
     job = SingleEpisodeJob(
         policy_uris=["mock://random"],
@@ -45,9 +51,7 @@ def test_job_runs_on_compat_episode_runner():
 
     with tempfile.TemporaryDirectory() as workspace:
         spec_path = Path(workspace) / "spec.json"
-        spec_path.write_text(
-            job.model_dump_json(exclude={"env": {"game": {"map_builder": {"instance": {"map_perimeter_placements"}}}}})
-        )
+        spec_path.write_text(job.model_dump_json())
 
         result = subprocess.run(
             [
