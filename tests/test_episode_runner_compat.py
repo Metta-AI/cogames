@@ -29,6 +29,12 @@ def _docker_available() -> bool:
 def test_job_runs_on_compat_episode_runner():
     env_cfg = make_game()
     env_cfg.game.max_steps = 10
+    # Keep this smoke test pinned to features supported by compat images.
+    env_cfg.game.events = {}
+    env_cfg.game.materialize_queries = []
+    map_builder_instance = getattr(env_cfg.game.map_builder, "instance", None)
+    if map_builder_instance is not None and hasattr(map_builder_instance, "map_perimeter_placements"):
+        map_builder_instance.map_perimeter_placements = []
 
     job = SingleEpisodeJob(
         policy_uris=["mock://random"],
