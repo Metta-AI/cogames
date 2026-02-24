@@ -30,6 +30,7 @@ from mettagrid.config.handler_config import Handler, updateTarget
 from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig, RenderConfig, RenderHudConfig
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
 from mettagrid.config.query import query
+from mettagrid.config.render_config import RenderAsset
 from mettagrid.config.tag import typeTag
 from mettagrid.config.territory_config import TerritoryConfig
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
@@ -84,6 +85,15 @@ class CvCMission(CoGameMission):
         self.clips.team_id = len(team_objs)
 
         all_teams = [*team_objs, self.clips]
+        render_assets = {
+            "hub": "hub",
+            "junction": [
+                RenderAsset(asset="junction.working", tags=["team:cogs"]),
+                RenderAsset(asset="junction.clipped1", tags=["team:clips"]),
+                RenderAsset(asset="junction"),
+            ],
+            **{f"{team.short_name}:{gear}": f"{gear}_station" for team in team_objs for gear in CvCConfig.GEAR},
+        }
 
         game = GameConfig(
             map_builder=self.map_builder(),
@@ -93,6 +103,7 @@ class CvCMission(CoGameMission):
             render=RenderConfig(
                 hud1=RenderHudConfig(resource="hp", max=100),
                 hud2=RenderHudConfig(resource="energy", short_name="E", max=100),
+                assets=render_assets,
             ),
             territories={
                 "team_territory": TerritoryConfig(

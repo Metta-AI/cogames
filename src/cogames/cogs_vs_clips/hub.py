@@ -42,7 +42,6 @@ class CvCHubConfig(CvCStationConfig):
         return GridObjectConfig(
             name="hub",
             map_name=map_name or "hub",
-            render_name="hub",
             render_symbol="📦",
             tags=[
                 team.team_tag(),

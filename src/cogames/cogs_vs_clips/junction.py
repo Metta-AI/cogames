@@ -42,7 +42,6 @@ class CvCJunctionConfig(CvCStationConfig):
         return GridObjectConfig(
             name="junction",
             map_name=map_name or "junction",
-            render_name="junction",
             render_symbol="📦",
             tags=[
                 f"team:{owner_team_name}",
