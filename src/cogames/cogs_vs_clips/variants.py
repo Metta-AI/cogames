@@ -12,6 +12,7 @@ from cogames.cogs_vs_clips.terrain import (
     MachinaArenaVariant,
 )
 from cogames.core import CoGameMissionVariant
+from mettagrid.config.filter import actorHasAnyOf
 from mettagrid.config.game_value import inv
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.map_builder.map_builder import MapBuilderConfig
@@ -489,6 +490,23 @@ class BraveheartVariant(CoGameMissionVariant):
             team.initial_hearts = 255
 
 
+_HEART_WITHDRAW_HANDLERS = ("get_heart", "get_and_make_heart", "get_last_heart")
+
+
+class TinManVariant(CoGameMissionVariant):
+    name: str = "tin_man"
+    description: str = "No heart without gear — agents must hold a gear to withdraw hearts from the hub."
+
+    @override
+    def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
+        gear_filter = actorHasAnyOf(CvCConfig.GEAR)
+        for obj in env.game.objects.values():
+            for handler_name in _HEART_WITHDRAW_HANDLERS:
+                handler = obj.on_use_handlers.get(handler_name)
+                if handler is not None:
+                    handler.filters = [handler.filters[0], gear_filter, *handler.filters[1:]]
+
+
 VARIANTS: list[CoGameMissionVariant] = [
     BraveheartVariant(),
     CavesVariant(),
@@ -509,6 +527,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     Small50Variant(),
     SuperChargedVariant(),
     ForcedRoleVibesVariant(),
+    TinManVariant(),
     *DIFFICULTY_VARIANTS,
 ]
 
