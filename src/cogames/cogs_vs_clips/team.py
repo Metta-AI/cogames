@@ -11,6 +11,12 @@ from pydantic import Field
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.hub import CvCHubConfig
 from mettagrid.base_config import Config
+from mettagrid.config.derived_stat import (
+    AnyDerivedStat,
+    CumulativeDerivedStat,
+    TagCountDerivedStat,
+    TagInventoryDerivedStat,
+)
 from mettagrid.config.filter import (
     AnyFilter,
     GameValueFilter,
@@ -68,6 +74,22 @@ class TeamConfig(Config):
                     edge_filters=[maxDistance(max(CvCConfig.JUNCTION_ALIGN_DISTANCE, CvCConfig.HUB_ALIGN_DISTANCE))],
                 ),
             )
+        ]
+
+    def derived_stats(self, resource_names: list[str]) -> list[AnyDerivedStat]:
+        junction_name = f"{self.name}/aligned.junction"
+        return [
+            TagCountDerivedStat(name=junction_name, tag=self.net_tag(), offset=1),
+            CumulativeDerivedStat(name=f"{self.name}/aligned.junction.held", source_stat=junction_name),
+            *[
+                TagInventoryDerivedStat(
+                    name=f"{self.name}/{resource}.amount",
+                    tag=self.team_tag(),
+                    resource=resource,
+                    require_tag=typeTag("hub"),
+                )
+                for resource in resource_names
+            ],
         ]
 
     def hub_query(self) -> Query:
