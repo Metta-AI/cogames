@@ -3,7 +3,7 @@ from typing import Literal, cast
 
 import pytest
 
-from cogames.cogs_vs_clips.terrain import MachinaArenaConfig
+from cogames.cogs_vs_clips.terrain import MachinaArenaConfig, SequentialMachinaArena
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.mapgen.scenes.base_hub import DEFAULT_EXTRACTORS, BaseHub
 
@@ -173,6 +173,36 @@ def _build_base_hub_only(*, corner_bundle: str, cross_bundle: str, cross_distanc
     return game_map.grid
 
 
+def _build_sequential_arena_map(
+    *,
+    width: int,
+    height: int,
+    seed: int,
+    map_corner_placements: list[tuple[str, int]],
+    map_perimeter_placements: list[tuple[str, int]] | None = None,
+    border_width: int | None = None,
+):
+    cfg_kwargs = {
+        "width": width,
+        "height": height,
+        "seed": seed,
+        "instance": SequentialMachinaArena.Config(
+            spawn_count=0,
+            building_coverage=0.0,
+            map_corner_placements=map_corner_placements,
+            map_perimeter_placements=map_perimeter_placements or [],
+            hub=BaseHub.Config(corner_bundle="none", cross_bundle="none"),
+        ),
+    }
+    if border_width is not None:
+        cfg_kwargs["border_width"] = border_width
+    return MapGen.Config(**cfg_kwargs).create().build()
+
+
+def _object_positions(grid, obj_name: str) -> set[tuple[int, int]]:
+    return {(y, x) for y in range(grid.shape[0]) for x in range(grid.shape[1]) if grid[y, x] == obj_name}
+
+
 @pytest.mark.parametrize(
     "corner_bundle,cross_bundle,expected_corner,expected_cross",
     [
@@ -200,6 +230,27 @@ def test_base_hub_grid_matches_bundles(
             assert value == "empty", f"Expected empty cross tile at {(x, y)}, found {value!r}"
         else:
             assert value == name, f"Expected cross object {name} at {(x, y)}, found {value!r}"
+
+
+@pytest.mark.parametrize("clips_hub_spawn_count", [1, 3])
+def test_clips_hub_spawns_on_inner_perimeter(clips_hub_spawn_count: int):
+    perimeter = (
+        {(2, x) for x in range(2, 19)}
+        | {(18, x) for x in range(2, 19)}
+        | {(y, 2) for y in range(2, 19)}
+        | {(y, 18) for y in range(2, 19)}
+    )
+    game_map = _build_sequential_arena_map(
+        width=21,
+        height=21,
+        seed=7,
+        map_corner_placements=[],
+        map_perimeter_placements=[("clips:hub", clips_hub_spawn_count)],
+        border_width=0,
+    )
+    placements = _object_positions(game_map.grid, "clips:hub")
+    assert len(placements) == clips_hub_spawn_count
+    assert placements <= perimeter
 
 
 def test_procedural_builder_deterministic_with_seed():

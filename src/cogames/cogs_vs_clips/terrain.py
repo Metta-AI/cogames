@@ -66,6 +66,41 @@ class MapCornerPlacements(Scene[MapCornerPlacementsConfig]):
                     self.grid[r, c] = obj_name
 
 
+class PerimeterPlacementsConfig(SceneConfig):
+    """Place objects randomly on the map perimeter at a fixed offset from edges."""
+
+    placements: list[tuple[str, int]] = []
+    offset: int = 2
+
+
+class PerimeterPlacements(Scene[PerimeterPlacementsConfig]):
+    """Place configured objects on unique random cells along an inset perimeter ring."""
+
+    def render(self) -> None:
+        cfg = self.config
+        h, w = self.height, self.width
+        offset = max(0, int(cfg.offset))
+
+        perimeter_positions = (
+            [(offset, c) for c in range(offset, w - offset)]
+            + [(h - 1 - offset, c) for c in range(offset, w - offset)]
+            + [(r, offset) for r in range(offset + 1, h - 1 - offset)]
+            + [(r, w - 1 - offset) for r in range(offset + 1, h - 1 - offset)]
+        )
+        available_positions = list(dict.fromkeys(perimeter_positions))
+        if not available_positions:
+            return
+
+        for obj_name, count in cfg.placements:
+            spawn_count = min(max(0, int(count)), len(available_positions))
+            if not obj_name or spawn_count <= 0:
+                continue
+            chosen = self.rng.choice(len(available_positions), size=spawn_count, replace=False)
+            for idx in sorted((int(i) for i in np.atleast_1d(chosen)), reverse=True):
+                r, c = available_positions.pop(idx)
+                self.grid[r, c] = obj_name
+
+
 class EnsureHubReachableJunctionConfig(SceneConfig):
     """Ensure each hub has at least one nearby neutral junction."""
 
@@ -83,7 +118,6 @@ class EnsureHubReachableJunction(Scene[EnsureHubReachableJunctionConfig]):
         return value.endswith(self.config.hub_suffix) or value == self.config.hub_name
 
     def _is_passable(self, value: object) -> bool:
-        # Match scripted-agent navigation expectations: avoid traversing other structures.
         if not isinstance(value, str):
             return False
         if value == "empty":
@@ -213,6 +247,8 @@ class MachinaArenaConfig(SceneConfig):
     # Objects to place at map corners (not BaseHub corners). List of (object_name, corner_index).
     # Corner indices: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right.
     map_corner_placements: list[tuple[str, int]] = []
+    # Objects to place randomly on the perimeter (object_name, count).
+    map_perimeter_placements: list[tuple[str, int]] = []
 
     #### Layers ####
 
@@ -488,12 +524,6 @@ class MachinaArena(Scene[MachinaArenaConfig]):
                 where="full",
             )
         )
-        children.append(
-            ChildrenAction(
-                scene=EnsureHubReachableJunctionConfig(max_distance=15),
-                where="full",
-            )
-        )
 
         return children
 
@@ -672,6 +702,13 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
                 where="full",
             )
         )
+        if cfg.map_perimeter_placements:
+            children.append(
+                ChildrenAction(
+                    scene=PerimeterPlacements.Config(placements=cfg.map_perimeter_placements, offset=2),
+                    where="full",
+                )
+            )
         if cfg.map_corner_placements:
             children.append(
                 ChildrenAction(
@@ -685,7 +722,6 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
                 where="full",
             )
         )
-
         return children
 
 
