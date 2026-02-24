@@ -69,7 +69,7 @@ MACHINA_1 = CoGameSite(
         height=88,
         instance=SequentialMachinaArena.Config(
             spawn_count=20,
-            map_perimeter_placements=[("clips:hub", 1)],
+            map_perimeter_placements=[("clips:hub", 3)],
         ),
     ),
     min_cogs=1,
