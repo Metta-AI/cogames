@@ -5,8 +5,7 @@
 **CogsGuard is the New Default Game**
 
 - `cogames missions` now shows CogsGuard (`cogsguard_arena`) as the default and only visible game
-- Legacy missions (training_facility, hello_world, machina_1) are hidden from the CLI but remain available for internal
-  use
+- Legacy missions (training_facility, hello_world, machina_1) are hidden from the CLI but still accessible by name
 - Default season changed to `beta-cogsguard`
 
 **Season-Aware Policy Validation**

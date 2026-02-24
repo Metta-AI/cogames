@@ -6,20 +6,21 @@ This guide explains how the procedural map system is wired together and how to e
 
 ### Core Modules
 
-- `cogs_vs_clips/procedural.py`
-  - `MachinaArena` scene
-  - Variant helpers (`ProceduralOverridesVariant`, `apply_procedural_overrides`, `apply_base_hub_overrides`)
+- `cogs_vs_clips/terrain.py`
+  - `MachinaArena` / `MachinaArenaConfig` scene
+  - `SequentialMachinaArena` / `SequentialMachinaArenaConfig` scene
+  - Variant helpers (`MapSeedVariant`, `BaseHubVariant`, `MachinaArenaVariant`)
 - `mettagrid/mapgen/scenes/building_distributions.py`
   - `UniformExtractorScene` and `DistributionConfig` for building placement
+- `cogames/core.py`
+  - Base `CoGameSite`, `CoGameMission`, `CoGameMissionVariant` types
 - `cogs_vs_clips/mission.py`
-  - Base `Site`, `Mission`, `MissionVariant` types
+  - `CvCMission` (the concrete mission class for Cogs vs Clips)
 - `cogs_vs_clips/sites.py`
   - Catalog of sites
 - `cogs_vs_clips/variants.py`
   - Catalog of variants
-- `cogs_vs_clips/missions.py`
-  - Catalog of missions, mostly composed from variants
-- `cogs_vs_clips/cli/mission.py`
+- `cogames/cli/mission.py`
   - CLI glue (`cogames play`, `cogames missions`, `cogames train`) and variant composition
 
 Everything ultimately produces a `MapBuilderConfig` that feeds into a `MettaGridConfig`. Missions and variants
@@ -34,7 +35,7 @@ coordinate map building, agent setup, and post-processing such as hub rewrites.
 Asteroid arena built as a Scene graph: base-biome shell, optional biome/dungeon overlays, resource placement,
 connectivity, and a central hub.
 
-Config fields (all keyword-only):
+Config fields (all keyword-only on `MachinaArenaConfig`):
 
 | Category                | Parameters                                                                                      |
 | ----------------------- | ----------------------------------------------------------------------------------------------- |
@@ -45,34 +46,39 @@ Config fields (all keyword-only):
 | Dungeon overlays        | `dungeon_weights`, `dungeon_count`, `max_dungeon_zone_fraction`                                 |
 | Buildings               | `building_names`, `building_weights`, `building_coverage`                                       |
 | Placement distributions | `distribution` (global `DistributionConfig`), `building_distributions` (per-building overrides) |
-| Hub layout              | `hub_corner_bundle`, `hub_cross_bundle`, `hub_cross_distance`                                   |
+| Hub layout              | `hub` (`BaseHubConfig` with `corner_bundle`, `cross_bundle`, `cross_distance`, etc.)            |
 
 Important details:
 
-- Building parameters are expressed in “buildings” (stations). Legacy extractor fields are not accepted.
+- Building parameters are expressed in "buildings" (stations). Legacy extractor fields are not accepted.
 - The top-level `MapGen.Config` (not the scene) carries `seed`. Scenes inherit RNGs spawned from the root, so the same
   seed reproduces terrain and placement exactly.
-- Hub defaults place chests in the corners, but variants commonly override bundles and cross spacing.
+- Hub defaults place extractors in the corners, but variants commonly override bundles and cross spacing via
+  `BaseHubVariant`.
 
 #### Example: site-level builder
 
 ```python
-from cogames.cogs_vs_clips.procedural import MachinaArena
+from cogames.cogs_vs_clips.terrain import MachinaArenaConfig
+from cogames.core import CoGameSite
 from mettagrid.mapgen.mapgen import MapGen
+from mettagrid.mapgen.scenes.base_hub import BaseHubConfig
 
-MACHINA_PROCEDURAL_200 = Site(
+MACHINA_PROCEDURAL_200 = CoGameSite(
     name="machina_procedural_200",
     description="Large procedural arena",
     map_builder=MapGen.Config(
         width=200,
         height=200,
         seed=12345,
-        instance=MachinaArena.Config(
+        instance=MachinaArenaConfig(
             spawn_count=4,
             base_biome="caves",
-            hub_corner_bundle="chests",
-            hub_cross_bundle="extractors",
-            hub_cross_distance=7,
+            hub=BaseHubConfig(
+                corner_bundle="extractors",
+                cross_bundle="extractors",
+                cross_distance=7,
+            ),
             building_names=[
                 "chest",
                 "junction",
@@ -114,7 +120,7 @@ modes:
 2. **Grid-driven**: Without coverage, it places objects on a jittered grid defined by `rows`, `cols`, and `padding`.
 
 Every random sample uses `self.rng`, which comes from the parent scene. Because `SceneConfig.seed` defaults to the
-parent’s RNG when unset, the top-level `MapGen.Config(seed=...)` ensures deterministic results.
+parent's RNG when unset, the top-level `MapGen.Config(seed=...)` ensures deterministic results.
 
 `DistributionConfig` supports:
 
@@ -133,86 +139,77 @@ global `distribution`.
 Sites describe reusable environments. They point to either a static map (`get_map("name.map")`) or a procedural builder.
 Examples:
 
-- `TRAINING_FACILITY`: hub-only builder, 21×21
-- `HELLO_WORLD`: 100×100 procedural arena
-- `MACHINA_1`: 200×200 procedural arena
+- `TRAINING_FACILITY`: hub-only builder, 13x13
+- `HELLO_WORLD`: 100x100 procedural arena
+- `MACHINA_1`: 88x88 procedural arena
+- `COGSGUARD_MACHINA_1`: 50x50 CogsGuard variant
+- `COGSGUARD_ARENA`: 50x50 compact training map
 
 Each site defines `min_cogs`/`max_cogs`. CLI calls (`--cogs`) override the default during mission instantiation.
 
 #### Mission lifecycle (`mission.py`)
 
-1. `mission.with_variants(variants_list)` (optional) clones the mission and attach variants to it
+1. `mission.with_variants(variants_list)` (optional) clones the mission and attaches variants to it
    - `variant.modify_mission()` is applied immediately
    - `variant.modify_env()` is applied when `make_env` is called
-   -
 2. `mission.make_env()` finalizes the `MettaGridConfig` and applies variants to the environment
 
 #### Variants
 
-Variants inherit from `MissionVariant` and override either `modify_mission(self, mission)`,
+Variants inherit from `CoGameMissionVariant` and override either `modify_mission(self, mission)`,
 `modify_env(self, mission, env)`, or both.
 
 Common patterns:
 
-- Update resource/tuning parameters:
+- Modify terrain config via typed variant helpers:
 
   ```python
-  class MinedOutVariant(MissionVariant):
-      name: str = "mined_out"
-      description: str = "Some resources are depleted."
+  from cogames.cogs_vs_clips.terrain import MachinaArenaVariant, MachinaArenaConfig
 
-      def modify_mission(self, mission: Mission):
-          mission.carbon_extractor.efficiency -= 50
-          mission.oxygen_extractor.efficiency -= 50
-          mission.germanium_extractor.efficiency -= 50
-          mission.silicon_extractor.efficiency -= 50
-  ```
-
-- Switch biomes or hub contents:
-
-  ```python
-  class CityVariant(ProceduralOverridesVariant):
+  class CityVariant(MachinaArenaVariant):
       name: str = "city"
       description: str = "Ancient city ruins provide structured pathways."
-      overrides: ProceduralOverrides = ProceduralOverrides(
-          biome_weights={"city": 1.0, "caves": 0.0, "desert": 0.0, "forest": 0.0},
-          base_biome="city",
-          # Fill almost the entire map with the city layer
-          density_scale=1.0,
-          biome_count=1,
-          max_biome_zone_fraction=0.95,
-          # Tighten the city grid itself
-      )
+
+      def modify_node(self, cfg: MachinaArenaConfig) -> None:
+          cfg.biome_weights = {"city": 1.0, "caves": 0.0, "desert": 0.0, "forest": 0.0}
+          cfg.base_biome = "city"
+          cfg.density_scale = 1.0
+          cfg.biome_count = 1
+          cfg.max_biome_zone_fraction = 0.95
   ```
 
-- Adjust hub bundles:
+- Adjust hub bundles via `BaseHubVariant`:
 
   ```python
-  class BothBaseVariant(MissionVariant):
-      name: str = "both_base"
-      description: str = "Chests on corners, extractors on cross arms."
+  from cogames.cogs_vs_clips.terrain import BaseHubVariant
+  from mettagrid.mapgen.scenes.base_hub import BaseHubConfig
 
-      def modify_mission(self, mission: Mission) -> Mission:
-          mission.procedural_overrides.update(
-              {
-                  "hub_corner_bundle": "chests",
-                  "hub_cross_bundle": "extractors",
-                  "hub_cross_distance": 7,
-              }
-          )
+  class ExtractorCrossVariant(BaseHubVariant):
+      name: str = "extractor_cross"
+      description: str = "Extractors on cross arms."
+
+      def modify_node(self, cfg: BaseHubConfig) -> None:
+          cfg.cross_bundle = "extractors"
+          cfg.cross_distance = 7
   ```
 
-- Adjust any env properties:
+- Adjust env properties directly:
 
   ```python
-  class MyVariant(MissionVariant):
+  from cogames.core import CoGameMissionVariant
+  from cogames.cogs_vs_clips.mission import CvCMission
+  from mettagrid.config.mettagrid_config import MettaGridConfig
+
+  class MyVariant(CoGameMissionVariant):
       name: str = "my"
-      def modify_env(self, mission: Mission, env: MettaGridConfig) -> None:
-          env.game.junction.efficiency -= 50
+
+      def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
+          # Modify env config before simulation starts
+          ...
   ```
 
-CLI variants are composed in order, so `cogames play -m machina_procedural.open_world -v city -v both_base` applies
-`city`, then `both_base`.
+CLI variants are composed in order, so `cogames play -m cogsguard_machina_1.basic -v city -v extractor_cross` applies
+`city`, then `extractor_cross`.
 
 ---
 
@@ -229,12 +226,12 @@ CLI variants are composed in order, so `cogames play -m machina_procedural.open_
   layouts; with caching disabled (`maps_cache_size=None`), you get a fresh layout each episode.
 - For fully reproducible play/eval runs, set **both** `--seed` and `--map-seed`.
 
-Example programmatic override using the shared `MapSeedVariant` helper:
+Example programmatic override using the `MapSeedVariant` helper:
 
 ```python
-from cogames.cogs_vs_clips.procedural import MapSeedVariant
+from cogames.cogs_vs_clips.terrain import MapSeedVariant
 
-base_mission = HelloWorldOpenWorldMission
+base_mission = my_mission
 seeded_mission = base_mission.with_variants([MapSeedVariant(seed=1234)])
 env_cfg = seeded_mission.make_env()
 # env_cfg.game.map_builder is a MapGen.Config with seed=1234; calling builder.build()
@@ -245,16 +242,19 @@ env_cfg = seeded_mission.make_env()
 
 ### Building New Missions
 
-1. **Define or reuse a Site** with the desired map builder.
-2. **Define the desired behavior in a variant**
-3. **Create a Mission object**:
+1. **Define or reuse a `CoGameSite`** with the desired map builder.
+2. **Define the desired behavior in a variant** (inheriting from `CoGameMissionVariant` or a typed helper like
+   `MachinaArenaVariant`).
+3. **Create a `CvCMission` object**:
 
 ```python
-mission = Mission(
-  name="my_mission",
-  description="My mission",
-  site=site,
-  variants=[Variant1(), Variant2()],
+from cogames.cogs_vs_clips.mission import CvCMission
+
+mission = CvCMission(
+    name="my_mission",
+    description="My mission",
+    site=my_site,
+    variants=[Variant1(), Variant2()],
 )
 ```
 
@@ -273,31 +273,15 @@ mission = Mission(
 - Play with variants and overrides:
 
   ```bash
-  cogames play --mission machina_procedural.open_world \
+  cogames play --mission cogsguard_machina_1.basic \
                --variant city \
-               --variant both_base \
                --cogs 8 \
                --policy random
   ```
 
-- Train on one or more missions (default policy `lstm`):
-
-  ```bash
-  # Single mission
-  uv run cogames train -m machina_1.open_world --steps 200000 --seed 12345
-
-  # Multiple missions
-  uv run cogames train \
-      -m machina_1.open_world \
-      -m machina_procedural.explore \
-      -m training_facility.harvest \
-      --steps 200000 \
-      --seed 12345
-  ```
-
 - Reproduce a procedural layout:
   ```bash
-  cogames play -m machina_procedural.open_world --variant city --map-seed 24601 --seed 24601
+  cogames play -m cogsguard_machina_1.basic --variant city --map-seed 24601 --seed 24601
   ```
   (Use `--map-seed` for layout determinism; include `--seed` to reproduce simulator/policy RNG.)
 
@@ -305,48 +289,7 @@ mission = Mission(
 
 ### Recommended Workflow
 
-1. Start with an existing Site + Mission pair (e.g., `HELLO_WORLD`, `ExploreMission`).
+1. Start with an existing Site + Mission pair (e.g., `COGSGUARD_ARENA`, `COGSGUARD_MACHINA_1`).
 2. Copy the mission, adjust its properties, and add it to `MISSIONS`.
 3. Define variants for reusable tweaks.
-4. Use CLI commands (`missions`, `play`, `train`) to iterate quickly.
-5. When training, consider reducing `--parallel-envs`/`--num-workers` on macOS to avoid long startup times while
-   generating large maps.
-
----
-
-### Curated Integrated Evals (Scorable Baselines)
-
-We provide a small integrated evaluation set (see `cogs_vs_clips/evals/integrated_eval.py`) tuned to yield non-zero
-scores for baseline agents while leaving headroom for improvement. These are composed from procedural `HELLO_WORLD` maps
-with variants that balance approachability and challenge.
-
-Key design choices:
-
-- Pack the base hub lightly (`EmptyBaseVariant`) where appropriate to encourage early exploration without
-  over-constraining.
-- Raise agent caps modestly (`PackRatVariant`) to avoid early inventory stalls but keep routing relevant.
-- Shape reward on vibe missions (`HeartChorusVariant`) so partial progress is scored.
-- Keep vibe mechanics intact unless the mission explicitly focuses on vibe manipulation.
-
-Included missions and variants:
-
-- oxygen_bottleneck: `EmptyBaseVariant(missing=["oxygen_extractor"])`, `ResourceBottleneckVariant(["oxygen"])`,
-  `SingleResourceUniformVariant("oxygen_extractor")`, `PackRatVariant`
-- energy_starved: `EmptyBaseVariant`, `DarkSideVariant`, `PackRatVariant`
-- distant_resources: `EmptyBaseVariant`, `DistantResourcesVariant`
-- quadrant_buildings: `EmptyBaseVariant`, `QuadrantBuildingsVariant`
-- single_use_swarm: `EmptyBaseVariant`, `SingleUseSwarmVariant`, `PackRatVariant`
-- vibe_check: `HeartChorusVariant`, `VibeCheckMin2Variant`
-
-Usage example:
-
-```bash
-uv run cogames diagnose thinky \
-  --mission-set integrated_evals \
-  --cogs 4 \
-  --episodes 2
-```
-
-Recommendation: When designing new scorable baselines, combine one "shaping" variant (e.g., `HeartChorusVariant`,
-`PackRatVariant`) with one "constraint" variant (e.g., `DarkSideVariant`, `ResourceBottleneckVariant`,
-`SingleUseSwarmVariant`) to keep tasks legible yet challenging.
+4. Use CLI commands (`missions`, `play`) to iterate quickly.

@@ -43,9 +43,9 @@ from einops import rearrange
 
 import pufferlib.vector as pvector
 from cogames.cogs_vs_clips.clip_difficulty import EASY
+from cogames.cogs_vs_clips.cog import CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
-from cogames.cogs_vs_clips.team import CogTeam
 from cogames.cogs_vs_clips.tutorials.scout_tutorial import ScoutRewardsVariant
 from mettagrid import MettaGridConfig
 from mettagrid.envs.early_reset_handler import EarlyResetHandler

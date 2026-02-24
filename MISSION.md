@@ -63,7 +63,7 @@ Roles are acquired at Gear Stations by spending resources. Each role has unique 
 | Role      | Specialization                                     | Dependency                          |
 | --------- | -------------------------------------------------- | ----------------------------------- |
 | Miner     | +40 cargo, 10x resource extraction from extractors | Needs team to deposit resources     |
-| Aligner   | +20 influence capacity, captures territory         | Needs Miners for resources          |
+| Aligner   | Captures neutral junctions (1 heart per capture)   | Needs Miners for resources          |
 | Scrambler | +200 HP, disrupts enemy control                    | Needs team presence to be effective |
 | Scout     | +100 energy, +400 HP, mobile reconnaissance        | Needs team to hold what they find   |
 
@@ -91,7 +91,6 @@ Facilities (Hub, Junction) project area-of-effect (AOE) in a radius (default 10 
 
 **Within friendly territory:**
 
-- Influence fully restored
 - Energy fully restored
 - HP fully restored
 
@@ -99,15 +98,14 @@ Facilities (Hub, Junction) project area-of-effect (AOE) in a radius (default 10 
 
 - -1 HP per tick
 - Energy drained
-- Influence drained
 
 ### Capturing Territory
 
-- **Aligners** capture neutral junctions by spending 1 influence and 1 heart
-- **Scramblers** disrupt enemy junctions by spending 1 heart, making them neutral
+- **Aligners** capture neutral junctions by spending 1 heart (requires aligner gear)
+- **Scramblers** disrupt enemy junctions by spending 1 heart (requires scrambler gear), making them neutral
 
-Since enemy AOE drains influence, Aligners cannot capture junctions within enemy territory. Scramblers must first
-neutralize nearby enemy junctions to stop the influence drain before Aligners can advance.
+Since enemy AOE drains HP and energy, pushing deep into enemy territory is dangerous. Scramblers, with their +200 HP
+bonus, can survive long enough to neutralize enemy junctions, clearing the way for Aligners to advance.
 
 ---
 

@@ -92,7 +92,7 @@ features = id_map.features()
 
 # Each feature provides:
 # - id: int - The feature ID used in observation tokens
-# - name: str - Human-readable feature name (e.g., "inv:food", "agent:group")
+# - name: str - Human-readable feature name (e.g., "inv:oxygen", "agent:group")
 # - normalization: float - Normalization factor for this feature
 ```
 
@@ -104,19 +104,23 @@ feature IDs for your configuration.
 
 | Feature Name                      | Description                                                                     | Objects with this Feature | Notes                                                                           |
 | --------------------------------- | ------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------- |
-| `agent:group`                     | Cog's group/team identifier                                                     | cogs                      | Teams not currently in use.                                                     |
-| `agent:frozen`                    | Whether cog is frozen or not. Frozen cogs cannot act                            | cogs                      | Freezing not currently in use.                                                  |
-| `episode_completion_pct`          | Portion of the episode completed, from 0 (start) to 255 (end). Not a percentage | self                      |                                                                                 |
-| `last_action`                     | Last action taken by the cog                                                    | self                      |                                                                                 |
-| `last_reward`                     | Last reward received by the cog                                                 | self                      |                                                                                 |
-| `vibe`                            | Cog's current vibe                                                              | any object                | Values can be found in `vibes.VIBES`                                            |
+| `agent:group`                     | Cog's group/team identifier                                                     | cogs                      | Used for team identification in CogsGuard                                       |
+| `agent:frozen`                    | Whether cog is frozen or not. Frozen cogs cannot act                            | cogs                      |                                                                                 |
+| `episode_completion_pct`          | Portion of the episode completed, from 0 (start) to 255 (end). Not a percentage | self (global)             |                                                                                 |
+| `last_action`                     | Last action taken by the cog                                                    | self (global)             |                                                                                 |
+| `last_reward`                     | Last reward received by the cog                                                 | self (global)             |                                                                                 |
+| `goal`                            | Indicates rewarding resources                                                   | cogs                      |                                                                                 |
+| `vibe`                            | Cog's current vibe                                                              | any object                | Values depend on mission config                                                 |
 | `tag`                             | Tags associated with an object (e.g., "wall", "oxygen_extractor", "blue")       | any object                | Values can be found in `IdMap.tag_names()`. Multiple tags emit multiple tokens. |
 | `cooldown_remaining`              | Remaining cooldown time for objects                                             | hub, extractors           | Value capped at 255                                                             |
-| `clipped`                         | Whether an hub is clipped or not                                                | extractors                |                                                                                 |
 | `remaining_uses`                  | Remaining uses for objects with use limits                                      | extractors                | Value capped at 255. Only emitted if `max_uses > 0`                             |
-| `inv:{resource_name}`             | Amount of resource in the object                                                | cogs, chests              | One feature per resource (e.g., `inv:food`, `inv:wood`, `inv:stone`)            |
-| `protocol_input:{resource_name}`  | Required input resource amount for current protocol                             | hub, extractors           | One feature per resource                                                        |
-| `protocol_output:{resource_name}` | Output resource amount for current protocol                                     | hub, extractors           | One feature per resource                                                        |
+| `lp:east/west/north/south`        | Directional offset from spawn position                                          | self (global)             |                                                                                 |
+| `agent_id`                        | Unique agent identifier                                                         | self (global)             |                                                                                 |
+| `inv:{resource_name}`             | Amount of resource in the object                                                | cogs, chests              | One feature per resource (e.g., `inv:oxygen`, `inv:carbon`, `inv:heart`)        |
+| `protocol_input:{resource_name}`  | Required input resource amount for current protocol                             | hub, extractors           | One feature per resource. Only if `protocol_details_obs` is enabled             |
+| `protocol_output:{resource_name}` | Output resource amount for current protocol                                     | hub, extractors           | One feature per resource. Only if `protocol_details_obs` is enabled             |
+| `aoe_mask`                        | Area-of-effect territory mask                                                   | tiles                     | Optional; enabled via `obs.aoe_mask`                                            |
+| `last_action_move`                | Whether the agent's location changed on the last step                           | self (global)             | Optional; enabled via `obs.global_obs.last_action_move`                         |
 
 ---
 
@@ -124,7 +128,7 @@ feature IDs for your configuration.
 
 Your FACE translates your decisions into executable commands using a **discrete action space**. Each command is
 represented as a single integer index (action ID) that corresponds to a fully qualified action variant such as
-`move_north`, `attack_3`, or `change_vibe_happy`.
+`move_north`, `noop`, or `change_vibe_happy`.
 
 Verb/argument combinations are flattened during environment initialization, so you only need to emit a scalar
 `action_id` per cog.

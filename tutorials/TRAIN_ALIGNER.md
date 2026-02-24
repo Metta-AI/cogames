@@ -28,7 +28,7 @@ It walks through:
 6. Uploading to the CoGames leaderboard
 
 **Aligner role**: Collect hearts and align neutral junctions to team control.
-Aligners have increased influence limit (+20) and heart limit (3), and start
+Aligners have a heart limit of 3 and start
 with 120 hearts per team to enable immediate junction alignment practice.
 
 ```python
@@ -53,13 +53,11 @@ from mettagrid.simulator import Simulator
 from mettagrid.simulator.replay_log_writer import InMemoryReplayWriter
 from mettagrid.util.stats_writer import NoopStatsWriter
 
-from cogames.cogs_vs_clips.tutorials.aligner_tutorial import AlignerRewardsVariant
 from cogames.cogs_vs_clips.clip_difficulty import EASY
-from cogames.cogs_vs_clips.cog import CogConfig
+from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
-from cogames.cogs_vs_clips.team import CogTeam
-from cogames.cogs_vs_clips.variants import BraveheartVariant
+from cogames.cogs_vs_clips.tutorials.aligner_tutorial import AlignerRewardsVariant
 ```
 
 ## 1. Build the mission and environment config
@@ -82,7 +80,7 @@ mission = CvCMission(
     max_steps=MAX_STEPS,
     cog=CogConfig(heart_limit=3),
     teams={"cogs": CogTeam(name="cogs", num_agents=NUM_AGENTS, wealth=3, initial_hearts=120)},
-    variants=[EASY, AlignerRewardsVariant(), BraveheartVariant()],
+    variants=[EASY, AlignerRewardsVariant()],
 )
 
 env_cfg: MettaGridConfig = mission.make_env()

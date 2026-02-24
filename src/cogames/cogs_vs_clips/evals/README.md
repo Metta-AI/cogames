@@ -1,9 +1,10 @@
 # CoGames Evaluation Missions
 
-This directory contains two types of evaluation missions for testing CoGames agents:
+This directory contains evaluation missions for testing CoGames agents:
 
 1. **Diagnostic Missions** - Fixed-map missions testing specific skills in controlled environments
-2. **Integrated Eval Missions** - Procedural missions combining multiple challenges for curriculum training
+2. **CogsGuard Eval Missions** - Fixed-map missions from curated evaluation arenas
+3. **Integrated Eval Missions** - Procedural missions combining multiple challenges
 
 ---
 
@@ -22,32 +23,18 @@ Diagnostic missions test specific skills in isolation with controlled, repeatabl
 - `diagnostic_chest_deposit_near` - Chest nearby, test deposit mechanics
 - `diagnostic_chest_deposit_search` - Find chest through exploration
 
-#### Resource Extraction
-
-- `diagnostic_extract_missing_carbon` - Extract carbon when it's missing from inventory
-- `diagnostic_extract_missing_oxygen` - Extract oxygen when it's missing
-- `diagnostic_extract_missing_germanium` - Extract germanium when it's missing
-- `diagnostic_extract_missing_silicon` - Extract silicon when it's missing
-
-#### Assembly
-
-- `diagnostic_assemble_seeded_near` - Agents pre-seeded with resources, assemble hearts at nearby hub
-- `diagnostic_assemble_seeded_search` - Agents pre-seeded, find hub and craft hearts
-
 #### Energy Management
 
 - `diagnostic_charge_up` - Test charging mechanics and energy management
 
-#### Complex Scenarios
+#### Memory
 
-- `diagnostic_radial` - Radial resource layout with chorus assembly
-- `diagnostic_agile` - Test agility and quick decision-making
-- `diagnostic_memory` - Test memory and state tracking
+- `diagnostic_memory` - Test memory and state tracking over longer distances
 
 #### Hard Variants
 
-Most diagnostic missions have `_hard` variants with increased difficulty (e.g., `diagnostic_chest_navigation1_hard`,
-`diagnostic_radial_hard`).
+Most diagnostic missions have `_hard` variants with increased difficulty and longer time limits (e.g.,
+`diagnostic_chest_navigation1_hard`, `diagnostic_charge_up_hard`, `diagnostic_memory_hard`).
 
 ### Playing Diagnostic Missions
 
@@ -55,162 +42,56 @@ Most diagnostic missions have `_hard` variants with increased difficulty (e.g., 
 # Basic diagnostic
 uv run cogames play --mission evals.diagnostic_chest_navigation1 --cogs 1
 
-# Multi-agent
-uv run cogames play --mission evals.diagnostic_extract_missing_oxygen --cogs 2
-
 # Hard variant
-uv run cogames play --mission evals.diagnostic_radial_hard --cogs 1
+uv run cogames play --mission evals.diagnostic_charge_up_hard --cogs 1
 
 # With policy
-uv run cogames play --mission evals.diagnostic_radial -p baseline --cogs 1
+uv run cogames play --mission evals.diagnostic_chest_deposit_search -p baseline --cogs 1
 ```
+
+---
+
+## CogsGuard Eval Missions
+
+**Location:** `cogsguard_evals.py` **Access:** `cogames play --mission cogsguard_evals.<name>` **Map Type:** Fixed ASCII
+maps (curated layouts)
+
+CogsGuard eval missions use hand-crafted maps designed to test specific scenarios at various scales.
+
+### Available CogsGuard Eval Missions
+
+- `eval_balanced_spread` - Balanced resource spread
+- `eval_clip_oxygen` - Clips pressure with oxygen constraints
+- `eval_collect_resources` / `_medium` / `_hard` - Resource collection at increasing difficulty
+- `eval_divide_and_conquer` - Multi-zone coordination
+- `eval_energy_starved` - Low energy environments
+- `eval_multi_coordinated_collect_hard` - Complex multi-agent coordination
+- `eval_oxygen_bottleneck` - Oxygen-limited scenarios
+- `eval_single_use_world` - Single-use extractors
+- `extractor_hub_30x30` / `50x50` / `70x70` / `80x80` / `100x100` - Hub-centric maps at various scales
 
 ---
 
 ## Integrated Eval Missions
 
-**Location:** `integrated_evals.py` **Access:** `cogames play --mission hello_world.*` **Map Type:** Procedural
+**Location:** `integrated_evals.py` **Access:** `cogames play --mission hello_world.<name>` **Map Type:** Procedural
 generation (MachinaArena)
-
-Integrated eval missions use procedural generation and combine multiple mission variants to create diverse training
-scenarios. They use 50×50 to 150×150 procedural maps with randomized building placements.
 
 ### Available Integrated Missions
 
-#### oxygen_bottleneck
-
-**Challenge:** Oxygen is the limiting resource; agents must prioritize oxygen extraction.
-
-**Variants Applied:**
-
-- EmptyBase (missing oxygen_extractor initially)
-- ResourceBottleneck (oxygen)
-- SingleResourceUniform (oxygen_extractor)
-- PackRat (increased inventory capacity)
-
-```bash
-uv run cogames play --mission hello_world.oxygen_bottleneck --cogs 2
-```
-
 #### energy_starved
 
-**Challenge:** Low energy regen and weak junctions require careful energy management.
+**Challenge:** Low energy regen requires careful energy management.
 
 **Variants Applied:**
 
-- EmptyBase
 - DarkSide (reduced energy regen)
-- PackRat
 
 ```bash
 uv run cogames play --mission hello_world.energy_starved --cogs 2
 ```
 
-#### distant_resources
-
-**Challenge:** Resources scattered far from base; requires efficient routing.
-
-**Variants Applied:**
-
-- EmptyBase
-- DistantResources
-
-```bash
-uv run cogames play --mission hello_world.distant_resources --cogs 4
-```
-
-#### quadrant_buildings
-
-**Challenge:** Buildings placed in four quadrants; requires region partitioning.
-
-**Variants Applied:**
-
-- EmptyBase
-- QuadrantBuildings
-
-```bash
-uv run cogames play --mission hello_world.quadrant_buildings --cogs 4
-```
-
-#### single_use_swarm
-
-**Challenge:** All extractors are single-use; agents must fan out and coordinate.
-
-**Variants Applied:**
-
-- EmptyBase
-- SingleUseSwarm
-- PackRat
-
-```bash
-uv run cogames play --mission hello_world.single_use_swarm --cogs 4
-```
-
-#### vibe_check
-
-**Challenge:** Vibe-based coordination and chorus assembly.
-
-**Variants Applied:**
-
-- EmptyBase
-- HeartChorus
-- VibeCheckMin2
-
-```bash
-uv run cogames play --mission hello_world.vibe_check --cogs 4
-```
-
-#### easy_hearts
-
-**Challenge:** Simplified heart crafting with generous parameters.
-
-**Variants Applied:**
-
-- LonelyHeart
-- HeartChorus
-- PackRat
-
-```bash
-uv run cogames play --mission hello_world.easy_hearts --cogs 2
-```
-
-### Playing Integrated Missions with Additional Variants
-
-You can apply additional variants on top of the mission's built-in variants:
-
-```bash
-# Add pack_rat variant
-uv run cogames play --mission hello_world.oxygen_bottleneck --cogs 2 --variant pack_rat
-
-# Add multiple variants
-uv run cogames play --mission hello_world.energy_starved --cogs 2 --variant pack_rat --variant small_50
-
-# With policy
-uv run cogames play --mission hello_world.single_use_swarm --cogs 4 -p baseline
-```
-
 ---
-
-## Programmatic Evaluation
-
-### Using cogames diagnose / cogames run
-
-For systematic evaluation across multiple missions and configurations:
-
-```bash
-# Evaluate on integrated eval suite
-uv run cogames diagnose thinky \
-  --mission-set integrated_evals \
-  --cogs 4 \
-  --episodes 2
-
-# Evaluate specific agent with structured output
-uv run cogames run \
-  --mission-set integrated_evals \
-  --policy baseline \
-  --episodes 10 \
-  --format json
-```
 
 ## Design Philosophy
 
@@ -221,23 +102,20 @@ uv run cogames run \
 - **Minimal**: Small maps, simple layouts, clear objectives
 - **Scalable**: Work well with 1-4 agents
 
+### CogsGuard Eval Missions
+
+- **Curated**: Hand-designed maps for specific scenarios
+- **Fixed agent counts**: Each map defines its own agent count based on spawn pads
+
 ### Integrated Missions
 
-- **Comprehensive**: Combine multiple challenges and variants
 - **Procedural**: Different map each run for generalization
-- **Challenging**: Require coordination and strategic planning
-- **Scalable**: Work well with 2-8 agents
+- **Composable**: Built from reusable variants
 
 ### Evaluation Best Practices
 
 1. Use diagnostic missions to identify specific skill deficits
-2. Use integrated missions to evaluate overall performance
-3. Run multiple seeds to account for procedural variation
-4. Compare against scripted baselines for context
-
----
-
-**Last Updated:** December 3, 2025
-
-**Diagnostic Missions:** 30+ (various skills and hard variants) **Integrated Missions:** 7 (procedural, with built-in
-variants)
+2. Use CogsGuard eval missions for standardized benchmarking
+3. Use integrated missions to evaluate overall performance
+4. Run multiple seeds to account for procedural variation
+5. Compare against scripted baselines for context

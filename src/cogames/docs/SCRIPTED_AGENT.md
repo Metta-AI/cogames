@@ -38,13 +38,8 @@ A simple CNN + LSTM policy used in CoGames tutorials.
 
 ```bash
 # Run a scripted policy by short name
-uv run cogames play --mission evals.diagnostic_radial -p starter --cogs 4
+uv run cogames play --mission evals.diagnostic_chest_navigation1 -p starter --cogs 4
 
 # Force a fixed role
-uv run cogames play --mission evals.diagnostic_radial -p miner --cogs 4
+uv run cogames play --mission evals.diagnostic_chest_navigation1 -p miner --cogs 4
 ```
-
-## More Advanced Agents
-
-The repository also contains richer scripted and Nim-compiled agent policies under `packages/cogames-agents/`, but that
-package is not published to PyPI.

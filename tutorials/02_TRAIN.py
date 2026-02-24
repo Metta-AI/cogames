@@ -49,16 +49,16 @@
 
 # %% [markdown]
 # Tip: the default `--steps` is extremely large; use a small number for quick tutorials.
-# Checkpoint bundles are written under `./train_dir/<run>/checkpoints/<run>:vX`.
+# Checkpoints are written under `./train_dir/<run_id>/`.
 #
 # ```bash
-# cogames tutorial train -m cogsguard_arena.basic -p class=lstm --steps 2000
+# cogames tutorial train -m cogsguard_machina_1.basic -p class=lstm --steps 2000
 # ```
 
 # %% [markdown]
 # Expected terminal output (example):
 # ```
-# Training on mission: cogsguard_arena.basic
+# Training on mission: cogsguard_machina_1.basic
 # ...progress logs...
 # Training complete. Checkpoints saved to: ./train_dir
 # Checkpoint saved to: ./train_dir/<run_id>/model_000001.pt
@@ -92,28 +92,26 @@
 # %% [markdown]
 # Then run:
 # ```bash
-# cogames tutorial train -m cogsguard_arena.basic -p class=my_trainable_policy.MyTrainablePolicy --steps 2000
-# ````
+# cogames tutorial train -m cogsguard_machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy --steps 2000
+# ```
 
 
 # %% [markdown]
 # Expected terminal output (example):
 # ```
-# Training on mission: cogsguard_arena.basic
+# Training on mission: cogsguard_machina_1.basic
 # ...progress logs...
 # Training complete. Checkpoints saved to: ./train_dir
-# Final checkpoint: train_dir/<run>/checkpoints/<run>:vX
+# Final checkpoint: ./train_dir/<run_id>/model_000001.pt
 # ```
-#
-# **Note:** When using the checkpoint in your code, you'll need to use the format `train_dir/<run>` rather than the full path shown in the output above.
 #
 
 # %% [markdown]
 # ## What to do next
 # - Play using the saved checkpoint bundle:
-#   `cogames play -m cogsguard_arena.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
+#   `cogames play -m cogsguard_machina_1.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
 # - Evaluate using the same bundle:
-#   `cogames eval -m cogsguard_arena.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
+#   `cogames eval -m cogsguard_machina_1.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
 #
 # Note: tutorial train writes `model_*.pt` under `./train_dir/<run_id>/`. Use `class=...` + `data=...` to run it.
 #

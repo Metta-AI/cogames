@@ -159,7 +159,7 @@ print(f"Action space: {policy_env_info.action_space}")
 # | `ThickSkinnedVariant()` | No passive HP drain, only in enemy territory |
 # | `DarkSideVariant()` | Zero solar energy regeneration |
 # | `SuperChargedVariant()` | +2 to all energy regen |
-# | `SharedRewards()` | All agents share the same reward signal |
+# | `NoClipsVariant()` | Disable Clips entirely (same as EASY) |
 #
 # ### Under the Hood: `MettaGridConfig`
 #
