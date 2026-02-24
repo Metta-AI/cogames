@@ -39,7 +39,9 @@ def test_job_runs_on_compat_episode_runner():
 
     with tempfile.TemporaryDirectory() as workspace:
         spec_path = Path(workspace) / "spec.json"
-        spec_path.write_text(job.model_dump_json())
+        spec_path.write_text(
+            job.model_dump_json(exclude={"env": {"game": {"map_builder": {"instance": {"map_perimeter_placements"}}}}})
+        )
 
         result = subprocess.run(
             [
