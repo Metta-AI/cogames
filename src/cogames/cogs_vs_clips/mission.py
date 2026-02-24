@@ -151,6 +151,7 @@ class CvCMission(CoGameMission):
             events=self._merge_events(),
             tags=[tag for t in all_teams for tag in t.all_tags()],
             materialize_queries=[mq for t in all_teams for mq in t.materialized_queries()],
+            derived_stats=[ds for t in all_teams for ds in t.derived_stats(CvCConfig.RESOURCES)],
         )
 
         env = MettaGridConfig(game=game)

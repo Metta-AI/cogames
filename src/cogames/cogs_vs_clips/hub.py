@@ -18,6 +18,7 @@ from mettagrid.config.mettagrid_config import (
     GridObjectConfig,
     InventoryConfig,
 )
+from mettagrid.config.mutation.stats_mutation import logStatToGame
 from mettagrid.config.territory_config import TerritoryControlConfig
 
 if TYPE_CHECKING:
@@ -53,11 +54,20 @@ class CvCHubConfig(CvCStationConfig):
             on_use_handlers={
                 "deposit": Handler(
                     filters=[sharedTagPrefix("team:"), actorHasAnyOf(self.elements)],
-                    mutations=[queryDeposit(hq, {resource: 100 for resource in self.elements})],
+                    mutations=[
+                        queryDeposit(
+                            hq,
+                            {resource: 100 for resource in self.elements},
+                            stat_prefix=f"{team.name}/",
+                        ),
+                    ],
                 ),
                 "get_heart": Handler(
                     filters=[sharedTagPrefix("team:"), *team.hub_has({"heart": 2})],
-                    mutations=[queryWithdraw(hq, {"heart": 1})],
+                    mutations=[
+                        queryWithdraw(hq, {"heart": 1}),
+                        logStatToGame(f"{team.name}/heart.withdrawn"),
+                    ],
                 ),
                 "get_and_make_heart": Handler(
                     filters=[
@@ -65,15 +75,26 @@ class CvCHubConfig(CvCStationConfig):
                         *team.hub_has({"heart": 1}),
                         *team.hub_has(self.heart_cost),
                     ],
-                    mutations=[queryDelta(hq, _neg(self.heart_cost)), updateActor({"heart": 1})],
+                    mutations=[
+                        queryDelta(hq, _neg(self.heart_cost)),
+                        updateActor({"heart": 1}),
+                        *[logStatToGame(f"{team.name}/{resource}.withdrawn") for resource in self.heart_cost],
+                    ],
                 ),
                 "get_last_heart": Handler(
                     filters=[sharedTagPrefix("team:"), *team.hub_has({"heart": 1})],
-                    mutations=[queryWithdraw(hq, {"heart": 1})],
+                    mutations=[
+                        queryWithdraw(hq, {"heart": 1}),
+                        logStatToGame(f"{team.name}/heart.withdrawn"),
+                    ],
                 ),
                 "make_heart": Handler(
                     filters=[sharedTagPrefix("team:"), *team.hub_has(self.heart_cost)],
-                    mutations=[queryDelta(hq, _neg(self.heart_cost)), queryDelta(hq, {"heart": 1})],
+                    mutations=[
+                        queryDelta(hq, _neg(self.heart_cost)),
+                        queryDelta(hq, {"heart": 1}),
+                        *[logStatToGame(f"{team.name}/{resource}.withdrawn") for resource in self.heart_cost],
+                    ],
                 ),
             },
         )

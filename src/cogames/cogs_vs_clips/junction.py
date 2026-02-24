@@ -6,7 +6,7 @@ from pydantic import Field
 
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.stations import CvCStationConfig
-from mettagrid.config.filter import actorHasAnyOf, actorHasTag, hasTag, hasTagPrefix, isNot, sharedTagPrefix
+from mettagrid.config.filter import actorHasAnyOf, actorHasTag, hasTag, isNot, sharedTagPrefix
 from mettagrid.config.handler_config import (
     Handler,
     actorHas,
@@ -15,7 +15,7 @@ from mettagrid.config.handler_config import (
 )
 from mettagrid.config.mettagrid_config import GridObjectConfig
 from mettagrid.config.mutation import recomputeMaterializedQuery, removeTag, removeTagPrefix
-from mettagrid.config.mutation.stats_mutation import logActorAgentStat
+from mettagrid.config.mutation.stats_mutation import logActorAgentStat, logStatToGame
 from mettagrid.config.query import query
 from mettagrid.config.tag import typeTag
 from mettagrid.config.territory_config import TerritoryControlConfig
@@ -72,24 +72,29 @@ class CvCJunctionConfig(CvCStationConfig):
                             queryDeposit(
                                 query(typeTag("hub"), hasTag(t.team_tag())),
                                 {resource: 100 for resource in CvCConfig.ELEMENTS},
+                                stat_prefix=f"{t.name}/",
                             ),
                         ],
                     )
                     for t in teams
                 },
-                "scramble": Handler(
-                    filters=[
-                        hasTagPrefix("team:"),
-                        isNot(sharedTagPrefix("team:")),
-                        actorHas({"scrambler": 1, **CvCConfig.SCRAMBLE_COST}),
-                    ],
-                    mutations=[
-                        removeTagPrefix("net:"),
-                        updateActor(_neg(CvCConfig.SCRAMBLE_COST)),
-                        logActorAgentStat("junction.scrambled_by_agent"),
-                        recomputeMaterializedQuery("net:"),
-                    ],
-                ),
+                **{
+                    f"scramble_{t.name}": Handler(
+                        filters=[
+                            hasTag(t.team_tag()),
+                            isNot(sharedTagPrefix("team:")),
+                            actorHas({"scrambler": 1, **CvCConfig.SCRAMBLE_COST}),
+                        ],
+                        mutations=[
+                            removeTagPrefix("net:"),
+                            updateActor(_neg(CvCConfig.SCRAMBLE_COST)),
+                            logActorAgentStat("junction.scrambled_by_agent"),
+                            logStatToGame(f"{t.name}/aligned.junction.lost"),
+                            recomputeMaterializedQuery("net:"),
+                        ],
+                    )
+                    for t in teams
+                },
                 **{
                     f"align_{t.name}": Handler(
                         filters=[
@@ -99,6 +104,7 @@ class CvCJunctionConfig(CvCStationConfig):
                         mutations=[
                             updateActor(_neg(CvCConfig.ALIGN_COST)),
                             logActorAgentStat("junction.aligned_by_agent"),
+                            logStatToGame(f"{t.name}/aligned.junction.gained"),
                             *t.junction_align_mutations(),
                         ],
                     )
