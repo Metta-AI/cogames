@@ -190,6 +190,103 @@ def test_assess_stage1_signals_confirms_with_metrics_and_replays() -> None:
     assert all(signal.replay_refs for signal in signals)
 
 
+def test_evaluate_stage1_pack_contract_uses_case_cogs_and_case_count() -> None:
+    case_names = [f"cogsguard_evals.case_{idx} (cogs=8)" for idx in range(14)]
+    case_names.append("cogsguard_evals.case_14 (cogs=7)")
+
+    report = diagnose_module.evaluate_stage1_pack_contract(
+        mission_set="cogsguard_evals",
+        steps=diagnose_module.COGSGUARD_STAGE1_FIXED_STEPS,
+        episodes=diagnose_module.COGSGUARD_STAGE1_FIXED_EPISODES,
+        case_names=case_names,
+        pack=diagnose_module.COGSGUARD_STAGE1_PACK_V1,
+    )
+
+    assert report.valid
+
+
+def test_evaluate_stage1_pack_contract_fails_for_case_cogs_and_case_count_mismatch() -> None:
+    report = diagnose_module.evaluate_stage1_pack_contract(
+        mission_set="cogsguard_evals",
+        steps=diagnose_module.COGSGUARD_STAGE1_FIXED_STEPS,
+        episodes=diagnose_module.COGSGUARD_STAGE1_FIXED_EPISODES,
+        case_names=_stage1_case_names(cogs=1),
+        pack=diagnose_module.COGSGUARD_STAGE1_PACK_V1,
+    )
+
+    assert not report.valid
+    checks_by_id = {check.check_id: check for check in report.checks}
+    assert not checks_by_id["pack.cogs"].passed
+    assert not checks_by_id["pack.case_count"].passed
+
+
+def test_evaluate_diagnose_validity_fails_when_pack_contract_is_invalid() -> None:
+    invalid_pack = diagnose_module.DiagnosePackContractReport(
+        valid=False,
+        checks=[
+            diagnose_module.DiagnosePackContractCheck(
+                check_id="pack.cogs",
+                passed=False,
+                details="case_cogs=[1]; expected=[7, 8]",
+            )
+        ],
+    )
+    requirement_results = [
+        diagnose_module.Stage1RequirementResult(
+            axis=diagnose_module.DiagnoseAxis.STABILITY,
+            satisfied=True,
+            matched_missions=["eval_balanced_spread"],
+            required_count=1,
+            accepted_probe_missions=["eval_balanced_spread"],
+        )
+    ]
+    stage1_signals = [
+        diagnose_module.Stage1AxisSignal(
+            axis=diagnose_module.DiagnoseAxis.STABILITY,
+            confirmed=True,
+            metric_refs=["eval_balanced_spread:reward_variance=0.0"],
+            replay_refs=["replays/example.json.z"],
+            summary="ok",
+        )
+    ]
+    absolute_summary = diagnose_module.Stage2ModeSummary(
+        mode=diagnose_module.Stage2Mode.ABSOLUTE,
+        seed=43,
+        case_count=1,
+        mission_metrics={},
+    )
+    mirror_summary = diagnose_module.Stage2ModeSummary(
+        mode=diagnose_module.Stage2Mode.MIRROR,
+        seed=44,
+        case_count=1,
+        mission_metrics={},
+    )
+    social_signal = diagnose_module.Stage2SocialSignal(
+        confirmed=True,
+        severity=0.0,
+        confidence=0.8,
+        summary="ok",
+        evidence_refs=[],
+    )
+
+    validity = diagnose_module.evaluate_diagnose_validity(
+        stage_status=diagnose_module.DiagnoseStageStatus.STAGE2_COMPLETED,
+        pack_contract_report=invalid_pack,
+        requirement_results=requirement_results,
+        stage1_signals=stage1_signals,
+        stage1_replay_count=1,
+        expected_stage1_replay_count=1,
+        stage2_absolute_summary=absolute_summary,
+        stage2_mirror_summary=mirror_summary,
+        stage2_replay_count=2,
+        expected_stage2_replay_count=2,
+        social_signal=social_signal,
+    )
+
+    assert not validity.valid
+    assert "stage1.pack_contract" in validity.failed_check_ids
+
+
 def test_write_replay_bundle_includes_replays_or_writes_readme(tmp_path: Path) -> None:
     bundle_path = diagnose_module.write_replay_bundle(tmp_path)
     with zipfile.ZipFile(bundle_path, "r") as bundle:

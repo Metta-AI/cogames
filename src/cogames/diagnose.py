@@ -437,7 +437,10 @@ COGSGUARD_STAGE1_PACK_V1 = DiagnosePack(
 )
 
 
-COGSGUARD_STAGE1_FIXED_COGS = [1, 2, 4]
+# Default cogs filter used when missions do not declare fixed cogs.
+COGSGUARD_STAGE1_DEFAULT_COG_FILTERS = [1, 2, 4]
+COGSGUARD_STAGE1_FIXED_CASE_COGS = [7, 8]
+COGSGUARD_STAGE1_FIXED_CASE_COUNT = 15
 COGSGUARD_STAGE1_FIXED_STEPS = 1000
 COGSGUARD_STAGE1_FIXED_EPISODES = 3
 
@@ -523,12 +526,18 @@ def validate_pack_definition(pack: DiagnosePack) -> None:
 def evaluate_stage1_pack_contract(
     *,
     mission_set: str,
-    cogs: list[int],
     steps: int,
     episodes: int,
+    case_names: list[str],
     pack: DiagnosePack,
 ) -> DiagnosePackContractReport:
-    sorted_cogs = sorted(cogs)
+    case_cogs = sorted(
+        {
+            int(match.group(1))
+            for case_name in case_names
+            if (match := re.search(r"\(cogs=(\d+)\)$", case_name)) is not None
+        }
+    )
     checks = [
         DiagnosePackContractCheck(
             check_id="pack.mission_set",
@@ -537,8 +546,13 @@ def evaluate_stage1_pack_contract(
         ),
         DiagnosePackContractCheck(
             check_id="pack.cogs",
-            passed=sorted_cogs == COGSGUARD_STAGE1_FIXED_COGS,
-            details=f"cogs={sorted_cogs}; expected={COGSGUARD_STAGE1_FIXED_COGS}",
+            passed=case_cogs == COGSGUARD_STAGE1_FIXED_CASE_COGS,
+            details=f"case_cogs={case_cogs}; expected={COGSGUARD_STAGE1_FIXED_CASE_COGS}",
+        ),
+        DiagnosePackContractCheck(
+            check_id="pack.case_count",
+            passed=len(case_names) == COGSGUARD_STAGE1_FIXED_CASE_COUNT,
+            details=f"case_count={len(case_names)}; expected={COGSGUARD_STAGE1_FIXED_CASE_COUNT}",
         ),
         DiagnosePackContractCheck(
             check_id="pack.steps",
@@ -2451,6 +2465,7 @@ def evaluate_interpretation_stability(snapshots: list[InterpretationSnapshot]) -
 def evaluate_diagnose_validity(
     *,
     stage_status: DiagnoseStageStatus,
+    pack_contract_report: DiagnosePackContractReport,
     requirement_results: list[Stage1RequirementResult],
     stage1_signals: list[Stage1AxisSignal],
     stage1_replay_count: int,
@@ -2461,7 +2476,16 @@ def evaluate_diagnose_validity(
     expected_stage2_replay_count: int,
     social_signal: Optional[Stage2SocialSignal],
 ) -> DiagnoseValidityReport:
+    failed_pack_checks = [check.details for check in pack_contract_report.checks if not check.passed]
+    pack_contract_details = (
+        "Stage 1 fixed-pack contract is satisfied." if not failed_pack_checks else " ; ".join(failed_pack_checks)
+    )
     checks = [
+        DiagnoseValidityCheck(
+            check_id="stage1.pack_contract",
+            passed=pack_contract_report.valid,
+            details=pack_contract_details,
+        ),
         DiagnoseValidityCheck(
             check_id="stage1.required_axes",
             passed=bool(requirement_results) and all(result.satisfied for result in requirement_results),
@@ -2644,7 +2668,7 @@ def _build_diagnose_cases(
     steps: int,
 ) -> list[DiagnoseCase]:
     experiment_filters = set(experiments or [])
-    cogs_list = cogs if cogs else [1, 2, 4]
+    cogs_list = cogs if cogs else list(COGSGUARD_STAGE1_DEFAULT_COG_FILTERS)
     respect_cogs_list = cogs is not None
     cases: list[DiagnoseCase] = []
 
@@ -2732,7 +2756,7 @@ def diagnose_cmd(
     ),
     # --- Simulation ---
     steps: int = typer.Option(
-        1000,
+        COGSGUARD_STAGE1_FIXED_STEPS,
         "--steps",
         "-s",
         metavar="N",
@@ -2740,7 +2764,7 @@ def diagnose_cmd(
         rich_help_panel="Simulation",
     ),
     episodes: int = typer.Option(
-        3,
+        COGSGUARD_STAGE1_FIXED_EPISODES,
         "--episodes",
         "-e",
         metavar="N",
@@ -2801,7 +2825,6 @@ def diagnose_cmd(
     ),
 ) -> None:
     pack = COGSGUARD_STAGE1_PACK_V1
-    resolved_cogs = cogs if cogs else list(COGSGUARD_STAGE1_FIXED_COGS)
     stage1_seed = 42
     stage2_absolute_seed = 43
     stage2_mirror_seed = 44
@@ -2847,14 +2870,7 @@ def diagnose_cmd(
     stage2_social_signal: Optional[Stage2SocialSignal] = None
     stage1_objective_by_mission: dict[str, list[float]] = {}
     stage1_mission_replay_refs: dict[str, list[str]] = {}
-    pack_contract_report = evaluate_stage1_pack_contract(
-        mission_set=mission_set,
-        cogs=resolved_cogs,
-        steps=steps,
-        episodes=episodes,
-        pack=pack,
-    )
-    write_json(config.output_dir / "stage1_pack_contract.json", pack_contract_report)
+    pack_contract_report: Optional[DiagnosePackContractReport] = None
     tournament_objective_context = TournamentObjectiveContext()
 
     def _git_sha() -> Optional[str]:
@@ -2937,6 +2953,7 @@ def diagnose_cmd(
         state: DiagnoseRunState,
         doctor_note: DiagnoseDoctorNote,
     ) -> InterpretationStabilityReport:
+        assert pack_contract_report is not None, "pack contract must be evaluated before writing artifacts"
         write_replay_bundle(config.output_dir)
         snapshots = [interpretation_snapshot_from_doctor_note(doctor_note, label="current")]
         snapshots.extend(comparison_snapshots)
@@ -2945,6 +2962,7 @@ def diagnose_cmd(
         write_json(config.output_dir / "interpretation_stability.json", stability)
         validity = evaluate_diagnose_validity(
             stage_status=state.stage_status,
+            pack_contract_report=pack_contract_report,
             requirement_results=state.requirement_results,
             stage1_signals=state.stage1_signals,
             stage1_replay_count=stage1_replay_count,
@@ -3037,6 +3055,22 @@ def diagnose_cmd(
             )
         )
 
+    cases = _build_diagnose_cases(
+        mission_set=mission_set,
+        experiments=experiments,
+        cogs=cogs,
+        steps=steps,
+    )
+    case_names = [case.name for case in cases]
+    pack_contract_report = evaluate_stage1_pack_contract(
+        mission_set=mission_set,
+        steps=steps,
+        episodes=episodes,
+        case_names=case_names,
+        pack=pack,
+    )
+    write_json(config.output_dir / "stage1_pack_contract.json", pack_contract_report)
+
     if mission_set == pack.mission_set and not pack_contract_report.valid:
         failed_details = [check.details for check in pack_contract_report.checks if not check.passed]
         baseline_notes.append("Standalone diagnose mode: fixed-pack contract checks did not pass.")
@@ -3047,12 +3081,6 @@ def diagnose_cmd(
         for detail in failed_details:
             console.print(f"[yellow]- {detail}[/yellow]")
 
-    cases = _build_diagnose_cases(
-        mission_set=mission_set,
-        experiments=experiments,
-        cogs=cogs,
-        steps=steps,
-    )
     if not cases:
         _persist_incomplete_state(
             stage_status=DiagnoseStageStatus.STAGE1_INCOMPLETE,
@@ -3068,7 +3096,6 @@ def diagnose_cmd(
         console.print(f"[yellow]Diagnosis marked incomplete. Artifacts: {config.output_dir}[/yellow]")
         raise typer.Exit(1)
 
-    case_names = [case.name for case in cases]
     gate = evaluate_stage1_gate(case_names=case_names, pack=pack)
     write_json(config.output_dir / "stage1_gate.json", gate)
     write_json(
