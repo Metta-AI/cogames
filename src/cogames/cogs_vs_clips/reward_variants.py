@@ -8,9 +8,10 @@ mission's default objective rewards.
 from __future__ import annotations
 
 import json
+import math
 from typing import Literal, Sequence, cast
 
-from mettagrid.config.game_value import stat
+from mettagrid.config.game_value import ConstValue, stat
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.reward_config import AgentReward, Aggregation, reward
 
@@ -18,6 +19,7 @@ CogsGuardRewardVariant = Literal[
     "aligner",
     "credit",
     "milestones",
+    "milestones_2",
     "miner",
     "no_objective",
     "penalize_vibe_change",
@@ -31,6 +33,7 @@ AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = (
     "objective",
     "no_objective",
     "milestones",
+    "milestones_2",
     "credit",
     "miner",
     "aligner",
@@ -41,6 +44,8 @@ AVAILABLE_REWARD_VARIANTS: tuple[CogsGuardRewardVariant, ...] = (
 )
 
 _OBJECTIVE_STAT_KEY = "aligned_junction_held"
+_MILESTONES_2_PREFIX = "milestones_2:"
+_MILESTONES_2_DEFAULT_COMPOUNDING_FACTOR = 5.0
 _ROLE_ORDER: tuple[str, ...] = ("miner", "aligner", "scrambler", "scout")
 _ROLE_NAMES = set(_ROLE_ORDER)
 
@@ -52,6 +57,20 @@ def _role_name_from_vibe(env: MettaGridConfig, vibe_id: int) -> str | None:
     if vibe_name not in _ROLE_NAMES:
         return None
     return vibe_name
+
+
+def _parse_milestones_2_factor(variant_name: str) -> float | None:
+    if not variant_name.startswith(_MILESTONES_2_PREFIX):
+        return None
+    factor_text = variant_name.split(":", 1)[1]
+    if not factor_text:
+        raise ValueError("milestones_2 factor is empty. Use 'milestones_2:<positive number>'.")
+    factor = float(factor_text)
+    if not math.isfinite(factor):
+        raise ValueError(f"milestones_2 factor must be finite (got {factor_text!r}).")
+    if factor <= 0:
+        raise ValueError(f"milestones_2 factor must be > 0 (got {factor}).")
+    return factor
 
 
 def _apply_milestones(rewards: dict[str, AgentReward], *, max_junctions: int = 100) -> None:
@@ -131,6 +150,59 @@ def _apply_aligner(rewards: dict[str, AgentReward]) -> None:
 _MINER_ELEMENTS = ("carbon", "oxygen", "germanium", "silicon")
 
 
+def _apply_milestones_2(
+    rewards: dict[str, AgentReward], *, compounding_factor: float, max_junctions: int = 100
+) -> None:
+    """Add capped role-shaped rewards that prioritize the objective reward mine.
+
+    - The main incentive remains the shared per-tick objective reward for holding
+      net-aligned junctions (the "constant source" once unlocked).
+    - Role shaping is intentionally small and capped so single-role teams can't
+      outscore mixed-role teams by farming a single behavior (e.g., align spam).
+    """
+    # Make the objective feel like a true "reward mine" unlocked by alignment:
+    # - net tags include the team's hub (ClosureQuery includes roots), so subtract 1
+    #   to count only aligned junctions connected to the hub.
+    # - Scale up the per-tick objective so holding aligned junctions dominates shaping.
+    objective_scale = compounding_factor
+    objective = rewards.get(_OBJECTIVE_STAT_KEY)
+    if objective is not None:
+        rewards[_OBJECTIVE_STAT_KEY] = reward(
+            [*objective.nums, ConstValue(value=-1.0)],
+            weight=objective.weight * objective_scale,
+            per_tick=True,
+        )
+
+    # Miner: reward extracting resources (used to craft hearts and sustain alignment).
+    rewards["milestones2_elements_gained"] = reward(
+        [stat(f"{element}.gained") for element in _MINER_ELEMENTS],
+        weight=0.0015,
+        max=3.0,
+    )
+
+    # Aligner: small reward for actually aligning junctions (objective unlock action).
+    rewards["milestones2_junction_aligned_by_agent"] = reward(
+        stat("junction.aligned_by_agent"),
+        weight=0.2,
+        max=1.0,
+    )
+
+    # Hearts are the shared "currency" for align/scramble. Rewarding acquisition helps
+    # miners/aligners coordinate without making heart farming dominate the objective.
+    rewards["milestones2_heart_gained"] = reward(
+        stat("heart.gained"),
+        weight=0.05,
+        max=2.0,
+    )
+
+    # Scrambler: keep tiny (scramble is easy to farm and can overwhelm objectives).
+    rewards["milestones2_junction_scrambled_by_agent"] = reward(
+        stat("junction.scrambled_by_agent"),
+        weight=0.1,
+        max=1.0,
+    )
+
+
 def _apply_miner(rewards: dict[str, AgentReward]) -> None:
     """Add miner-focused shaping rewards."""
     # Gear acquisition/retention
@@ -188,6 +260,9 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
     - `objective`: no-op marker; keeps the mission's default objective reward wiring.
     - `no_objective`: disables the objective stat reward (`junction.held`).
     - `milestones`: adds shaped rewards for aligning/scrambling junctions and holding more junctions.
+    - `milestones_2`: capped role-shaped rewards that strongly favor alignment to unlock the objective reward mine.
+    - `milestones_2:<factor>`: same as milestones_2, with custom objective compounding factor.
+      Example: `milestones_2:25`.
     - `credit`: adds additional dense shaping for precursor behaviors (resources/gear/deposits).
     - `miner`: add miner-focused shaping rewards.
     - `aligner`: add aligner-focused shaping rewards.
@@ -213,7 +288,12 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
         variant_names = list(variants)
 
     reward_variants: list[CogsGuardRewardVariant] = []
+    milestones_2_compounding_factor = _MILESTONES_2_DEFAULT_COMPOUNDING_FACTOR
     for variant_name in variant_names:
+        maybe_factor = _parse_milestones_2_factor(variant_name)
+        if maybe_factor is not None:
+            milestones_2_compounding_factor = maybe_factor
+            variant_name = "milestones_2"
         if variant_name not in AVAILABLE_REWARD_VARIANTS:
             available = ", ".join(AVAILABLE_REWARD_VARIANTS)
             raise ValueError(f"Unknown Cogsguard reward variant '{variant_name}'. Available: {available}")
@@ -256,6 +336,8 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
             rewards.pop(_OBJECTIVE_STAT_KEY, None)
         if "milestones" in enabled:
             _apply_milestones(rewards)
+        if "milestones_2" in enabled:
+            _apply_milestones_2(rewards, compounding_factor=milestones_2_compounding_factor)
         if "credit" in enabled:
             _apply_credit(rewards)
         if "aligner" in enabled:
