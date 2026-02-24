@@ -49,6 +49,7 @@ from cogames.cli.leaderboard import (
     submissions_cmd,
 )
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
+from cogames.cli.matches import matches_cmd
 from cogames.cli.mission import (
     describe_mission,
     get_mission_name_and_config,
@@ -1712,6 +1713,22 @@ app.command(
 [cyan]cogames leaderboard --season beta-cogsguard[/cyan]           View rankings""",
     add_help_option=False,
 )(leaderboard_cmd)
+
+app.command(
+    name="matches",
+    help="Show your recent matches and policy logs.",
+    rich_help_panel="Tournament",
+    epilog="""[dim]Examples:[/dim]
+
+[cyan]cogames matches[/cyan]                              List recent matches
+
+[cyan]cogames matches <match-id>[/cyan]                   Show match details
+
+[cyan]cogames matches <match-id> --logs[/cyan]            Show available logs
+
+[cyan]cogames matches <match-id> -d ./logs[/cyan]         Download logs""",
+    add_help_option=False,
+)(matches_cmd)
 
 
 app.command(

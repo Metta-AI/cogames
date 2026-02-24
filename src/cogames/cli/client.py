@@ -222,7 +222,11 @@ class TournamentServerClient:
         raise RuntimeError("No seasons available from server")
 
     def get_season_matches(
-        self, season_name: str, include_hidden_seasons: bool = False, policy_version_ids: list[uuid.UUID] | None = None
+        self,
+        season_name: str,
+        include_hidden_seasons: bool = False,
+        policy_version_ids: list[uuid.UUID] | None = None,
+        limit: int | None = None,
     ) -> list[MatchResponse]:
         params: dict[str, str | list[str]] = {}
 
@@ -231,6 +235,9 @@ class TournamentServerClient:
 
         if policy_version_ids:
             params["policy_version_ids"] = [str(pvid) for pvid in policy_version_ids]
+
+        if limit is not None:
+            params["limit"] = str(limit)
 
         return self._get(
             f"/tournament/seasons/{season_name}/matches",
@@ -320,3 +327,26 @@ class TournamentServerClient:
         Returns a mapping of policy_version_id -> list of season names.
         """
         return self._get("/tournament/my-memberships", dict[str, list[str]])
+
+    def get_match(self, match_id: uuid.UUID) -> MatchResponse:
+        """Get details for a specific match."""
+        return self._get(f"/tournament/matches/{match_id}", MatchResponse)
+
+    def list_match_policy_logs(self, match_id: uuid.UUID, policy_version_id: uuid.UUID) -> list[str]:
+        """List available policy log files for a policy in a match."""
+        return self._get(
+            f"/tournament/matches/{match_id}/{policy_version_id}/policy-logs",
+            list[str],
+        )
+
+    def get_match_policy_log(self, match_id: uuid.UUID, policy_version_id: uuid.UUID, agent_idx: int) -> str:
+        """Get the content of a specific agent's policy log in a match."""
+        headers = {}
+        if self._token:
+            headers["X-Auth-Token"] = self._token
+        response = self._http_client.get(
+            f"/tournament/matches/{match_id}/{policy_version_id}/policy-logs/{agent_idx}",
+            headers=headers,
+        )
+        response.raise_for_status()
+        return response.text
