@@ -15,6 +15,7 @@ from mettagrid.config.filter import (
     AnyFilter,
     GameValueFilter,
     HandlerTarget,
+    anyOf,
     hasTag,
     hasTagPrefix,
     isNear,
@@ -64,7 +65,7 @@ class TeamConfig(Config):
                         hasTag(self.team_tag()),
                     ),
                     candidates=query(typeTag("junction"), hasTag(self.team_tag())),
-                    edge_filters=[maxDistance(CvCConfig.JUNCTION_ALIGN_DISTANCE)],
+                    edge_filters=[maxDistance(max(CvCConfig.JUNCTION_ALIGN_DISTANCE, CvCConfig.HUB_ALIGN_DISTANCE))],
                 ),
             )
         ]
@@ -75,7 +76,12 @@ class TeamConfig(Config):
     def junction_is_alignable(self) -> list[AnyFilter]:
         return [
             isNot(hasTagPrefix("team:")),
-            isNear(query(self.net_tag()), radius=CvCConfig.JUNCTION_ALIGN_DISTANCE),
+            anyOf(
+                [
+                    isNear(query(self.net_tag()), radius=CvCConfig.JUNCTION_ALIGN_DISTANCE),
+                    isNear(query(typeTag("hub"), hasTag(self.team_tag())), radius=CvCConfig.HUB_ALIGN_DISTANCE),
+                ]
+            ),
         ]
 
     def junction_align_mutations(self) -> list:
