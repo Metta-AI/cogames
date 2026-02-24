@@ -23,6 +23,7 @@ class CoGameMissionVariant(Config, ABC):
     # harder to find the variant source code based on CLI interactions.
     name: str
     description: str = Field(default="")
+    depends_on: list[str] = Field(default_factory=list)
 
     def modify_mission(self, mission: CoGameMission) -> None:
         # Override this method to modify the mission.
