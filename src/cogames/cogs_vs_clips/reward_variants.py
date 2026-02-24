@@ -167,14 +167,13 @@ def _apply_scout(rewards: dict[str, AgentReward]) -> None:
 
 def _apply_scrambler(rewards: dict[str, AgentReward]) -> None:
     """Add scrambler-focused shaping rewards."""
-    # Scrambler gear acquisition/loss
+    # Scrambler gear acquisition/loss (scramblers are needed to scramble junctions)
     rewards["scrambler_gained"] = reward(stat("scrambler.gained"), weight=2.0)
     rewards["scrambler_lost"] = reward(stat("scrambler.lost"), weight=-2.0)
 
-    # Penalize losing hearts and resources (dying loaded is costly, dying empty is cheap)
+    # Heart acquisition/loss (hearts are consumed to scramble junctions)
+    rewards["heart_gained"] = reward(stat("heart.gained"), weight=0.5)
     rewards["heart_lost"] = reward(stat("heart.lost"), weight=-0.5)
-    for element in ("carbon", "oxygen", "germanium", "silicon"):
-        rewards[f"{element}_lost"] = reward(stat(f"{element}.lost"), weight=-0.1)
 
     # Junction scrambling (the primary scrambler objective)
     rewards["junction_scrambled_by_agent"] = reward(stat("junction.scrambled_by_agent"), weight=5.0)
