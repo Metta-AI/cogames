@@ -2810,7 +2810,7 @@ def diagnose_cmd(
         policy=policy,
         mission_set=mission_set,
         experiments=experiments,
-        cogs=resolved_cogs,
+        cogs=cogs,
         steps=steps,
         episodes=episodes,
         pack=pack,

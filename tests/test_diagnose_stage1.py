@@ -52,6 +52,42 @@ def _read_state(output_dir: Path) -> diagnose_module.DiagnoseRunState:
     return diagnose_module.DiagnoseRunState.model_validate_json((output_dir / "diagnose_state.json").read_text())
 
 
+def test_diagnose_cli_does_not_force_default_cogs_into_case_filters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def _capture_build_cases(**kwargs):  # type: ignore[no-untyped-def]
+        captured["cogs"] = kwargs["cogs"]
+        return []
+
+    monkeypatch.setattr(diagnose_module, "_build_diagnose_cases", _capture_build_cases)
+
+    result = _run_diagnose(output_dir=tmp_path, mission_set="cogsguard_evals")
+
+    assert result.exit_code == 1
+    assert captured["cogs"] is None
+
+
+def test_diagnose_cli_forwards_explicit_cogs_to_case_filters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def _capture_build_cases(**kwargs):  # type: ignore[no-untyped-def]
+        captured["cogs"] = kwargs["cogs"]
+        return []
+
+    monkeypatch.setattr(diagnose_module, "_build_diagnose_cases", _capture_build_cases)
+
+    result = _run_diagnose(output_dir=tmp_path, mission_set="cogsguard_evals", extra_args=["--cogs", "8"])
+
+    assert result.exit_code == 1
+    assert captured["cogs"] == [8]
+
+
 def _patch_evaluate_to_fail(monkeypatch: pytest.MonkeyPatch, *, message: str) -> None:
     def _should_not_run_evaluate(*_args, **_kwargs):
         raise AssertionError(message)
