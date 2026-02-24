@@ -101,7 +101,6 @@ class CogTeam(TeamConfig):
         hq = self.hub_query()
         return GridObjectConfig(
             name=f"{self.short_name}:{gear_type}",
-            render_name=f"{gear_type}_station",
             render_symbol=CvCConfig.GEAR_SYMBOLS[gear_type],
             tags=[f"team:{self.name}"],
             on_use_handlers={
