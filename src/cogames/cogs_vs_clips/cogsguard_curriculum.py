@@ -73,6 +73,10 @@ def normalize_variant_names(variants: str | Sequence[str] | None) -> list[str]:
     return list(variants)
 
 
+def _is_parametrized_reward_variant(name: str) -> bool:
+    return name.startswith("milestones_2:")
+
+
 def split_variants(
     variants: str | Sequence[str] | None,
 ) -> tuple[list[CoGameMissionVariant], list[str]]:
@@ -87,7 +91,7 @@ def split_variants(
     resolved_rewards: list[str] = []
     unknown: list[str] = []
     for name in names:
-        if name in reward_variants:
+        if name in reward_variants or _is_parametrized_reward_variant(name):
             resolved_rewards.append(name)
             continue
         variant = all_variants.get(name)
