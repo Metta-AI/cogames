@@ -88,13 +88,13 @@ cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --dry-run --skip-valida
 By default, `cogames upload` both uploads and submits to a season. You can specify a season explicitly:
 
 ```bash
-cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --season beta-cvc-no-clips --skip-validation
+cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --season beta-teams-small --skip-validation
 ```
 
 Or submit a previously uploaded policy to a season:
 
 ```bash
-cogames submit my_policy_name --season beta-cvc-no-clips
+cogames submit my_policy_name --season beta-teams-small
 ```
 
 List available seasons:
@@ -116,7 +116,7 @@ cogames submissions
 ## Step 6 — View the leaderboard
 
 ```bash
-cogames leaderboard --season beta-cvc-no-clips
+cogames leaderboard --season beta-teams-small
 ```
 
 

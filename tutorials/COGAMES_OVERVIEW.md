@@ -40,7 +40,7 @@ The arena contains:
 | Role | Stats | Ability |
 |-----------|--------------------------------|------------------------------------------|
 | Miner | +40 cargo, 10x extraction | Gathers resources at extractors |
-| Aligner | +20 influence | Captures neutral junctions (1 influence + 1 heart) |
+| Aligner | Heart limit 3 | Captures neutral junctions (1 heart per capture) |
 | Scrambler | +200 HP | Disrupts enemy junctions (1 heart) |
 | Scout | +100 energy, +400 HP | Mobile reconnaissance |
 
@@ -64,9 +64,9 @@ This creates constant pressure — your team must expand faster than Clips consu
 
 ### Territory Effects
 
-**Friendly territory** (near aligned junctions or hub): HP, energy, and influence fully restored.
+**Friendly territory** (near aligned junctions or hub): HP and energy fully restored.
 
-**Outside friendly territory**: −1 HP/tick, energy drained, influence drained.
+**Outside friendly territory**: −1 HP/tick, energy drained.
 
 ## Watch a Game
 
@@ -105,7 +105,7 @@ from cogames.cogs_vs_clips.clip_difficulty import EASY
 from cogames.cogs_vs_clips.tutorials.miner_tutorial import MinerRewardsVariant
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.sites import make_cogsguard_machina1_site
-from cogames.cogs_vs_clips.team import CogTeam
+from cogames.cogs_vs_clips.cog import CogTeam
 from cogames.cogs_vs_clips.variants import NoVibesVariant
 from cogames.policy.tutorial_policy import TutorialPolicyNet
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
@@ -300,7 +300,7 @@ cogames tutorial play
 
 **Watch scripted agents** — see baseline behavior on the Arena map:
 ```bash
-cogames play -m cogsguard_arena.basic -p starter
+cogames play -m cogsguard_machina_1.basic -p class=baseline
 ```
 
 **Role-specific training tutorials** — deep-dive into each role:
@@ -330,16 +330,3 @@ print(f"Saved to {save_path}")
 !cogames upload -p "class=tutorial,data={save_path}" -n {POLICY_NAME} --skip-validation
 ```
 
-## Feedback
-
-We'd love your thoughts on CogsGuard. Some prompts to consider:
-
-1. **Is the cooperation loop compelling?** Does the Miner → resources → hearts → Aligner/Scrambler
-   chain feel like it creates meaningful interdependence?
-2. **Do the 4 roles feel distinct and necessary?** Is any role redundant or under-defined?
-3. **Is the Clips pressure intuitive?** Does the automated enemy expansion create the right
-   kind of urgency without feeling unfair?
-4. **What would make training policies more interesting?** Reward shaping ideas, curriculum
-   suggestions, or environment modifications?
-5. **How does the observation space feel?** Is the sparse token representation something you'd
-   want to work with, or would you prefer alternatives?

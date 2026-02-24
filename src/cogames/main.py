@@ -430,7 +430,7 @@ def variants_cmd() -> None:
     rich_help_panel="Missions",
     epilog="""[dim]Examples:[/dim]
 
-  [cyan]cogames describe hello_world.open_world[/cyan]                Describe mission
+  [cyan]cogames describe cogsguard_machina_1.basic[/cyan]             Describe mission
 
   [cyan]cogames describe arena -c 4 -v dark_side[/cyan]               With 4 cogs and variant""",
     add_help_option=False,
@@ -440,7 +440,7 @@ def describe_cmd(
     mission: str = typer.Argument(
         ...,
         metavar="MISSION",
-        help="Mission name (e.g., hello_world.open_world).",
+        help="Mission name (e.g., cogsguard_machina_1.basic).",
     ),
     cogs: Optional[int] = typer.Option(
         None,

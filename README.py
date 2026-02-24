@@ -119,13 +119,13 @@
 # 2. Upload a starter policy and submit it to the tournament.
 #
 #     ```bash
-#     cogames upload --policy "class=cogames.policy.starter_agent.StarterPolicy" --name "$USER.README-quickstart-starter-policy" --season beta-cogsguard --skip-validation
+#     cogames upload --policy "class=cogames.policy.starter_agent.StarterPolicy" --name "$USER.README-quickstart-starter-policy" --season beta-teams-small --skip-validation
 #     ```
 #
 # 3. Check your submission on the leaderboard.
 #
 #     ```bash
-#     cogames leaderboard --season beta-cogsguard
+#     cogames leaderboard --season beta-teams-small
 #     ```
 
 # %% [markdown]
@@ -147,7 +147,7 @@
 #
 # * gathering resources and depositing them at controlled junctions
 # * acquiring specialized roles (Miner, Aligner, Scrambler, Scout) at gear stations
-# * capturing neutral junctions using Aligners (costs 1 heart + 1 influence)
+# * capturing neutral junctions using Aligners (costs 1 heart)
 # * disrupting enemy junctions using Scramblers (costs 1 heart)
 # * defending territory from Clips expansion
 #
@@ -210,7 +210,7 @@
 # To check your submission status and match results:
 # ```bash
 # cogames submissions
-# cogames leaderboard --season beta-cogsguard
+# cogames leaderboard --season beta-teams-small
 # ```
 
 # %% [markdown]
@@ -335,7 +335,7 @@ display_command_reference()
 #   title={CoGames: Multi-Agent Cooperative Game Environments},
 #   author={Softmax},
 #   year={2025},
-#   url={https://github.com/metta-ai/metta}
+#   url={https://github.com/Metta-AI/cogames}
 # }
 # ```
 #

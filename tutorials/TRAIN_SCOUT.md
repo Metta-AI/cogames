@@ -58,7 +58,7 @@ from cogames.cogs_vs_clips.clip_difficulty import EASY
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.tutorials.scout_tutorial import ScoutRewardsVariant
 from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
-from cogames.cogs_vs_clips.team import CogTeam
+from cogames.cogs_vs_clips.cog import CogTeam
 ```
 
 ## 1. Build the mission and environment config
