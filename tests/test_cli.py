@@ -58,7 +58,6 @@ def test_missions_list_for_specific_site():
 
     output = result.stdout
     assert "cogsguard_arena.basic" in output
-    assert "cogsguard_arena.scrambler_tutorial" in output
 
 
 def test_missions_nonexistent_mission():

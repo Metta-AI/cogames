@@ -56,13 +56,13 @@ from mettagrid.util.stats_writer import NoopStatsWriter
 from cogames.cogs_vs_clips.clip_difficulty import EASY
 from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
+from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
 from cogames.cogs_vs_clips.tutorials.aligner_tutorial import AlignerRewardsVariant
 ```
 
 ## 1. Build the mission and environment config
 
-- **Site**: CogsGuard Arena (50x50 compact training map with gear stations in hub)
+- **Site**: CogsGuard Machina 1 (50x50 training map)
 - **EASY difficulty**: No clips pressure
 - **heart_limit=3**: Aligners can hold 3 hearts at once
 - **initial_hearts=120**: Team starts with 120 hearts for immediate practice
@@ -75,7 +75,7 @@ MAX_STEPS = 1000
 mission = CvCMission(
     name="aligner_tutorial",
     description="Learn aligner role - collect hearts, align neutral junctions.",
-    site=COGSGUARD_ARENA,
+    site=COGSGUARD_MACHINA_1,
     num_cogs=NUM_AGENTS,
     max_steps=MAX_STEPS,
     cog=CogConfig(heart_limit=3),
