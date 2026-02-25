@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
@@ -11,6 +12,7 @@ import uuid
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import httpx
 import typer
@@ -19,10 +21,8 @@ from cogames.cli.base import console
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.policy import PolicySpec, get_policy_spec
-from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec
-from mettagrid.runner.episode_runner import run_episode_isolated
-from mettagrid.runner.types import EpisodeSpec, PureSingleEpisodeResult, SingleEpisodeJob
+from mettagrid.runner.types import PureSingleEpisodeResult
 from mettagrid.util.uri_resolvers.schemes import localize_uri, parse_uri
 
 DEFAULT_SUBMIT_SERVER = "https://api.observatory.softmax-research.net"
@@ -192,15 +192,17 @@ def create_bundle(
     return output
 
 
-def _validation_spec(policy_uri: str, env_cfg: MettaGridConfig) -> EpisodeSpec:
-    env_cfg.game.max_steps = 10
-    return EpisodeSpec(
-        policy_uris=[policy_uri],
-        assignments=[0] * env_cfg.game.num_agents,
-        env=env_cfg,
-        seed=42,
-        max_action_time_ms=10000,
-    )
+def _validation_job_spec(policy_uri: str, config_data: dict[str, Any]) -> dict[str, Any]:
+    env_cfg = dict(config_data)
+    env_cfg["game"] = dict(env_cfg["game"])
+    env_cfg["game"]["max_steps"] = 10
+    return {
+        "policy_uris": [policy_uri],
+        "assignments": [0] * env_cfg["game"]["num_agents"],
+        "env": env_cfg,
+        "seed": 42,
+        "max_action_time_ms": 10000,
+    }
 
 
 def _check_results(res: PureSingleEpisodeResult) -> None:
@@ -211,14 +213,36 @@ def _check_results(res: PureSingleEpisodeResult) -> None:
         raise typer.Exit(1)
 
 
-def validate_bundle(policy_uri: str, env_cfg: MettaGridConfig) -> None:
-    spec = _validation_spec(policy_uri, env_cfg)
-    with tempfile.NamedTemporaryFile(suffix=".json", delete=True) as results_file:
-        res = run_episode_isolated(spec, Path(results_file.name))
-        _check_results(res)
+def ensure_docker_daemon_access() -> None:
+    docker = shutil.which("docker")
+    if docker is None:
+        console.print("[red]Docker CLI not found on PATH.[/red]")
+        console.print("[dim]Install Docker and ensure the `docker` command is available, then retry.[/dim]")
+        raise typer.Exit(1)
+
+    try:
+        result = subprocess.run([docker, "info"], capture_output=True, text=True, timeout=15)
+    except subprocess.TimeoutExpired:
+        console.print("[red]Timed out while checking Docker daemon access.[/red]")
+        console.print(
+            "[dim]Docker did not respond to `docker info` within 15 seconds. "
+            "Check DOCKER_HOST and daemon health, then retry.[/dim]"
+        )
+        raise typer.Exit(1) from None
+
+    if result.returncode != 0:
+        console.print("[red]Cannot access the Docker daemon.[/red]")
+        detail = (result.stderr or result.stdout).strip()
+        if detail:
+            console.print(f"[red]{detail}[/red]")
+        console.print(
+            "[dim]Start Docker Desktop (or your Docker service) and ensure your user can access "
+            "the daemon socket.[/dim]"
+        )
+        raise typer.Exit(1)
 
 
-def validate_bundle_docker(policy_uri: str, env_cfg: MettaGridConfig, image: str) -> None:
+def validate_bundle_docker(policy_uri: str, config_data: dict[str, Any], image: str) -> None:
     local_path = localize_uri(policy_uri)
     if local_path is None:
         raise ValueError(f"Cannot localize policy URI: {policy_uri}")
@@ -230,19 +254,12 @@ def validate_bundle_docker(policy_uri: str, env_cfg: MettaGridConfig, image: str
         container_policy_uri = f"file:///workspace/policy/{local_path.name}"
         container_mount_target = f"/workspace/policy/{local_path.name}"
 
-    spec = _validation_spec(container_policy_uri, env_cfg)
-    job = SingleEpisodeJob(
-        policy_uris=spec.policy_uris,
-        assignments=spec.assignments,
-        env=spec.env,
-        seed=spec.seed,
-        max_action_time_ms=spec.max_action_time_ms,
-    )
+    job_spec = _validation_job_spec(container_policy_uri, config_data)
 
     with tempfile.TemporaryDirectory(prefix="cogames_docker_validate_") as workspace:
         spec_path = Path(workspace) / "spec.json"
         results_path = Path(workspace) / "results.json"
-        spec_path.write_text(job.model_dump_json())
+        spec_path.write_text(json.dumps(job_spec))
 
         cmd = [
             "docker",
@@ -348,7 +365,6 @@ def upload_policy(
     setup_script: str | None = None,
     season: str | None = None,
     include_hidden: bool = False,
-    validation_mode: str = "local",
     image: str = DEFAULT_EPISODE_RUNNER_IMAGE,
 ) -> UploadResult | None:
     if dry_run:
@@ -385,8 +401,6 @@ def upload_policy(
                 cmd.extend(["--season", season])
             if include_hidden:
                 cmd.append("--include-hidden")
-            if validation_mode != "local":
-                cmd.extend(["--validation-mode", validation_mode])
             if image != DEFAULT_EPISODE_RUNNER_IMAGE:
                 cmd.extend(["--image", image])
             result = subprocess.run(cmd, text=True, timeout=300)

@@ -11,14 +11,15 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+import typer
 from pytest_httpserver import HTTPServer
 from typer.testing import CliRunner
 from werkzeug import Response
 
 from cogames.auth import AuthConfigReaderWriter
+from cogames.cli.submit import ensure_docker_daemon_access
 from cogames.main import app
 from mettagrid.config.mettagrid_config import MettaGridConfig
-from mettagrid.runner.types import PureSingleEpisodeResult
 
 _SEASON_ID = "11111111-1111-1111-1111-111111111111"
 _ENTRY_CONFIG_ID = "22222222-2222-2222-2222-222222222222"
@@ -681,18 +682,20 @@ def test_validate_policy_fetches_config_and_runs(
 
     captured_args: dict[str, Any] = {}
 
-    def fake_run_episode_isolated(spec, _results_path, **_kwargs):
-        captured_args["spec"] = spec
+    def fake_ensure_docker_daemon_access() -> None:
+        captured_args["preflight_called"] = True
+
+    def fake_validate_bundle_docker(policy_uri, config_data, image):
         captured_args["called"] = True
-        return PureSingleEpisodeResult(
-            rewards=[1.0],
-            action_timeouts=[0],
-            stats={"game": {}, "agent": [{"action.move": 1.0}]},
-            steps=10,
-        )
+        captured_args["policy_uri"] = policy_uri
+        captured_args["config_data"] = config_data
+        captured_args["image"] = image
 
     runner = CliRunner()
-    with patch("cogames.cli.submit.run_episode_isolated", fake_run_episode_isolated):
+    with (
+        patch("cogames.main.ensure_docker_daemon_access", fake_ensure_docker_daemon_access),
+        patch("cogames.main.validate_bundle_docker", fake_validate_bundle_docker),
+    ):
         result = runner.invoke(
             app,
             [
@@ -712,8 +715,47 @@ def test_validate_policy_fetches_config_and_runs(
     config_requests = [req for req, _ in httpserver.log if "/tournament/configs/" in req.path]
     assert len(config_requests) == 1
 
+    assert captured_args.get("preflight_called") is True
     assert captured_args.get("called") is True
-    assert captured_args["spec"].env.game.max_steps == 10
+    assert captured_args["policy_uri"] == "class=cogames.policy.starter_agent.StarterPolicy"
+    assert captured_args["config_data"]["game"]["num_agents"] == default_cfg.game.num_agents
+
+
+def test_validate_policy_exits_early_when_docker_unavailable(httpserver: HTTPServer) -> None:
+    def fake_ensure_docker_daemon_access() -> None:
+        raise typer.Exit(1)
+
+    runner = CliRunner()
+    with patch("cogames.main.ensure_docker_daemon_access", fake_ensure_docker_daemon_access):
+        result = runner.invoke(
+            app,
+            [
+                "validate-bundle",
+                "--policy",
+                "class=cogames.policy.starter_agent.StarterPolicy",
+                "--season",
+                "test-season",
+                "--server",
+                httpserver.url_for(""),
+            ],
+        )
+
+    assert result.exit_code == 1
+    assert len(httpserver.log) == 0
+
+
+def test_ensure_docker_daemon_access_exits_cleanly_on_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("cogames.cli.submit.shutil.which", lambda _name: "/usr/bin/docker")
+
+    def _fake_run(*_args: Any, **_kwargs: Any):
+        raise subprocess.TimeoutExpired(cmd=["docker", "info"], timeout=15)
+
+    monkeypatch.setattr("cogames.cli.submit.subprocess.run", _fake_run)
+
+    with pytest.raises(typer.Exit) as exc:
+        ensure_docker_daemon_access()
+
+    assert exc.value.exit_code == 1
 
 
 # --- Policy Size Rejection Tests ---
