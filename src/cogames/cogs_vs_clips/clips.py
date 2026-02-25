@@ -40,12 +40,12 @@ class ClipsConfig(TeamConfig):
     initial_clips_spots: int = Field(default=1)
 
     scramble_start: int = Field(default=50)
-    scramble_interval: int = Field(default=100)
+    scramble_interval: int = Field(default=70)
     scramble_radius: int = Field(default=CvCConfig.JUNCTION_ALIGN_DISTANCE)
     scramble_end: Optional[int] = Field(default=None)
 
     align_start: int = Field(default=100)
-    align_interval: int = Field(default=100)
+    align_interval: int = Field(default=70)
     align_end: Optional[int] = Field(default=None)
 
     presence_end: Optional[int] = Field(default=None)

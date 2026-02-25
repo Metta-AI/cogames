@@ -193,8 +193,8 @@ def test_clips_default_event_frequency() -> None:
     env = CogsGuardMachina1Mission.make_env()
     align_steps = env.game.events["neutral_to_clips"].model_dump(mode="python")["timesteps"]
     scramble_steps = env.game.events["cogs_to_neutral"].model_dump(mode="python")["timesteps"]
-    assert align_steps[1] - align_steps[0] == 100
-    assert scramble_steps[1] - scramble_steps[0] == 100
+    assert align_steps[1] - align_steps[0] == 70
+    assert scramble_steps[1] - scramble_steps[0] == 70
 
 
 def test_clips_alignment_range_uses_ship_and_junction_distance() -> None:
