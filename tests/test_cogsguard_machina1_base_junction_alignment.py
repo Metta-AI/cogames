@@ -27,6 +27,14 @@ def test_cogsguard_machina1_site_has_no_home_junction() -> None:
     instance = map_builder.instance
     assert instance is not None
     assert isinstance(instance, MachinaArenaConfig)
+    assert instance.map_corner_offset == 1
+    assert instance.map_perimeter_placements == []
+    assert instance.map_corner_placements == [
+        ("clips:ship", 0),
+        ("clips:ship", 1),
+        ("clips:ship", 2),
+        ("clips:ship", 3),
+    ]
     assert instance.building_distributions is not None
     assert instance.building_distributions["junction"].type == DistributionType.POISSON
 

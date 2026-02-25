@@ -69,7 +69,13 @@ MACHINA_1 = CoGameSite(
         height=88,
         instance=SequentialMachinaArena.Config(
             spawn_count=20,
-            map_perimeter_placements=[("clips:hub", 3)],
+            map_corner_offset=1,
+            map_corner_placements=[
+                ("clips:ship", 0),
+                ("clips:ship", 1),
+                ("clips:ship", 2),
+                ("clips:ship", 3),
+            ],
         ),
     ),
     min_cogs=1,
@@ -111,6 +117,8 @@ def make_cogsguard_arena_site(num_agents: int = 10) -> CoGameSite:
         instance=MachinaArena.Config(
             spawn_count=num_agents,
             building_coverage=0.1,
+            map_corner_offset=1,
+            map_corner_placements=[("clips:ship", 0)],
             building_distributions={
                 # Avoid "junction clusters" that can become unassailable when captured.
                 "junction": DistributionConfig(type=DistributionType.POISSON),
@@ -184,6 +192,8 @@ COGSGUARD_ARENA = CoGameSite(
         instance=MachinaArena.Config(
             spawn_count=20,
             building_coverage=0.1,
+            map_corner_offset=1,
+            map_corner_placements=[("clips:ship", 0)],
             building_distributions={
                 # Avoid "junction clusters" that can become unassailable when captured.
                 "junction": DistributionConfig(type=DistributionType.POISSON),

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Final, Optional
 
 from cogames.cogs_vs_clips.mission import CvCMission
+from cogames.cogs_vs_clips.ships import remove_clips_ships_from_map_config
 from cogames.core import CoGameMissionVariant
 
 MEDIUM_CLIPS_END: Final[int] = 300
@@ -18,7 +19,11 @@ class CogsGuardDifficulty(CoGameMissionVariant):
 
     def modify_mission(self, mission: CvCMission) -> None:
         if self.disable_clips:
-            mission.clips.disabled = True
+            mission.site = mission.site.model_copy(
+                deep=True,
+                update={"map_builder": remove_clips_ships_from_map_config(mission.site.map_builder)},
+            )
+            mission.clips.disabled = False
             return
 
         mission.clips.disabled = False

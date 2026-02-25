@@ -46,13 +46,14 @@ class MapCornerPlacementsConfig(SceneConfig):
     """Place objects at map corners. Corner indices: 0=TL, 1=TR, 2=BL, 3=BR."""
 
     placements: list[tuple[str, int]] = []
+    offset: int = 2
 
 
 class MapCornerPlacements(Scene[MapCornerPlacementsConfig]):
     def render(self) -> None:
         cfg = self.config
         h, w = self.height, self.width
-        offset = 2
+        offset = max(0, int(cfg.offset))
         corners = [
             (offset, offset),
             (offset, w - 1 - offset),
@@ -102,10 +103,10 @@ class PerimeterPlacements(Scene[PerimeterPlacementsConfig]):
 
 
 class EnsureHubReachableJunctionConfig(SceneConfig):
-    """Ensure each hub has at least one nearby neutral junction."""
+    """Ensure each hub/ship has at least one nearby neutral junction."""
 
-    hub_suffix: str = ":hub"
-    hub_name: str = "hub"
+    anchor_suffixes: list[str] = [":hub", ":ship"]
+    anchor_names: list[str] = ["hub", "ship"]
     junction_name: str = "junction"
     min_distance: int = 4
     max_distance: int = 15
@@ -115,7 +116,7 @@ class EnsureHubReachableJunction(Scene[EnsureHubReachableJunctionConfig]):
     def _is_hub_cell(self, value: object) -> bool:
         if not isinstance(value, str):
             return False
-        return value.endswith(self.config.hub_suffix) or value == self.config.hub_name
+        return any(value.endswith(s) for s in self.config.anchor_suffixes) or value in self.config.anchor_names
 
     def _is_passable(self, value: object) -> bool:
         if not isinstance(value, str):
@@ -247,6 +248,8 @@ class MachinaArenaConfig(SceneConfig):
     # Objects to place at map corners (not BaseHub corners). List of (object_name, corner_index).
     # Corner indices: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right.
     map_corner_placements: list[tuple[str, int]] = []
+    # Inset used for map_corner_placements.
+    map_corner_offset: int = 2
     # Objects to place randomly on the perimeter (object_name, count).
     map_perimeter_placements: list[tuple[str, int]] = []
 
@@ -712,7 +715,10 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
         if cfg.map_corner_placements:
             children.append(
                 ChildrenAction(
-                    scene=MapCornerPlacements.Config(placements=cfg.map_corner_placements),
+                    scene=MapCornerPlacements.Config(
+                        placements=cfg.map_corner_placements,
+                        offset=cfg.map_corner_offset,
+                    ),
                     where="full",
                 )
             )

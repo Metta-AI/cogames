@@ -23,25 +23,12 @@ class OverrunVariant(CoGameMissionVariant):
         # Fire the align event once at step 1 targeting all junctions.
         mission.clips.align_start = 1
         mission.clips.align_interval = mission.max_steps + 1
+        mission.clips.align_all_neutral = True
+        mission.clips.align_unlimited_targets = True
         # Disable further clips spread/scramble after initialization.
         disable_start = mission.max_steps + 1
         mission.clips.scramble_start = disable_start
         mission.clips.scramble_interval = disable_start
-
-    @override
-    def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
-        from mettagrid.config.filter import AnyFilter, hasTagPrefix, isNot  # noqa: PLC0415
-        from mettagrid.config.query import Query  # noqa: PLC0415
-
-        # Replace filters: drop the proximity filter (isNear clips net) so ALL neutral junctions
-        # get flipped at step 1, not just those near the clips starting position.
-        # Keep only the hub exclusion so the cog hub junction stays aligned.
-        clip_event = env.game.events["neutral_to_clips"]
-        assert isinstance(clip_event.target_query, Query)
-        target_filters: list[AnyFilter] = [isNot(hasTagPrefix("team:"))]
-        clip_event.target_query.filters = target_filters
-        clip_event.filters = [isNot(hasTagPrefix("team"))]
-        clip_event.max_targets = None
 
 
 class ScramblerRewardsVariant(CoGameMissionVariant):
