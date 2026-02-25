@@ -5,7 +5,6 @@
 """CLI for CoGames - collection of environments for multi-agent cooperative and competitive games."""
 
 from cogames.cli.utils import suppress_noisy_logs
-from mettagrid.base_config import LENIENT_CONTEXT
 
 suppress_noisy_logs()
 
@@ -71,13 +70,12 @@ from cogames.cli.submit import (
     DEFAULT_SUBMIT_SERVER,
     RESULTS_URL,
     create_bundle,
+    ensure_docker_daemon_access,
     upload_policy,
-    validate_bundle,
     validate_bundle_docker,
 )
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
-from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.loader import discover_and_register_policies
 from mettagrid.policy.policy_registry import get_policy_registry
@@ -1838,7 +1836,7 @@ def create_bundle_cmd(
 
 @app.command(
     name="validate-bundle",
-    help="Validate a policy bundle runs correctly in process isolation.",
+    help="Validate a policy bundle runs correctly in Docker.",
     rich_help_panel="Policies",
     add_help_option=False,
 )
@@ -1870,16 +1868,10 @@ def validate_bundle_cmd(
         help="Tournament server URL (used to resolve default season).",
         rich_help_panel="Server",
     ),
-    validation_mode: str = typer.Option(
-        "local",
-        "--validation-mode",
-        help="Validation mode: 'local' (in-process) or 'docker' (in container).",
-        rich_help_panel="Validation",
-    ),
     image: str = typer.Option(
         DEFAULT_EPISODE_RUNNER_IMAGE,
         "--image",
-        help="Docker image for container validation (only used with --validation-mode docker).",
+        help="Docker image for container validation.",
         rich_help_panel="Validation",
     ),
     _help: bool = typer.Option(
@@ -1892,23 +1884,21 @@ def validate_bundle_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
+    ensure_docker_daemon_access()
+
     season_info = _resolve_season(server, season, include_hidden=include_hidden)
     entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool), None)
     if not entry_pool_info or not entry_pool_info.config_id:
         console.print("[red]No entry config found for season[/red]")
         raise typer.Exit(1)
 
-    if validation_mode == "docker" and image == DEFAULT_EPISODE_RUNNER_IMAGE and season_info.compat_version is not None:
+    if image == DEFAULT_EPISODE_RUNNER_IMAGE and season_info.compat_version is not None:
         image = f"ghcr.io/metta-ai/episode-runner:compat-v{season_info.compat_version}"
 
     with TournamentServerClient(server_url=server) as client:
         config_data = client.get_config(entry_pool_info.config_id)
-    env_cfg = MettaGridConfig.model_validate(config_data, context=LENIENT_CONTEXT)
 
-    if validation_mode == "docker":
-        validate_bundle_docker(policy, env_cfg, image)
-    else:
-        validate_bundle(policy, env_cfg)
+    validate_bundle_docker(policy, config_data, image)
 
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
@@ -2005,19 +1995,13 @@ def upload_cmd(
     skip_validation: bool = typer.Option(
         False,
         "--skip-validation",
-        help="Skip policy validation in isolated environment.",
-        rich_help_panel="Validation",
-    ),
-    validation_mode: str = typer.Option(
-        "local",
-        "--validation-mode",
-        help="Validation mode: 'local' (in-process) or 'docker' (in container).",
+        help="Skip policy validation in Docker.",
         rich_help_panel="Validation",
     ),
     image: str = typer.Option(
         DEFAULT_EPISODE_RUNNER_IMAGE,
         "--image",
-        help="Docker image for container validation (only used with --validation-mode docker).",
+        help="Docker image for container validation.",
         rich_help_panel="Validation",
     ),
     # --- Server ---
@@ -2082,7 +2066,6 @@ def upload_cmd(
         setup_script=setup_script,
         season=season_info.name if not no_submit else None,
         include_hidden=include_hidden,
-        validation_mode=validation_mode,
         image=image,
     )
 
