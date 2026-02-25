@@ -1036,14 +1036,6 @@ def train_cmd(
         min=1,
         rich_help_panel="Training",
     ),
-    batch_size: int = typer.Option(
-        4096,
-        "--batch-size",
-        metavar="N",
-        help="Batch size for training.",
-        min=1,
-        rich_help_panel="Training",
-    ),
     minibatch_size: int = typer.Option(
         4096,
         "--minibatch-size",
@@ -1160,7 +1152,6 @@ def train_cmd(
             checkpoints_path=Path(checkpoints_path),
             seed=seed,
             map_seed=map_seed,
-            batch_size=batch_size,
             minibatch_size=minibatch_size,
             vector_num_workers=num_workers,
             vector_num_envs=parallel_envs,
