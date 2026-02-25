@@ -232,8 +232,8 @@ def test_base_hub_grid_matches_bundles(
             assert value == name, f"Expected cross object {name} at {(x, y)}, found {value!r}"
 
 
-@pytest.mark.parametrize("clips_hub_spawn_count", [1, 3])
-def test_clips_hub_spawns_on_inner_perimeter(clips_hub_spawn_count: int):
+@pytest.mark.parametrize("clips_ship_spawn_count", [1, 3])
+def test_clips_ship_spawns_on_inner_perimeter(clips_ship_spawn_count: int):
     perimeter = (
         {(2, x) for x in range(2, 19)}
         | {(18, x) for x in range(2, 19)}
@@ -245,11 +245,11 @@ def test_clips_hub_spawns_on_inner_perimeter(clips_hub_spawn_count: int):
         height=21,
         seed=7,
         map_corner_placements=[],
-        map_perimeter_placements=[("clips:hub", clips_hub_spawn_count)],
+        map_perimeter_placements=[("clips:ship", clips_ship_spawn_count)],
         border_width=0,
     )
-    placements = _object_positions(game_map.grid, "clips:hub")
-    assert len(placements) == clips_hub_spawn_count
+    placements = _object_positions(game_map.grid, "clips:ship")
+    assert len(placements) == clips_ship_spawn_count
     assert placements <= perimeter
 
 

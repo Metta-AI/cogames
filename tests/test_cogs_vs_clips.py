@@ -8,9 +8,14 @@ from cogames.cogs_vs_clips.missions import (
     CogsGuardMachina1Mission,
     make_game,
 )
+from cogames.cogs_vs_clips.scrambler_tutorial import ScramblerTutorialMission
+from cogames.cogs_vs_clips.ships import count_clips_ships_in_map_config
+from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
+from cogames.cogs_vs_clips.variants import MultiTeamVariant
 from cogames.core import CoGameSite
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.query import ClosureQuery, MaterializedQuery
+from mettagrid.map_builder.ascii import AsciiMapBuilder
 from mettagrid.simulator import Simulation
 from mettagrid.test_support.map_builders import ObjectNameMapBuilder
 
@@ -117,3 +122,110 @@ def test_hub_global_obs_shows_own_team_only():
         assert beta_obs[key] == beta_hub_inv[element], (
             f"beta agent should see beta hub's {element}={beta_hub_inv[element]}, got {beta_obs[key]}"
         )
+
+
+def test_clips_event_targets_scale_with_default_clips_ship_count() -> None:
+    mission = CogsGuardMachina1Mission.model_copy(deep=True)
+    assert count_clips_ships_in_map_config(mission.site.map_builder) == 4
+
+    env = mission.make_env()
+
+    assert env.game.events["neutral_to_clips"].max_targets == 4
+    assert env.game.events["cogs_to_neutral"].max_targets == 4
+
+
+def test_clips_uses_ship_object_with_junction_territory_range() -> None:
+    env = CogsGuardMachina1Mission.make_env()
+
+    assert "clips:ship" in env.game.objects
+    assert "clips:hub" not in env.game.objects
+
+    ship = env.game.objects["clips:ship"]
+    assert ship.name == "ship"
+    assert ship.territory_controls
+    assert ship.territory_controls[0].strength == CvCConfig.TERRITORY_CONTROL_RADIUS
+
+
+def test_clips_alignment_range_uses_ship_and_junction_distance() -> None:
+    env = CogsGuardMachina1Mission.make_env()
+
+    net_clips_query = next(mq for mq in env.game.materialize_queries if mq.tag == "net:clips").model_dump(mode="python")
+    assert net_clips_query["query"]["source"]["source"] == "type:ship"
+    assert net_clips_query["query"]["edge_filters"][0]["radius"] == CvCConfig.JUNCTION_ALIGN_DISTANCE
+
+    event_dump = env.game.events["neutral_to_clips"].model_dump(mode="python")
+    inner_filters = event_dump["target_query"]["filters"][1]["inner"]
+    max_distance_filters = [f for f in inner_filters if f["filter_type"] == "max_distance"]
+    assert len(max_distance_filters) == 2
+    assert {f["radius"] for f in max_distance_filters} == {CvCConfig.JUNCTION_ALIGN_DISTANCE}
+    assert {f["query"]["source"] for f in max_distance_filters} == {"net:clips", "type:ship"}
+
+    scramble_inner_filters = env.game.events["cogs_to_neutral"].model_dump(mode="python")["target_query"]["filters"]
+    scramble_net_filter = next(
+        f for f in scramble_inner_filters if f["filter_type"] == "max_distance" and f["query"]["source"] == "net:clips"
+    )
+    assert scramble_net_filter["radius"] == CvCConfig.JUNCTION_ALIGN_DISTANCE
+
+
+def test_clips_event_targets_use_clips_ship_map_placements_for_ascii_builder() -> None:
+    mission = CvCMission(
+        name="clips_ship_map_config_scaling",
+        description="Scale clips events by clips ship map placements",
+        site=CoGameSite(
+            name="test",
+            description="map clips:ship placement drives events",
+            map_builder=AsciiMapBuilder.Config(
+                char_to_map_name={
+                    "#": "wall",
+                    ".": "empty",
+                    "a": "agent.cogs",
+                    "S": "clips:ship",
+                    "j": "junction",
+                },
+                map_data=[
+                    ["#", "#", "#", "#", "#"],
+                    ["#", "a", "S", "j", "#"],
+                    ["#", ".", "j", ".", "#"],
+                    ["#", ".", "S", ".", "#"],
+                    ["#", "#", "#", "#", "#"],
+                ],
+            ),
+            min_cogs=1,
+            max_cogs=1,
+        ),
+        teams={"cogs": CogTeam(name="cogs", short_name="c", num_agents=1, wealth=1)},
+        max_steps=100,
+    )
+
+    env = mission.make_env()
+
+    assert env.game.events["neutral_to_clips"].max_targets == 2
+    assert env.game.events["cogs_to_neutral"].max_targets == 2
+
+
+def test_clips_event_targets_scale_after_multi_team_map_rewrite() -> None:
+    mission = CogsGuardMachina1Mission.with_variants([MultiTeamVariant(num_teams=2)])
+    env = mission.make_env()
+
+    assert env.game.events["neutral_to_clips"].max_targets == 8
+    assert env.game.events["cogs_to_neutral"].max_targets == 8
+
+
+def test_multiteam_variant_does_not_mutate_shared_site_constants() -> None:
+    original_ship_count = count_clips_ships_in_map_config(COGSGUARD_MACHINA_1.map_builder)
+    mission = CvCMission(
+        name="basic",
+        description="Constructor variant path should not mutate shared site state",
+        site=COGSGUARD_MACHINA_1,
+        num_cogs=8,
+        max_steps=1000,
+        variants=[MultiTeamVariant(num_teams=2)],
+    )
+
+    assert count_clips_ships_in_map_config(mission.site.map_builder) == original_ship_count * 2
+    assert count_clips_ships_in_map_config(COGSGUARD_MACHINA_1.map_builder) == original_ship_count
+
+
+def test_scrambler_tutorial_overrun_alignment_still_applies() -> None:
+    env = ScramblerTutorialMission.make_env()
+    assert env.game.events["neutral_to_clips"].max_targets is None

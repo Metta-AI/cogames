@@ -6,6 +6,7 @@ from pydantic import Field
 
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.evals.difficulty_variants import DIFFICULTY_VARIANTS
+from cogames.cogs_vs_clips.ships import remove_clips_ships_from_map_config
 from cogames.cogs_vs_clips.terrain import (
     BaseHubVariant,
     MachinaArenaConfig,
@@ -373,17 +374,15 @@ class MultiTeamVariant(CoGameMissionVariant):
             for name in ["cogs_green", "cogs_blue"][: self.num_teams]
         }
         mission.num_cogs = None
-
-    def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
-        original_builder = env.game.map_builder
         agents_per_team = mission.num_agents // self.num_teams
+        original_builder = mission.site.map_builder
         # Shrink inner instance borders so teams are close together
         if isinstance(original_builder, MapGen.Config):
             original_builder = original_builder.model_copy(deep=True)
             original_builder.border_width = 1
             # Set spawn_count to match agents per team so map cells match agent count
             _set_spawn_count(original_builder, agents_per_team)
-        env.game.map_builder = MapGen.Config(
+        map_builder = MapGen.Config(
             instance=original_builder,
             instances=self.num_teams,
             set_team_by_instance=True,
@@ -397,15 +396,20 @@ class MultiTeamVariant(CoGameMissionVariant):
             instance_border_width=0,  # No border between instances
             instance_border_clear_radius=3,  # Clear walls near instance boundary
         )
+        # Copy-on-write avoids mutating shared site singletons (e.g. COGSGUARD_MACHINA_1).
+        mission.site = mission.site.model_copy(deep=True, update={"map_builder": map_builder})
 
 
 class NoClipsVariant(CoGameMissionVariant):
     name: str = "no_clips"
-    description: str = "Disable clips behavior entirely."
+    description: str = "Remove all clips ships from the map."
 
     @override
     def modify_mission(self, mission: CvCMission) -> None:
-        mission.clips.disabled = True
+        mission.site = mission.site.model_copy(
+            deep=True,
+            update={"map_builder": remove_clips_ships_from_map_config(mission.site.map_builder)},
+        )
 
 
 class NoVibesVariant(CoGameMissionVariant):
