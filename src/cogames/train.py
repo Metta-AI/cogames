@@ -103,7 +103,6 @@ def train(
     num_steps: int,
     checkpoints_path: Path,
     seed: int,
-    batch_size: int,
     minibatch_size: int,
     map_seed: Optional[int] = None,
     missions_arg: Optional[list[str]] = None,
@@ -184,6 +183,19 @@ def train(
     if remainder:
         vector_batch_size += envs_per_worker - remainder
 
+    # vector_batch_size must divide num_envs so that agents_per_batch
+    # divides total_agents, otherwise PufferLib's experience buffer overflows.
+    # Since vector_batch_size = k * envs_per_worker and num_envs = num_workers *
+    # envs_per_worker, we need k to divide num_workers.
+    if num_envs % vector_batch_size != 0:
+        k = vector_batch_size // envs_per_worker
+        for candidate in range(k, num_workers + 1):
+            if num_workers % candidate == 0:
+                vector_batch_size = candidate * envs_per_worker
+                break
+        else:
+            vector_batch_size = num_envs
+
     if backend is pvector.Serial:
         vector_batch_size = num_envs
 
@@ -233,36 +245,23 @@ def train(
     optimizer = "adam"
     adam_eps = 1e-8
 
+    # Let PufferLib auto-compute batch_size = total_agents * bptt_horizon,
+    # so segments == total_agents.  Combined with the vector_batch_size
+    # divisibility constraint above, this ensures segments % agents_per_batch == 0
+    # and prevents experience buffer overflows.
     total_agents = max(1, getattr(vecenv, "num_agents", 1))
-    num_envs = max(1, getattr(vecenv, "num_envs", 1))
-    num_workers = max(1, getattr(vecenv, "num_workers", 1))
-    envs_per_worker = max(1, num_envs // num_workers)
+    auto_batch_size = total_agents * bptt_horizon
 
-    original_batch_size = batch_size
-    amended_batch_size = max(original_batch_size, total_agents * bptt_horizon)
-    remainder = amended_batch_size % envs_per_worker
-    if remainder:
-        amended_batch_size += envs_per_worker - remainder
-
-    if amended_batch_size != original_batch_size:
-        logger.info(
-            "Adjusted batch_size from %s to %s (agents=%s, horizon=%s, envs/worker=%s)",
-            original_batch_size,
-            amended_batch_size,
-            total_agents,
-            bptt_horizon,
-            envs_per_worker,
-        )
-
-    amended_minibatch_size = min(minibatch_size, amended_batch_size)
+    amended_minibatch_size = min(minibatch_size, auto_batch_size)
     if amended_minibatch_size != minibatch_size:
         logger.info(
-            "Reducing minibatch_size from %s to %s to keep it <= batch_size",
+            "Reducing minibatch_size from %s to %s to keep it <= batch_size=%s",
             minibatch_size,
             amended_minibatch_size,
+            auto_batch_size,
         )
 
-    aligned_minibatch_size = _align_minibatch_size(amended_minibatch_size, amended_batch_size, bptt_horizon)
+    aligned_minibatch_size = _align_minibatch_size(amended_minibatch_size, auto_batch_size, bptt_horizon)
     if aligned_minibatch_size != amended_minibatch_size:
         logger.info(
             "Adjusting minibatch_size from %s to %s to align with bptt_horizon=%s",
@@ -272,7 +271,7 @@ def train(
         )
         amended_minibatch_size = aligned_minibatch_size
 
-    effective_timesteps = max(num_steps, amended_batch_size)
+    effective_timesteps = max(num_steps, auto_batch_size)
     if effective_timesteps != num_steps:
         logger.info(
             "Raising total_timesteps from %s to %s to keep it >= batch_size",
@@ -285,7 +284,7 @@ def train(
         device=device.type,
         total_timesteps=effective_timesteps,
         minibatch_size=amended_minibatch_size,
-        batch_size=amended_batch_size,
+        batch_size="auto",
         data_dir=str(checkpoints_path),
         checkpoint_interval=checkpoint_interval,
         bptt_horizon=bptt_horizon,
