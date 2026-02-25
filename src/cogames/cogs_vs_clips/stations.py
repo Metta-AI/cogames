@@ -33,7 +33,7 @@ class CvCExtractorConfig(CvCStationConfig):
     """Simple resource extractor with inventory that transfers resources to actors."""
 
     resource: str = Field(description="The resource to extract")
-    initial_amount: int = Field(default=100, description="Initial amount of resource in extractor")
+    initial_amount: int = Field(default=200, description="Initial amount of resource in extractor")
     small_amount: int = Field(default=1, description="Amount extracted without mining equipment")
     large_amount: int = Field(default=10, description="Amount extracted with mining equipment")
 
