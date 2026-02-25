@@ -6,7 +6,6 @@ from cogames.cogs_vs_clips.clips import ClipsConfig
 from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.junction import CvCJunctionConfig
-from cogames.cogs_vs_clips.ships import count_clips_ships_in_map_config
 from cogames.cogs_vs_clips.stations import (
     CvCExtractorConfig,
     CvCWallConfig,
@@ -169,14 +168,10 @@ class CvCMission(CoGameMission):
 
     def _merge_events(self) -> dict:
         """Merge clips and weather events, raising on key conflicts."""
-        if self.clips.disabled:
-            clips_events = {}
-        else:
-            clips_ship_count = count_clips_ships_in_map_config(self.map_builder())
-            if clips_ship_count <= 0:
-                clips_events = {}
-            else:
-                clips_events = self.clips.events(max_steps=self.max_steps, ship_count=clips_ship_count)
+        clips_events = self.clips.events(
+            max_steps=self.max_steps,
+            map_builder=self.map_builder(),
+        )
         weather_events = self.weather.events(max_steps=self.max_steps)
         overlap = set(clips_events) & set(weather_events)
         if overlap:

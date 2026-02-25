@@ -9,24 +9,41 @@ from mettagrid.mapgen.scene import SceneConfig
 CLIPS_SHIP_MAP_NAME = "clips:ship"
 
 
-def count_clips_ships_in_map_config(config: MapBuilderConfig | SceneConfig) -> int:
-    """Count clips ship placements in a map builder config."""
+def is_clips_ship_map_name(name: str) -> bool:
+    return name == CLIPS_SHIP_MAP_NAME or name.startswith(f"{CLIPS_SHIP_MAP_NAME}:")
+
+
+def clips_ship_map_names_in_map_config(config: MapBuilderConfig | SceneConfig) -> list[str]:
+    """Return clips ship map names present in a map builder config, one entry per ship placement."""
     if isinstance(config, MapGenConfig):
         if config.instance is None:
-            return 0
-        return count_clips_ships_in_map_config(config.instance) * (config.instances or 1)
+            return []
+        names = clips_ship_map_names_in_map_config(config.instance)
+        return names * (config.instances or 1)
 
     if isinstance(config, MachinaArenaConfig):
-        corner = sum(1 for name, _ in config.map_corner_placements if name == CLIPS_SHIP_MAP_NAME)
-        perimeter = sum(max(0, count) for name, count in config.map_perimeter_placements if name == CLIPS_SHIP_MAP_NAME)
-        return corner + perimeter
+        corner = [name for name, _ in config.map_corner_placements if is_clips_ship_map_name(name)]
+        perimeter: list[str] = []
+        for name, count in config.map_perimeter_placements:
+            if is_clips_ship_map_name(name):
+                perimeter.extend([name] * max(0, count))
+        return [*corner, *perimeter]
 
     if isinstance(config, AsciiMapBuilderConfig):
-        return sum(
-            1 for row in config.map_data for cell in row if config.char_to_map_name.get(cell) == CLIPS_SHIP_MAP_NAME
-        )
+        return [
+            map_name
+            for row in config.map_data
+            for cell in row
+            for map_name in [config.char_to_map_name.get(cell, "")]
+            if is_clips_ship_map_name(map_name)
+        ]
 
-    return 0
+    return []
+
+
+def count_clips_ships_in_map_config(config: MapBuilderConfig | SceneConfig) -> int:
+    """Count clips ship placements in a map builder config."""
+    return len(clips_ship_map_names_in_map_config(config))
 
 
 def remove_clips_ships_from_map_config(config: AnyMapBuilderConfig | SceneConfig) -> AnyMapBuilderConfig | SceneConfig:
@@ -49,8 +66,10 @@ def remove_clips_ships_from_map_config(config: AnyMapBuilderConfig | SceneConfig
 def _remove_from_machina(config: MachinaArenaConfig) -> MachinaArenaConfig:
     return config.model_copy(
         update={
-            "map_corner_placements": [p for p in config.map_corner_placements if p[0] != CLIPS_SHIP_MAP_NAME],
-            "map_perimeter_placements": [p for p in config.map_perimeter_placements if p[0] != CLIPS_SHIP_MAP_NAME],
+            "map_corner_placements": [p for p in config.map_corner_placements if not is_clips_ship_map_name(p[0])],
+            "map_perimeter_placements": [
+                p for p in config.map_perimeter_placements if not is_clips_ship_map_name(p[0])
+            ],
         }
     )
 
@@ -63,7 +82,7 @@ def _remove_from_ascii(config: AsciiMapBuilderConfig) -> AsciiMapBuilderConfig:
         deep=True,
         update={
             "map_data": [
-                [empty_char if config.char_to_map_name.get(cell) == CLIPS_SHIP_MAP_NAME else cell for cell in row]
+                [empty_char if is_clips_ship_map_name(config.char_to_map_name.get(cell, "")) else cell for cell in row]
                 for row in config.map_data
             ]
         },

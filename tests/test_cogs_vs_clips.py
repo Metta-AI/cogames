@@ -11,13 +11,24 @@ from cogames.cogs_vs_clips.missions import (
 from cogames.cogs_vs_clips.scrambler_tutorial import ScramblerTutorialMission
 from cogames.cogs_vs_clips.ships import count_clips_ships_in_map_config
 from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
+from cogames.cogs_vs_clips.terrain import MachinaArenaConfig
 from cogames.cogs_vs_clips.variants import MultiTeamVariant
 from cogames.core import CoGameSite
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.query import ClosureQuery, MaterializedQuery
 from mettagrid.map_builder.ascii import AsciiMapBuilder
+from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.simulator import Simulation
 from mettagrid.test_support.map_builders import ObjectNameMapBuilder
+
+
+def _clips_event_group(events: dict, base_name: str) -> dict:
+    prefix = f"{base_name}_"
+    return {name: event for name, event in events.items() if name == base_name or name.startswith(prefix)}
+
+
+def _sum_max_targets(events: dict) -> int:
+    return sum((event.max_targets or 0) for event in events.values())
 
 
 def test_make_cogs_vs_clips_scenario():
@@ -130,8 +141,36 @@ def test_clips_event_targets_scale_with_default_clips_ship_count() -> None:
 
     env = mission.make_env()
 
-    assert env.game.events["neutral_to_clips"].max_targets == 4
-    assert env.game.events["cogs_to_neutral"].max_targets == 4
+    neutral_events = _clips_event_group(env.game.events, "neutral_to_clips")
+    scramble_events = _clips_event_group(env.game.events, "cogs_to_neutral")
+    assert len(neutral_events) == 4
+    assert len(scramble_events) == 4
+    assert _sum_max_targets(neutral_events) == 4
+    assert _sum_max_targets(scramble_events) == 4
+    assert all(event.max_targets == 1 for event in neutral_events.values())
+    assert all(event.max_targets == 1 for event in scramble_events.values())
+
+
+def test_clips_event_targets_split_per_corner_ship_count() -> None:
+    mission = CogsGuardMachina1Mission.model_copy(deep=True)
+    assert isinstance(mission.site.map_builder, MapGen.Config)
+    assert mission.site.map_builder.instance is not None
+    assert isinstance(mission.site.map_builder.instance, MachinaArenaConfig)
+    mission.site.map_builder.instance.map_corner_placements = [
+        ("clips:ship:0", 0),
+        ("clips:ship:1", 1),
+    ]
+
+    env = mission.make_env()
+
+    neutral_events = _clips_event_group(env.game.events, "neutral_to_clips")
+    scramble_events = _clips_event_group(env.game.events, "cogs_to_neutral")
+    assert len(neutral_events) == 2
+    assert len(scramble_events) == 2
+    assert _sum_max_targets(neutral_events) == 2
+    assert _sum_max_targets(scramble_events) == 2
+    assert all(event.max_targets == 1 for event in neutral_events.values())
+    assert all(event.max_targets == 1 for event in scramble_events.values())
 
 
 def test_clips_uses_ship_object_with_junction_territory_range() -> None:
@@ -139,11 +178,23 @@ def test_clips_uses_ship_object_with_junction_territory_range() -> None:
 
     assert "clips:ship" in env.game.objects
     assert "clips:hub" not in env.game.objects
+    assert "c:hub" in env.game.objects
 
     ship = env.game.objects["clips:ship"]
+    hub = env.game.objects["c:hub"]
     assert ship.name == "ship"
     assert ship.territory_controls
+    assert hub.territory_controls
     assert ship.territory_controls[0].strength == CvCConfig.TERRITORY_CONTROL_RADIUS
+    assert ship.territory_controls[0].strength < hub.territory_controls[0].strength
+
+
+def test_clips_default_event_frequency() -> None:
+    env = CogsGuardMachina1Mission.make_env()
+    align_steps = env.game.events["neutral_to_clips"].model_dump(mode="python")["timesteps"]
+    scramble_steps = env.game.events["cogs_to_neutral"].model_dump(mode="python")["timesteps"]
+    assert align_steps[1] - align_steps[0] == 100
+    assert scramble_steps[1] - scramble_steps[0] == 100
 
 
 def test_clips_alignment_range_uses_ship_and_junction_distance() -> None:
@@ -153,18 +204,44 @@ def test_clips_alignment_range_uses_ship_and_junction_distance() -> None:
     assert net_clips_query["query"]["source"]["source"] == "type:ship"
     assert net_clips_query["query"]["edge_filters"][0]["radius"] == CvCConfig.JUNCTION_ALIGN_DISTANCE
 
-    event_dump = env.game.events["neutral_to_clips"].model_dump(mode="python")
-    inner_filters = event_dump["target_query"]["filters"][1]["inner"]
-    max_distance_filters = [f for f in inner_filters if f["filter_type"] == "max_distance"]
-    assert len(max_distance_filters) == 2
-    assert {f["radius"] for f in max_distance_filters} == {CvCConfig.JUNCTION_ALIGN_DISTANCE}
-    assert {f["query"]["source"] for f in max_distance_filters} == {"net:clips", "type:ship"}
+    neutral_events = _clips_event_group(env.game.events, "neutral_to_clips")
+    scramble_events = _clips_event_group(env.game.events, "cogs_to_neutral")
+    assert len(neutral_events) == 4
+    assert len(scramble_events) == 4
 
-    scramble_inner_filters = env.game.events["cogs_to_neutral"].model_dump(mode="python")["target_query"]["filters"]
-    scramble_net_filter = next(
-        f for f in scramble_inner_filters if f["filter_type"] == "max_distance" and f["query"]["source"] == "net:clips"
-    )
-    assert scramble_net_filter["radius"] == CvCConfig.JUNCTION_ALIGN_DISTANCE
+    neutral_lane_ship_tags: set[str] = set()
+    for neutral_event in neutral_events.values():
+        neutral_filters = neutral_event.model_dump(mode="python")["target_query"]["filters"]
+        neutral_lane_filter = next(f for f in neutral_filters if f["filter_type"] == "max_distance")
+        assert neutral_lane_filter["radius"] == CvCConfig.JUNCTION_ALIGN_DISTANCE
+        lane_query = neutral_lane_filter["query"]
+        assert lane_query["query_type"] == "closure"
+        assert lane_query["source"]["source"] == "type:ship"
+        assert lane_query["candidates"]["source"] == "type:junction"
+        assert lane_query["edge_filters"][0]["radius"] == CvCConfig.JUNCTION_ALIGN_DISTANCE
+
+        source_tags = {f["tag"] for f in lane_query["source"]["filters"] if f["filter_type"] == "tag"}
+        assert "team:clips" in source_tags
+        lane_ship_tags = [tag for tag in source_tags if tag.startswith("clips:ship")]
+        assert len(lane_ship_tags) == 1
+        candidate_tags = [f["tag"] for f in lane_query["candidates"]["filters"] if f["filter_type"] == "tag"]
+        assert candidate_tags == lane_ship_tags
+        neutral_lane_ship_tags.update(lane_ship_tags)
+
+    scramble_lane_ship_tags: set[str] = set()
+    for scramble_event in scramble_events.values():
+        scramble_filters = scramble_event.model_dump(mode="python")["target_query"]["filters"]
+        scramble_lane_filter = next(f for f in scramble_filters if f["filter_type"] == "max_distance")
+        assert scramble_lane_filter["radius"] == CvCConfig.JUNCTION_ALIGN_DISTANCE
+        lane_query = scramble_lane_filter["query"]
+        assert lane_query["query_type"] == "closure"
+        source_tags = {f["tag"] for f in lane_query["source"]["filters"] if f["filter_type"] == "tag"}
+        lane_ship_tags = [tag for tag in source_tags if tag.startswith("clips:ship")]
+        assert len(lane_ship_tags) == 1
+        scramble_lane_ship_tags.update(lane_ship_tags)
+
+    assert len(neutral_lane_ship_tags) == 4
+    assert len(scramble_lane_ship_tags) == 4
 
 
 def test_clips_event_targets_use_clips_ship_map_placements_for_ascii_builder() -> None:
@@ -199,16 +276,26 @@ def test_clips_event_targets_use_clips_ship_map_placements_for_ascii_builder() -
 
     env = mission.make_env()
 
-    assert env.game.events["neutral_to_clips"].max_targets == 2
-    assert env.game.events["cogs_to_neutral"].max_targets == 2
+    neutral_events = _clips_event_group(env.game.events, "neutral_to_clips")
+    scramble_events = _clips_event_group(env.game.events, "cogs_to_neutral")
+    assert len(neutral_events) == 2
+    assert len(scramble_events) == 2
+    assert _sum_max_targets(neutral_events) == 2
+    assert _sum_max_targets(scramble_events) == 2
+    assert all(event.max_targets == 1 for event in neutral_events.values())
+    assert all(event.max_targets == 1 for event in scramble_events.values())
 
 
 def test_clips_event_targets_scale_after_multi_team_map_rewrite() -> None:
     mission = CogsGuardMachina1Mission.with_variants([MultiTeamVariant(num_teams=2)])
     env = mission.make_env()
 
-    assert env.game.events["neutral_to_clips"].max_targets == 8
-    assert env.game.events["cogs_to_neutral"].max_targets == 8
+    neutral_events = _clips_event_group(env.game.events, "neutral_to_clips")
+    scramble_events = _clips_event_group(env.game.events, "cogs_to_neutral")
+    assert len(neutral_events) == 8
+    assert len(scramble_events) == 8
+    assert _sum_max_targets(neutral_events) == 8
+    assert _sum_max_targets(scramble_events) == 8
 
 
 def test_multiteam_variant_does_not_mutate_shared_site_constants() -> None:
