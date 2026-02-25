@@ -51,7 +51,7 @@ class SeasonInfo(SeasonSummary):
     status: Literal["not_started", "in_progress", "complete"]
     display_name: str
     started_at: str | None = None
-    tournament_type: Literal["policy", "team"]
+    tournament_type: Literal["freeplay", "team"]
     entrant_count: int
     active_entrant_count: int
     match_count: int
