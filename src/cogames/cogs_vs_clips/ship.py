@@ -18,7 +18,11 @@ class CvCShipConfig(CvCStationConfig):
 
     control_range: int = Field(default=CvCConfig.TERRITORY_CONTROL_RADIUS, description="Range for territory control")
 
-    def station_cfg(self, team: TeamConfig, map_name: Optional[str] = None) -> GridObjectConfig:
+    def station_cfg(
+        self,
+        team: TeamConfig,
+        map_name: Optional[str] = None,
+    ) -> GridObjectConfig:
         return GridObjectConfig(
             name="ship",
             map_name=map_name or "ship",

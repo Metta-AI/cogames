@@ -116,7 +116,10 @@ class EnsureHubReachableJunction(Scene[EnsureHubReachableJunctionConfig]):
     def _is_hub_cell(self, value: object) -> bool:
         if not isinstance(value, str):
             return False
-        return any(value.endswith(s) for s in self.config.anchor_suffixes) or value in self.config.anchor_names
+        return (
+            any(value.endswith(s) or f"{s}:" in value for s in self.config.anchor_suffixes)
+            or value in self.config.anchor_names
+        )
 
     def _is_passable(self, value: object) -> bool:
         if not isinstance(value, str):
