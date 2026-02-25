@@ -19,7 +19,7 @@ def _season(compat_version: str | None) -> SeasonInfo:
         compat_version=compat_version,
         status="not_started",
         display_name="Test Season",
-        tournament_type="policy",
+        tournament_type="freeplay",
         entrant_count=0,
         active_entrant_count=0,
         match_count=0,

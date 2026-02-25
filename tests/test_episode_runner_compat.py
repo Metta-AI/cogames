@@ -9,7 +9,6 @@
 # The RIGHT fix is one of:
 #   1. Make your schema change backwards compatible (e.g. optional fields with defaults).
 #   2. Bump COMPAT_VERSION and publish a new compat image that includes your changes.
-
 import os
 import subprocess
 import tempfile
@@ -21,9 +20,19 @@ from cogames.cogs_vs_clips.missions import make_game
 from mettagrid.runner.types import SingleEpisodeJob
 
 
+def _repo_compat_version() -> str:
+    current = Path(__file__).resolve().parent
+    for parent in [current, *current.parents]:
+        if (parent / ".repo-root").exists():
+            compat_file = parent / "COMPAT_VERSION"
+            if compat_file.exists():
+                return compat_file.read_text().strip()
+            break
+    raise RuntimeError("Could not locate COMPAT_VERSION at repo root")
+
+
 def _compat_image() -> str:
-    compat_version = (Path(__file__).resolve().parents[3] / "COMPAT_VERSION").read_text().strip()
-    return f"ghcr.io/metta-ai/episode-runner:compat-v{compat_version}"
+    return f"ghcr.io/metta-ai/episode-runner:compat-v{_repo_compat_version()}"
 
 
 IMAGE = os.environ.get("EPISODE_RUNNER_IMAGE", _compat_image())
