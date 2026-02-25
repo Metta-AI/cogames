@@ -232,7 +232,7 @@ def _apply_scout(rewards: dict[str, AgentReward]) -> None:
     rewards["scout_gained"] = reward(stat("scout.gained"), weight=2.0)
     rewards["scout_lost"] = reward(stat("scout.lost"), weight=-2.0)
 
-    rewards["cell_visited"] = reward(stat("cell.visited"), weight=0.0001)
+    rewards["cell_visited"] = reward(stat("cell.visited"), weight=0.00001)
     for other_role in ("miner", "scrambler", "aligner"):
         rewards[f"{other_role}_gained"] = reward(stat(f"{other_role}.gained"), weight=-1.0)
 

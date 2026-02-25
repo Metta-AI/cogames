@@ -8,10 +8,10 @@ from cogames.cogs_vs_clips.missions import (
     CogsGuardMachina1Mission,
     make_game,
 )
-from cogames.cogs_vs_clips.scrambler_tutorial import ScramblerTutorialMission
 from cogames.cogs_vs_clips.ships import count_clips_ships_in_map_config
 from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
 from cogames.cogs_vs_clips.terrain import MachinaArenaConfig
+from cogames.cogs_vs_clips.tutorials.scrambler_tutorial import ScramblerTutorialMission
 from cogames.cogs_vs_clips.variants import MultiTeamVariant
 from cogames.core import CoGameSite
 from mettagrid.config.mettagrid_config import MettaGridConfig

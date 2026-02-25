@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, override
 
 from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
+from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
 from cogames.core import CoGameMissionVariant
 
 if TYPE_CHECKING:
@@ -48,7 +48,7 @@ class ScramblerRewardsVariant(CoGameMissionVariant):
 ScramblerTutorialMission = CvCMission(
     name="scrambler_tutorial",
     description="Learn scrambler role - acquire scrambler gear and scramble enemy junctions.",
-    site=COGSGUARD_ARENA,
+    site=COGSGUARD_MACHINA_1,
     num_cogs=4,
     max_steps=1000,
     cog=CogConfig(heart_limit=3),

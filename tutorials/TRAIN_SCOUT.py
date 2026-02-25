@@ -45,7 +45,7 @@ import pufferlib.vector as pvector
 from cogames.cogs_vs_clips.clip_difficulty import EASY
 from cogames.cogs_vs_clips.cog import CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
+from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
 from cogames.cogs_vs_clips.tutorials.scout_tutorial import ScoutRewardsVariant
 from mettagrid import MettaGridConfig
 from mettagrid.envs.early_reset_handler import EarlyResetHandler
@@ -62,7 +62,7 @@ from pufferlib.pufferlib import set_buffers
 # %% [markdown]
 # ## 1. Build the mission and environment config
 #
-# - **Site**: CogsGuard Arena (50x50 compact training map)
+# - **Site**: CogsGuard Machina 1 (50x50 training map)
 # - **EASY difficulty**: No clips pressure
 # - **initial_hearts=0**: Scouts don't need hearts
 # - **1000 max steps** per episode
@@ -74,7 +74,7 @@ MAX_STEPS = 1000
 mission = CvCMission(
     name="scout_tutorial",
     description="Learn scout role - exploration and visiting stale cells.",
-    site=COGSGUARD_ARENA,
+    site=COGSGUARD_MACHINA_1,
     num_cogs=NUM_AGENTS,
     max_steps=MAX_STEPS,
     teams={"cogs": CogTeam(name="cogs", num_agents=NUM_AGENTS, wealth=3, initial_hearts=0)},

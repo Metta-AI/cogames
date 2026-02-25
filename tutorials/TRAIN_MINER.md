@@ -52,14 +52,14 @@ from mettagrid.util.stats_writer import NoopStatsWriter
 from cogames.cogs_vs_clips.clip_difficulty import EASY
 from cogames.cogs_vs_clips.cog import CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
+from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
 from cogames.cogs_vs_clips.tutorials.miner_tutorial import MinerRewardsVariant
 ```
 
 ## 1. Build the mission and environment config
 
 We construct a CvCMission from scratch:
-- **Site**: CogsGuard Arena (50x50 compact training map)
+- **Site**: CogsGuard Machina 1 (50x50 training map)
 - **EASY difficulty**: Disables clips events
 - **initial_hearts=0**: No free hearts — miners must earn everything
 - **1000 max steps** per episode
@@ -74,7 +74,7 @@ MAX_STEPS = 1000
 mission = CvCMission(
     name="miner_tutorial",
     description="Learn miner role - resource extraction and deposits (no clips).",
-    site=COGSGUARD_ARENA,
+    site=COGSGUARD_MACHINA_1,
     num_cogs=NUM_AGENTS,
     max_steps=MAX_STEPS,
     teams={"cogs": CogTeam(name="cogs", num_agents=NUM_AGENTS, wealth=3, initial_hearts=0)},

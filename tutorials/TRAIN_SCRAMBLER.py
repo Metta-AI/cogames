@@ -41,8 +41,8 @@ from einops import rearrange
 import pufferlib.vector as pvector
 from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.scrambler_tutorial import OverrunVariant, ScramblerRewardsVariant
-from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
+from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
+from cogames.cogs_vs_clips.tutorials.scrambler_tutorial import OverrunVariant, ScramblerRewardsVariant
 from mettagrid import MettaGridConfig
 from mettagrid.envs.early_reset_handler import EarlyResetHandler
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
@@ -58,7 +58,7 @@ from pufferlib.pufferlib import set_buffers
 # %% [markdown]
 # ## 1. Build the mission and environment config
 #
-# - **Site**: CogsGuard Arena (50x50 compact training map)
+# - **Site**: CogsGuard Machina 1 (50x50 training map)
 # - **OverrunVariant**: All junctions start clips-aligned, giving scramblers targets to scramble
 # - **initial_hearts=120**: Hearts available for scrambling junctions
 # - **heart_limit=3**: Limits heart accumulation to focus on scrambling
@@ -71,7 +71,7 @@ MAX_STEPS = 1000
 mission = CvCMission(
     name="scrambler_tutorial",
     description="Learn scrambler role - scramble enemy junctions.",
-    site=COGSGUARD_ARENA,
+    site=COGSGUARD_MACHINA_1,
     num_cogs=NUM_AGENTS,
     max_steps=MAX_STEPS,
     cog=CogConfig(heart_limit=3),

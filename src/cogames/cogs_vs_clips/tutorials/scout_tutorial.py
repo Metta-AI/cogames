@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, override
 from cogames.cogs_vs_clips.clip_difficulty import EASY
 from cogames.cogs_vs_clips.cog import CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.sites import COGSGUARD_ARENA
+from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
 from cogames.core import CoGameMissionVariant
 
 if TYPE_CHECKING:
@@ -31,7 +31,7 @@ class ScoutRewardsVariant(CoGameMissionVariant):
 ScoutTutorialMission = CvCMission(
     name="scout_tutorial",
     description="Learn scout role - exploration and visiting stale cells (no clips).",
-    site=COGSGUARD_ARENA,
+    site=COGSGUARD_MACHINA_1,
     num_cogs=4,
     max_steps=1000,
     teams={"cogs": CogTeam(name="cogs", num_agents=4, wealth=3, initial_hearts=0)},
