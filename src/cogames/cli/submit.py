@@ -21,7 +21,8 @@ from cogames.cli.base import console
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.policy import PolicySpec, get_policy_spec
-from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec
+from mettagrid.policy.prepare_policy_spec import extract_submission_archive
+from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec, write_submission_policy_spec
 from mettagrid.runner.types import PureSingleEpisodeResult
 from mettagrid.util.uri_resolvers.schemes import localize_uri, parse_uri
 
@@ -69,6 +70,97 @@ def _zip_directory_to(src: Path, dest: Path) -> None:
                 zipf.write(file_path, arcname=file_path.relative_to(src))
 
 
+def _copy_tree_to(src: Path, dest: Path) -> None:
+    for file_path in src.rglob("*"):
+        if not file_path.is_file():
+            continue
+        target = dest / file_path.relative_to(src)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(file_path, target)
+
+
+def _materialize_bundle_from_local(local: Path, bundle_root: Path) -> SubmissionPolicySpec:
+    if local.is_dir():
+        _copy_tree_to(local, bundle_root)
+    else:
+        extract_submission_archive(local, bundle_root)
+    return _load_submission_spec(bundle_root)
+
+
+def _load_submission_spec(bundle_root: Path) -> SubmissionPolicySpec:
+    spec_path = bundle_root / POLICY_SPEC_FILENAME
+    if not spec_path.exists():
+        raise FileNotFoundError(f"{POLICY_SPEC_FILENAME} not found in bundle: {bundle_root}")
+    return SubmissionPolicySpec.model_validate_json(spec_path.read_text())
+
+
+def _copy_include_paths_into_bundle(paths: list[Path], cwd: Path, bundle_root: Path) -> None:
+    for path in paths:
+        source = cwd / path
+        target = bundle_root / path
+        if source.is_dir():
+            _copy_tree_to(source, target)
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+
+
+def _prepare_submission_spec_from_policy(
+    ctx: typer.Context,
+    policy: str,
+    cwd: Path,
+    init_kwargs: dict[str, str] | None,
+) -> tuple[SubmissionPolicySpec, list[str]]:
+    policy_spec = get_policy_spec(ctx, policy)
+    console.print(f"[dim]Policy class: {policy_spec.class_path}[/dim]")
+
+    if init_kwargs:
+        merged_kwargs = {**policy_spec.init_kwargs, **init_kwargs}
+        policy_spec = PolicySpec(
+            class_path=policy_spec.class_path,
+            data_path=policy_spec.data_path,
+            init_kwargs=merged_kwargs,
+        )
+
+    if policy_spec.init_kwargs:
+        console.print(f"[dim]Init kwargs: {policy_spec.init_kwargs}[/dim]")
+
+    files_to_include: list[str] = []
+    if policy_spec.data_path:
+        data_rel = str(_resolve_path_within_cwd(policy_spec.data_path, cwd))
+        policy_spec = PolicySpec(
+            class_path=policy_spec.class_path,
+            data_path=data_rel,
+            init_kwargs=policy_spec.init_kwargs,
+        )
+        files_to_include.append(data_rel)
+        console.print(f"[dim]Data path: {data_rel}[/dim]")
+
+    submission_spec = SubmissionPolicySpec(
+        class_path=policy_spec.class_path,
+        data_path=policy_spec.data_path,
+        init_kwargs=policy_spec.init_kwargs,
+        setup_script=None,
+    )
+    return submission_spec, files_to_include
+
+
+def _prepare_submission_spec_from_uri(
+    policy: str,
+    bundle_root: Path,
+    init_kwargs: dict[str, str] | None,
+) -> SubmissionPolicySpec:
+    local = localize_uri(policy)
+    if local is None:
+        raise ValueError(f"Cannot localize policy URI: {policy}")
+    console.print(f"[dim]Policy bundle: {local}[/dim]")
+    submission_spec = _materialize_bundle_from_local(local, bundle_root)
+    if init_kwargs:
+        submission_spec.init_kwargs.update(init_kwargs)
+        console.print(f"[dim]Init kwargs: {submission_spec.init_kwargs}[/dim]")
+    return submission_spec
+
+
 def _collect_ancestor_init_files(include_files: list[Path]) -> list[Path]:
     found: set[Path] = set()
     for path in include_files:
@@ -109,6 +201,8 @@ def create_submission_zip(
             for root, _, files in os.walk(file_path):
                 for file in files:
                     full = Path(root) / file
+                    if not full.exists():
+                        continue
                     all_files[str(full)] = full
         else:
             all_files[str(file_path)] = file_path
@@ -129,65 +223,38 @@ def create_bundle(
     init_kwargs: dict[str, str] | None = None,
     setup_script: str | None = None,
 ) -> Path:
-    # TODO: Unify the two paths below. For URI inputs, extract the PolicySpec from the
-    # bundle so we can apply init_kwargs/include_files/setup_script, then re-zip.
-    local = localize_uri(policy) if parse_uri(policy, allow_none=True, default_scheme=None) else None
-    if local is not None:
-        if init_kwargs or include_files or setup_script:
-            console.print("[red]Error:[/red] Extra files/kwargs are not supported with bundle URIs.")
-            raise typer.Exit(1)
-        console.print(f"[dim]Packaging existing bundle: {local}[/dim]")
-        if local.is_dir():
-            _zip_directory_to(local, output)
-        else:
-            shutil.copy2(local, output)
-        console.print(f"[dim]Bundle size: {output.stat().st_size / 1024:.0f} KB[/dim]")
-        return output
-
-    policy_spec = get_policy_spec(ctx, policy)
-    console.print(f"[dim]Policy class: {policy_spec.class_path}[/dim]")
-
-    if init_kwargs:
-        merged_kwargs = {**policy_spec.init_kwargs, **init_kwargs}
-        policy_spec = PolicySpec(
-            class_path=policy_spec.class_path,
-            data_path=policy_spec.data_path,
-            init_kwargs=merged_kwargs,
-        )
-
-    if policy_spec.init_kwargs:
-        console.print(f"[dim]Init kwargs: {policy_spec.init_kwargs}[/dim]")
-
     cwd = Path.cwd().resolve()
-    if policy_spec.data_path:
-        data_rel = str(_resolve_path_within_cwd(policy_spec.data_path, cwd))
-        policy_spec = PolicySpec(
-            class_path=policy_spec.class_path,
-            data_path=data_rel,
-            init_kwargs=policy_spec.init_kwargs,
-        )
-        console.print(f"[dim]Data path: {data_rel}[/dim]")
+    is_uri = parse_uri(policy, allow_none=True, default_scheme=None) is not None
+    files_to_include = list(include_files or [])
 
-    setup_script_rel: str | None = None
-    if setup_script:
-        setup_script_rel = str(_resolve_path_within_cwd(setup_script, cwd))
-        console.print(f"[dim]Setup script: {setup_script_rel}[/dim]")
+    with tempfile.TemporaryDirectory(prefix="cogames_bundle_build_") as tmp_dir:
+        bundle_root = Path(tmp_dir) / "bundle"
+        bundle_root.mkdir()
 
-    files_to_include = []
-    if policy_spec.data_path:
-        files_to_include.append(policy_spec.data_path)
-    if setup_script_rel:
-        files_to_include.append(setup_script_rel)
-    if include_files:
-        files_to_include.extend(include_files)
+        if is_uri:
+            submission_spec = _prepare_submission_spec_from_uri(policy, bundle_root, init_kwargs)
+        else:
+            submission_spec, policy_files = _prepare_submission_spec_from_policy(ctx, policy, cwd, init_kwargs)
+            files_to_include.extend(policy_files)
 
-    validated_paths: list[Path] = []
-    if files_to_include:
-        validated_paths = validate_paths(files_to_include)
-        console.print(f"[dim]Including {len(validated_paths)} file(s)[/dim]")
+        if setup_script:
+            setup_script_rel = str(_resolve_path_within_cwd(setup_script, cwd))
+            files_to_include.append(setup_script_rel)
+            submission_spec.setup_script = setup_script_rel
+            console.print(f"[dim]Setup script: {setup_script_rel}[/dim]")
 
-    tmp_zip = create_submission_zip(validated_paths, policy_spec, setup_script=setup_script_rel)
-    shutil.move(str(tmp_zip), str(output))
+        validated_paths: list[Path] = []
+        if files_to_include:
+            validated_paths = validate_paths(files_to_include)
+            console.print(f"[dim]Including {len(validated_paths)} file(s)[/dim]")
+
+        if validated_paths:
+            include_with_ancestors = validated_paths + _collect_ancestor_init_files(validated_paths)
+            _copy_include_paths_into_bundle(include_with_ancestors, cwd, bundle_root)
+
+        write_submission_policy_spec(bundle_root / POLICY_SPEC_FILENAME, submission_spec)
+        _zip_directory_to(bundle_root, output)
+
     console.print(f"[dim]Bundle size: {output.stat().st_size / 1024:.0f} KB[/dim]")
     return output
 

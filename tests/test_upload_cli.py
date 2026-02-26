@@ -345,6 +345,77 @@ def test_upload_zip_policy(
         assert hyperparams == {"lr": 1e-4, "epochs": 100}
 
 
+def test_upload_zip_policy_with_includes_and_setup_script(
+    httpserver: HTTPServer,
+    fake_home: Path,
+    tmp_path: Path,
+) -> None:
+    """Test augmenting an existing zip URI with include-files, setup script, and init kwargs."""
+    _setup_mock_upload_server(httpserver)
+
+    policy_zip = tmp_path / "my_policy.zip"
+    policy_spec = {
+        "class_path": "my_policies.TrainedAgent",
+        "data_path": "model.safetensors",
+        "init_kwargs": {"num_layers": 4},
+    }
+    with zipfile.ZipFile(policy_zip, "w") as zf:
+        zf.writestr("policy_spec.json", json.dumps(policy_spec))
+        zf.writestr("model.safetensors", b"fake model data")
+
+    extra_pkg = tmp_path / "extra" / "pkg"
+    extra_pkg.mkdir(parents=True)
+    (tmp_path / "extra" / "__init__.py").write_text("")
+    (extra_pkg / "__init__.py").write_text("")
+    (extra_pkg / "module.py").write_text("class Extra: pass\n")
+    (tmp_path / "setup_script.py").write_text("print('setup')\n")
+
+    result = subprocess.run(
+        [
+            "cogames",
+            "upload",
+            "--policy",
+            policy_zip.as_uri(),
+            "--name",
+            "test-policy",
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "http://fake-login-server",
+            "--skip-validation",
+            "--include-files",
+            "extra/pkg",
+            "--setup-script",
+            "setup_script.py",
+            "--init-kwarg",
+            "dropout=0.1",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        cwd=tmp_path,
+        env={
+            "HOME": str(fake_home),
+            "PATH": os.environ.get("PATH", ""),
+        },
+    )
+
+    assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+
+    assert len(httpserver.log) == 5
+    upload_req, _ = httpserver.log[3]
+    with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
+        names = set(zf.namelist())
+        spec = json.loads(zf.read("policy_spec.json"))
+        assert "model.safetensors" in names
+        assert "extra/__init__.py" in names
+        assert "extra/pkg/__init__.py" in names
+        assert "extra/pkg/module.py" in names
+        assert "setup_script.py" in names
+        assert spec["setup_script"] == "setup_script.py"
+        assert spec["init_kwargs"] == {"num_layers": 4, "dropout": "0.1"}
+
+
 def test_upload_s3_policy(
     httpserver: HTTPServer,
     fake_home: Path,
