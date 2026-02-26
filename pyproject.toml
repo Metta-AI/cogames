@@ -9,7 +9,7 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 classifiers = ["Programming Language :: Python :: 3", "Programming Language :: Python :: 3.12"]
 dependencies = [
-  "mettagrid==0.16.5",
+  "mettagrid==0.16.7",
   "packaging>=24.0.0",
   "pufferlib-core",
   "pydantic>=2.11.5",
@@ -66,7 +66,7 @@ testpaths = ["tests"]
 source = ["cogames"]
 
 [tool.uv.sources]
-mettagrid = { workspace = true }
+mettagrid = {git = "https://github.com/Metta-AI/mettagrid.git"}
 
 [tool.ruff]
 extend = "../../.ruff.toml"
