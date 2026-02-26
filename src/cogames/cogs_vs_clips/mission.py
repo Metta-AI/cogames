@@ -6,6 +6,7 @@ from cogames.cogs_vs_clips.clips import ClipsConfig
 from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.junction import CvCJunctionConfig
+from cogames.cogs_vs_clips.render import render_config
 from cogames.cogs_vs_clips.stations import (
     CvCExtractorConfig,
     CvCWallConfig,
@@ -27,10 +28,9 @@ from mettagrid.config.action_config import (
 from mettagrid.config.filter import sharedTagPrefix
 from mettagrid.config.game_value import QueryInventoryValue
 from mettagrid.config.handler_config import Handler, updateTarget
-from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig, RenderConfig, RenderHudConfig
+from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
 from mettagrid.config.query import query
-from mettagrid.config.render_config import RenderAsset
 from mettagrid.config.tag import typeTag
 from mettagrid.config.territory_config import TerritoryConfig
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
@@ -85,26 +85,13 @@ class CvCMission(CoGameMission):
         self.clips.team_id = len(team_objs)
 
         all_teams = [*team_objs, self.clips]
-        render_assets = {
-            "hub": "hub",
-            "junction": [
-                RenderAsset(asset="junction.working", tags=["team:cogs"]),
-                RenderAsset(asset="junction.clipped1", tags=["team:clips"]),
-                RenderAsset(asset="junction"),
-            ],
-            **{f"{team.short_name}:{gear}": f"{gear}_station" for team in team_objs for gear in CvCConfig.GEAR},
-        }
 
         game = GameConfig(
             map_builder=self.map_builder(),
             max_steps=self.max_steps,
             num_agents=self.num_agents,
             resource_names=CvCConfig.RESOURCES,
-            render=RenderConfig(
-                hud1=RenderHudConfig(resource="hp", max=100),
-                hud2=RenderHudConfig(resource="energy", short_name="E", max=100),
-                assets=render_assets,
-            ),
+            render=render_config(team_objs=team_objs),
             territories={
                 "team_territory": TerritoryConfig(
                     tag_prefix="team:",
