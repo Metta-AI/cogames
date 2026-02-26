@@ -27,7 +27,7 @@ def render_config(team_objs: Sequence[TeamConfig]) -> RenderConfig:
     return RenderConfig(
         agent_huds={
             "hp": RenderHudConfig(resource="hp", max=100, rank=0),
-            "energy": RenderHudConfig(resource="energy", max=100, rank=1),
+            "energy": RenderHudConfig(resource="energy", max=20, rank=1),
         },
         object_status={
             "agent": {
@@ -35,7 +35,7 @@ def render_config(team_objs: Sequence[TeamConfig]) -> RenderConfig:
                 "energy": RenderStatusBarConfig(
                     resource="energy",
                     short_name="E",
-                    max=100,
+                    max=20,
                     divisions=20,
                     rank=1,
                 ),
