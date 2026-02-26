@@ -11,9 +11,14 @@ import json
 import math
 from typing import Literal, Sequence, cast
 
-from mettagrid.config.game_value import ConstValue, stat
+from mettagrid.config.game_value import (
+    AnyGameValue,
+    SumGameValue,
+    stat,
+    val,
+)
 from mettagrid.config.mettagrid_config import MettaGridConfig
-from mettagrid.config.reward_config import AgentReward, Aggregation, reward
+from mettagrid.config.reward_config import AgentReward, reward
 
 CogsGuardRewardVariant = Literal[
     "aligner",
@@ -120,9 +125,9 @@ def _apply_credit(rewards: dict[str, AgentReward]) -> None:
     gain_rewards: dict[str, AgentReward] = {
         "heart_gained": reward(stat("heart.gained"), weight=w_heart, max=cap_heart),
         "aligner_gained": reward(stat("aligner.gained"), weight=w_align_gear, max=cap_align_gear),
-        "aligner_lost": reward(stat("aligner.lost"), weight=-w_align_gear, max=-cap_align_gear),
+        "aligner_lost": reward(stat("aligner.lost"), weight=-w_align_gear, min=-cap_align_gear),
         "scrambler_gained": reward(stat("scrambler.gained"), weight=w_scramble_gear, max=cap_scramble_gear),
-        "scrambler_lost": reward(stat("scrambler.lost"), weight=-w_scramble_gear, max=-cap_scramble_gear),
+        "scrambler_lost": reward(stat("scrambler.lost"), weight=-w_scramble_gear, min=-cap_scramble_gear),
         "carbon_gained": reward(stat("carbon.gained"), weight=w_element_gain, max=cap_element_gain),
         "oxygen_gained": reward(stat("oxygen.gained"), weight=w_element_gain, max=cap_element_gain),
         "germanium_gained": reward(stat("germanium.gained"), weight=w_element_gain, max=cap_element_gain),
@@ -167,9 +172,13 @@ def _apply_milestones_2(
     objective_scale = compounding_factor
     objective = rewards.get(_OBJECTIVE_STAT_KEY)
     if objective is not None:
+        objective_sum = cast(SumGameValue, objective.reward)
+        assert objective_sum.weights is not None
+        objective_value: AnyGameValue = cast(AnyGameValue, objective_sum.values[0])
+        objective_weight = objective_sum.weights[0]
         rewards[_OBJECTIVE_STAT_KEY] = reward(
-            [*objective.nums, ConstValue(value=-1.0)],
-            weight=objective.weight * objective_scale,
+            [objective_value, val(-1.0)],
+            weight=objective_weight * objective_scale,
             per_tick=True,
         )
 
@@ -189,11 +198,7 @@ def _apply_milestones_2(
 
     # Hearts are the shared "currency" for align/scramble. Rewarding acquisition helps
     # miners/aligners coordinate without making heart farming dominate the objective.
-    rewards["milestones2_heart_gained"] = reward(
-        stat("heart.gained"),
-        weight=0.05,
-        max=2.0,
-    )
+    rewards["milestones2_heart_gained"] = reward(stat("heart.gained"), weight=0.05, max=2.0)
 
     # Scrambler: keep tiny (scramble is easy to farm and can overwhelm objectives).
     rewards["milestones2_junction_scrambled_by_agent"] = reward(
@@ -216,13 +221,13 @@ def _apply_miner(rewards: dict[str, AgentReward]) -> None:
     # keep deposited metrics in role-percentile parsing for historical episodes).
     rewards["gain_diversity"] = reward(
         [stat(f"{e}.gained") for e in _MINER_ELEMENTS],
-        aggregation=Aggregation.SUM_LOGS,
         weight=0.5,
+        log=True,
     )
     rewards["loss_diversity"] = reward(
         [stat(f"{e}.lost") for e in _MINER_ELEMENTS],
-        aggregation=Aggregation.SUM_LOGS,
         weight=0.5,
+        log=True,
     )
 
 

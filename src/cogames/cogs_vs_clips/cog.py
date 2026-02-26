@@ -8,7 +8,7 @@ from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.team import TeamConfig
 from mettagrid.base_config import Config
 from mettagrid.config.filter import sharedTagPrefix
-from mettagrid.config.game_value import InventoryValue, Scope
+from mettagrid.config.game_value import inv, num_tagged
 from mettagrid.config.handler_config import (
     ClearInventoryMutation,
     EntityTarget,
@@ -24,7 +24,7 @@ from mettagrid.config.mettagrid_config import (
     ResourceLimitsConfig,
 )
 from mettagrid.config.mutation.game_value_mutation import SetGameValueMutation
-from mettagrid.config.reward_config import reward, stat
+from mettagrid.config.reward_config import reward
 
 
 class CogConfig(Config):
@@ -69,17 +69,13 @@ class CogConfig(Config):
                 "regen": Handler(mutations=[updateActor({"hp": self.hp_regen})]),
                 "solar_to_energy": Handler(
                     mutations=[
-                        SetGameValueMutation(
-                            value=InventoryValue(item="energy"),
-                            source=InventoryValue(item="solar"),
-                            target=EntityTarget.ACTOR,
-                        )
+                        SetGameValueMutation(value=inv("energy"), source=inv("solar"), target=EntityTarget.ACTOR)
                     ]
                 ),
             },
             rewards={
                 "aligned_junction_held": reward(
-                    stat(f"{team.name}/aligned.junction", scope=Scope.GAME),
+                    num_tagged(team.net_tag()),
                     weight=1.0 / max_steps,
                     per_tick=True,
                 ),
