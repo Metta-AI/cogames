@@ -8,7 +8,7 @@ from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.team import TeamConfig
 from mettagrid.base_config import Config
 from mettagrid.config.filter import sharedTagPrefix
-from mettagrid.config.game_value import InventoryValue, QueryCountValue
+from mettagrid.config.game_value import InventoryValue, Scope
 from mettagrid.config.handler_config import (
     ClearInventoryMutation,
     EntityTarget,
@@ -24,8 +24,7 @@ from mettagrid.config.mettagrid_config import (
     ResourceLimitsConfig,
 )
 from mettagrid.config.mutation.game_value_mutation import SetGameValueMutation
-from mettagrid.config.query import query
-from mettagrid.config.reward_config import reward
+from mettagrid.config.reward_config import reward, stat
 
 
 class CogConfig(Config):
@@ -80,7 +79,7 @@ class CogConfig(Config):
             },
             rewards={
                 "aligned_junction_held": reward(
-                    QueryCountValue(query=query(team.net_tag())),
+                    stat(f"{team.name}/aligned.junction", scope=Scope.GAME),
                     weight=1.0 / max_steps,
                     per_tick=True,
                 ),
