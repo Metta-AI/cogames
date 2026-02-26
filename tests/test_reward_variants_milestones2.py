@@ -4,6 +4,7 @@ from cogames.cogs_vs_clips.cog import CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.reward_variants import apply_reward_variants
 from cogames.cogs_vs_clips.sites import make_cogsguard_arena_site
+from mettagrid.config.game_value import Scope, StatValue, SumGameValue
 
 
 def _make_env():
@@ -39,3 +40,23 @@ def test_milestones_2_accepts_finite_positive_compounding_factor() -> None:
     apply_reward_variants(env, variants=["milestones_2:1.5"])
 
     assert env.label.endswith(".milestones_2")
+
+
+def test_milestones_2_wires_role_shaping_without_caps() -> None:
+    env = _make_env()
+
+    apply_reward_variants(env, variants=["milestones_2"])
+
+    rewards = env.game.agents[0].rewards
+    gained_reward = rewards["milestones2_elements_gained"].reward
+    assert isinstance(gained_reward, SumGameValue)
+    assert gained_reward.log is True
+
+    deposited_reward = rewards["milestones2_elements_deposited"].reward
+    assert isinstance(deposited_reward, SumGameValue)
+    assert deposited_reward.log is True
+    assert all(isinstance(value, StatValue) and value.scope == Scope.GAME for value in deposited_reward.values)
+
+    aligned_reward = rewards["milestones2_junction_aligned_by_agent"].reward
+    assert isinstance(aligned_reward, SumGameValue)
+    assert aligned_reward.weights == pytest.approx([0.3])

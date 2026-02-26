@@ -156,13 +156,17 @@ _MINER_ELEMENTS = ("carbon", "oxygen", "germanium", "silicon")
 
 
 def _apply_milestones_2(
-    rewards: dict[str, AgentReward], *, compounding_factor: float, max_junctions: int = 100
+    rewards: dict[str, AgentReward],
+    *,
+    compounding_factor: float,
+    team_name: str,
+    max_junctions: int = 100,
 ) -> None:
-    """Add capped role-shaped rewards that prioritize the objective reward mine.
+    """Add role-shaped rewards that prioritize the objective reward mine.
 
     - The main incentive remains the shared per-tick objective reward for holding
       net-aligned junctions (the "constant source" once unlocked).
-    - Role shaping is intentionally small and capped so single-role teams can't
+    - Role shaping is intentionally small so single-role teams can't
       outscore mixed-role teams by farming a single behavior (e.g., align spam).
     """
     # Make the objective feel like a true "reward mine" unlocked by alignment:
@@ -182,29 +186,39 @@ def _apply_milestones_2(
             per_tick=True,
         )
 
-    # Miner: reward extracting resources (used to craft hearts and sustain alignment).
+    # Miner: reward extracting + returning resources.
+    #
+    # Note: Avoid rewarding `*.lost` for "returning" resources because it increments for any
+    # inventory decrease (including limit-enforcement drops during gear swaps), which creates
+    # a shaping farming loop that doesn't require contributing to the team economy.
     rewards["milestones2_elements_gained"] = reward(
         [stat(f"{element}.gained") for element in _MINER_ELEMENTS],
-        weight=0.0015,
-        max=3.0,
+        log=True,
+        weight=0.03,
+    )
+    rewards["milestones2_elements_deposited"] = reward(
+        [stat(f"game.{team_name}/{element}.deposited") for element in _MINER_ELEMENTS],
+        log=True,
+        weight=0.03,
     )
 
     # Aligner: small reward for actually aligning junctions (objective unlock action).
     rewards["milestones2_junction_aligned_by_agent"] = reward(
         stat("junction.aligned_by_agent"),
-        weight=0.2,
-        max=1.0,
+        weight=0.3,
     )
 
     # Hearts are the shared "currency" for align/scramble. Rewarding acquisition helps
     # miners/aligners coordinate without making heart farming dominate the objective.
-    rewards["milestones2_heart_gained"] = reward(stat("heart.gained"), weight=0.05, max=2.0)
+    rewards["milestones2_heart_gained"] = reward(
+        stat("heart.gained"),
+        weight=0.05,
+    )
 
     # Scrambler: keep tiny (scramble is easy to farm and can overwhelm objectives).
     rewards["milestones2_junction_scrambled_by_agent"] = reward(
         stat("junction.scrambled_by_agent"),
         weight=0.1,
-        max=1.0,
     )
 
 
@@ -265,7 +279,7 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
     - `objective`: no-op marker; keeps the mission's default objective reward wiring.
     - `no_objective`: disables the objective stat reward (`junction.held`).
     - `milestones`: adds shaped rewards for aligning/scrambling junctions and holding more junctions.
-    - `milestones_2`: capped role-shaped rewards that strongly favor alignment to unlock the objective reward mine.
+    - `milestones_2`: role-shaped rewards that strongly favor alignment to unlock the objective reward mine.
     - `milestones_2:<factor>`: same as milestones_2, with custom objective compounding factor.
       Example: `milestones_2:25`.
     - `credit`: adds additional dense shaping for precursor behaviors (resources/gear/deposits).
@@ -342,7 +356,14 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
         if "milestones" in enabled:
             _apply_milestones(rewards)
         if "milestones_2" in enabled:
-            _apply_milestones_2(rewards, compounding_factor=milestones_2_compounding_factor)
+            team_name = next((t.split(":", 1)[1] for t in agent_cfg.tags if t.startswith("team:")), None)
+            if team_name is None:
+                raise ValueError("milestones_2 reward variant requires agent tags to include team:<name>")
+            _apply_milestones_2(
+                rewards,
+                compounding_factor=milestones_2_compounding_factor,
+                team_name=team_name,
+            )
         if "credit" in enabled:
             _apply_credit(rewards)
         if "aligner" in enabled:
