@@ -52,9 +52,7 @@ class AuthConfigReaderWriter:
     def has_saved_token(self, token_key: str) -> bool:
         """Check if we have a saved token for this server"""
         token = self.load_token(token_key)
-        if token is None:
-            return False
-        return True
+        return token is not None
 
     def save_token(self, token: str, auth_server_key: str) -> None:
         """Save the token to a YAML file with secure permissions.
@@ -447,6 +445,4 @@ class BaseCLIAuthenticator:
     def has_saved_token(self, token_key: str) -> bool:
         """Check if we have a saved token for this server"""
         token = self.load_token(token_key)
-        if token is None:
-            return False
-        return True
+        return token is not None

@@ -255,7 +255,7 @@ import sys
 from collections import defaultdict
 
 # Clear cached modules
-for mod in list(sys.modules.keys()):
+for mod in list(sys.modules):
     if mod.startswith("cogames") or mod.startswith("rich"):
         del sys.modules[mod]
 
