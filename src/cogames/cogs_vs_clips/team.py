@@ -11,12 +11,6 @@ from pydantic import Field
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.hub import CvCHubConfig
 from mettagrid.base_config import Config
-from mettagrid.config.derived_stat import (
-    AnyDerivedStat,
-    CumulativeDerivedStat,
-    TagCountDerivedStat,
-    TagInventoryDerivedStat,
-)
 from mettagrid.config.filter import (
     AnyFilter,
     GameValueFilter,
@@ -28,13 +22,14 @@ from mettagrid.config.filter import (
     isNot,
     maxDistance,
 )
-from mettagrid.config.game_value import QueryInventoryValue
+from mettagrid.config.game_value import MaxGameValue, QueryCountValue, QueryInventoryValue, SumGameValue, stat, val
 from mettagrid.config.mettagrid_config import (
     GridObjectConfig,
     InventoryConfig,
 )
 from mettagrid.config.mutation import addTag, recomputeMaterializedQuery
 from mettagrid.config.query import ClosureQuery, MaterializedQuery, Query, materializedQuery, query
+from mettagrid.config.stat_writer import StatWriter
 from mettagrid.config.tag import typeTag
 
 
@@ -76,17 +71,30 @@ class TeamConfig(Config):
             )
         ]
 
-    def derived_stats(self, resource_names: list[str]) -> list[AnyDerivedStat]:
+    def stat_writers(self, resource_names: list[str]) -> list[StatWriter]:
         junction_name = f"{self.name}/aligned.junction"
         return [
-            TagCountDerivedStat(name=junction_name, tag=self.net_tag(), offset=1),
-            CumulativeDerivedStat(name=f"{self.name}/aligned.junction.held", source_stat=junction_name),
+            StatWriter(
+                name=junction_name,
+                value=MaxGameValue(
+                    values=[
+                        SumGameValue(values=[QueryCountValue(query=query(self.net_tag())), val(-1)]),
+                        val(0),
+                    ]
+                ),
+            ),
+            StatWriter(
+                name=f"{self.name}/aligned.junction.held",
+                value=stat(f"game.{junction_name}"),
+                accumulate=True,
+            ),
             *[
-                TagInventoryDerivedStat(
+                StatWriter(
                     name=f"{self.name}/{resource}.amount",
-                    tag=self.team_tag(),
-                    resource=resource,
-                    require_tag=typeTag("hub"),
+                    value=QueryInventoryValue(
+                        query=query(typeTag("hub"), hasTag(self.team_tag())),
+                        item=resource,
+                    ),
                 )
                 for resource in resource_names
             ],
