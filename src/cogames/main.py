@@ -1737,12 +1737,12 @@ app.command(
 )(diagnose_module.diagnose_cmd)
 
 
-def _resolve_season(server: str, season_name: str | None = None, include_hidden: bool = False) -> SeasonInfo:
+def _resolve_season(server: str, season_name: str | None = None) -> SeasonInfo:
     try:
         with TournamentServerClient(server_url=server) as client:
             if season_name is None:
                 season_name = client.get_default_season().name
-            info = client.get_season(season_name, include_hidden=include_hidden)
+            info = client.get_season(season_name)
             console.print(f"[dim]Using season: {info.name}[/dim]")
             return info
     except Exception as e:
@@ -1846,12 +1846,6 @@ def validate_bundle_cmd(
         help="Tournament season (determines which game to validate against).",
         rich_help_panel="Tournament",
     ),
-    include_hidden: bool = typer.Option(
-        False,
-        "--include-hidden",
-        hidden=True,
-        rich_help_panel="Tournament",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -1877,7 +1871,7 @@ def validate_bundle_cmd(
 ) -> None:
     ensure_docker_daemon_access()
 
-    season_info = _resolve_season(server, season, include_hidden=include_hidden)
+    season_info = _resolve_season(server, season)
     entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool), None)
     if not entry_pool_info or not entry_pool_info.config_id:
         console.print("[red]No entry config found for season[/red]")
@@ -2010,12 +2004,6 @@ def upload_cmd(
         help="Tournament server URL.",
         rich_help_panel="Server",
     ),
-    include_hidden: bool = typer.Option(
-        False,
-        "--include-hidden",
-        hidden=True,
-        rich_help_panel="Server",
-    ),
     # --- Help ---
     _help: bool = typer.Option(
         False,
@@ -2034,7 +2022,7 @@ def upload_cmd(
         console.print("[red]Policy name must be at most 64 characters[/red]")
         raise typer.Exit(1)
 
-    season_info = _resolve_season(server, season, include_hidden=include_hidden)
+    season_info = _resolve_season(server, season)
 
     check_compat_version(season_info)
 
@@ -2056,7 +2044,6 @@ def upload_cmd(
         init_kwargs=init_kwargs if init_kwargs else None,
         setup_script=setup_script,
         season=season_info.name if not no_submit else None,
-        include_hidden=include_hidden,
         image=image,
     )
 

@@ -103,12 +103,6 @@ def submissions_cmd(
         help="Filter by tournament season.",
         rich_help_panel="Filter",
     ),
-    include_hidden: bool = typer.Option(
-        False,
-        "--include-hidden",
-        hidden=True,
-        rich_help_panel="Tournament",
-    ),
     login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
@@ -146,7 +140,7 @@ def submissions_cmd(
 
     with client:
         if season:
-            _show_season_submissions(client, season, policy_name, json_output, include_hidden=include_hidden)
+            _show_season_submissions(client, season, policy_name, json_output)
         else:
             _show_all_uploads(client, policy_name, json_output)
 
@@ -206,11 +200,10 @@ def _show_season_submissions(
     season: str,
     policy_name: Optional[str],
     json_output: bool,
-    include_hidden: bool = False,
 ) -> None:
     """Show submissions for a specific season."""
     try:
-        entries = client.get_season_policies(season, mine=True, include_hidden_seasons=include_hidden)
+        entries = client.get_season_policies(season, mine=True)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
             console.print(f"[red]Season '{season}' not found[/red]")
@@ -305,7 +298,7 @@ def leaderboard_cmd(
 
     try:
         with client:
-            entries = client.get_leaderboard(season, include_hidden_seasons=True)
+            entries = client.get_leaderboard(season)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
             console.print(f"[red]Season '{season}' not found[/red]")

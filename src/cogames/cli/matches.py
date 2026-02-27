@@ -136,7 +136,6 @@ def _list_matches(
         # Fetch matches
         matches = client.get_season_matches(
             season_name,
-            include_hidden_seasons=True,
             policy_version_ids=policy_version_ids,
             limit=limit,
         )
@@ -216,7 +215,6 @@ def _resolve_match_id(client: TournamentServerClient, match_id_str: str) -> uuid
     default_season = client.get_default_season()
     matches = client.get_season_matches(
         default_season.name,
-        include_hidden_seasons=True,
         policy_version_ids=[pv.id for pv in my_policies],
     )
     hits = [m for m in matches if str(m.id).startswith(match_id_str)]

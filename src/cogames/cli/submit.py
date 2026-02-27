@@ -431,7 +431,6 @@ def upload_policy(
     skip_validation: bool = False,
     setup_script: str | None = None,
     season: str | None = None,
-    include_hidden: bool = False,
     image: str = DEFAULT_EPISODE_RUNNER_IMAGE,
 ) -> UploadResult | None:
     if dry_run:
@@ -466,8 +465,6 @@ def upload_policy(
             ]
             if season:
                 cmd.extend(["--season", season])
-            if include_hidden:
-                cmd.append("--include-hidden")
             if image != DEFAULT_EPISODE_RUNNER_IMAGE:
                 cmd.extend(["--image", image])
             result = subprocess.run(cmd, text=True, timeout=300)
