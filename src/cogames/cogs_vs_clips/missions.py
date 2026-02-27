@@ -72,8 +72,7 @@ def get_missions() -> list[CvCMission]:
 
 def make_game(num_cogs: int = 2, map_name: str = "training_facility_open_1.map") -> MettaGridConfig:
     """Create a default CogsGuard game configuration."""
-    mission = make_cogsguard_mission(num_agents=num_cogs)
-    return mission.make_env()
+    return make_cogsguard_mission(num_agents=num_cogs).make_env()
 
 
 def __getattr__(name: str) -> list[CvCMission]:
