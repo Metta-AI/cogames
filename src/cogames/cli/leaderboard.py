@@ -65,7 +65,7 @@ def _format_timestamp(value: Optional[str]) -> str:
         return value
 
     if timestamp.tzinfo is not None:
-        timestamp = timestamp.astimezone()
+        return timestamp.astimezone().strftime("%Y-%m-%d %H:%M")
     return timestamp.strftime("%Y-%m-%d %H:%M")
 
 
