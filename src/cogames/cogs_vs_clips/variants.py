@@ -13,9 +13,18 @@ from cogames.cogs_vs_clips.terrain import (
     MachinaArenaVariant,
 )
 from cogames.core import CoGameMissionVariant
-from mettagrid.config.filter import actorHasAnyOf
-from mettagrid.config.game_value import inv
+from mettagrid.config.filter import (
+    GameValueFilter,
+    HandlerTarget,
+    actorHasAnyOf,
+    isNot,
+    sharedTagPrefix,
+    targetHasAnyOf,
+)
+from mettagrid.config.game_value import QueryCountValue, inv
 from mettagrid.config.mettagrid_config import MettaGridConfig
+from mettagrid.config.query import query
+from mettagrid.config.tag import typeTag
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.mapgen.scenes.base_hub import DEFAULT_EXTRACTORS as HUB_EXTRACTORS
@@ -511,6 +520,34 @@ class TinManVariant(CoGameMissionVariant):
                     handler.filters = [handler.filters[0], gear_filter, *handler.filters[1:]]
 
 
+class TinManTeamVariant(CoGameMissionVariant):
+    name: str = "tin_team"
+    description: str = (
+        "No hearts until all teammates have gear — "
+        "heart withdrawal is blocked until every agent on the team holds a gear item."
+    )
+
+    @override
+    def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
+        # Query: teammates (same team, agents only) that lack any gear.
+        ungeared_teammates = QueryCountValue(
+            query=query(
+                typeTag("agent"),
+                [
+                    sharedTagPrefix("team:"),
+                    isNot(targetHasAnyOf(CvCConfig.GEAR)),
+                ],
+            ),
+        )
+        # Block when any teammate lacks gear (count >= 1).
+        all_geared = isNot(GameValueFilter(target=HandlerTarget.ACTOR, value=ungeared_teammates, min=1))
+        for obj in env.game.objects.values():
+            for handler_name in _HEART_WITHDRAW_HANDLERS:
+                handler = obj.on_use_handlers.get(handler_name)
+                if handler is not None:
+                    handler.filters = [handler.filters[0], all_geared, *handler.filters[1:]]
+
+
 VARIANTS: list[CoGameMissionVariant] = [
     BraveheartVariant(),
     CavesVariant(),
@@ -532,6 +569,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     SuperChargedVariant(),
     ForcedRoleVibesVariant(),
     TinManVariant(),
+    TinManTeamVariant(),
     *DIFFICULTY_VARIANTS,
 ]
 
