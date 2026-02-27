@@ -11,21 +11,19 @@ from cogames.cli.client import TournamentServerClient
 
 class _FakeClient:
     def __init__(self) -> None:
-        self.include_hidden_args: list[bool] = []
+        self.called: bool = False
 
     def get_season_policies(
         self,
         season_name: str,
         mine: bool = False,
-        include_hidden_seasons: bool = False,
     ) -> list[Any]:
         _ = (season_name, mine)
-        self.include_hidden_args.append(include_hidden_seasons)
+        self.called = True
         return []
 
 
-@pytest.mark.parametrize("include_hidden", [False, True])
-def test_show_season_submissions_forwards_include_hidden(monkeypatch: pytest.MonkeyPatch, include_hidden: bool) -> None:
+def test_show_season_submissions_calls_client(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _FakeClient()
     printed: list[str] = []
     monkeypatch.setattr(leaderboard.console, "print", lambda value, *args, **kwargs: printed.append(str(value)))
@@ -35,8 +33,7 @@ def test_show_season_submissions_forwards_include_hidden(monkeypatch: pytest.Mon
         "test-season",
         policy_name=None,
         json_output=True,
-        include_hidden=include_hidden,
     )
 
-    assert client.include_hidden_args == [include_hidden]
+    assert client.called
     assert printed == [json.dumps([], indent=2)]

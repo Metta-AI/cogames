@@ -208,9 +208,8 @@ class TournamentServerClient:
     def get_seasons(self) -> list[SeasonSummary]:
         return self._get("/tournament/seasons", list[SeasonSummary])
 
-    def get_season(self, season_name: str, include_hidden: bool = False) -> SeasonInfo:
-        params = {"include_hidden": "true"} if include_hidden else None
-        return self._get(f"/tournament/seasons/{season_name}", SeasonInfo, params=params)
+    def get_season(self, season_name: str) -> SeasonInfo:
+        return self._get(f"/tournament/seasons/{season_name}", SeasonInfo)
 
     def get_default_season(self) -> SeasonSummary:
         seasons = self.get_seasons()
@@ -224,14 +223,10 @@ class TournamentServerClient:
     def get_season_matches(
         self,
         season_name: str,
-        include_hidden_seasons: bool = False,
         policy_version_ids: list[uuid.UUID] | None = None,
         limit: int | None = None,
     ) -> list[MatchResponse]:
         params: dict[str, str | list[str]] = {}
-
-        if include_hidden_seasons:
-            params["include_hidden"] = "true"
 
         if policy_version_ids:
             params["policy_version_ids"] = [str(pvid) for pvid in policy_version_ids]
@@ -251,11 +246,10 @@ class TournamentServerClient:
     def get_season_versions(self, season_name: str) -> list[SeasonVersionInfo]:
         return self._get(f"/tournament/seasons/{season_name}/versions", list[SeasonVersionInfo])
 
-    def get_leaderboard(self, season_name: str, include_hidden_seasons: bool = False) -> list[LeaderboardEntry]:
+    def get_leaderboard(self, season_name: str) -> list[LeaderboardEntry]:
         return self._get(
             f"/tournament/seasons/{season_name}/leaderboard",
             list[LeaderboardEntry],
-            params={"include_hidden": "true"} if include_hidden_seasons else None,
         )
 
     def get_my_policy_versions(
@@ -290,14 +284,10 @@ class TournamentServerClient:
             json={"policy_version_id": str(policy_version_id)},
         )
 
-    def get_season_policies(
-        self, season_name: str, mine: bool = False, include_hidden_seasons: bool = False
-    ) -> list[SeasonPolicyEntry]:
+    def get_season_policies(self, season_name: str, mine: bool = False) -> list[SeasonPolicyEntry]:
         params: dict[str, str] = {}
         if mine:
             params["mine"] = "true"
-        if include_hidden_seasons:
-            params["include_hidden"] = "true"
 
         return self._get(
             f"/tournament/seasons/{season_name}/policies",
