@@ -209,7 +209,7 @@ class AlignerPolicyNet(nn.Module):
         self._num_features = max((int(f.id) for f in env_info.obs_features), default=0) + 1
 
         feature_norms = {f.id: f.normalization for f in env_info.obs_features}
-        max_id = max((int(fid) for fid in feature_norms.keys()), default=-1)
+        max_id = max((int(fid) for fid in feature_norms), default=-1)
         feature_scale = torch.ones(max(256, max_id + 1), dtype=torch.float32)
         for fid, norm in feature_norms.items():
             feature_scale[fid] = max(float(norm), 1.0)
