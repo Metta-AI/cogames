@@ -292,7 +292,7 @@ class MachinaArena(Scene[MachinaArenaConfig]):
             "plains": BiomePlainsConfig,
         }
         if cfg.base_biome not in biome_map:
-            raise ValueError(f"Unknown base_biome '{cfg.base_biome}'. Valid: {sorted(biome_map.keys())}")
+            raise ValueError(f"Unknown base_biome '{cfg.base_biome}'. Valid: {sorted(biome_map)}")
         BaseCfgModel: type[SceneConfig] = biome_map[cfg.base_biome]
         base_cfg: SceneConfig = BaseCfgModel.model_validate(cfg.base_biome_config or {})
 
@@ -314,7 +314,7 @@ class MachinaArena(Scene[MachinaArenaConfig]):
             else:
                 weights_dict = {k: v for k, v in default_building_weights.items()}
 
-        building_names_final = list(dict.fromkeys(list((cfg.building_names or list(weights_dict.keys())))))
+        building_names_final = list(dict.fromkeys(list((cfg.building_names or list(weights_dict)))))
         building_weights_final = {
             name: weights_dict.get(name, default_building_weights.get(name, 1.0)) for name in building_names_final
         }
@@ -553,7 +553,7 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
         }
         BaseCfgModel = biome_map.get(cfg.base_biome)
         if BaseCfgModel is None:
-            raise ValueError(f"Unknown base_biome '{cfg.base_biome}'. Valid: {sorted(biome_map.keys())}")
+            raise ValueError(f"Unknown base_biome '{cfg.base_biome}'. Valid: {sorted(biome_map)}")
         base_cfg: SceneConfig = BaseCfgModel.model_validate(cfg.base_biome_config or {})
         default_building_weights = {
             "junction": 0.6,
@@ -564,7 +564,7 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
         }
         weights_dict: dict[str, float] = {str(k): v for k, v in (cfg.building_weights or {}).items()}
         if not weights_dict:
-            names = cfg.building_names or list(default_building_weights.keys())
+            names = cfg.building_names or list(default_building_weights)
             weights_dict = {name: default_building_weights.get(name, 1.0) for name in names}
         building_names_final = list(dict.fromkeys(cfg.building_names or list(weights_dict)))
         building_weights_final = {
@@ -805,9 +805,7 @@ class BaseHubVariant(EnvNodeVariant[BaseHubConfig]):
             return False
         if isinstance(instance, RandomTransform.Config) and isinstance(instance.scene, BaseHub.Config):
             return True
-        if isinstance(instance, MachinaArena.Config):
-            return True
-        return False
+        return isinstance(instance, MachinaArena.Config)
 
     @classmethod
     def extract_node(cls, env: MettaGridConfig) -> BaseHubConfig:

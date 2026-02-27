@@ -176,7 +176,7 @@ print(f"  resources:      {game.resource_names}")
 print(f"  obs window:     {game.obs.height}x{game.obs.width}")
 print(f"  obs tokens:     {game.obs.num_tokens} x {game.obs.token_dim}")
 print(f"  map builder:    {type(game.map_builder).__name__}")
-print(f"  objects:        {list(game.objects.keys())}")
+print(f"  objects:        {list(game.objects)}")
 
 actions = game.actions.actions()
 print(f"  actions:        {[a.name for a in actions]}")

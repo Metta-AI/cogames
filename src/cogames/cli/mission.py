@@ -479,7 +479,7 @@ def list_evals() -> None:
     table.add_column("Map Size", style="green", justify="center")
     table.add_column("Description", style="white")
 
-    site_names = sorted(missions_by_site.keys())
+    site_names = sorted(missions_by_site)
     for idx, site_name in enumerate(site_names):
         site = next((s for s in SITES if s.name == site_name), None)
         # Determine map size if possible

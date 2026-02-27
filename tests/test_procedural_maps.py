@@ -142,7 +142,7 @@ def test_uniform_extractors_configuration_pass_through():
     nodes = _find_nodes(tree, "UniformExtractorScene.Config")
     assert nodes, "UniformExtractorScene should be present"
     ucfg = nodes[0]["config"]
-    assert ucfg.get("building_names") == list(buildings.keys())
+    assert ucfg.get("building_names") == list(buildings)
     assert ucfg.get("building_weights") == buildings
     assert pytest.approx(ucfg.get("target_coverage", 0.0), rel=1e-6) == 0.0125
 
