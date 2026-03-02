@@ -1,8 +1,5 @@
-"""CLI commands for viewing matches and policy logs."""
-
 from __future__ import annotations
 
-import json
 import re
 import uuid
 from pathlib import Path
@@ -13,7 +10,7 @@ import typer
 from rich import box
 from rich.table import Table
 
-from cogames.cli.base import console
+from cogames.cli.base import console, emit_json
 from cogames.cli.client import MatchResponse, TournamentServerClient
 from cogames.cli.leaderboard import _format_score, _format_timestamp, parse_season_ref
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
@@ -120,6 +117,9 @@ def _list_matches(
         # Get user's policy versions
         my_policies = client.get_my_policy_versions()
         if not my_policies:
+            if json_output:
+                emit_json([])
+                return
             console.print("[yellow]No uploaded policies found.[/yellow]")
             console.print("Upload a policy with: [cyan]cogames upload[/cyan]")
             return
@@ -151,7 +151,7 @@ def _list_matches(
         raise typer.Exit(1) from exc
 
     if json_output:
-        console.print(json.dumps([m.model_dump(mode="json") for m in matches], indent=2))
+        emit_json([m.model_dump(mode="json") for m in matches])
         return
 
     if not matches:
@@ -164,7 +164,7 @@ def _list_matches(
         show_lines=False,
         pad_edge=False,
     )
-    table.add_column("Match ID", style="dim")
+    table.add_column("Match ID", style="dim", overflow="fold")
     table.add_column("Date", style="green")
     table.add_column("Status")
     table.add_column("Pool")
@@ -183,7 +183,7 @@ def _list_matches(
         scores = ", ".join(_format_score(p.score) for p in match.players)
 
         table.add_row(
-            str(match.id)[:8],
+            str(match.id),
             _format_timestamp(match.created_at.isoformat()),
             f"[{status_style}]{match.status}[/{status_style}]",
             match.pool_name,
@@ -254,7 +254,7 @@ def _show_match_detail(
         result: dict[str, Any] = match.model_dump(mode="json")
         if show_logs:
             result["logs"] = _collect_logs(client, match)
-        console.print(json.dumps(result, indent=2))
+        emit_json(result)
         return
 
     # Display match info
@@ -268,6 +268,9 @@ def _show_match_detail(
         # Show only the last line of the traceback
         error_summary = match.error.strip().rsplit("\n", 1)[-1]
         console.print(f"[red]Error: {error_summary}[/red]")
+
+    if match.episode_id:
+        console.print(f"Episode: {match.episode_id}")
 
     console.print("\n[bold]Players:[/bold]")
     for i, player in enumerate(match.players):
@@ -288,6 +291,14 @@ def _show_match_detail(
 
         for pv_id in match_pv_ids:
             _handle_logs(client, match.id, pv_id, download_logs)
+    else:
+        hints = [f"[dim]Logs: cogames matches {match_id_str} --logs[/dim]"]
+        hints.append(f"[dim]Artifacts: cogames match-artifacts {match_id_str}[/dim]")
+        if match.episode_id:
+            episode_id = str(match.episode_id)
+            hints.append(f"[dim]Episode: cogames episode show {episode_id}[/dim]")
+            hints.append(f"[dim]Replay: cogames episode replay {episode_id}[/dim]")
+        console.print("\n" + "\n".join(hints))
 
 
 def _collect_logs(client: TournamentServerClient, match: MatchResponse) -> dict[str, list[str]]:
@@ -356,3 +367,83 @@ def _handle_logs(
         console.print(f"\n[green]Logs saved to {download_dir}[/green]")
     else:
         console.print(f"\n[dim]Download logs: cogames matches {match_id} --download-logs ./logs[/dim]")
+
+
+def match_artifacts_cmd(
+    match_id: str = typer.Argument(
+        ...,
+        metavar="MATCH_ID",
+        help="Match ID to fetch artifacts for.",
+    ),
+    artifact_type: str = typer.Argument(
+        "logs",
+        metavar="ARTIFACT_TYPE",
+        help="Type of artifact to retrieve (e.g. 'logs').",
+    ),
+    policy: Optional[str] = typer.Option(
+        None,
+        "--policy",
+        "-p",
+        metavar="POLICY_VERSION_ID",
+        help="Policy version ID. If omitted, uses your first policy in the match.",
+        rich_help_panel="Filter",
+    ),
+    output: Optional[Path] = typer.Option(  # noqa: B008
+        None,
+        "--output",
+        "-o",
+        metavar="FILE",
+        help="Save artifact to file.",
+        rich_help_panel="Output",
+    ),
+    login_server: str = typer.Option(
+        DEFAULT_COGAMES_SERVER,
+        "--login-server",
+        metavar="URL",
+        help="Authentication server URL.",
+        rich_help_panel="Server",
+    ),
+    server: str = typer.Option(
+        DEFAULT_SUBMIT_SERVER,
+        "--server",
+        metavar="URL",
+        help="Tournament server URL.",
+        rich_help_panel="Server",
+    ),
+    _help: bool = typer.Option(
+        False,
+        "--help",
+        "-h",
+        help="Show this message and exit.",
+        is_eager=True,
+        callback=_help_callback,
+        rich_help_panel="Other",
+    ),
+) -> None:
+    client = _get_client(login_server, server)
+    if not client:
+        return
+
+    with client:
+        match_uuid = _resolve_match_id(client, match_id)
+
+        if policy:
+            pv_id = uuid.UUID(policy)
+        else:
+            my_policies = client.get_my_policy_versions()
+            my_pv_ids = {pv.id for pv in my_policies}
+            match = client.get_match(match_uuid)
+            match_pv_ids = [p.policy.id for p in match.players if p.policy.id in my_pv_ids]
+            if not match_pv_ids:
+                console.print("[red]You don't own any policies in this match.[/red]")
+                raise typer.Exit(1)
+            pv_id = match_pv_ids[0]
+
+        response = client.get_match_artifact(match_uuid, pv_id, artifact_type)
+
+    if output:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(response.content)
+        console.print(f"[green]Artifact saved to {output}[/green]")
+    else:
+        console.print(response.text)

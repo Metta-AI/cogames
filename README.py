@@ -122,10 +122,11 @@
 #     cogames upload --policy "class=cogames.policy.starter_agent.StarterPolicy" --name "$USER.README-quickstart-starter-policy" --season beta-teams-small --skip-validation
 #     ```
 #
-# 3. Check your submission on the leaderboard.
+# 3. Check your submission status.
 #
 #     ```bash
-#     cogames leaderboard --season beta-teams-small
+#     cogames submissions --season beta-teams-small --policy "$USER.README-quickstart-starter-policy"
+#     cogames season matches beta-teams-small --limit 5
 #     ```
 
 # %% [markdown]
@@ -155,7 +156,7 @@
 #
 # <p align="center">
 #   <img src="assets/cvc-reel.gif" alt="CogsGuard reel">
-# <br>
+# </p>
 #
 # There are many mission configurations available, with different map sizes, junction layouts, and game rules.
 #
@@ -171,52 +172,66 @@
 # %% [markdown]
 # # About the tournament
 #
+# We run multiple tournament seasons at a time, and each has a different structure. Our freeplay seasons are cheap to
+# submit to and evergreen: we give you indicative scores, showing how you play with others. Our team tournaments support
+# limited submissions and usually follow this pattern:
+#
+# - **Play-ins**: New submissions are evaluated in one or more early stages, with eliminations based on stage results.
+# - **Team stages**: Surviving policies are sampled into teams and evaluated in repeated team matches.
+# - **Progressive culling**: Lower-performing teams/policies are removed across later stages.
+# - **Final scoring**: Remaining policies are ranked on the season leaderboard using season-specific scoring.
+#
+# To inspect the exact rules for a specific season:
+# ```bash
+# cogames season list
+# cogames season show <SEASON>
+# cogames season stages <SEASON>
+# cogames season progress <SEASON>
+# cogames season teams <SEASON>
+# cogames season leaderboard <SEASON>
+# cogames season leaderboard <SEASON> --pool <POOL> --type team
+# cogames season leaderboard <SEASON> --pool <POOL> --type score-policies
+# cogames season pool-config <SEASON> <POOL>
+# ```
+#
+# Note: `cogames season show` takes only one positional argument (`<SEASON>`).
+# Use separate subcommands (`stages`, `progress`, `teams`, `leaderboard`) for details.
+#
 # ## API Docs
 # The tournament API is documented at [api.observatory.softmax-research.net/docs](https://api.observatory.softmax-research.net/docs). The interactive
 # OpenAPI spec describes all public endpoints for seasons, matches, leaderboards, and submissions.
 #
+# ## Intended submit workflow (CLI)
 #
-# ## How seasons work
-#
-# The ALB leaderboard runs in seasons. Each season has two pools:
-#
-# - **Qualifying pool**: Where new submissions start. Your policy plays matches against other policies in the pool.
-# - **Competition pool**: Policies that score above a threshold in qualifying get promoted here.
-#
-# To see active seasons and their pools:
-# ```bash
-# cogames seasons
-# ```
-#
-# ## How scoring works
-#
-# When you submit a policy, it gets queued for matches against other policies in its pool. Our focal metric is VORP (Value Over Replacement Policy), which estimates how much your agent improves team performance compared to a baseline.
-#
-# VORP is calculated by comparing:
-#
-# - Replacement mean: The average score when only other pool policies play (no candidate)
-# - Candidate score: The score when your policy plays
-#
-# The difference tells us how much value your policy adds to a team. A positive VORP means your policy makes teams better; a negative VORP means teams perform worse with your policy than without it.
-#
-# You can evaluate VOR locally before submitting:
+# Recommended end-to-end sequence once you are ready to submit:
 #
 # ```bash
-# cogames pickup --policy <YOUR_POLICY> --pool <POOL_POLICY>
-# ```
+# # 1) Login
+# cogames login
 #
-# ## Viewing results
+# # 2) Pick a season
+# cogames season list
+# cogames season show <SEASON>
 #
-# To check your submission status and match results:
-# ```bash
-# cogames submissions
-# cogames leaderboard --season beta-teams-small
+# # 3) Upload (bundle + validate + upload + submit)
+# cogames upload -p <POLICY_SPEC_OR_CHECKPOINT> -n <POLICY_NAME> --season <SEASON>
+#
+# # Alternative if already uploaded:
+# cogames submit <POLICY_NAME[:vN]> --season <SEASON>
+#
+# # 4) Track status
+# cogames submissions --season <SEASON> --policy <POLICY_NAME>
+# cogames season matches <SEASON> --limit 20
+#
+# # 5) Debug specific outcomes
+# cogames matches <MATCH_ID>
+# cogames match-artifacts <MATCH_ID>
+# cogames episode show <EPISODE_ID>
+# cogames episode replay <EPISODE_ID>
 # ```
 
 # %% [markdown]
 # # Command Reference
-#
-# Most commands are of the form `cogames <command> --mission [MISSION] --policy [POLICY] [OPTIONS]`
 #
 # To specify a `MISSION`, you can:
 #
