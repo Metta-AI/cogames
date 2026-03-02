@@ -74,7 +74,7 @@ def normalize_variant_names(variants: str | Sequence[str] | None) -> list[str]:
 
 
 def _is_parametrized_reward_variant(name: str) -> bool:
-    return name.startswith("milestones_2:")
+    return name.startswith("objective_mine:")
 
 
 def split_variants(
