@@ -114,9 +114,14 @@ class TutorialOverlayAgentPolicy(AgentPolicy):
     def __init__(self, policy_env_info: PolicyEnvInterface, phases: Sequence[str]):
         super().__init__(policy_env_info)
         self._phases = tuple(phases)
+        self._emitted_phases = False
 
     def step(self, obs: AgentObservation) -> Action:
-        self._infos = {"tutorial_overlay_phases": list(self._phases)}
+        if self._emitted_phases:
+            self._infos = {}
+        else:
+            self._infos = {"tutorial_overlay_phases": list(self._phases)}
+            self._emitted_phases = True
         return Action(name="noop")
 
 
