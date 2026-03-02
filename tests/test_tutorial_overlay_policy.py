@@ -35,3 +35,17 @@ def test_tutorial_overlay_policy_cogsguard_emits_mission_phases() -> None:
     assert phases[0].startswith("CogsGuard:")
     assert "clips" in phases[0].lower()
     assert "tutorial_overlay" not in infos
+
+
+def test_tutorial_overlay_policy_emits_phases_once_per_agent() -> None:
+    cfg = MettaGridConfig.EmptyRoom(num_agents=1, width=3, height=3, with_walls=False)
+    policy_env_info = PolicyEnvInterface.from_mg_cfg(cfg)
+    policy = TutorialOverlayPolicy(policy_env_info, tutorial="play")
+    agent = policy.agent_policy(0)
+    obs = AgentObservation(agent_id=0, tokens=[])
+
+    agent.step(obs)
+    assert "tutorial_overlay_phases" in agent.infos
+
+    agent.step(obs)
+    assert "tutorial_overlay_phases" not in agent.infos
