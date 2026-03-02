@@ -76,6 +76,7 @@ from cogames.cli.submit import (
 )
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
+from cogames.seed import seed_rollout_rng
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.loader import discover_and_register_policies
 from mettagrid.policy.policy_registry import get_policy_registry
@@ -647,11 +648,18 @@ def play_cmd(
         console.print("[red]Error: Use only one of --save-replay-dir or --save-replay-file.[/red]")
         raise typer.Exit(1)
 
+    explicit_steps = ctx.get_parameter_source("steps") in (
+        ParameterSource.COMMANDLINE,
+        ParameterSource.ENVIRONMENT,
+        ParameterSource.PROMPT,
+    )
+
     resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(
         ctx,
         mission,
         variants_arg=variant,
         cogs=cogs,
+        steps=steps if explicit_steps else None,
         difficulty=difficulty,
     )
 
@@ -668,15 +676,9 @@ def play_cmd(
         if isinstance(map_builder, MapGen.Config):
             map_builder.seed = map_seed
 
+    seed_rollout_rng(seed)
     resolved_device = resolve_training_device(console, device)
     policy_spec = get_policy_spec(ctx, policy, device=str(resolved_device))
-
-    if ctx.get_parameter_source("steps") in (
-        ParameterSource.COMMANDLINE,
-        ParameterSource.ENVIRONMENT,
-        ParameterSource.PROMPT,
-    ):
-        env_cfg.game.max_steps = steps
 
     console.print(f"[cyan]Playing {resolved_mission}[/cyan]")
     console.print(f"Max Steps: {env_cfg.game.max_steps}, Render: {render}")
@@ -1551,10 +1553,9 @@ def pickup_cmd(
         mission,
         variants_arg=variant,
         cogs=cogs,
+        steps=steps,
         difficulty=difficulty,
     )
-    if steps is not None:
-        env_cfg.game.max_steps = steps
 
     candidate_label = policy
     pool_labels = pool
