@@ -86,6 +86,9 @@ class NumCogsVariant(CoGameMissionVariant):
             )
 
         mission.num_cogs = self.num_cogs
+        map_builder = mission.site.map_builder.model_copy(deep=True)
+        _set_spawn_count(map_builder, self.num_cogs)
+        mission.site = mission.site.model_copy(update={"map_builder": map_builder})
 
 
 class ClipsEasyVariant(CoGameMissionVariant):

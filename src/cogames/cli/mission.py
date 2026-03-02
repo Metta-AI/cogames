@@ -9,10 +9,12 @@ from rich.table import Table
 
 from cogames.cli.base import console
 from cogames.cogs_vs_clips.clip_difficulty import get_cogsguard_difficulty
+from cogames.cogs_vs_clips.cogsguard_curriculum import split_variants
 from cogames.cogs_vs_clips.mission import CvCMission, NumCogsVariant
+from cogames.cogs_vs_clips.reward_variants import apply_reward_variants
 from cogames.cogs_vs_clips.sites import SITES
 from cogames.cogs_vs_clips.terrain import MachinaArena
-from cogames.cogs_vs_clips.variants import HIDDEN_VARIANTS, VARIANTS
+from cogames.cogs_vs_clips.variants import VARIANTS
 from cogames.core import (
     MAP_MISSION_DELIMITER,
     CoGameMissionVariant,
@@ -96,42 +98,6 @@ def load_mission_set(mission_set: str) -> list[CvCMission]:
     return missions_list
 
 
-def parse_variants(variants_arg: Optional[list[str]]) -> list[CoGameMissionVariant]:
-    """Parse variant specifications from command line.
-
-    Args:
-        variants_arg: List of variant names like ["solar_flare", "dark_side"]
-
-    Returns:
-        List of configured CoGameMissionVariant instances
-
-    Raises:
-        ValueError: If variant name is unknown
-    """
-    if not variants_arg:
-        return []
-
-    variants: list[CoGameMissionVariant] = []
-    all_variants = [*VARIANTS, *HIDDEN_VARIANTS]
-    for name in variants_arg:
-        # Find matching variant class by instantiating and checking the name
-        variant: CoGameMissionVariant | None = None
-        for v in all_variants:
-            if v.name == name:
-                variant = v
-                break
-
-        if variant is None:
-            # Get available variant names
-            available = ", ".join(v.name for v in VARIANTS)
-            raise ValueError(f"Unknown variant '{name}'.\nAvailable variants: {available}")
-
-        # Instantiate with default configuration
-        variants.append(variant)
-
-    return variants
-
-
 def parse_difficulty(difficulty_arg: Optional[str]) -> Optional[CoGameMissionVariant]:
     if difficulty_arg is None:
         return None
@@ -167,6 +133,7 @@ def get_mission_name_and_config(
     mission_arg: Optional[str],
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
+    steps: Optional[int] = None,
     difficulty: Optional[str] = None,
 ) -> tuple[str, MettaGridConfig, Optional[CvCMission]]:
     if not mission_arg:
@@ -174,7 +141,7 @@ def get_mission_name_and_config(
         console.print("[yellow]Missing: --mission / -m[/yellow]\n")
     else:
         try:
-            return get_mission(mission_arg, variants_arg=variants_arg, cogs=cogs, difficulty=difficulty)
+            return get_mission(mission_arg, variants_arg=variants_arg, cogs=cogs, steps=steps, difficulty=difficulty)
         except ValueError as e:
             error_msg = str(e)
             if "variant" in error_msg.lower() or "difficulty" in error_msg.lower():
@@ -207,7 +174,7 @@ def get_mission_names_and_configs(
             not_deduped = [
                 mission
                 for missions in missions_arg
-                for mission in _get_missions_by_possible_wildcard(missions, variants_arg, cogs, difficulty)
+                for mission in _get_missions_by_possible_wildcard(missions, variants_arg, cogs, steps, difficulty)
             ]
             name_set: set[str] = set()
             deduped = []
@@ -217,11 +184,6 @@ def get_mission_names_and_configs(
                     deduped.append((m, c))
             if not deduped:
                 raise ValueError(f"No missions found for {missions_arg}")
-
-            # Apply steps override if explicitly provided
-            if steps is not None:
-                for _, env_cfg in deduped:
-                    env_cfg.game.max_steps = steps
 
             return deduped
         except ValueError as e:
@@ -239,6 +201,7 @@ def _get_missions_by_possible_wildcard(
     mission_arg: str,
     variants_arg: Optional[list[str]],
     cogs: Optional[int],
+    steps: Optional[int],
     difficulty: Optional[str],
 ) -> list[tuple[str, MettaGridConfig]]:
     if "*" in mission_arg:
@@ -249,11 +212,18 @@ def _get_missions_by_possible_wildcard(
         return [
             (name, env_cfg)
             for name, env_cfg, _ in (
-                get_mission(m, variants_arg=variants_arg, cogs=cogs, difficulty=difficulty) for m in missions
+                get_mission(m, variants_arg=variants_arg, cogs=cogs, steps=steps, difficulty=difficulty)
+                for m in missions
             )
         ]
     # Drop the Mission for single mission
-    name, env_cfg, _ = get_mission(mission_arg, variants_arg=variants_arg, cogs=cogs, difficulty=difficulty)
+    name, env_cfg, _ = get_mission(
+        mission_arg,
+        variants_arg=variants_arg,
+        cogs=cogs,
+        steps=steps,
+        difficulty=difficulty,
+    )
     return [(name, env_cfg)]
 
 
@@ -295,6 +265,7 @@ def get_mission(
     mission_arg: str,
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
+    steps: Optional[int] = None,
     include_legacy: bool = False,
     difficulty: Optional[str] = None,
 ) -> tuple[str, MettaGridConfig, Optional[CvCMission]]:
@@ -325,14 +296,17 @@ def get_mission(
 
         # Load config based on file extension - no Mission available for file-based configs
         if path.suffix == ".py":
-            return mission_arg, load_mission_config_from_python(path), None
+            env_cfg = load_mission_config_from_python(path)
         elif path.suffix in [".yaml", ".yml", ".json"]:
-            return mission_arg, load_mission_config(path), None
+            env_cfg = load_mission_config(path)
         else:
             raise ValueError(f"Unsupported file format: {path.suffix}")
+        if steps is not None:
+            env_cfg.game.max_steps = steps
+        return mission_arg, env_cfg, None
 
     # Parse variants if provided
-    variants = parse_variants(variants_arg)
+    variants, reward_variants = split_variants(variants_arg)
     difficulty_variant = parse_difficulty(difficulty)
 
     # Otherwise, treat it as a fully qualified mission name, or as a site name
@@ -343,8 +317,15 @@ def get_mission(
     else:
         site_name, mission_name = mission_arg.split(MAP_MISSION_DELIMITER)
 
-    mission: CvCMission = find_mission(site_name, mission_name, include_evals=True, include_legacy=include_legacy)
+    mission: CvCMission = find_mission(
+        site_name,
+        mission_name,
+        include_evals=True,
+        include_legacy=include_legacy,
+    ).model_copy(deep=True)
 
+    if steps is not None:
+        mission.max_steps = steps
     if difficulty_variant is not None:
         mission = mission.with_variants([difficulty_variant])
     if variants:
@@ -352,11 +333,11 @@ def get_mission(
     if cogs is not None:
         mission = mission.with_variants([NumCogsVariant(num_cogs=cogs)])
 
-    return (
-        mission.full_name(),
-        mission.make_env(),
-        mission,
-    )
+    env_cfg = mission.make_env()
+    if reward_variants:
+        apply_reward_variants(env_cfg, variants=reward_variants)
+
+    return (mission.full_name(), env_cfg, mission)
 
 
 def list_variants() -> None:
