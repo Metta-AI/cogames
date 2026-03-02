@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from typing import Any, Optional
 
@@ -11,7 +10,7 @@ import typer
 from rich import box
 from rich.table import Table
 
-from cogames.cli.base import console
+from cogames.cli.base import console, emit_json
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
@@ -76,7 +75,7 @@ def _format_score(value: Any) -> str:
     return "—"
 
 
-def _get_client(login_server: str, server: str) -> TournamentServerClient | None:
+def _get_authenticated_client(login_server: str, server: str) -> TournamentServerClient | None:
     return TournamentServerClient.from_login(server_url=server, login_server=login_server)
 
 
@@ -134,7 +133,7 @@ def submissions_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = _get_authenticated_client(login_server, server)
     if not client:
         return
 
@@ -162,7 +161,7 @@ def _show_all_uploads(
         raise typer.Exit(1) from exc
 
     if json_output:
-        console.print(json.dumps([e.model_dump(mode="json") for e in entries], indent=2))
+        emit_json([e.model_dump(mode="json") for e in entries])
         return
 
     if not entries:
@@ -223,7 +222,7 @@ def _show_season_submissions(
             entries = [e for e in entries if e.policy.name == name]
 
     if json_output:
-        console.print(json.dumps([e.model_dump(mode="json") for e in entries], indent=2))
+        emit_json([e.model_dump(mode="json") for e in entries])
         return
 
     if not entries:
@@ -254,11 +253,11 @@ def _show_season_submissions(
 
 
 def leaderboard_cmd(
-    season: str = typer.Option(
-        "beta-cogsguard",
+    season: Optional[str] = typer.Option(
+        None,
         "--season",
         metavar="SEASON",
-        help="Tournament season name.",
+        help="Tournament season name (default: server default).",
         rich_help_panel="Tournament",
     ),
     login_server: str = typer.Option(
@@ -292,16 +291,14 @@ def leaderboard_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    client = _get_client(login_server, server)
-    if not client:
-        return
-
+    resolved_season = season or "<default>"
     try:
-        with client:
-            entries = client.get_leaderboard(season)
+        with TournamentServerClient(server_url=server) as client:
+            resolved_season = season or client.get_default_season().name
+            entries = client.get_leaderboard(resolved_season)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
-            console.print(f"[red]Season '{season}' not found[/red]")
+            console.print(f"[red]Season '{resolved_season}' not found[/red]")
             raise typer.Exit(1) from exc
         console.print(f"[red]Request failed with status {exc.response.status_code}[/red]")
         console.print(f"[dim]{exc.response.text}[/dim]")
@@ -311,14 +308,14 @@ def leaderboard_cmd(
         raise typer.Exit(1) from exc
 
     if json_output:
-        console.print(json.dumps([e.model_dump(mode="json") for e in entries], indent=2))
+        emit_json([e.model_dump(mode="json") for e in entries])
         return
 
     if not entries:
-        console.print(f"[yellow]No leaderboard entries for season '{season}'.[/yellow]")
+        console.print(f"[yellow]No leaderboard entries for season '{resolved_season}'.[/yellow]")
         return
 
-    table = Table(title=f"Leaderboard: {season}", box=box.SIMPLE_HEAVY, show_lines=False, pad_edge=False)
+    table = Table(title=f"Leaderboard: {resolved_season}", box=box.SIMPLE_HEAVY, show_lines=False, pad_edge=False)
     table.add_column("Rank", justify="right", style="bold")
     table.add_column("Policy", style="bold cyan")
     table.add_column("Score", justify="right", style="green")
@@ -332,90 +329,5 @@ def leaderboard_cmd(
             _format_score(entry.score),
             str(entry.matches),
         )
-
-    console.print(table)
-
-
-def seasons_cmd(
-    season_name: Optional[str] = typer.Argument(None, help="Show versions of a specific season."),
-    versions: bool = typer.Option(False, "--versions", "-v", help="List all versions of the season."),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL",
-        rich_help_panel="Server",
-    ),
-    server: str = typer.Option(
-        DEFAULT_SUBMIT_SERVER,
-        "--server",
-        "-s",
-        metavar="URL",
-        help="Tournament server URL",
-        rich_help_panel="Server",
-    ),
-    json_output: bool = typer.Option(
-        False,
-        "--json",
-        help="Print raw JSON instead of table.",
-        rich_help_panel="Output",
-    ),
-    _help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show this message and exit.",
-        is_eager=True,
-        callback=_help_callback,
-        rich_help_panel="Other",
-    ),
-) -> None:
-    client = _get_client(login_server, server)
-    if not client:
-        return
-
-    try:
-        with client:
-            if season_name and versions:
-                season_versions = client.get_season_versions(season_name)
-                if json_output:
-                    console.print(json.dumps([v.model_dump(mode="json") for v in season_versions], indent=2))
-                    return
-
-                if not season_versions:
-                    console.print(f"[yellow]No versions found for season '{season_name}'.[/yellow]")
-                    return
-
-                table = Table(title=f"Versions: {season_name}", box=box.SIMPLE_HEAVY, show_lines=False, pad_edge=False)
-                table.add_column("Version", style="bold cyan")
-                table.add_column("Status", style="white")
-                table.add_column("Created", style="dim")
-
-                for v in season_versions:
-                    status = "[green]canonical[/green]" if v.canonical else "[dim]historical[/dim]"
-                    table.add_row(f"v{v.version}", status, _format_timestamp(v.created_at))
-
-                console.print(table)
-                return
-
-            seasons = client.get_seasons()
-    except httpx.HTTPError as exc:
-        console.print(f"[red]Failed to reach server:[/red] {exc}")
-        raise typer.Exit(1) from exc
-
-    if json_output:
-        console.print(json.dumps([s.model_dump(mode="json") for s in seasons], indent=2))
-        return
-
-    if not seasons:
-        console.print("[yellow]No seasons found.[/yellow]")
-        return
-
-    table = Table(title="Tournament Seasons", box=box.SIMPLE_HEAVY, show_lines=False, pad_edge=False)
-    table.add_column("Season", style="bold cyan")
-    table.add_column("Description", style="white")
-
-    for season in seasons:
-        table.add_row(season.name, season.summary)
 
     console.print(table)
