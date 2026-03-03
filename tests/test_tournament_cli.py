@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import json
 import uuid
+from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
+import pytest
 from pytest_httpserver import HTTPServer
 from typer.testing import CliRunner
 
+from cogames.auth import AuthConfigReaderWriter
 from cogames.cli.client import TournamentServerClient
 from cogames.main import app
 
@@ -937,3 +940,162 @@ class TestHelpTextContent:
         assert "status" in output
         assert "get-token" in output
         assert "set-token" in output
+
+
+# ---------------------------------------------------------------------------
+# Season lookup auth header tests
+# ---------------------------------------------------------------------------
+
+
+def _save_token(tmp_path: Path, token: str, login_server: str) -> None:
+    AuthConfigReaderWriter("cogames.yaml", "login_tokens").save_token(token, login_server)
+
+
+class TestSeasonLookupAuth:
+    """Verify that upload and submit pass (or omit) the auth token when querying seasons.
+
+    The _resolve_season helper now loads a saved token via CoGamesAuthenticator and
+    forwards it to TournamentServerClient so that private seasons (e.g. 'test-season'
+    used by CI service accounts) are accessible. Public users with no saved token should
+    still be able to resolve public seasons without any auth header.
+    """
+
+    def test_upload_sends_token_in_season_lookup_when_token_saved(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        _save_token(tmp_path, "service-token-xyz", "http://fake-login-server")
+        _setup_read_endpoints(httpserver)
+        monkeypatch.setattr("cogames.main.upload_policy", lambda **_: None)
+
+        runner.invoke(
+            app,
+            [
+                "upload",
+                "--policy",
+                "class=cogames.policy.starter_agent.StarterPolicy",
+                "--name",
+                "test-policy",
+                "--server",
+                httpserver.url_for(""),
+                "--login-server",
+                "http://fake-login-server",
+                "--skip-validation",
+            ],
+        )
+
+        season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons"]
+        assert season_reqs, "Expected a request to /tournament/seasons"
+        assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
+
+    def test_upload_sends_no_token_in_season_lookup_when_absent(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        # No token saved — CoGamesAuthenticator.load_token returns None
+        _setup_read_endpoints(httpserver)
+        monkeypatch.setattr("cogames.main.upload_policy", lambda **_: None)
+
+        runner.invoke(
+            app,
+            [
+                "upload",
+                "--policy",
+                "class=cogames.policy.starter_agent.StarterPolicy",
+                "--name",
+                "test-policy",
+                "--server",
+                httpserver.url_for(""),
+                "--login-server",
+                "http://fake-login-server",
+                "--skip-validation",
+            ],
+        )
+
+        season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons"]
+        assert season_reqs, "Expected a request to /tournament/seasons"
+        assert "X-Auth-Token" not in season_reqs[0].headers
+
+    def test_submit_sends_token_in_season_lookup_when_token_saved(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        _save_token(tmp_path, "service-token-xyz", "http://fake-login-server")
+        _setup_read_endpoints(httpserver)
+
+        policy_version_id = str(uuid.uuid4())
+        policy_id = str(uuid.uuid4())
+        httpserver.expect_request("/stats/policy-versions", method="GET").respond_with_json(
+            {
+                "entries": [
+                    {
+                        "id": policy_version_id,
+                        "policy_id": policy_id,
+                        "created_at": "2026-01-01T00:00:00Z",
+                        "policy_created_at": "2026-01-01T00:00:00Z",
+                        "user_id": "u1",
+                        "name": "test-policy",
+                        "version": 1,
+                    }
+                ]
+            }
+        )
+        httpserver.expect_request("/tournament/seasons/test-season/submissions", method="POST").respond_with_json(
+            {"pools": ["ranked"]}
+        )
+
+        with _mock_from_login(httpserver):
+            runner.invoke(
+                app,
+                [
+                    "submit",
+                    "test-policy",
+                    "--season",
+                    "test-season",
+                    "--server",
+                    httpserver.url_for(""),
+                    "--login-server",
+                    "http://fake-login-server",
+                ],
+            )
+
+        season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons/test-season"]
+        assert season_reqs, "Expected a request to /tournament/seasons/test-season"
+        assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
+
+    def test_submit_sends_no_token_in_season_lookup_when_absent(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        # No token saved — season lookup runs unauthenticated, then from_login fails
+        _setup_read_endpoints(httpserver)
+
+        runner.invoke(
+            app,
+            [
+                "submit",
+                "test-policy",
+                "--season",
+                "test-season",
+                "--server",
+                httpserver.url_for(""),
+                "--login-server",
+                "http://fake-login-server",
+            ],
+        )
+
+        season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons/test-season"]
+        assert season_reqs, "Expected a request to /tournament/seasons/test-season"
+        assert "X-Auth-Token" not in season_reqs[0].headers
