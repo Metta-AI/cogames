@@ -1598,7 +1598,7 @@ def version_cmd() -> None:
     table.add_column("", justify="right", style="bold cyan")
     table.add_column("", justify="right")
 
-    for dist_name in ["mettagrid", "pufferlib-core", "cogames"]:
+    for dist_name in ["mettagrid", "cogames"]:
         table.add_row(dist_name, public_version(dist_name))
 
     console.print(table)
