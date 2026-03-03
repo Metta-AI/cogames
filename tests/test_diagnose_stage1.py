@@ -17,9 +17,20 @@ _STAGE1_PROBE_MISSIONS = (
     "eval_divide_and_conquer",
 )
 
+_ROLE_SPECIFIC_PROBE_MISSIONS = (
+    "aligner_tutorial",
+    "miner_tutorial",
+    "scout_tutorial",
+    "scrambler_tutorial",
+)
+
 
 def _stage1_case_names(*, cogs: int = 8, mission_set: str = "cogsguard_evals") -> list[str]:
     return [f"{mission_set}.{mission} (cogs={cogs})" for mission in _STAGE1_PROBE_MISSIONS]
+
+
+def _role_specific_case_names(*, cogs: int = 4, mission_set: str = "role_specific_evals") -> list[str]:
+    return [f"{mission_set}.{mission} (cogs={cogs})" for mission in _ROLE_SPECIFIC_PROBE_MISSIONS]
 
 
 def _diagnose_case(name: str) -> diagnose_module.DiagnoseCase:
@@ -28,6 +39,10 @@ def _diagnose_case(name: str) -> diagnose_module.DiagnoseCase:
 
 def _stage1_pack_cases() -> list[diagnose_module.DiagnoseCase]:
     return [_diagnose_case(case_name) for case_name in _stage1_case_names(cogs=1)]
+
+
+def _role_specific_pack_cases() -> list[diagnose_module.DiagnoseCase]:
+    return [_diagnose_case(case_name) for case_name in _role_specific_case_names(cogs=4)]
 
 
 def _run_diagnose(*, output_dir: Path, mission_set: str, extra_args: list[str] | None = None):
@@ -159,6 +174,22 @@ def test_evaluate_stage1_gate_marks_missing_axes() -> None:
     assert not results_by_axis[diagnose_module.DiagnoseAxis.CONTROL].satisfied
 
 
+def test_evaluate_stage1_gate_role_specific_pack_requires_all_role_probes() -> None:
+    gate = diagnose_module.evaluate_stage1_gate(
+        case_names=_role_specific_case_names(),
+        pack=diagnose_module.ROLE_SPECIFIC_STAGE1_PACK_V1,
+    )
+
+    assert gate.satisfied
+    results_by_axis = {result.axis: result for result in gate.results}
+    assert results_by_axis[diagnose_module.DiagnoseAxis.STABILITY].matched_missions == ["scout_tutorial"]
+    assert results_by_axis[diagnose_module.DiagnoseAxis.EFFICIENCY].matched_missions == ["miner_tutorial"]
+    assert results_by_axis[diagnose_module.DiagnoseAxis.CONTROL].matched_missions == [
+        "aligner_tutorial",
+        "scrambler_tutorial",
+    ]
+
+
 def test_assess_stage1_signals_confirms_with_metrics_and_replays() -> None:
     gate = diagnose_module.evaluate_stage1_gate(
         case_names=_stage1_case_names(),
@@ -218,6 +249,27 @@ def test_evaluate_stage1_pack_contract_fails_for_case_cogs_and_case_count_mismat
     checks_by_id = {check.check_id: check for check in report.checks}
     assert not checks_by_id["pack.cogs"].passed
     assert not checks_by_id["pack.case_count"].passed
+
+
+def test_evaluate_stage1_pack_contract_role_specific_pack_defaults() -> None:
+    pack = diagnose_module.ROLE_SPECIFIC_STAGE1_PACK_V1
+    report = diagnose_module.evaluate_stage1_pack_contract(
+        mission_set=pack.mission_set,
+        steps=pack.expected_steps,
+        episodes=pack.expected_episodes,
+        case_names=_role_specific_case_names(cogs=4),
+        pack=pack,
+    )
+
+    assert report.valid
+
+
+def test_load_diagnose_missions_role_specific_evals_contains_tutorial_roles() -> None:
+    missions = diagnose_module._load_diagnose_missions("role_specific_evals")
+    mission_names = {mission.name for mission in missions}
+
+    assert mission_names == set(_ROLE_SPECIFIC_PROBE_MISSIONS)
+    assert all(not isinstance(mission, type) for mission in missions)
 
 
 def test_evaluate_diagnose_validity_fails_when_pack_contract_is_invalid() -> None:
@@ -375,5 +427,26 @@ def test_diagnose_cli_completes_stage2_with_replays(
     assert state.run_status == diagnose_module.DiagnoseRunStatus.COMPLETE
 
     manifest = json.loads((output_dir / "manifest.json").read_text())
+    assert manifest["stage_status"] == "stage2_completed"
+    assert manifest["run_status"] == "complete"
+
+
+def test_diagnose_cli_role_specific_pack_completes_stage2_with_replays(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_dir = tmp_path / "run"
+    monkeypatch.setattr(diagnose_module, "_build_diagnose_cases", lambda **_kwargs: _role_specific_pack_cases())
+    _patch_diagnose_runtime(monkeypatch, evaluate_fn=_fake_evaluate_with_replays)
+
+    result = _run_diagnose(output_dir=output_dir, mission_set="role_specific_evals")
+
+    assert result.exit_code == 0, result.output
+    state = _read_state(output_dir)
+    assert state.stage_status == diagnose_module.DiagnoseStageStatus.STAGE2_COMPLETED
+    assert state.run_status == diagnose_module.DiagnoseRunStatus.COMPLETE
+
+    manifest = json.loads((output_dir / "manifest.json").read_text())
+    assert manifest["pack_id"] == diagnose_module.ROLE_SPECIFIC_STAGE1_PACK_V1.pack_id
     assert manifest["stage_status"] == "stage2_completed"
     assert manifest["run_status"] == "complete"
