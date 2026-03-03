@@ -37,7 +37,7 @@ from cogames import game, verbose
 from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import train as train_module
-from cogames.cli.auth import auth_app
+from cogames.cli.auth import CoGamesAuthenticator, auth_app
 from cogames.cli.base import console, emit_json
 from cogames.cli.client import SeasonInfo, TournamentServerClient
 from cogames.cli.episode import episode_app
@@ -1743,9 +1743,11 @@ app.command(
 )(diagnose_module.diagnose_cmd)
 
 
-def _resolve_season(server: str, season_name: str | None = None) -> SeasonInfo:
+def _resolve_season(server: str, login_server: str | None = None, season_name: str | None = None) -> SeasonInfo:
+    auth_token = CoGamesAuthenticator().load_token(login_server) if login_server else None
+
     try:
-        with TournamentServerClient(server_url=server) as client:
+        with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
             if season_name is None:
                 season_name = client.get_default_season().name
             info = client.get_season(season_name)
@@ -1877,7 +1879,7 @@ def validate_bundle_cmd(
 ) -> None:
     ensure_docker_daemon_access()
 
-    season_info = _resolve_season(server, season)
+    season_info = _resolve_season(server, season_name=season)
     entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool), None)
     if not entry_pool_info or not entry_pool_info.config_id:
         console.print("[red]No entry config found for season[/red]")
@@ -2028,7 +2030,7 @@ def upload_cmd(
         console.print("[red]Policy name must be at most 64 characters[/red]")
         raise typer.Exit(1)
 
-    season_info = _resolve_season(server, season)
+    season_info = _resolve_season(server, login_server, season)
 
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
@@ -2112,7 +2114,7 @@ def submit_cmd(
 ) -> None:
     import httpx  # noqa: PLC0415
 
-    season_info = _resolve_season(server, season)
+    season_info = _resolve_season(server, login_server, season)
     season_name = season_info.name
 
     client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
@@ -2266,7 +2268,7 @@ def ship_cmd(
         console.print("[red]Policy name must be at most 64 characters[/red]")
         raise typer.Exit(1)
 
-    season_info = _resolve_season(server, season)
+    season_info = _resolve_season(server, login_server, season)
 
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
