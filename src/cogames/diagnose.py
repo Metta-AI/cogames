@@ -78,6 +78,10 @@ class DiagnosePack(BaseModel):
     pack_version: str
     mission_set: str
     requirements: list[DiagnosePackRequirement]
+    expected_case_cogs: list[int]
+    expected_case_count: int
+    expected_steps: int
+    expected_episodes: int
 
 
 class Stage1RequirementResult(BaseModel):
@@ -434,15 +438,53 @@ COGSGUARD_STAGE1_PACK_V1 = DiagnosePack(
             min_required=1,
         ),
     ],
+    expected_case_cogs=[7, 8],
+    expected_case_count=15,
+    expected_steps=1000,
+    expected_episodes=3,
 )
 
 
 # Default cogs filter used when missions do not declare fixed cogs.
 COGSGUARD_STAGE1_DEFAULT_COG_FILTERS = [1, 2, 4]
-COGSGUARD_STAGE1_FIXED_CASE_COGS = [7, 8]
-COGSGUARD_STAGE1_FIXED_CASE_COUNT = 15
-COGSGUARD_STAGE1_FIXED_STEPS = 1000
-COGSGUARD_STAGE1_FIXED_EPISODES = 3
+COGSGUARD_STAGE1_FIXED_CASE_COGS = COGSGUARD_STAGE1_PACK_V1.expected_case_cogs
+COGSGUARD_STAGE1_FIXED_CASE_COUNT = COGSGUARD_STAGE1_PACK_V1.expected_case_count
+COGSGUARD_STAGE1_FIXED_STEPS = COGSGUARD_STAGE1_PACK_V1.expected_steps
+COGSGUARD_STAGE1_FIXED_EPISODES = COGSGUARD_STAGE1_PACK_V1.expected_episodes
+
+
+ROLE_SPECIFIC_STAGE1_PACK_V1 = DiagnosePack(
+    pack_id="role_specific_stage1",
+    pack_version="v1",
+    mission_set="role_specific_evals",
+    requirements=[
+        DiagnosePackRequirement(
+            axis=DiagnoseAxis.STABILITY,
+            probe_missions=["scout_tutorial"],
+            min_required=1,
+        ),
+        DiagnosePackRequirement(
+            axis=DiagnoseAxis.EFFICIENCY,
+            probe_missions=["miner_tutorial"],
+            min_required=1,
+        ),
+        DiagnosePackRequirement(
+            axis=DiagnoseAxis.CONTROL,
+            probe_missions=["aligner_tutorial", "scrambler_tutorial"],
+            min_required=2,
+        ),
+    ],
+    expected_case_cogs=[4],
+    expected_case_count=4,
+    expected_steps=1000,
+    expected_episodes=3,
+)
+
+
+STAGE1_PACKS_BY_MISSION_SET: dict[str, DiagnosePack] = {
+    COGSGUARD_STAGE1_PACK_V1.mission_set: COGSGUARD_STAGE1_PACK_V1,
+    ROLE_SPECIFIC_STAGE1_PACK_V1.mission_set: ROLE_SPECIFIC_STAGE1_PACK_V1,
+}
 
 
 STAGE1_PROBE_THRESHOLD_PROFILE_ID = "cogsguard_stage1_probe_thresholds_v1"
@@ -546,23 +588,23 @@ def evaluate_stage1_pack_contract(
         ),
         DiagnosePackContractCheck(
             check_id="pack.cogs",
-            passed=case_cogs == COGSGUARD_STAGE1_FIXED_CASE_COGS,
-            details=f"case_cogs={case_cogs}; expected={COGSGUARD_STAGE1_FIXED_CASE_COGS}",
+            passed=case_cogs == pack.expected_case_cogs,
+            details=f"case_cogs={case_cogs}; expected={pack.expected_case_cogs}",
         ),
         DiagnosePackContractCheck(
             check_id="pack.case_count",
-            passed=len(case_names) == COGSGUARD_STAGE1_FIXED_CASE_COUNT,
-            details=f"case_count={len(case_names)}; expected={COGSGUARD_STAGE1_FIXED_CASE_COUNT}",
+            passed=len(case_names) == pack.expected_case_count,
+            details=f"case_count={len(case_names)}; expected={pack.expected_case_count}",
         ),
         DiagnosePackContractCheck(
             check_id="pack.steps",
-            passed=steps == COGSGUARD_STAGE1_FIXED_STEPS,
-            details=f"steps={steps}; expected={COGSGUARD_STAGE1_FIXED_STEPS}",
+            passed=steps == pack.expected_steps,
+            details=f"steps={steps}; expected={pack.expected_steps}",
         ),
         DiagnosePackContractCheck(
             check_id="pack.episodes",
-            passed=episodes == COGSGUARD_STAGE1_FIXED_EPISODES,
-            details=f"episodes={episodes}; expected={COGSGUARD_STAGE1_FIXED_EPISODES}",
+            passed=episodes == pack.expected_episodes,
+            details=f"episodes={episodes}; expected={pack.expected_episodes}",
         ),
     ]
     return DiagnosePackContractReport(
@@ -841,7 +883,11 @@ def stage1_summary_payload(*, mission_names: list[str], episode_count: int, case
 
 
 def use_stage1_pack(mission_set: str) -> bool:
-    return mission_set == COGSGUARD_STAGE1_PACK_V1.mission_set
+    return mission_set in STAGE1_PACKS_BY_MISSION_SET
+
+
+def resolve_stage1_pack(mission_set: str) -> DiagnosePack:
+    return STAGE1_PACKS_BY_MISSION_SET.get(mission_set, COGSGUARD_STAGE1_PACK_V1)
 
 
 def _policy_episode_rewards(summary: MultiEpisodeRolloutSummary, policy_index: int = 0) -> list[float]:
@@ -2622,6 +2668,9 @@ def _load_diagnose_missions(mission_set: str) -> list[CvCMission]:
     if mission_set == "spanning_evals":
         return _load_eval_missions("cogames.cogs_vs_clips.evals.spanning_evals")
 
+    if mission_set == "role_specific_evals":
+        return _load_eval_missions("cogames.cogs_vs_clips.evals.role_specific_evals")
+
     raise ValueError(f"Unknown mission set: {mission_set}")
 
 
@@ -2719,6 +2768,7 @@ def diagnose_cmd(
     # --- Evaluation ---
     mission_set: Literal[
         "cogsguard_evals",
+        "role_specific_evals",
         "diagnostic_evals",
         "integrated_evals",
         "spanning_evals",
@@ -2729,7 +2779,7 @@ def diagnose_cmd(
         "--mission-set",
         "-S",
         metavar="SET",
-        help="Eval suite to run (full Stage 2 diagnosis currently requires cogsguard_evals).",
+        help=("Eval suite to run (full Stage 2 diagnosis currently requires cogsguard_evals or role_specific_evals)."),
         rich_help_panel="Evaluation",
     ),
     experiments: Optional[list[str]] = typer.Option(  # noqa: B008
@@ -2824,7 +2874,7 @@ def diagnose_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    pack = COGSGUARD_STAGE1_PACK_V1
+    pack = resolve_stage1_pack(mission_set)
     stage1_seed = 42
     stage2_absolute_seed = 43
     stage2_mirror_seed = 44
