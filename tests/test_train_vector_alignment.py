@@ -1,5 +1,7 @@
 """Tests for automatic alignment of vectorized environment configuration."""
 
+import pytest
+
 from cogames.train import _align_minibatch_size, _resolve_vector_counts
 
 
@@ -63,13 +65,14 @@ def test_align_leaves_underfilled_worker_pair() -> None:
     assert aligned_workers == 8
 
 
-def test_align_minibatch_size_minimum_bptt() -> None:
-    assert _align_minibatch_size(4, 64, 64) == 64
-
-
-def test_align_minibatch_size_rounds_up_when_possible() -> None:
-    assert _align_minibatch_size(70, 128, 64) == 128
-
-
-def test_align_minibatch_size_rounds_down_when_needed() -> None:
-    assert _align_minibatch_size(70, 96, 64) == 64
+@pytest.mark.parametrize(
+    ("minibatch_size", "steps", "bptt_horizon", "expected"),
+    [
+        (4, 64, 64, 64),
+        (70, 128, 64, 128),
+        (70, 96, 64, 64),
+    ],
+    ids=["minimum-bptt", "rounds-up", "rounds-down"],
+)
+def test_align_minibatch_size(minibatch_size: int, steps: int, bptt_horizon: int, expected: int) -> None:
+    assert _align_minibatch_size(minibatch_size, steps, bptt_horizon) == expected
