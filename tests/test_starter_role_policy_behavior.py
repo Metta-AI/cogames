@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from cogames.cogs_vs_clips.missions import CogsGuardBasicMission
 from cogames.policy.starter_agent import StarterCogPolicyImpl
 from mettagrid.config.id_map import ObservationFeatureSpec
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
@@ -10,12 +11,12 @@ from mettagrid.simulator.interface import PackedCoordinate
 def _mock_policy_env_info() -> PolicyEnvInterface:
     action_names = ["noop", "move_north", "move_south", "move_east", "move_west"]
     tags = [
-        "type:miner_station",
+        "type:c:miner",
         "type:junction",
-        "type:chest",
-        "type:aligner_station",
-        "type:scrambler_station",
-        "type:scout_station",
+        "type:hub",
+        "type:c:aligner",
+        "type:c:scrambler",
+        "type:c:scout",
         "type:carbon_extractor",
         "type:oxygen_extractor",
         "type:germanium_extractor",
@@ -81,7 +82,7 @@ def test_preferred_role_targets_its_station_when_not_equipped() -> None:
             _inv_token(3, "inv:aligner", 0),
             _inv_token(4, "inv:scrambler", 0),
             _inv_token(5, "inv:heart", 0),
-            _tag_token(0, row=2, col=3),  # type:miner_station (east)
+            _tag_token(0, row=2, col=3),  # type:c:miner (east)
             _tag_token(1, row=1, col=2),  # type:junction (north)
         ],
     )
@@ -119,3 +120,29 @@ def test_inventory_items_ignore_empty_suffix_tokens() -> None:
     items = impl._inventory_amounts(obs)
     assert "" not in items
     assert items["miner"] == 1
+
+
+def test_aligner_without_heart_targets_hub() -> None:
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, preferred_gear=None)
+    state = impl.initial_agent_state()
+    obs = AgentObservation(
+        agent_id=0,
+        tokens=[
+            _inv_token(1, "inv:aligner", 1),
+            _inv_token(2, "inv:heart", 0),
+            _tag_token(2, row=3, col=2),  # type:hub (south)
+            _tag_token(1, row=1, col=2),  # type:junction (north)
+        ],
+    )
+
+    action, _ = impl.step_with_state(obs, state)
+    assert action.name == "move_south"
+
+
+def test_cogsguard_tags_resolve_role_station_targets() -> None:
+    policy_env_info = PolicyEnvInterface.from_mg_cfg(CogsGuardBasicMission.make_env())
+    for role in ["miner", "aligner", "scrambler", "scout"]:
+        impl = StarterCogPolicyImpl(policy_env_info, agent_id=0, preferred_gear=role)
+        expected_tag_name = f"type:c:{role}"
+        expected_tag_id = policy_env_info.tags.index(expected_tag_name)
+        assert expected_tag_id in impl._gear_station_tags_by_gear[role]
