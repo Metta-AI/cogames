@@ -72,17 +72,28 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
                 tag_ids.add(self._tag_name_to_id[type_name])
         return tag_ids
 
-    def _inventory_items(self, obs: AgentObservation) -> set[str]:
-        items: set[str] = set()
+    def _inventory_amounts(self, obs: AgentObservation) -> dict[str, int]:
+        items: dict[str, int] = {}
         for token in obs.tokens:
             if token.location != self._center:
                 continue
             name = token.feature.name
             if not name.startswith("inv:"):
                 continue
-            parts = name.split(":", 2)
-            if len(parts) >= 2:
-                items.add(parts[1])
+            suffix = name[4:]
+            if not suffix:
+                continue
+            item_name, sep, power_str = suffix.rpartition(":p")
+            if not sep or not item_name or not power_str.isdigit():
+                item_name = suffix
+                power = 0
+            else:
+                power = int(power_str)
+            value = int(token.value)
+            if value <= 0:
+                continue
+            base = max(int(token.feature.normalization), 1)
+            items[item_name] = items.get(item_name, 0) + value * (base**power)
         return items
 
     def _closest_tag_location(self, obs: AgentObservation, tag_ids: set[int]) -> Optional[tuple[int, int]]:
@@ -130,17 +141,19 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
             direction = "east" if delta_col > 0 else "west"
         return self._action(f"move_{direction}"), state
 
-    def _current_gear(self, items: set[str]) -> Optional[str]:
+    def _current_gear(self, items: dict[str, int]) -> Optional[str]:
+        if self._preferred_gear is not None and items.get(self._preferred_gear, 0) > 0:
+            return self._preferred_gear
         for gear in GEAR:
-            if gear in items:
+            if items.get(gear, 0) > 0:
                 return gear
         return None
 
     def step_with_state(self, obs: AgentObservation, state: StarterCogState) -> tuple[Action, StarterCogState]:
         """Compute the action for this Cog."""
-        items = self._inventory_items(obs)
+        items = self._inventory_amounts(obs)
         gear = self._current_gear(items)
-        has_heart = "heart" in items
+        has_heart = items.get("heart", 0) > 0
 
         if self._preferred_gear is not None and gear != self._preferred_gear:
             target_tags = self._gear_station_tags_by_gear.get(self._preferred_gear, set())
