@@ -54,11 +54,11 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         self._fallback_action_name = "noop" if "noop" in self._action_name_set else self._action_names[0]
         self._center = (policy_env_info.obs_height // 2, policy_env_info.obs_width // 2)
         self._tag_name_to_id = {name: idx for idx, name in enumerate(policy_env_info.tags)}
-        self._gear_station_tags_by_gear = {gear: self._resolve_tag_ids([f"{gear}_station"]) for gear in GEAR}
+        self._gear_station_tags_by_gear = {gear: self._resolve_tag_ids([f"c:{gear}"]) for gear in GEAR}
         self._gear_station_tags = set().union(*self._gear_station_tags_by_gear.values())
         self._extractor_tags = self._resolve_tag_ids([f"{element}_extractor" for element in ELEMENTS])
         self._junction_tags = self._resolve_tag_ids(["junction"])
-        self._chest_tags = self._resolve_tag_ids(["chest"])
+        self._heart_source_tags = self._resolve_tag_ids(["hub", "chest"])
 
     def _resolve_tag_ids(self, names: Iterable[str]) -> set[int]:
         tag_ids: set[int] = set()
@@ -160,9 +160,9 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         elif gear is None:
             target_tags = self._gear_station_tags
         elif gear == "aligner":
-            target_tags = self._junction_tags if has_heart else self._chest_tags
+            target_tags = self._junction_tags if has_heart else self._heart_source_tags
         elif gear == "scrambler":
-            target_tags = self._junction_tags if has_heart else self._chest_tags
+            target_tags = self._junction_tags if has_heart else self._heart_source_tags
         elif gear == "miner":
             target_tags = self._extractor_tags
         else:
@@ -173,7 +173,7 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
 
     def initial_agent_state(self) -> StarterCogState:
         """Get the initial state for a new agent."""
-        return StarterCogState()
+        return StarterCogState(wander_direction_index=self._agent_id % len(WANDER_DIRECTIONS))
 
 
 # ============================================================================
