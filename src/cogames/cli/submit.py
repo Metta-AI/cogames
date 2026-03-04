@@ -369,18 +369,13 @@ def upload_submission(
     """Upload submission to CoGames backend using a presigned S3 URL."""
     console.print("[bold]Uploading[/bold]")
 
-    presigned_data = client.get_presigned_upload_url()
-    upload_url = presigned_data.get("upload_url")
-    upload_id = presigned_data.get("upload_id")
-
-    if not upload_url or not upload_id:
-        raise ValueError("Upload URL missing from response")
+    presigned = client.get_presigned_upload_url()
 
     console.print("[dim]Uploading to storage...[/dim]")
 
     with open(zip_path, "rb") as f:
         upload_response = httpx.put(
-            upload_url,
+            presigned.upload_url,
             content=f,
             headers={"Content-Type": "application/zip"},
             timeout=600.0,
@@ -395,28 +390,19 @@ def upload_submission(
     # Server checks actual S3 object size (catches old clients or misreported sizes). Only
     # the server knows the real size, so this try/except can't be replaced by a client-side check.
     try:
-        result = client.complete_policy_upload(upload_id, submission_name, season=season)
+        result = client.complete_policy_upload(str(presigned.upload_id), submission_name, season=season)
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 413:
             detail = e.response.json().get("detail", "Policy too large")
             console.print(f"[red]{detail}[/red]")
             raise typer.Exit(1) from None
         raise
-    submission_id = result.get("id")
-    name = result.get("name")
-    version = result.get("version")
-    pools = result.get("pools")
-    if submission_id is None or name is None or version is None:
-        raise ValueError("Missing fields in response")
-    try:
-        return UploadResult(
-            policy_version_id=uuid.UUID(str(submission_id)),
-            name=name,
-            version=version,
-            pools=pools,
-        )
-    except ValueError as exc:
-        raise ValueError(f"Invalid submission ID returned: {submission_id}") from exc
+    return UploadResult(
+        policy_version_id=result.id,
+        name=result.name,
+        version=result.version,
+        pools=result.pools,
+    )
 
 
 def upload_policy(

@@ -23,6 +23,7 @@ from mettagrid.config.mettagrid_config import MettaGridConfig
 
 _SEASON_ID = "11111111-1111-1111-1111-111111111111"
 _ENTRY_CONFIG_ID = "22222222-2222-2222-2222-222222222222"
+_UPLOAD_ID = "33333333-3333-3333-3333-333333333333"
 
 
 def _season_info_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
@@ -33,8 +34,10 @@ def _season_info_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
         "canonical": summary["canonical"],
         "is_default": summary["is_default"],
         "status": "in_progress",
-        "display_name": summary["name"],
-        "tournament_type": "freeplay",
+        "display_name": summary.get("display_name", summary["name"]),
+        "tournament_type": summary.get("tournament_type", "freeplay"),
+        "created_at": summary.get("created_at", "2026-01-01T00:00:00Z"),
+        "public": summary.get("public", True),
         "entrant_count": 1,
         "active_entrant_count": 1,
         "match_count": 0,
@@ -63,7 +66,7 @@ def test_upload_command_sends_correct_requests(
     tmp_path: Path,
 ) -> None:
     """Test that 'cogames upload' sends the expected requests to the server."""
-    upload_id = "test-upload-id-abc"
+    upload_id = _UPLOAD_ID
     _setup_mock_upload_server(httpserver, upload_id=upload_id)
 
     # Run the upload command
@@ -120,9 +123,13 @@ def test_upload_command_fails_without_auth(
     season_summary = {
         "id": _SEASON_ID,
         "name": "test-season",
+        "display_name": "Test Season",
         "version": 1,
         "canonical": True,
         "is_default": True,
+        "created_at": "2026-01-01T00:00:00Z",
+        "public": True,
+        "tournament_type": "freeplay",
         "entry_pool": None,
         "leaderboard_pool": None,
         "summary": "",
@@ -170,15 +177,19 @@ def test_upload_command_fails_without_auth(
 
 def _setup_mock_upload_server(
     httpserver: HTTPServer,
-    upload_id: str = "test-upload-id",
+    upload_id: str = _UPLOAD_ID,
 ) -> None:
     """Configure httpserver with the endpoints needed for upload."""
     season_summary = {
         "id": _SEASON_ID,
         "name": "test-season",
+        "display_name": "Test Season",
         "version": 1,
         "canonical": True,
         "is_default": True,
+        "created_at": "2026-01-01T00:00:00Z",
+        "public": True,
+        "tournament_type": "freeplay",
         "entry_pool": None,
         "leaderboard_pool": None,
         "summary": "",
@@ -200,6 +211,7 @@ def _setup_mock_upload_server(
     ).respond_with_json(
         {
             "upload_url": httpserver.url_for("/fake-s3-upload"),
+            "s3_key": "test/policy.zip",
             "upload_id": upload_id,
         }
     )
@@ -500,9 +512,13 @@ _SEASON_WITH_ENTRY_CONFIG: list[dict[str, Any]] = [
     {
         "id": _SEASON_ID,
         "name": "test-season",
+        "display_name": "Test Season",
         "version": 1,
         "canonical": True,
         "is_default": True,
+        "created_at": "2026-01-01T00:00:00Z",
+        "public": True,
+        "tournament_type": "freeplay",
         "entry_pool": "qualifying",
         "leaderboard_pool": "ranked",
         "summary": "",
@@ -517,9 +533,13 @@ _SEASON_NO_ENTRY_CONFIG: list[dict[str, Any]] = [
     {
         "id": _SEASON_ID,
         "name": "test-season",
+        "display_name": "Test Season",
         "version": 1,
         "canonical": True,
         "is_default": True,
+        "created_at": "2026-01-01T00:00:00Z",
+        "public": True,
+        "tournament_type": "freeplay",
         "entry_pool": None,
         "leaderboard_pool": "ranked",
         "summary": "",
@@ -533,7 +553,7 @@ _SEASON_NO_ENTRY_CONFIG: list[dict[str, Any]] = [
 def _setup_mock_upload_server_with_season(
     httpserver: HTTPServer,
     seasons: list[dict[str, Any]],
-    upload_id: str = "test-upload-id",
+    upload_id: str = _UPLOAD_ID,
 ) -> None:
     season_summary = seasons[0]
 
@@ -557,6 +577,7 @@ def _setup_mock_upload_server_with_season(
     ).respond_with_json(
         {
             "upload_url": httpserver.url_for("/fake-s3-upload"),
+            "s3_key": "test/policy.zip",
             "upload_id": upload_id,
         }
     )
@@ -732,6 +753,8 @@ def test_validate_policy_fetches_config_and_runs(
             "status": "in_progress",
             "display_name": "Test Season",
             "tournament_type": "freeplay",
+            "created_at": "2026-01-01T00:00:00Z",
+            "public": True,
             "entrant_count": 1,
             "active_entrant_count": 1,
             "match_count": 0,
@@ -841,9 +864,13 @@ def test_upload_rejects_oversized_at_completion(
     season_summary = {
         "id": _SEASON_ID,
         "name": "test-season",
+        "display_name": "Test Season",
         "version": 1,
         "canonical": True,
         "is_default": True,
+        "created_at": "2026-01-01T00:00:00Z",
+        "public": True,
+        "tournament_type": "freeplay",
         "entry_pool": None,
         "leaderboard_pool": None,
         "summary": "",
@@ -855,7 +882,7 @@ def test_upload_rejects_oversized_at_completion(
         _season_info_from_summary(season_summary)
     )
     httpserver.expect_request("/stats/policies/submit/presigned-url", method="POST").respond_with_json(
-        {"upload_url": httpserver.url_for("/fake-s3-upload"), "upload_id": "test-upload-id"}
+        {"upload_url": httpserver.url_for("/fake-s3-upload"), "s3_key": "test/policy.zip", "upload_id": _UPLOAD_ID}
     )
     httpserver.expect_request("/fake-s3-upload", method="PUT").respond_with_data("")
     httpserver.expect_request("/stats/policies/submit/complete", method="POST").respond_with_json(

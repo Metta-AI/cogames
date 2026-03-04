@@ -1,255 +1,42 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 from typing import Any, Literal, TypeVar, overload
 
 import httpx
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+from pydantic import TypeAdapter
 
+from cogames.cli._model_base import CLIModel
 from cogames.cli.base import console
+from cogames.cli.generated_models import (
+    EpisodeQueryResponse,
+    EpisodeResponse,
+    LeaderboardEntry,
+    MatchResponse,
+    MembershipHistoryEntry,
+    PoliciesResponse,
+    PolicySummary,
+    PolicyVersionResponse,
+    PolicyVersionRow,
+    PolicyVersionsResponse,
+    PresignedUploadUrlResponse,
+    ScorePoliciesLeaderboardEntry,
+    SeasonDetail,
+    SeasonSummary,
+    SeasonVersionInfo,
+    StageStats,
+    SubmitResponse,
+    TeamSummaryOutput,
+    TeamTournamentProgress,
+)
 from cogames.cli.login import CoGamesAuthenticator
 
 T = TypeVar("T")
 
 
-class CLIModel(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
-
-class PolicyVersionInfo(CLIModel):
-    id: uuid.UUID
-    policy_id: uuid.UUID
-    created_at: datetime
-    policy_created_at: datetime
-    user_id: str
-    name: str
-    version: int
-
-
-class PoolInfo(CLIModel):
-    id: uuid.UUID | None = None
-    name: str
-    description: str
-    config_id: uuid.UUID | None = None
-
-
-class SeasonSummary(CLIModel):
-    id: uuid.UUID = Field(description="Unique season identifier")
-    name: str = Field(description="Short name of the season")
-    display_name: str | None = Field(default=None, description="Human-readable season title for UI display")
-    version: int = Field(description="Season version number")
-    canonical: bool = Field(description="Whether this is the canonical (active) version")
-    summary: str = Field(description="Human-readable description of the season")
-    entry_pool: str | None = Field(default=None, description="Name of the pool where new policies are submitted")
-    leaderboard_pool: str | None = Field(default=None, description="Name of the pool used for the leaderboard")
-    is_default: bool = Field(description="Whether this is the default season")
-    compat_version: str | None = Field(default=None, description="Compatibility version string (e.g. '0.4')")
-    created_at: str | None = Field(default=None, description="ISO 8601 timestamp when this season version was created")
-    public: bool | None = Field(default=None, description="Whether this season is visible to non-Softmax users")
-    tournament_type: Literal["freeplay", "team"] | None = Field(default=None, description="Tournament format")
-    pools: list[PoolInfo] = Field(description="Pools in this season")
-
-
-class SeasonInfo(SeasonSummary):
-    status: Literal["not_started", "in_progress", "complete"]
-    display_name: str = Field(default=..., description="Human-readable season title for UI display")
-    started_at: str | None = None
-    tournament_type: Literal["freeplay", "team"] = Field(default=..., description="Tournament format")
-    entrant_count: int
-    active_entrant_count: int
-    match_count: int
-    stage_count: int
-
-
-class MatchPlayerInfo(CLIModel):
-    policy: PolicyVersionSummary
-    num_agents: int
-    score: float | None
-
-
-class MatchResponse(CLIModel):
-    id: uuid.UUID
-    season_name: str
-    pool_name: str
-    status: str
-    assignments: list[int]
-    players: list[MatchPlayerInfo]
-    error: str | None
-    episode_id: uuid.UUID | None
-    job_id: uuid.UUID | None = None
-    episode: dict[str, Any] | None = None
-    created_at: datetime
-
-
-class SeasonVersionInfo(CLIModel):
-    version: int
-    canonical: bool
-    disabled_at: str | None
-    created_at: str
-    compat_version: str | None = None
-
-
-class LeaderboardEntry(CLIModel):
-    rank: int
-    policy: PolicyVersionSummary
-    score: float
-    score_stddev: float | None = None
-    matches: int
-
-
-class PolicyVersionSummary(CLIModel):
-    id: uuid.UUID
-    name: str | None
-    version: int | None
-
-
-class SubmitToSeasonResponse(CLIModel):
-    pools: list[str]
-
-
-class PoolMembership(CLIModel):
-    pool_name: str
-    active: bool
-    completed: int
-    failed: int
-    pending: int
-
-
-class SeasonPolicyEntry(CLIModel):
-    policy: PolicyVersionSummary
-    pools: list[PoolMembership]
-    entered_at: str
-
-
 class PoolConfigInfo(CLIModel):
     pool_name: str
     config: dict[str, Any]
-
-
-class MembershipHistoryEntry(CLIModel):
-    season_name: str
-    season_version: int | None
-    pool_name: str
-    action: str
-    notes: str | None
-    created_at: str
-
-
-class StageStats(CLIModel):
-    name: str
-    policy_count: int = 0
-    match_count: int = 0
-    completion_pct: float = 0.0
-    team_count: int | None = None
-    eliminated_count: int | None = None
-
-
-class ProgressStage(CLIModel):
-    index: int
-    name: str
-    kind: str
-    description: str
-    input_pool: str
-    output_pool: str
-    status: str
-
-
-class TeamTournamentProgress(CLIModel):
-    phase: str
-    phase_detail: dict[str, str | int] = Field(default_factory=dict)
-    stages: list[StageStats]
-    stage_flow: list[ProgressStage] = Field(default_factory=list)
-    started: bool = False
-
-
-class TeamCogSummary(CLIModel):
-    position: int
-    policy: PolicyVersionSummary
-
-
-class TeamSummary(CLIModel):
-    id: uuid.UUID | None = None
-    name: str | None = None
-    pool_name: str
-    eliminated: bool | None = None
-    score: float | None = None
-    matches: int | None = None
-    rank: int | None = None
-    members: list[PolicyVersionSummary] = Field(default_factory=list)
-    cogs: list[TeamCogSummary] = Field(default_factory=list)
-    created_at: str | None = None
-
-    @model_validator(mode="after")
-    def _populate_cogs_from_members(self) -> TeamSummary:
-        """Normalize legacy team payloads that use `members` into the modern `cogs` shape."""
-        if not self.cogs and self.members:
-            self.cogs = [TeamCogSummary(position=index, policy=member) for index, member in enumerate(self.members)]
-        return self
-
-
-class ScorePoliciesLeaderboardEntry(CLIModel):
-    rank: int
-    policy: PolicyVersionSummary
-    placement_score: float
-    team_appearances: int
-    team_ranks: list[int]
-
-
-class AgentResult(CLIModel):
-    agent_id: int
-    reward: float
-    metrics: dict[str, float]
-
-
-class PolicyResult(CLIModel):
-    position: int
-    policy: PolicyVersionSummary
-    num_agents: int
-    avg_reward: float
-    avg_metrics: dict[str, float]
-    agents: list[AgentResult]
-
-
-class EpisodeResponse(CLIModel):
-    id: uuid.UUID
-    replay_url: str | None = None
-    thumbnail_url: str | None = None
-    tags: dict[str, str] = Field(default_factory=dict)
-    game_stats: dict[str, float] = Field(default_factory=dict)
-    policy_results: list[PolicyResult] = Field(default_factory=list)
-    steps: int | None = None
-    created_at: datetime
-
-
-class EpisodeQueryResult(CLIModel):
-    id: uuid.UUID
-    replay_url: str | None = None
-    thumbnail_url: str | None = None
-    attributes: dict[str, Any] = Field(default_factory=dict)
-    eval_task_id: uuid.UUID | None = None
-    created_at: datetime
-    tags: dict[str, str] = Field(default_factory=dict)
-    avg_rewards: dict[uuid.UUID, float] = Field(default_factory=dict)
-    job_id: uuid.UUID | None = None
-
-
-class EpisodeQueryResponse(CLIModel):
-    episodes: list[EpisodeQueryResult]
-
-
-class PolicyRow(CLIModel):
-    id: uuid.UUID
-    name: str
-    created_at: datetime
-    user_id: str
-    attributes: dict[str, Any]
-    version_count: int
-
-
-class PoliciesResponse(CLIModel):
-    entries: list[PolicyRow]
-    total_count: int
 
 
 class TournamentServerClient:
@@ -334,8 +121,8 @@ class TournamentServerClient:
     def get_seasons(self) -> list[SeasonSummary]:
         return self._get("/tournament/seasons", list[SeasonSummary])
 
-    def get_season(self, season_name: str) -> SeasonInfo:
-        return self._get(f"/tournament/seasons/{season_name}", SeasonInfo)
+    def get_season(self, season_name: str) -> SeasonDetail:
+        return self._get(f"/tournament/seasons/{season_name}", SeasonDetail)
 
     def get_default_season(self) -> SeasonSummary:
         seasons = self.get_seasons()
@@ -382,54 +169,54 @@ class TournamentServerClient:
         self,
         name: str | None = None,
         version: int | None = None,
-    ) -> list[PolicyVersionInfo]:
+    ) -> list[PolicyVersionRow]:
         params: dict[str, Any] = {"mine": "true", "limit": 100}
         if name is not None:
             params["name_exact"] = name
         if version is not None:
             params["version"] = version
-        result = self._get("/stats/policy-versions", params=params)
-        entries = result.get("entries", [])
-        return [PolicyVersionInfo.model_validate(e) for e in entries]
+        result = self._get("/stats/policy-versions", PolicyVersionsResponse, params=params)
+        return result.entries
 
     def lookup_policy_version(
         self,
         name: str,
         version: int | None = None,
-    ) -> PolicyVersionInfo | None:
+    ) -> PolicyVersionRow | None:
         versions = self.get_my_policy_versions(name=name, version=version)
         return versions[0] if versions else None
 
-    def get_policy_version(self, policy_version_id: uuid.UUID) -> PolicyVersionInfo:
-        return self._get(f"/stats/policy-versions/{policy_version_id}", PolicyVersionInfo)
+    def get_policy_version(self, policy_version_id: uuid.UUID) -> PolicyVersionRow:
+        return self._get(f"/stats/policy-versions/{policy_version_id}", PolicyVersionRow)
 
-    def submit_to_season(self, season_name: str, policy_version_id: uuid.UUID) -> SubmitToSeasonResponse:
+    def submit_to_season(self, season_name: str, policy_version_id: uuid.UUID) -> SubmitResponse:
         return self._post(
             f"/tournament/seasons/{season_name}/submissions",
-            SubmitToSeasonResponse,
+            SubmitResponse,
             json={"policy_version_id": str(policy_version_id)},
         )
 
-    def get_season_policies(self, season_name: str, mine: bool = False) -> list[SeasonPolicyEntry]:
+    def get_season_policies(self, season_name: str, mine: bool = False) -> list[PolicySummary]:
         params: dict[str, str] = {}
         if mine:
             params["mine"] = "true"
 
         return self._get(
             f"/tournament/seasons/{season_name}/policies",
-            list[SeasonPolicyEntry],
+            list[PolicySummary],
             params=params if params else None,
         )
 
-    def get_presigned_upload_url(self) -> dict[str, Any]:
-        return self._post("/stats/policies/submit/presigned-url", timeout=60.0)
+    def get_presigned_upload_url(self) -> PresignedUploadUrlResponse:
+        return self._post("/stats/policies/submit/presigned-url", PresignedUploadUrlResponse, timeout=60.0)
 
-    def complete_policy_upload(self, upload_id: str, name: str, season: str | None = None) -> dict[str, Any]:
+    def complete_policy_upload(self, upload_id: str, name: str, season: str | None = None) -> PolicyVersionResponse:
         payload: dict[str, Any] = {"upload_id": upload_id, "name": name}
         if season is not None:
             payload["season"] = season
         return self._post(
             "/stats/policies/submit/complete",
+            PolicyVersionResponse,
             timeout=120.0,
             json=payload,
         )
@@ -454,11 +241,9 @@ class TournamentServerClient:
         return result
 
     def get_match(self, match_id: uuid.UUID) -> MatchResponse:
-        """Get details for a specific match."""
         return self._get(f"/tournament/matches/{match_id}", MatchResponse)
 
     def list_match_policy_logs(self, match_id: uuid.UUID, policy_version_id: uuid.UUID) -> list[str]:
-        """List available policy log files for a policy in a match."""
         return self._get(
             f"/tournament/matches/{match_id}/{policy_version_id}/policy-logs",
             list[str],
@@ -496,7 +281,7 @@ class TournamentServerClient:
         pool_name: str | None = None,
         eliminated: bool | None = None,
         policy_version_id: uuid.UUID | None = None,
-    ) -> list[TeamSummary]:
+    ) -> list[TeamSummaryOutput]:
         params: dict[str, str] = {}
         if limit is not None:
             params["limit"] = str(limit)
@@ -510,7 +295,7 @@ class TournamentServerClient:
             params["policy_version_id"] = str(policy_version_id)
         return self._get(
             f"/tournament/seasons/{season_name}/teams",
-            list[TeamSummary],
+            list[TeamSummaryOutput],
             params=params if params else None,
         )
 
@@ -534,20 +319,20 @@ class TournamentServerClient:
         season_name: str,
         leaderboard_type: Literal["team"],
         pool_name: str,
-    ) -> list[TeamSummary]: ...
+    ) -> list[TeamSummaryOutput]: ...
     @overload
     def get_stage_leaderboard(
         self,
         season_name: str,
         leaderboard_type: str,
         pool_name: str,
-    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]: ...
+    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummaryOutput]: ...
     def get_stage_leaderboard(
         self,
         season_name: str,
         leaderboard_type: str,
         pool_name: str,
-    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]:
+    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummaryOutput]:
         if leaderboard_type == "score-policies":
             return self._get(
                 f"/tournament/seasons/{season_name}/leaderboard/{leaderboard_type}/{pool_name}",
@@ -556,7 +341,7 @@ class TournamentServerClient:
         if leaderboard_type == "team":
             return self._get(
                 f"/tournament/seasons/{season_name}/leaderboard/{leaderboard_type}/{pool_name}",
-                list[TeamSummary],
+                list[TeamSummaryOutput],
             )
         return self._get(
             f"/tournament/seasons/{season_name}/leaderboard/{leaderboard_type}/{pool_name}",

@@ -77,3 +77,5 @@ extend = "../../.ruff.toml"
 # - E402 Module level import not at top of file (cells can have imports even when not the first cell)
 "README.py" = ["E501", "E402"]
 "tutorials/*.py" = ["E501", "E402"]
+# generated_models.py is auto-generated from openapi.json via datamodel-codegen
+"src/cogames/cli/generated_models.py" = ["E501", "I001"]

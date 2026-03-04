@@ -39,7 +39,7 @@ from cogames import play as play_module
 from cogames import train as train_module
 from cogames.cli.auth import CoGamesAuthenticator, auth_app
 from cogames.cli.base import console, emit_json
-from cogames.cli.client import SeasonInfo, TournamentServerClient
+from cogames.cli.client import SeasonDetail, TournamentServerClient
 from cogames.cli.episode import episode_app
 from cogames.cli.leaderboard import (
     leaderboard_cmd,
@@ -1743,9 +1743,8 @@ app.command(
 )(diagnose_module.diagnose_cmd)
 
 
-def _resolve_season(server: str, login_server: str | None = None, season_name: str | None = None) -> SeasonInfo:
+def _resolve_season(server: str, login_server: str | None = None, season_name: str | None = None) -> SeasonDetail:
     auth_token = CoGamesAuthenticator().load_token(login_server) if login_server else None
-
     try:
         with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
             if season_name is None:
