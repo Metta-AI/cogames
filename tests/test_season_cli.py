@@ -12,21 +12,23 @@ import typer
 from rich.console import Console
 
 from cogames.cli import season
-from cogames.cli.client import (
+from cogames.cli.client import PoolConfigInfo
+from cogames.cli.generated_models import (
+    Kind,
     LeaderboardEntry,
     MatchPlayerInfo,
     MatchResponse,
     PolicyVersionSummary,
-    PoolConfigInfo,
     PoolInfo,
     ProgressStage,
     ScorePoliciesLeaderboardEntry,
-    SeasonInfo,
+    SeasonDetail,
     SeasonSummary,
     SeasonVersionInfo,
     StageStats,
+    Status,
     TeamCogSummary,
-    TeamSummary,
+    TeamSummaryOutput,
     TeamTournamentProgress,
 )
 
@@ -38,6 +40,7 @@ def _make_season_summary(**overrides: Any) -> SeasonSummary:
     defaults: dict[str, Any] = {
         "id": FAKE_UUID,
         "name": "test-season",
+        "display_name": "Test Season",
         "version": 1,
         "canonical": True,
         "summary": "A test season",
@@ -45,16 +48,20 @@ def _make_season_summary(**overrides: Any) -> SeasonSummary:
         "leaderboard_pool": "leaderboard",
         "is_default": True,
         "compat_version": "0.15",
+        "created_at": "2026-01-01T00:00:00Z",
+        "public": True,
+        "tournament_type": "freeplay",
         "pools": [PoolInfo(name="entry", description="Entry pool")],
     }
     defaults.update(overrides)
     return SeasonSummary(**defaults)
 
 
-def _make_season_info(**overrides: Any) -> SeasonInfo:
+def _make_season_info(**overrides: Any) -> SeasonDetail:
     defaults: dict[str, Any] = {
         "id": FAKE_UUID,
         "name": "test-season",
+        "display_name": "Test Season",
         "version": 1,
         "canonical": True,
         "summary": "A test season",
@@ -62,18 +69,19 @@ def _make_season_info(**overrides: Any) -> SeasonInfo:
         "leaderboard_pool": "leaderboard",
         "is_default": True,
         "compat_version": "0.15",
+        "created_at": "2026-01-01T00:00:00Z",
+        "public": True,
+        "tournament_type": "freeplay",
         "pools": [],
         "status": "in_progress",
-        "display_name": "Test Season",
         "started_at": "2026-01-01T00:00:00Z",
-        "tournament_type": "freeplay",
         "entrant_count": 10,
         "active_entrant_count": 8,
         "match_count": 50,
         "stage_count": 3,
     }
     defaults.update(overrides)
-    return SeasonInfo(**defaults)
+    return SeasonDetail(**defaults)
 
 
 def _policy_summary(name: str = "policy-a", version: int = 1) -> PolicyVersionSummary:
@@ -91,7 +99,7 @@ def _render(*objects: Any) -> str:
 class _FakeClient:
     def __init__(self) -> None:
         self.seasons: list[SeasonSummary] = [_make_season_summary()]
-        self.season_info: SeasonInfo = _make_season_info()
+        self.season_info: SeasonDetail = _make_season_info()
         self.versions: list[SeasonVersionInfo] = [
             SeasonVersionInfo(
                 version=1,
@@ -127,26 +135,26 @@ class _FakeClient:
                 ProgressStage(
                     index=1,
                     name="Play-ins: one-player",
-                    kind="policy_eval",
+                    kind=Kind.policy_eval,
                     description="Stage one",
                     input_pool="stage-1",
                     output_pool="stage-2",
-                    status="complete",
+                    status=Status.complete,
                 ),
                 ProgressStage(
                     index=2,
                     name="Play-ins: two-player",
-                    kind="policy_eval",
+                    kind=Kind.policy_eval,
                     description="Stage two",
                     input_pool="stage-2",
                     output_pool="stage-3",
-                    status="active",
+                    status=Status.active,
                 ),
             ],
             started=True,
         )
-        self.teams: list[TeamSummary] = [
-            TeamSummary(
+        self.teams: list[TeamSummaryOutput] = [
+            TeamSummaryOutput(
                 id=FAKE_UUID_2,
                 pool_name="pool-a",
                 eliminated=False,
@@ -193,7 +201,7 @@ class _FakeClient:
     def get_seasons(self) -> list[SeasonSummary]:
         return self.seasons
 
-    def get_season(self, season_name: str) -> SeasonInfo:
+    def get_season(self, season_name: str) -> SeasonDetail:
         return self.season_info
 
     def get_season_versions(self, season_name: str) -> list[SeasonVersionInfo]:
@@ -208,7 +216,7 @@ class _FakeClient:
     def get_progress(self, season_name: str) -> TeamTournamentProgress:
         return self.progress
 
-    def get_teams(self, season_name: str, **kwargs: Any) -> list[TeamSummary]:
+    def get_teams(self, season_name: str, **kwargs: Any) -> list[TeamSummaryOutput]:
         _ = kwargs
         return self.teams
 
@@ -221,7 +229,7 @@ class _FakeClient:
         season_name: str,
         leaderboard_type: str,
         pool_name: str,
-    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]:
+    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummaryOutput]:
         self.last_leaderboard_season = season_name
         if leaderboard_type == "team":
             return self.teams
@@ -398,24 +406,6 @@ def test_season_leaderboard_team_table(fake_client: _FakeClient, monkeypatch: py
     assert "policy-a" in rendered
 
 
-def test_season_leaderboard_team_table_legacy_shape(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    fake_client.teams = [
-        TeamSummary(name="team-alpha", pool_name="pool-a", score=100.0, rank=1, members=[_policy_summary()])
-    ]
-    printed = _capture(monkeypatch)
-    season.season_leaderboard(
-        season_name="test-season",
-        pool="pool-a",
-        leaderboard_type="team",
-        json_output=False,
-        login_server="x",
-        server="y",
-    )
-    rendered = _render(*printed)
-    assert "team-alpha" in rendered
-    assert "policy-a" in rendered
-
-
 def test_season_leaderboard_400_shows_detail(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = _capture(monkeypatch)
 
@@ -511,17 +501,6 @@ def test_season_teams_table(fake_client: _FakeClient, monkeypatch: pytest.Monkey
     season.season_teams(season_name="test-season", json_output=False, login_server="x", server="y")
     rendered = _render(*printed)
     assert "pool-a" in rendered
-    assert "policy-a" in rendered
-
-
-def test_season_teams_table_legacy_shape(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    fake_client.teams = [
-        TeamSummary(name="team-alpha", pool_name="pool-a", score=100.0, rank=1, members=[_policy_summary()])
-    ]
-    printed = _capture(monkeypatch)
-    season.season_teams(season_name="test-season", json_output=False, login_server="x", server="y")
-    rendered = _render(*printed)
-    assert "team-alpha" in rendered
     assert "policy-a" in rendered
 
 

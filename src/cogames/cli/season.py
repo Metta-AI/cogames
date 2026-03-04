@@ -9,12 +9,18 @@ from rich import box
 from rich.table import Table
 
 from cogames.cli.base import console, emit_json
-from cogames.cli.client import LeaderboardEntry, ScorePoliciesLeaderboardEntry, TeamSummary, TournamentServerClient
+from cogames.cli.client import (
+    LeaderboardEntry,
+    ScorePoliciesLeaderboardEntry,
+    TeamSummaryOutput,
+    TournamentServerClient,
+)
+from cogames.cli.generated_models import Phase
 from cogames.cli.leaderboard import _format_score, _format_timestamp
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 
-LeaderboardEntries = list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]
+LeaderboardEntries = list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummaryOutput]
 LeaderboardType = Literal["policy", "team", "score-policies"]
 LEADERBOARD_TYPE_OPTION = typer.Option(
     "policy",
@@ -41,22 +47,16 @@ def _http_error_detail(exc: httpx.HTTPStatusError) -> str | None:
     return None
 
 
-def _team_label(team: TeamSummary, fallback: str) -> str:
-    if team.id is not None:
-        return str(team.id)
-    if team.name:
-        return team.name
-    return fallback
+def _team_label(team: TeamSummaryOutput) -> str:
+    return str(team.id)
 
 
-def _team_members(team: TeamSummary) -> str:
-    if team.cogs:
-        return ", ".join(f"{cog.position}:{cog.policy.name or '?'}:v{cog.policy.version or '?'}" for cog in team.cogs)
-    return ", ".join(f"{idx}:{member.name or '?'}:v{member.version or '?'}" for idx, member in enumerate(team.members))
+def _team_members(team: TeamSummaryOutput) -> str:
+    return ", ".join(f"{cog.position}:{cog.policy.name or '?'}:v{cog.policy.version or '?'}" for cog in team.cogs)
 
 
-def _is_team_entries(entries: LeaderboardEntries) -> TypeGuard[list[TeamSummary]]:
-    return bool(entries) and isinstance(entries[0], TeamSummary)
+def _is_team_entries(entries: LeaderboardEntries) -> TypeGuard[list[TeamSummaryOutput]]:
+    return bool(entries) and isinstance(entries[0], TeamSummaryOutput)
 
 
 def _format_optional_int(value: int | None) -> str:
@@ -156,8 +156,8 @@ def season_show(
 
     console.print(f"\n[bold]{info.display_name}[/bold]")
     console.print(f"Name: {info.name}")
-    console.print(f"Status: {info.status}")
-    console.print(f"Type: {info.tournament_type}")
+    console.print(f"Status: {info.status.value}")
+    console.print(f"Type: {info.tournament_type.value}")
     console.print(f"Version: v{info.version}")
     if info.compat_version:
         console.print(f"Compat: {info.compat_version}")
@@ -319,14 +319,16 @@ def season_progress(
 
     console.print(f"\n[bold]Progress: {season_name}[/bold]")
     console.print(f"Started: {'yes' if progress.started else 'no'}")
-    console.print(f"Phase: {progress.phase}")
+    phase_str = progress.phase.value if isinstance(progress.phase, Phase) else progress.phase
+    console.print(f"Phase: {phase_str}")
     if progress.phase_detail:
         detail = ", ".join(f"{key}={value}" for key, value in progress.phase_detail.items())
         console.print(f"Phase detail: {detail}")
 
-    completed_stages = sum(1 for stage in progress.stage_flow if stage.status == "complete")
-    console.print(f"Stages: {completed_stages}/{len(progress.stage_flow)}")
-    active_stage = next((stage.name for stage in progress.stage_flow if stage.status == "active"), None)
+    stage_flow = progress.stage_flow or []
+    completed_stages = sum(1 for stage in stage_flow if stage.status.value == "complete")
+    console.print(f"Stages: {completed_stages}/{len(stage_flow)}")
+    active_stage = next((stage.name for stage in stage_flow if stage.status.value == "active"), None)
     if active_stage:
         console.print(f"Current stage: {active_stage}")
 
@@ -403,7 +405,7 @@ def season_leaderboard(
         for idx, team in enumerate(entries, start=1):
             table.add_row(
                 str(idx),
-                _team_label(team, str(idx)),
+                _team_label(team),
                 team.pool_name,
                 _format_score(team.score),
                 _format_optional_int(team.matches),
@@ -484,9 +486,9 @@ def season_teams(
     table.add_column("Eliminated", justify="center")
     table.add_column("Members", style="dim")
 
-    for idx, team in enumerate(teams, start=1):
+    for team in teams:
         table.add_row(
-            _team_label(team, str(idx)),
+            _team_label(team),
             team.pool_name,
             _format_score(team.score),
             _format_optional_int(team.matches),

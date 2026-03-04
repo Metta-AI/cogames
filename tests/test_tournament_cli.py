@@ -38,9 +38,13 @@ def _season_summary(
     return {
         "id": _SEASON_ID,
         "name": name,
+        "display_name": name,
         "version": 1,
         "canonical": True,
         "is_default": is_default,
+        "created_at": "2026-02-25T12:00:00Z",
+        "public": True,
+        "tournament_type": "freeplay",
         "entry_pool": None,
         "leaderboard_pool": "ranked",
         "summary": "A test season",
@@ -473,7 +477,7 @@ class TestJsonOutputStability:
         httpserver.expect_request(
             "/stats/policy-versions",
             method="GET",
-        ).respond_with_json({"entries": [_policy_version_info()]})
+        ).respond_with_json({"entries": [_policy_version_info()], "total_count": 1})
         httpserver.expect_request(
             "/tournament/seasons/test-season/matches",
             method="GET",
@@ -508,7 +512,7 @@ class TestJsonOutputStability:
         httpserver.expect_request(
             "/stats/policy-versions",
             method="GET",
-        ).respond_with_json({"entries": [_policy_version_info()]})
+        ).respond_with_json({"entries": [_policy_version_info()], "total_count": 1})
         httpserver.expect_request(
             "/tournament/seasons/test-season/matches",
             method="GET",
@@ -537,7 +541,7 @@ class TestJsonOutputStability:
         httpserver.expect_request(
             "/stats/policy-versions",
             method="GET",
-        ).respond_with_json({"entries": [_policy_version_info()]})
+        ).respond_with_json({"entries": [_policy_version_info()], "total_count": 1})
         httpserver.expect_request(
             "/tournament/seasons/test-season/matches",
             method="GET",
@@ -589,7 +593,7 @@ class TestJsonOutputStability:
         httpserver.expect_request(
             "/stats/policy-versions",
             method="GET",
-        ).respond_with_json({"entries": [_policy_version_info()]})
+        ).respond_with_json({"entries": [_policy_version_info()], "total_count": 1})
         httpserver.expect_request(
             "/tournament/my-memberships",
             method="GET",
@@ -880,7 +884,7 @@ class TestAuthBehavior:
         httpserver.expect_request(
             "/stats/policy-versions",
             method="GET",
-        ).respond_with_json({"entries": [_policy_version_info()]})
+        ).respond_with_json({"entries": [_policy_version_info()], "total_count": 1})
         httpserver.expect_request(
             "/tournament/seasons/test-season/matches",
             method="GET",

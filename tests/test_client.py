@@ -7,21 +7,22 @@ import pytest
 from pytest_httpserver import HTTPServer
 
 from cogames.cli.client import (
-    AgentResult,
     EpisodeQueryResponse,
-    EpisodeQueryResult,
     EpisodeResponse,
     LeaderboardEntry,
     PoliciesResponse,
+    ScorePoliciesLeaderboardEntry,
+    StageStats,
+    TeamTournamentProgress,
+    TournamentServerClient,
+)
+from cogames.cli.generated_models import (
+    AgentResult,
     PolicyResult,
     PolicyRow,
     ProgressStage,
-    ScorePoliciesLeaderboardEntry,
-    StageStats,
     TeamCogSummary,
-    TeamSummary,
-    TeamTournamentProgress,
-    TournamentServerClient,
+    TeamSummaryOutput,
 )
 
 # ---------------------------------------------------------------------------
@@ -49,14 +50,14 @@ def _stage_stats_payload(name: str = "stage-1", policy_count: int = 10) -> dict:
 
 def _progress_payload() -> dict:
     return {
-        "phase": "sample",
+        "phase": "sample_teams",
         "phase_detail": {"pool": "sample-1", "stage_index": 0},
         "stages": [_stage_stats_payload()],
         "stage_flow": [
             {
                 "index": 1,
                 "name": "Sampling",
-                "kind": "sample",
+                "kind": "sample_teams",
                 "description": "Sample teams",
                 "input_pool": "sample-1",
                 "output_pool": "team-round-1",
@@ -79,19 +80,6 @@ def _team_summary_payload() -> dict:
             {"position": 1, "policy": {"id": _PV_ID2, "name": "beta", "version": 1}},
         ],
         "created_at": "2026-02-20T12:00:00Z",
-    }
-
-
-def _legacy_team_summary_payload() -> dict:
-    return {
-        "name": "team-alpha",
-        "pool_name": "stage-1",
-        "score": 1400.0,
-        "rank": 2,
-        "members": [
-            {"id": _PV_ID, "name": "alpha", "version": 3},
-            {"id": _PV_ID2, "name": "beta", "version": 1},
-        ],
     }
 
 
@@ -171,7 +159,7 @@ class TestProgressStageModel:
         data = {
             "index": 1,
             "name": "Sampling",
-            "kind": "sample",
+            "kind": "sample_teams",
             "description": "Sample teams",
             "input_pool": "sample-1",
             "output_pool": "team-round-1",
@@ -180,18 +168,19 @@ class TestProgressStageModel:
         ps = ProgressStage.model_validate(data)
         assert ps.index == 1
         assert ps.name == "Sampling"
-        assert ps.kind == "sample"
-        assert ps.status == "active"
+        assert ps.kind.value == "sample_teams"
+        assert ps.status.value == "active"
 
 
 class TestTeamTournamentProgressModel:
     def test_parse(self) -> None:
         data = _progress_payload()
         progress = TeamTournamentProgress.model_validate(data)
-        assert progress.phase == "sample"
+        assert progress.phase == "sample_teams"
         assert progress.started is True
         assert len(progress.stages) == 1
         assert isinstance(progress.stages[0], StageStats)
+        assert progress.stage_flow is not None
         assert len(progress.stage_flow) == 1
         assert isinstance(progress.stage_flow[0], ProgressStage)
 
@@ -199,7 +188,7 @@ class TestTeamTournamentProgressModel:
 class TestTeamSummaryModel:
     def test_parse(self) -> None:
         data = _team_summary_payload()
-        team = TeamSummary.model_validate(data)
+        team = TeamSummaryOutput.model_validate(data)
         assert team.id == uuid.UUID(_TEAM_ID)
         assert team.pool_name == "stage-1"
         assert team.eliminated is False
@@ -209,18 +198,6 @@ class TestTeamSummaryModel:
         assert isinstance(team.cogs[0], TeamCogSummary)
         assert team.cogs[0].position == 0
         assert team.cogs[0].policy.name == "alpha"
-
-    def test_parse_legacy_payload(self) -> None:
-        data = _legacy_team_summary_payload()
-        team = TeamSummary.model_validate(data)
-        assert team.id is None
-        assert team.name == "team-alpha"
-        assert team.pool_name == "stage-1"
-        assert team.eliminated is None
-        assert team.matches is None
-        assert len(team.cogs) == 2
-        assert team.cogs[1].position == 1
-        assert team.cogs[1].policy.name == "beta"
 
 
 class TestScorePoliciesLeaderboardEntryModel:
@@ -307,7 +284,7 @@ class TestGetProgress:
         )
         progress = client.get_progress("s1")
         assert isinstance(progress, TeamTournamentProgress)
-        assert progress.phase == "sample"
+        assert progress.phase == "sample_teams"
 
 
 class TestGetTeams:
@@ -317,7 +294,7 @@ class TestGetTeams:
         )
         teams = client.get_teams("s1")
         assert len(teams) == 1
-        assert isinstance(teams[0], TeamSummary)
+        assert isinstance(teams[0], TeamSummaryOutput)
         assert teams[0].pool_name == "stage-1"
 
     def test_filters(self, httpserver: HTTPServer, client: TournamentServerClient) -> None:
@@ -373,7 +350,7 @@ class TestGetStageLeaderboard:
         )
         result = client.get_stage_leaderboard("s1", "team", "stage-1")
         assert len(result) == 1
-        assert isinstance(result[0], TeamSummary)
+        assert isinstance(result[0], TeamSummaryOutput)
         assert result[0].pool_name == "stage-1"
 
 
@@ -460,7 +437,7 @@ def _episode_query_result_payload() -> dict:
         "eval_task_id": None,
         "created_at": "2026-02-20T12:00:00Z",
         "tags": {"game": "cogsguard"},
-        "avg_rewards": {_PV_ID: 15.5},
+        "avg_rewards": {_PV_ID: 15.5},  # string UUID keys as returned by the server
         "job_id": None,
     }
 
@@ -481,34 +458,6 @@ class TestGetScorePoliciesLeaderboard:
 # ---------------------------------------------------------------------------
 # query_episodes
 # ---------------------------------------------------------------------------
-
-
-class TestEpisodeQueryResultModel:
-    def test_parse(self) -> None:
-        data = _episode_query_result_payload()
-        result = EpisodeQueryResult.model_validate(data)
-        assert result.id == uuid.UUID(_EPISODE_ID)
-        assert result.replay_url == "https://example.com/replay/1"
-        assert result.tags == {"game": "cogsguard"}
-        assert result.avg_rewards[uuid.UUID(_PV_ID)] == 15.5
-
-    def test_nullable_fields(self) -> None:
-        data = _episode_query_result_payload()
-        data["replay_url"] = None
-        data["thumbnail_url"] = None
-        data["eval_task_id"] = None
-        data["job_id"] = None
-        result = EpisodeQueryResult.model_validate(data)
-        assert result.replay_url is None
-        assert result.eval_task_id is None
-
-
-class TestEpisodeQueryResponseModel:
-    def test_parse(self) -> None:
-        data = {"episodes": [_episode_query_result_payload()]}
-        resp = EpisodeQueryResponse.model_validate(data)
-        assert len(resp.episodes) == 1
-        assert isinstance(resp.episodes[0], EpisodeQueryResult)
 
 
 class TestQueryEpisodes:
