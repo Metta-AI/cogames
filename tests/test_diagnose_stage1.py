@@ -351,6 +351,19 @@ def test_write_replay_bundle_includes_replays_or_writes_readme(tmp_path: Path) -
         assert "replays/episode_0.json.z" in bundle.namelist()
 
 
+def test_write_diagnose_bundle_zip_includes_report_files(tmp_path: Path) -> None:
+    manifest_payload = '{"run_id":"run_001","artifact_files":["diagnose_report.html"]}'
+    (tmp_path / "manifest.json").write_text(manifest_payload, encoding="utf-8")
+    (tmp_path / "doctor_note.json").write_text('{"run_id":"run_001"}', encoding="utf-8")
+    (tmp_path / "diagnose_report.html").write_text("<html>report</html>", encoding="utf-8")
+    (tmp_path / "replay_bundle.zip").write_text("zip-bytes", encoding="utf-8")
+
+    bundle_path = diagnose_module.write_diagnose_bundle_zip(output_dir=tmp_path, bundle_path=tmp_path / "upload.zip")
+    with zipfile.ZipFile(bundle_path, "r") as bundle:
+        names = set(bundle.namelist())
+    assert {"manifest.json", "doctor_note.json", "diagnose_report.html", "replay_bundle.zip"}.issubset(names)
+
+
 def test_diagnose_cli_marks_incomplete_when_gate_fails(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -450,3 +463,25 @@ def test_diagnose_cli_role_specific_pack_completes_stage2_with_replays(
     assert manifest["pack_id"] == diagnose_module.ROLE_SPECIFIC_STAGE1_PACK_V1.pack_id
     assert manifest["stage_status"] == "stage2_completed"
     assert manifest["run_status"] == "complete"
+
+
+def test_diagnose_cli_writes_uploadable_bundle_zip(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output_dir = tmp_path / "run"
+    bundle_path = tmp_path / "diagnose-upload.zip"
+    monkeypatch.setattr(diagnose_module, "_build_diagnose_cases", lambda **_kwargs: _stage1_pack_cases())
+    _patch_diagnose_runtime(monkeypatch, evaluate_fn=_fake_evaluate_with_replays)
+
+    result = _run_diagnose(
+        output_dir=output_dir,
+        mission_set="cogsguard_evals",
+        extra_args=["--bundle-zip", str(bundle_path)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert bundle_path.is_file()
+    with zipfile.ZipFile(bundle_path, "r") as bundle:
+        names = set(bundle.namelist())
+    assert {"manifest.json", "doctor_note.json", "diagnose_report.html", "replay_bundle.zip"}.issubset(names)
