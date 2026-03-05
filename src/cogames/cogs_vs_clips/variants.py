@@ -369,6 +369,53 @@ class BalancedCornersVariant(MachinaArenaVariant):
         node.max_balance_shortcuts = self.max_balance_shortcuts
 
 
+class DenseJunctionsVariant(CoGameMissionVariant):
+    name: str = "dense_junctions"
+    description: str = "Increase junction density significantly and start extractors at 400 resources."
+    junction_coverage_scale: float = 2.0
+    junction_weight_scale: float = 3.0
+    extractor_starting_resources: int = 400
+
+    @override
+    def compat(self, mission: CvCMission) -> bool:
+        env = mission.make_env()
+        return isinstance(env.game.map_builder, MapGen.Config) and isinstance(
+            env.game.map_builder.instance, MachinaArenaConfig
+        )
+
+    @override
+    def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
+        map_builder = env.game.map_builder
+        assert isinstance(map_builder, MapGen.Config)
+        assert isinstance(map_builder.instance, MachinaArenaConfig)
+        arena = map_builder.instance
+
+        arena.building_coverage = min(1.0, arena.building_coverage * self.junction_coverage_scale)
+        default_building_weights = {
+            "junction": 0.7,
+            "germanium_extractor": 0.3,
+            "silicon_extractor": 0.3,
+            "oxygen_extractor": 0.3,
+            "carbon_extractor": 0.3,
+        }
+        building_weights = (
+            dict(arena.building_weights) if arena.building_weights is not None else dict(default_building_weights)
+        )
+        junction_weight = float(building_weights.get("junction", 0.7))
+        building_weights["junction"] = junction_weight * self.junction_weight_scale
+        arena.building_weights = building_weights
+
+        for obj_name, obj_cfg in env.game.objects.items():
+            if not obj_name.endswith("_extractor") or obj_cfg.inventory is None:
+                continue
+            initial = dict(obj_cfg.inventory.initial)
+            if not initial:
+                continue
+            for key in initial:
+                initial[key] = self.extractor_starting_resources
+            obj_cfg.inventory.initial = initial
+
+
 class MultiTeamVariant(CoGameMissionVariant):
     """Split the map into multiple team instances, each with their own hub and resources."""
 
@@ -553,6 +600,7 @@ class TinManTeamVariant(CoGameMissionVariant):
 
 VARIANTS: list[CoGameMissionVariant] = [
     BraveheartVariant(),
+    DenseJunctionsVariant(),
     CavesVariant(),
     CityVariant(),
     DarkSideVariant(),
