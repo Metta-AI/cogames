@@ -8,7 +8,7 @@ specific interaction behaviors.
 from dataclasses import dataclass
 from typing import Any
 
-from cogames.cogs_vs_clips.cog import CogTeam
+from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.hub import CvCHubConfig
 from cogames.cogs_vs_clips.junction import CvCJunctionConfig
@@ -1083,3 +1083,101 @@ class TestJunctionAlignment:
             "J1 should still have team:cogs after J2 alignment (on_tag_remove cascade bug)"
         )
         assert _has_tag_at(sim, "net:cogs", 2, 1, "junction"), "J1 should still have net:cogs after J2 alignment"
+
+
+class TestAlignedJunctionReward:
+    """Test cog agents accumulate correct reward for holding aligned junctions."""
+
+    def test_aligned_junction_reward_accumulates_per_tick(self):
+        """Reward accumulates proportionally to ticks held x junction count.
+
+        Before alignment (hub only has net:cogs, num_tagged=1):
+            reward += 1 * weight per tick
+        After aligning one junction (hub + junction, num_tagged=2):
+            reward += 2 * weight per tick
+
+        Map layout:
+            #  #  #  #
+            #  H  .  #
+            #  @  J  #   J diagonal-adjacent to H
+            #  .  .  #
+            #  #  #  #
+        """
+        cogs = TeamConfig(name="cogs", short_name="c")
+        max_steps = 100
+
+        agent_cfg = CogConfig().agent_config(cogs, max_steps)
+        agent_cfg.inventory = InventoryConfig(
+            initial={"aligner": 1, "heart": 5, "hp": 1000, "energy": 1000, "solar": 1},
+            limits=_resource_limits(),
+        )
+
+        junction = CvCJunctionConfig().station_cfg([cogs])
+
+        cfg = MettaGridConfig(
+            game=GameConfig(
+                num_agents=1,
+                max_steps=max_steps,
+                resource_names=CvCConfig.RESOURCES,
+                territories={"team_territory": TerritoryConfig(tag_prefix="team:")},
+                actions=ActionsConfig(noop=NoopActionConfig(), move=MoveActionConfig()),
+                agent=agent_cfg,
+                objects={
+                    "wall": WallConfig(),
+                    "c:hub": GridObjectConfig(name="hub", map_name="c:hub", tags=[cogs.team_tag()]),
+                    junction.map_name: junction,
+                },
+                tags=cogs.all_tags(),
+                materialize_queries=cogs.materialized_queries(),
+                map_builder=AsciiMapBuilder.Config(
+                    map_data=[
+                        ["#", "#", "#", "#"],
+                        ["#", "H", ".", "#"],
+                        ["#", "@", "J", "#"],
+                        ["#", ".", ".", "#"],
+                        ["#", "#", "#", "#"],
+                    ],
+                    char_to_map_name={
+                        "#": "wall",
+                        "@": "agent.agent",
+                        ".": "empty",
+                        "H": "c:hub",
+                        "J": "junction",
+                    },
+                ),
+            )
+        )
+
+        sim = Simulation(cfg, seed=42)
+        agent = sim.agent(0)
+        agent.set_inventory({"aligner": 1, "heart": 5, "hp": 1000, "energy": 1000, "solar": 1})
+
+        weight = 1.0 / max_steps
+
+        # Pre-alignment: only hub has net:cogs (num_tagged = 1)
+        for _ in range(5):
+            agent.set_action("noop")
+            sim.step()
+
+        expected_pre = 5 * 1 * weight
+        assert abs(agent.episode_reward - expected_pre) < 0.01, (
+            f"Pre-alignment reward: expected ~{expected_pre}, got {agent.episode_reward}"
+        )
+
+        # Align junction by moving east onto it
+        agent.set_action("move_east")
+        sim.step()
+
+        assert _has_tag_at(sim, "net:cogs", 2, 2, "junction"), "Junction should have net:cogs after alignment"
+        reward_after_align = agent.episode_reward
+
+        # Post-alignment: hub + junction have net:cogs (num_tagged = 2)
+        for _ in range(5):
+            agent.set_action("noop")
+            sim.step()
+
+        holding_reward = agent.episode_reward - reward_after_align
+        expected_holding = 5 * 2 * weight
+        assert abs(holding_reward - expected_holding) < 0.01, (
+            f"Holding 2 net objects for 5 ticks: expected ~{expected_holding}, got {holding_reward}"
+        )
