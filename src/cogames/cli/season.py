@@ -12,7 +12,7 @@ from cogames.cli.base import console, emit_json
 from cogames.cli.client import (
     LeaderboardEntry,
     ScorePoliciesLeaderboardEntry,
-    TeamSummaryOutput,
+    TeamSummary,
     TournamentServerClient,
 )
 from cogames.cli.generated_models import Phase
@@ -20,7 +20,7 @@ from cogames.cli.leaderboard import _format_score, _format_timestamp
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 
-LeaderboardEntries = list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummaryOutput]
+LeaderboardEntries = list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]
 LeaderboardType = Literal["policy", "team", "score-policies"]
 LEADERBOARD_TYPE_OPTION = typer.Option(
     "policy",
@@ -47,16 +47,16 @@ def _http_error_detail(exc: httpx.HTTPStatusError) -> str | None:
     return None
 
 
-def _team_label(team: TeamSummaryOutput) -> str:
+def _team_label(team: TeamSummary) -> str:
     return str(team.id)
 
 
-def _team_members(team: TeamSummaryOutput) -> str:
+def _team_members(team: TeamSummary) -> str:
     return ", ".join(f"{cog.position}:{cog.policy.name or '?'}:v{cog.policy.version or '?'}" for cog in team.cogs)
 
 
-def _is_team_entries(entries: LeaderboardEntries) -> TypeGuard[list[TeamSummaryOutput]]:
-    return bool(entries) and isinstance(entries[0], TeamSummaryOutput)
+def _is_team_entries(entries: LeaderboardEntries) -> TypeGuard[list[TeamSummary]]:
+    return bool(entries) and isinstance(entries[0], TeamSummary)
 
 
 def _format_optional_int(value: int | None) -> str:

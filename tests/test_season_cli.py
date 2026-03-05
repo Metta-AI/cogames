@@ -28,7 +28,7 @@ from cogames.cli.generated_models import (
     StageStats,
     Status,
     TeamCogSummary,
-    TeamSummaryOutput,
+    TeamSummary,
     TeamTournamentProgress,
 )
 
@@ -153,8 +153,8 @@ class _FakeClient:
             ],
             started=True,
         )
-        self.teams: list[TeamSummaryOutput] = [
-            TeamSummaryOutput(
+        self.teams: list[TeamSummary] = [
+            TeamSummary(
                 id=FAKE_UUID_2,
                 pool_name="pool-a",
                 eliminated=False,
@@ -216,7 +216,7 @@ class _FakeClient:
     def get_progress(self, season_name: str) -> TeamTournamentProgress:
         return self.progress
 
-    def get_teams(self, season_name: str, **kwargs: Any) -> list[TeamSummaryOutput]:
+    def get_teams(self, season_name: str, **kwargs: Any) -> list[TeamSummary]:
         _ = kwargs
         return self.teams
 
@@ -229,7 +229,7 @@ class _FakeClient:
         season_name: str,
         leaderboard_type: str,
         pool_name: str,
-    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummaryOutput]:
+    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]:
         self.last_leaderboard_season = season_name
         if leaderboard_type == "team":
             return self.teams

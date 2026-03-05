@@ -26,7 +26,7 @@ from cogames.cli.generated_models import (
     SeasonVersionInfo,
     StageStats,
     SubmitResponse,
-    TeamSummaryOutput,
+    TeamSummary,
     TeamTournamentProgress,
 )
 from cogames.cli.login import CoGamesAuthenticator
@@ -281,7 +281,7 @@ class TournamentServerClient:
         pool_name: str | None = None,
         eliminated: bool | None = None,
         policy_version_id: uuid.UUID | None = None,
-    ) -> list[TeamSummaryOutput]:
+    ) -> list[TeamSummary]:
         params: dict[str, str] = {}
         if limit is not None:
             params["limit"] = str(limit)
@@ -295,7 +295,7 @@ class TournamentServerClient:
             params["policy_version_id"] = str(policy_version_id)
         return self._get(
             f"/tournament/seasons/{season_name}/teams",
-            list[TeamSummaryOutput],
+            list[TeamSummary],
             params=params if params else None,
         )
 
@@ -319,20 +319,20 @@ class TournamentServerClient:
         season_name: str,
         leaderboard_type: Literal["team"],
         pool_name: str,
-    ) -> list[TeamSummaryOutput]: ...
+    ) -> list[TeamSummary]: ...
     @overload
     def get_stage_leaderboard(
         self,
         season_name: str,
         leaderboard_type: str,
         pool_name: str,
-    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummaryOutput]: ...
+    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]: ...
     def get_stage_leaderboard(
         self,
         season_name: str,
         leaderboard_type: str,
         pool_name: str,
-    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummaryOutput]:
+    ) -> list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]:
         if leaderboard_type == "score-policies":
             return self._get(
                 f"/tournament/seasons/{season_name}/leaderboard/{leaderboard_type}/{pool_name}",
@@ -341,7 +341,7 @@ class TournamentServerClient:
         if leaderboard_type == "team":
             return self._get(
                 f"/tournament/seasons/{season_name}/leaderboard/{leaderboard_type}/{pool_name}",
-                list[TeamSummaryOutput],
+                list[TeamSummary],
             )
         return self._get(
             f"/tournament/seasons/{season_name}/leaderboard/{leaderboard_type}/{pool_name}",
