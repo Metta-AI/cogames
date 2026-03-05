@@ -662,6 +662,29 @@ def write_replay_bundle(output_dir: Path) -> Path:
     return bundle_path
 
 
+def write_diagnose_bundle_zip(*, output_dir: Path, bundle_path: Path) -> Path:
+    bundle_path.parent.mkdir(parents=True, exist_ok=True)
+    output_dir_resolved = output_dir.resolve()
+    bundle_path_resolved = bundle_path.resolve()
+    artifact_paths = sorted(
+        (path for path in output_dir.rglob("*") if path.is_file()),
+        key=lambda path: path.relative_to(output_dir).as_posix(),
+    )
+
+    with zipfile.ZipFile(bundle_path, "w", zipfile.ZIP_DEFLATED) as bundle:
+        files_written = 0
+        for artifact_path in artifact_paths:
+            if artifact_path.resolve() == bundle_path_resolved:
+                continue
+            if not artifact_path.resolve().is_relative_to(output_dir_resolved):
+                continue
+            bundle.write(artifact_path, arcname=artifact_path.relative_to(output_dir).as_posix())
+            files_written += 1
+        if files_written == 0:
+            bundle.writestr("README.txt", "No artifacts were captured for this diagnose run.\n")
+    return bundle_path
+
+
 def write_bundle_guide(
     *,
     output_dir: Path,
@@ -2849,6 +2872,13 @@ def diagnose_cmd(
         help="Previous diagnose run directory containing doctor_note.json for interpretation stability comparison.",
         rich_help_panel="Output",
     ),
+    bundle_zip: Optional[Path] = typer.Option(  # noqa: B008
+        None,
+        "--bundle-zip",
+        metavar="FILE",
+        help="Write a portable diagnose artifact zip suitable for upload/import in dashboard tools.",
+        rich_help_panel="Output",
+    ),
     stability_reruns: int = typer.Option(
         0,
         "--stability-reruns",
@@ -3050,6 +3080,8 @@ def diagnose_cmd(
             diagnose_validity=validity,
         )
         write_json(config.output_dir / "manifest.json", manifest)
+        if bundle_zip is not None:
+            write_diagnose_bundle_zip(output_dir=config.output_dir, bundle_path=bundle_zip)
         return stability
 
     def _persist_incomplete_state(
