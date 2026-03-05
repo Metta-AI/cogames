@@ -22,7 +22,7 @@ from cogames.cli.generated_models import (
     PolicyRow,
     ProgressStage,
     TeamCogSummary,
-    TeamSummaryOutput,
+    TeamSummary,
 )
 
 # ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ class TestTeamTournamentProgressModel:
 class TestTeamSummaryModel:
     def test_parse(self) -> None:
         data = _team_summary_payload()
-        team = TeamSummaryOutput.model_validate(data)
+        team = TeamSummary.model_validate(data)
         assert team.id == uuid.UUID(_TEAM_ID)
         assert team.pool_name == "stage-1"
         assert team.eliminated is False
@@ -294,7 +294,7 @@ class TestGetTeams:
         )
         teams = client.get_teams("s1")
         assert len(teams) == 1
-        assert isinstance(teams[0], TeamSummaryOutput)
+        assert isinstance(teams[0], TeamSummary)
         assert teams[0].pool_name == "stage-1"
 
     def test_filters(self, httpserver: HTTPServer, client: TournamentServerClient) -> None:
@@ -350,7 +350,7 @@ class TestGetStageLeaderboard:
         )
         result = client.get_stage_leaderboard("s1", "team", "stage-1")
         assert len(result) == 1
-        assert isinstance(result[0], TeamSummaryOutput)
+        assert isinstance(result[0], TeamSummary)
         assert result[0].pool_name == "stage-1"
 
 
