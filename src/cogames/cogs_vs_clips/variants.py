@@ -164,6 +164,17 @@ class ClipsWaveOnlyVariant(CoGameMissionVariant):
         )
 
 
+class GreedyClipsVariant(CoGameMissionVariant):
+    name: str = "greedy_clips"
+    description: str = "Clips spread from each ship by always selecting the nearest valid junction to that ship center."
+    max_search_radius: int = 120
+
+    @override
+    def modify_mission(self, mission: CvCMission) -> None:
+        mission.clips.greedy_expand_from_ships = True
+        mission.clips.greedy_max_search_radius = self.max_search_radius
+
+
 class DarkSideVariant(CoGameMissionVariant):
     name: str = "dark_side"
     description: str = "You're on the dark side of the asteroid. You recharge slower."
@@ -621,6 +632,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     ForcedRoleVibesVariant(),
     TinManVariant(),
     TinManTeamVariant(),
+    GreedyClipsVariant(),
     *DIFFICULTY_VARIANTS,
 ]
 
