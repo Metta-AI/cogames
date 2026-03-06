@@ -51,6 +51,8 @@ class ClipsConfig(TeamConfig):
     presence_end: Optional[int] = Field(default=None)
     align_all_neutral: bool = Field(default=False)
     align_unlimited_targets: bool = Field(default=False)
+    greedy_expand_from_ships: bool = Field(default=False)
+    greedy_max_search_radius: int = Field(default=120, ge=1)
 
     def _ship_map_names(self) -> list[str]:
         return [f"{self.short_name}:ship", *[f"{self.short_name}:ship:{idx}" for idx in range(4)]]
@@ -104,6 +106,30 @@ class ClipsConfig(TeamConfig):
 
         if not self.align_all_neutral and not self.align_unlimited_targets:
             events: dict[str, EventConfig] = {}
+            max_search_radius = max(1, self.greedy_max_search_radius)
+
+            def add_greedy_event_chain(
+                *,
+                base_name: str,
+                timesteps: list[int],
+                target_filters: list[AnyFilter],
+                ship_query: Query,
+                mutations: list,
+            ) -> None:
+                next_event_name: str | None = None
+                for radius in range(max_search_radius, 0, -1):
+                    radius_name = base_name if radius == 1 else f"{base_name}_r{radius}"
+                    filters = [*target_filters, isNear(ship_query, radius=radius)]
+                    events[radius_name] = EventConfig(
+                        name=radius_name,
+                        target_query=query(typeTag("junction"), filters=filters),
+                        timesteps=timesteps if radius == 1 else [],
+                        mutations=mutations,
+                        max_targets=1,
+                        fallback=next_event_name,
+                    )
+                    next_event_name = radius_name
+
             for lane_idx, ship_map_name in enumerate(ship_map_names):
                 suffix = "" if lane_idx == 0 else f"_s{lane_idx}"
                 align_key = f"neutral_to_clips{suffix}"
@@ -117,42 +143,63 @@ class ClipsConfig(TeamConfig):
                     candidates=query(typeTag("junction"), hasTag(ship_map_name)),
                     edge_filters=[maxDistance(CvCConfig.JUNCTION_ALIGN_DISTANCE)],
                 )
+                align_filters = [
+                    isNot(hasTagPrefix("team:")),
+                    isNear(ship_frontier, radius=CvCConfig.JUNCTION_ALIGN_DISTANCE),
+                ]
+                scramble_filters = [
+                    hasTagPrefix("team:"),
+                    isNot(hasTag(self.team_tag())),
+                    isNear(ship_frontier, radius=self.scramble_radius),
+                ]
+                align_timesteps = periodic(start=self.align_start, period=self.align_interval, end=align_end)
+                scramble_timesteps = periodic(
+                    start=self.scramble_start,
+                    period=self.scramble_interval,
+                    end=scramble_end,
+                )
+                align_mutations = [
+                    addTag(self.team_tag()),
+                    addTag(self.net_tag()),
+                    addTag(ship_map_name),
+                    recomputeMaterializedQuery("net:"),
+                ]
+                scramble_mutations = [
+                    removeTagPrefix("net:"),
+                    removeTag(ship_map_name),
+                    logActorAgentStat("junction.scrambled_by_clips"),
+                    recomputeMaterializedQuery("net:"),
+                ]
+
+                if self.greedy_expand_from_ships:
+                    add_greedy_event_chain(
+                        base_name=align_key,
+                        timesteps=align_timesteps,
+                        target_filters=align_filters,
+                        ship_query=ship_query,
+                        mutations=align_mutations,
+                    )
+                    add_greedy_event_chain(
+                        base_name=scramble_key,
+                        timesteps=scramble_timesteps,
+                        target_filters=scramble_filters,
+                        ship_query=ship_query,
+                        mutations=scramble_mutations,
+                    )
+                    continue
 
                 events[align_key] = EventConfig(
                     name=align_key,
-                    target_query=query(
-                        typeTag("junction"),
-                        filters=[
-                            isNot(hasTagPrefix("team:")),
-                            isNear(ship_frontier, radius=CvCConfig.JUNCTION_ALIGN_DISTANCE),
-                        ],
-                    ),
-                    timesteps=periodic(start=self.align_start, period=self.align_interval, end=align_end),
-                    mutations=[
-                        addTag(self.team_tag()),
-                        addTag(self.net_tag()),
-                        addTag(ship_map_name),
-                        recomputeMaterializedQuery("net:"),
-                    ],
+                    target_query=query(typeTag("junction"), filters=align_filters),
+                    timesteps=align_timesteps,
+                    mutations=align_mutations,
                     max_targets=1,
                 )
                 events[scramble_key] = EventConfig(
                     name=scramble_key,
-                    target_query=query(
-                        typeTag("junction"),
-                        filters=[
-                            hasTagPrefix("team:"),
-                            isNot(hasTag(self.team_tag())),
-                            isNear(ship_frontier, radius=self.scramble_radius),
-                        ],
-                    ),
-                    timesteps=periodic(start=self.scramble_start, period=self.scramble_interval, end=scramble_end),
-                    mutations=[
-                        removeTagPrefix("net:"),
-                        removeTag(ship_map_name),
-                        logActorAgentStat("junction.scrambled_by_clips"),
-                        recomputeMaterializedQuery("net:"),
-                    ],
+                    target_query=query(typeTag("junction"), filters=scramble_filters),
+                    timesteps=scramble_timesteps,
+                    mutations=scramble_mutations,
                     max_targets=1,
                 )
             return events
