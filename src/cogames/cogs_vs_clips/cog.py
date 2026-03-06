@@ -42,7 +42,7 @@ class CogConfig(Config):
     cargo_modifiers: dict[str, int] = Field(default_factory=lambda: {"miner": 40})
 
     initial_energy: int = Field(default=100)
-    initial_hp: int = Field(default=50)
+    initial_hp: int = Field(default_factory=lambda data: data["hp_limit"])
     initial_solar: int = Field(default=1)
 
     hp_regen: int = Field(default=-1)
