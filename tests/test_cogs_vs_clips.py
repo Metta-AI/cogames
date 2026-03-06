@@ -1,7 +1,7 @@
 import pytest
 
 from cogames.cogs_vs_clips.clips import ClipsConfig
-from cogames.cogs_vs_clips.cog import CogTeam
+from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.missions import (
@@ -81,6 +81,12 @@ def test_team_net_tag_uses_type_hub_source():
     assert mq.tag == "net:cogs"
     assert isinstance(mq.query, ClosureQuery)
     assert "type:hub" in str(mq.query.source), "Source query should include type:hub"
+
+
+def test_cog_default_initial_hp_matches_hp_limit() -> None:
+    cog = CogConfig(hp_limit=123)
+    agent = cog.agent_config(team=CogTeam(), max_steps=100)
+    assert agent.inventory.initial["hp"] == 123
 
 
 def test_hub_global_obs_shows_own_team_only():
