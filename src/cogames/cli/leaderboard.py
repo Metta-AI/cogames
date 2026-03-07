@@ -253,12 +253,32 @@ def _show_season_submissions(
 
 
 def leaderboard_cmd(
+    season_arg: Optional[str] = typer.Argument(
+        None,
+        metavar="SEASON",
+        help="Tournament season name (positional shorthand for --season).",
+    ),
     season: Optional[str] = typer.Option(
         None,
         "--season",
         metavar="SEASON",
         help="Tournament season name (default: server default).",
         rich_help_panel="Tournament",
+    ),
+    policy_filter: Optional[str] = typer.Option(
+        None,
+        "--policy",
+        "-P",
+        metavar="POLICY",
+        help="Filter by policy name (e.g., 'slanky' or 'slanky:v88').",
+        rich_help_panel="Filter",
+    ),
+    mine: bool = typer.Option(
+        False,
+        "--mine",
+        "-M",
+        help="Show only your own policies (requires auth).",
+        rich_help_panel="Filter",
     ),
     login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
@@ -291,10 +311,16 @@ def leaderboard_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    resolved_season = season or "<default>"
+    # Resolve season from positional arg or --season option
+    if season_arg and season:
+        console.print("[red]Error: Cannot pass season as both positional arg and --season[/red]")
+        raise typer.Exit(1)
+    effective_season = season_arg or season
+
+    resolved_season = effective_season or "<default>"
     try:
         with TournamentServerClient(server_url=server) as client:
-            resolved_season = season or client.get_default_season().name
+            resolved_season = effective_season or client.get_default_season().name
             entries = client.get_leaderboard(resolved_season)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
@@ -306,6 +332,24 @@ def leaderboard_cmd(
     except httpx.HTTPError as exc:
         console.print(f"[red]Failed to reach server:[/red] {exc}")
         raise typer.Exit(1) from exc
+
+    # Apply --mine filter: keep only entries matching the user's own policy IDs
+    if mine:
+        auth_client = _get_authenticated_client(login_server, server)
+        if not auth_client:
+            return
+        with auth_client:
+            my_versions = auth_client.get_my_policy_versions()
+            my_ids = {str(v.id) for v in my_versions}
+        entries = [e for e in entries if str(e.policy.id) in my_ids]
+
+    # Apply --policy filter: match by name, optionally by version
+    if policy_filter:
+        name, version = parse_policy_identifier(policy_filter)
+        if version is not None:
+            entries = [e for e in entries if e.policy.name == name and e.policy.version == version]
+        else:
+            entries = [e for e in entries if e.policy.name == name]
 
     if json_output:
         emit_json([e.model_dump(mode="json") for e in entries])

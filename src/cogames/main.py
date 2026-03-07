@@ -1693,7 +1693,13 @@ app.command(
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames leaderboard --season beta-cogsguard[/cyan]           View rankings""",
+[cyan]cogames leaderboard beta-cvc[/cyan]                          View rankings (positional season)
+
+[cyan]cogames leaderboard --season beta-cvc[/cyan]                 View rankings (option)
+
+[cyan]cogames leaderboard beta-cvc --policy slanky[/cyan]          Filter by policy name
+
+[cyan]cogames leaderboard beta-cvc --mine[/cyan]                   Show only your policies""",
     add_help_option=False,
 )(leaderboard_cmd)
 
