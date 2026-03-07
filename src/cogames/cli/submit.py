@@ -453,9 +453,15 @@ def upload_policy(
                 cmd.extend(["--season", season])
             if image != DEFAULT_EPISODE_RUNNER_IMAGE:
                 cmd.extend(["--image", image])
-            result = subprocess.run(cmd, text=True, timeout=300)
+            try:
+                result = subprocess.run(cmd, text=True, timeout=300)
+            except subprocess.TimeoutExpired:
+                console.print("[red]Validation timed out after 5 minutes[/red]")
+                console.print("[dim]Hint: Use --skip-validation to bypass Docker validation[/dim]")
+                raise typer.Exit(1) from None
             if result.returncode != 0:
                 console.print("[red]Validation failed[/red]")
+                console.print("[dim]Hint: Use --skip-validation to bypass, or --dry-run to debug[/dim]")
                 raise typer.Exit(1)
             console.print("[green]Validation passed[/green]")
         else:

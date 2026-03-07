@@ -66,6 +66,12 @@ def _translate_error(e: Exception) -> str:
     translated = msg.replace("Invalid symbol name", "Could not find policy class")
     if isinstance(e, ModuleNotFoundError):
         translated += ". Please make sure to specify your policy class."
+        translated += (
+            "\n\n[dim]Hint: If uploading a custom policy, make sure to include its source "
+            "with --include-files / -f, e.g.:\n"
+            "  cogames upload -p class=my_pkg.MyPolicy -n my-policy "
+            "-f src/my_pkg[/dim]"
+        )
     # Hint at ':' vs '.' confusion in class paths
     if ":" in msg and ("No module named" in msg or "Could not find" in translated):
         translated += " Note: use '.' as the module separator (not ':')."
