@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import sys
 import uuid
 from datetime import datetime
 from typing import Any
@@ -263,6 +264,18 @@ def fake_client(monkeypatch: pytest.MonkeyPatch) -> _FakeClient:
 def _capture(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
     printed: list[Any] = []
     monkeypatch.setattr(season.console, "print", lambda value, *args, **kwargs: printed.append(value))
+    buf: list[str] = []
+
+    def _stdout_write(s: str) -> int:
+        buf.append(s)
+        if "\n" in s:
+            text = "".join(buf).rstrip("\n")
+            buf.clear()
+            if text:
+                printed.append(text)
+        return len(s)
+
+    monkeypatch.setattr(sys.stdout, "write", _stdout_write)
     return printed
 
 
