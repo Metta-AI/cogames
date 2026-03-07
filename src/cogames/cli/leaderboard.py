@@ -338,10 +338,14 @@ def leaderboard_cmd(
         auth_client = _get_authenticated_client(login_server, server)
         if not auth_client:
             return
-        with auth_client:
-            my_versions = auth_client.get_my_policy_versions()
-            my_ids = {str(v.id) for v in my_versions}
-        entries = [e for e in entries if str(e.policy.id) in my_ids]
+        try:
+            with auth_client:
+                my_entries = auth_client.get_season_policies(resolved_season, mine=True)
+                my_ids = {entry.policy.id for entry in my_entries}
+        except httpx.HTTPError as exc:
+            console.print(f"[red]Failed to reach server:[/red] {exc}")
+            raise typer.Exit(1) from exc
+        entries = [e for e in entries if e.policy.id in my_ids]
 
     # Apply --policy filter: match by name, optionally by version
     if policy_filter:
