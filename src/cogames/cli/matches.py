@@ -123,29 +123,22 @@ def _list_matches(
 ) -> None:
     """List recent matches for the user's policies."""
     try:
-        # Get user's policy versions
-        my_policies = client.get_my_policy_versions()
+        filter_name: str | None = None
+        filter_version: int | None = None
+        if policy_filter:
+            filter_name, filter_version = parse_policy_identifier(policy_filter)
+        my_policies = client.get_my_policy_versions(name=filter_name, version=filter_version)
+
         if not my_policies:
             if json_output:
                 emit_json([])
                 return
-            console.print("[yellow]No uploaded policies found.[/yellow]")
-            console.print("Upload a policy with: [cyan]cogames upload[/cyan]")
-            return
-
-        # Apply --policy filter to narrow which policy versions to query
-        if policy_filter:
-            filter_name, filter_version = parse_policy_identifier(policy_filter)
-            if filter_version is not None:
-                my_policies = [p for p in my_policies if p.name == filter_name and p.version == filter_version]
-            else:
-                my_policies = [p for p in my_policies if p.name == filter_name]
-            if not my_policies:
-                if json_output:
-                    emit_json([])
-                    return
+            if policy_filter:
                 console.print(f"[yellow]No uploaded policies matching '{policy_filter}'.[/yellow]")
-                return
+            else:
+                console.print("[yellow]No uploaded policies found.[/yellow]")
+                console.print("Upload a policy with: [cyan]cogames upload[/cyan]")
+            return
 
         policy_version_ids = [pv.id for pv in my_policies]
 
