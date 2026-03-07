@@ -25,6 +25,7 @@ import yaml  # type: ignore[import]
 from click.core import ParameterSource
 from packaging.version import Version
 from rich import box
+from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
@@ -1342,9 +1343,13 @@ def run_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
+    # When structured output is requested, redirect all status messages to stderr
+    # so only clean JSON/YAML appears on stdout.
+    out = Console(stderr=True) if format_ else console
+
     # Handle mission set expansion
     if mission_set and missions:
-        console.print("[red]Error: Cannot use both --mission-set and --mission[/red]")
+        out.print("[red]Error: Cannot use both --mission-set and --mission[/red]")
         raise typer.Exit(1)
 
     if mission_set:
@@ -1353,9 +1358,9 @@ def run_cmd(
         try:
             mission_objs = load_mission_set(mission_set)
             missions = [m.full_name() for m in mission_objs]
-            console.print(f"[cyan]Using mission set '{mission_set}' ({len(missions)} missions)[/cyan]")
+            out.print(f"[cyan]Using mission set '{mission_set}' ({len(missions)} missions)[/cyan]")
         except ValueError as e:
-            console.print(f"[red]{e}[/red]")
+            out.print(f"[red]{e}[/red]")
             raise typer.Exit(1) from e
 
         # Default to 4 cogs for mission sets unless explicitly specified
@@ -1378,23 +1383,23 @@ def run_cmd(
             if isinstance(map_builder, MapGen.Config):
                 map_builder.seed = map_seed
 
-    resolved_device = resolve_training_device(console, device)
+    resolved_device = resolve_training_device(out, device)
     policy_specs = get_policy_specs_with_proportions(ctx, policies, device=str(resolved_device))
 
     if ctx.info_name == "scrimmage":
         if len(policy_specs) != 1:
-            console.print("[red]Error: scrimmage accepts exactly one --policy / -p value.[/red]")
+            out.print("[red]Error: scrimmage accepts exactly one --policy / -p value.[/red]")
             raise typer.Exit(1)
         if policy_specs[0].proportion != 1.0:
-            console.print("[red]Error: scrimmage does not support policy proportions.[/red]")
+            out.print("[red]Error: scrimmage does not support policy proportions.[/red]")
             raise typer.Exit(1)
 
-    console.print(
+    out.print(
         f"[cyan]Preparing evaluation for {len(policy_specs)} policies across {len(selected_missions)} mission(s)[/cyan]"
     )
 
     evaluate_module.evaluate(
-        console,
+        out,
         missions=selected_missions,
         policy_specs=[spec.to_policy_spec() for spec in policy_specs],
         proportions=[spec.proportion for spec in policy_specs],
