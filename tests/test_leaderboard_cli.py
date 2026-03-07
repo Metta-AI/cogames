@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from typing import Any, cast
 
 import pytest
@@ -27,6 +28,18 @@ def test_show_season_submissions_calls_client(monkeypatch: pytest.MonkeyPatch) -
     client = _FakeClient()
     printed: list[str] = []
     monkeypatch.setattr(leaderboard.console, "print", lambda value, *args, **kwargs: printed.append(str(value)))
+    buf: list[str] = []
+
+    def _stdout_write(s: str) -> int:
+        buf.append(s)
+        if "\n" in s:
+            text = "".join(buf).rstrip("\n")
+            buf.clear()
+            if text:
+                printed.append(text)
+        return len(s)
+
+    monkeypatch.setattr(sys.stdout, "write", _stdout_write)
 
     leaderboard._show_season_submissions(
         cast(TournamentServerClient, client),
