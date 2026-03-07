@@ -12,7 +12,7 @@ from rich.table import Table
 
 from cogames.cli.base import console, emit_json
 from cogames.cli.client import MatchResponse, TournamentServerClient
-from cogames.cli.leaderboard import _format_score, _format_timestamp, parse_season_ref
+from cogames.cli.leaderboard import _format_score, _format_timestamp, parse_policy_identifier, parse_season_ref
 from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 
@@ -40,6 +40,14 @@ def matches_cmd(
         "-s",
         metavar="SEASON",
         help="Tournament season (for listing matches).",
+        rich_help_panel="Filter",
+    ),
+    policy_filter: Optional[str] = typer.Option(
+        None,
+        "--policy",
+        "-P",
+        metavar="POLICY",
+        help="Filter matches to those involving a specific policy (e.g., 'slanky' or 'slanky:v88').",
         rich_help_panel="Filter",
     ),
     limit: int = typer.Option(
@@ -103,7 +111,7 @@ def matches_cmd(
         if match_id:
             _show_match_detail(client, match_id, logs, download_logs, json_output)
         else:
-            _list_matches(client, season, limit, json_output)
+            _list_matches(client, season, limit, json_output, policy_filter=policy_filter)
 
 
 def _list_matches(
@@ -111,6 +119,7 @@ def _list_matches(
     season: Optional[str],
     limit: int,
     json_output: bool,
+    policy_filter: Optional[str] = None,
 ) -> None:
     """List recent matches for the user's policies."""
     try:
@@ -123,6 +132,20 @@ def _list_matches(
             console.print("[yellow]No uploaded policies found.[/yellow]")
             console.print("Upload a policy with: [cyan]cogames upload[/cyan]")
             return
+
+        # Apply --policy filter to narrow which policy versions to query
+        if policy_filter:
+            filter_name, filter_version = parse_policy_identifier(policy_filter)
+            if filter_version is not None:
+                my_policies = [p for p in my_policies if p.name == filter_name and p.version == filter_version]
+            else:
+                my_policies = [p for p in my_policies if p.name == filter_name]
+            if not my_policies:
+                if json_output:
+                    emit_json([])
+                    return
+                console.print(f"[yellow]No uploaded policies matching '{policy_filter}'.[/yellow]")
+                return
 
         policy_version_ids = [pv.id for pv in my_policies]
 

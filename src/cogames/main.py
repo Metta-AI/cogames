@@ -1705,6 +1705,8 @@ app.command(
 
 [cyan]cogames matches[/cyan]                              List recent matches
 
+[cyan]cogames matches --policy slanky[/cyan]               Filter by policy name
+
 [cyan]cogames matches <match-id>[/cyan]                   Show match details
 
 [cyan]cogames matches <match-id> --logs[/cyan]            Show available logs
