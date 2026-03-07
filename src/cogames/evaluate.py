@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections import defaultdict
 from typing import Literal, Optional, TypeAlias
 
@@ -74,7 +75,8 @@ def evaluate(
         assignments = [i for i, c in enumerate(counts) for _ in range(c)]
 
         progress_label = f"Simulating ({mission_name})"
-        with typer.progressbar(length=episodes, label=progress_label) as progress:
+        progress_file = sys.stderr if output_format else sys.stdout
+        with typer.progressbar(length=episodes, label=progress_label, file=progress_file) as progress:
             rollout, replay_paths = run_multi_episode_rollout(
                 policy_specs=policy_specs,
                 assignments=assignments,
@@ -133,7 +135,7 @@ def _output_results(
             serialized = json.dumps(to_dump.model_dump(mode="json"), indent=2)
         else:
             serialized = yaml.safe_dump(to_dump.model_dump(), sort_keys=False)
-        console.print(serialized)
+        sys.stdout.write(serialized + "\n")
         return
 
     name_count: defaultdict[str, int] = defaultdict(int)
