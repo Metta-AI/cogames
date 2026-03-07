@@ -94,3 +94,21 @@ def test_parse_policy_spec_applies_device_override_for_uri(monkeypatch: pytest.M
 def test_parse_policy_spec_rejects_invalid_input(raw_spec: str):
     with pytest.raises(ValueError):
         parse_policy_spec(raw_spec)
+
+
+def test_colon_in_shorthand_suggests_dot_replacement():
+    """Using ':' as module separator should suggest '.' instead."""
+    with pytest.raises(ValueError, match=r"Did you mean 'class=my_pkg\.my_module\.MyPolicy'"):
+        parse_policy_spec("my_pkg:my_module:MyPolicy")
+
+
+def test_unsupported_field_suggests_kw_prefix():
+    """Unknown fields should suggest using kw. prefix."""
+    with pytest.raises(ValueError, match=r"use 'kw\.scrambler_schedule=1500'"):
+        parse_policy_spec("class=random,scrambler_schedule=1500")
+
+
+def test_query_string_syntax_suggests_kw_format():
+    """?key=val URI syntax should suggest kw.key=val format."""
+    with pytest.raises(ValueError, match=r"kw\.foo=bar"):
+        parse_policy_spec("class=random?foo=bar")

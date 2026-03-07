@@ -62,9 +62,13 @@ def describe_policy_arg(with_proportion: bool):
 
 
 def _translate_error(e: Exception) -> str:
-    translated = str(e).replace("Invalid symbol name", "Could not find policy class")
+    msg = str(e)
+    translated = msg.replace("Invalid symbol name", "Could not find policy class")
     if isinstance(e, ModuleNotFoundError):
         translated += ". Please make sure to specify your policy class."
+    # Hint at ':' vs '.' confusion in class paths
+    if ":" in msg and ("No module named" in msg or "Could not find" in translated):
+        translated += " Note: use '.' as the module separator (not ':')."
     return translated
 
 
@@ -207,7 +211,12 @@ def parse_policy_spec(spec: str, device: str | None = None) -> PolicySpecWithPro
 
     if "=" not in first:
         if ":" in first:
-            raise ValueError("Policy shorthand cannot include ':'; use class=... or a supported URI instead.")
+            dotted = first.replace(":", ".")
+            raise ValueError(
+                f"Policy shorthand cannot include ':'. "
+                f"Did you mean 'class={dotted}'? "
+                f"Use '.' as the module separator (not ':')."
+            )
         entries[0] = f"class={first}"
 
     class_path: str | None = None
@@ -220,6 +229,16 @@ def parse_policy_spec(spec: str, device: str | None = None) -> PolicySpecWithPro
         if key == "class":
             if not value:
                 raise ValueError("Policy class cannot be empty.")
+            # Catch ?key=val URI-style kwargs (e.g. class=MyPolicy?foo=bar)
+            if "?" in value:
+                class_part, query = value.split("?", 1)
+                pairs = query.split("&") if query else []
+                hint_parts = [f"kw.{p}" for p in pairs if "=" in p]
+                hint = ",".join([f"class={class_part}"] + hint_parts)
+                raise ValueError(
+                    f"Query string syntax (?key=val) is not supported in policy specs. "
+                    f"Use comma-separated kw. prefix instead: '{hint}'."
+                )
             class_path = resolve_policy_class_path(value)
             continue
 
@@ -240,7 +259,9 @@ def parse_policy_spec(spec: str, device: str | None = None) -> PolicySpecWithPro
             init_kwargs[kw_key.replace("-", "_")] = value
             continue
 
-        raise ValueError(f"Unsupported policy field '{key}'.")
+        raise ValueError(
+            f"Unsupported policy field '{key}'. To pass '{key}' as a policy init kwarg, use 'kw.{key}={value}'."
+        )
 
     if class_path is None:
         raise ValueError("Policy specification must include class= for key=value format.")
