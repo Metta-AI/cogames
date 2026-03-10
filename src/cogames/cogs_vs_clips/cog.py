@@ -8,7 +8,7 @@ from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.team import TeamConfig
 from mettagrid.base_config import Config
 from mettagrid.config.filter import sharedTagPrefix
-from mettagrid.config.game_value import inv, num_tagged, stat
+from mettagrid.config.game_value import num_tagged, stat
 from mettagrid.config.handler_config import (
     ClearInventoryMutation,
     EntityTarget,
@@ -23,7 +23,6 @@ from mettagrid.config.mettagrid_config import (
     InventoryConfig,
     ResourceLimitsConfig,
 )
-from mettagrid.config.mutation.game_value_mutation import SetGameValueMutation
 from mettagrid.config.mutation.stats_mutation import logActorAgentStat
 from mettagrid.config.reward_config import reward
 
@@ -57,22 +56,14 @@ class CogConfig(Config):
                     "hp": ResourceLimitsConfig(min=self.hp_limit, resources=["hp"], modifiers=self.hp_modifiers),
                     "gear": ResourceLimitsConfig(max=self.gear_limit, resources=CvCConfig.GEAR, modifiers={"hp": 100}),
                     "heart": ResourceLimitsConfig(max=self.heart_limit, resources=["heart"], modifiers={"hp": 100}),
-                    "energy": ResourceLimitsConfig(
-                        min=self.energy_limit, resources=["energy"], modifiers=self.energy_modifiers
-                    ),
                     "cargo": ResourceLimitsConfig(
                         min=self.cargo_limit, resources=CvCConfig.ELEMENTS, modifiers=self.cargo_modifiers
                     ),
                 },
-                initial={"energy": self.initial_energy, "hp": self.initial_hp, "solar": self.initial_solar},
+                initial={"hp": self.initial_hp},
             ),
             on_tick={
                 "regen": Handler(mutations=[updateActor({"hp": self.hp_regen})]),
-                "solar_to_energy": Handler(
-                    mutations=[
-                        SetGameValueMutation(value=inv("energy"), source=inv("solar"), target=EntityTarget.ACTOR)
-                    ]
-                ),
                 "track_aligned_junctions": Handler(
                     mutations=[logActorAgentStat("aligned_junction_held", source=num_tagged(team.net_tag()))],
                 ),

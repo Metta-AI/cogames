@@ -6,6 +6,7 @@ from cogames.cogs_vs_clips.clips import ClipsConfig
 from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.junction import CvCJunctionConfig
+from cogames.cogs_vs_clips.machina_1_variant import CvCMachina1Variant  # noqa: F401 - register variant
 from cogames.cogs_vs_clips.render import render_config
 from cogames.cogs_vs_clips.stations import (
     CvCExtractorConfig,
@@ -19,6 +20,7 @@ from cogames.core import (
     CoGameMissionVariant,
     CoGameSite,
 )
+from cogames.variants import VariantRegistry
 from mettagrid.config.action_config import (
     ActionsConfig,
     ChangeVibeActionConfig,
@@ -49,6 +51,7 @@ class CvCMission(CoGameMission):
     """Mission configuration for CogsGuard game mode."""
 
     max_steps: int = Field(default=10000)
+    default_variant: str | None = Field(default="machina_1")
     total_junctions: int = Field(default=118, description="Total junctions on the map (for curriculum scaling)")
 
     cog: CogConfig = Field(default_factory=lambda: CogConfig())
@@ -74,11 +77,26 @@ class CvCMission(CoGameMission):
     def make_env(self) -> MettaGridConfig:
         """Create a MettaGridConfig from this mission.
 
-        Applies all variants to the produced configuration.
+        Uses VariantRegistry to resolve dependencies and apply variants
+        in topological order (e.g. energy -> solar -> days).
 
         Returns:
             MettaGridConfig ready for environment creation
         """
+        # default_variant injects structural variants (energy→solar→days) that
+        # every CvC mission needs but that shouldn't appear in user-facing labels.
+        # It exists because these variants still read config from mission.cog /
+        # mission.weather rather than owning their own fields. Once config ownership
+        # migrates into the variants themselves, each variant becomes self-contained
+        # and can be listed in `variants=[]` directly — at which point default_variant
+        # can be removed.
+        registry = VariantRegistry(list(self.variants))
+        variant_names: list[str] = []
+        if self.default_variant:
+            variant_names.append(self.default_variant)
+        variant_names.extend(v.name for v in self.variants)
+        registry.run_configure(variant_names)
+
         team_objs = list(self.teams.values())
         for i, t in enumerate(team_objs):
             t.team_id = i
@@ -119,7 +137,7 @@ class CvCMission(CoGameMission):
                 aoe_mask=True,
             ),
             actions=ActionsConfig(
-                move=MoveActionConfig(consumed_resources=self.cog.action_cost),
+                move=MoveActionConfig(),
                 noop=NoopActionConfig(),
                 change_vibe=ChangeVibeActionConfig(vibes=CvCConfig.VIBES),
             ),
@@ -135,7 +153,7 @@ class CvCMission(CoGameMission):
                 },
                 **{name: cfg for team in all_teams for name, cfg in team.stations().items()},
             },
-            events=self._merge_events(),
+            events=self.clips.events(max_steps=self.max_steps, map_builder=self.map_builder()),
             tags=[tag for t in all_teams for tag in t.all_tags()],
             materialize_queries=[mq for t in all_teams for mq in t.materialized_queries()],
             stat_writers=[sw for t in all_teams for sw in t.stat_writers(CvCConfig.RESOURCES)],
@@ -147,20 +165,9 @@ class CvCMission(CoGameMission):
         env = env.model_copy(deep=True)
         env.label = self.full_name()
 
+        registry.apply_to_env(self, env)
+
         for variant in self.variants:
-            variant.modify_env(self, env)
             env.label += f".{variant.name}"
 
         return env
-
-    def _merge_events(self) -> dict:
-        """Merge clips and weather events, raising on key conflicts."""
-        clips_events = self.clips.events(
-            max_steps=self.max_steps,
-            map_builder=self.map_builder(),
-        )
-        weather_events = self.weather.events(max_steps=self.max_steps)
-        overlap = set(clips_events) & set(weather_events)
-        if overlap:
-            raise ValueError(f"Overlapping event keys between clips and weather: {overlap}")
-        return {**clips_events, **weather_events}
