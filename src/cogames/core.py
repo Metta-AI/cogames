@@ -3,19 +3,32 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import TypeVar
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from pydantic import Field
 from typing_extensions import Self
 
 from mettagrid.base_config import Config
+
+if TYPE_CHECKING:
+    from cogames.variants import ResolvedDeps
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
 
 # Type variable for mission types
 TMission = TypeVar("TMission", bound="CoGameMission")
+T = TypeVar("T", bound="CoGameMissionVariant")
 
 MAP_MISSION_DELIMITER = "."
+
+
+@dataclass
+class Deps:
+    """Declared dependencies for a variant, resolved before configure runs."""
+
+    required: list[type[CoGameMissionVariant]] = field(default_factory=list)
+    optional: list[type[CoGameMissionVariant]] = field(default_factory=list)
 
 
 class CoGameMissionVariant(Config, ABC):
@@ -24,6 +37,34 @@ class CoGameMissionVariant(Config, ABC):
     name: str
     description: str = Field(default="")
     depends_on: list[str] = Field(default_factory=list)
+
+    _type_registry: ClassVar[dict[str, type[CoGameMissionVariant]]] = {}
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        name_val = cls.__dict__.get("name")
+        if isinstance(name_val, str) and name_val:
+            CoGameMissionVariant._type_registry[name_val] = cls
+
+    @classmethod
+    def create(cls, name: str) -> CoGameMissionVariant:
+        variant_cls = cls._type_registry.get(name)
+        assert variant_cls is not None, f"Unknown variant '{name}'. Available: {sorted(cls._type_registry)}"
+        return variant_cls()  # pyright: ignore[reportCallIssue]
+
+    def dependencies(self) -> Deps:
+        """Declare required and optional variant dependencies.
+
+        Called before configure to build the full dependency graph. The registry
+        auto-creates missing required deps and repeats until stable.
+        """
+        return Deps()
+
+    def configure(self, deps: ResolvedDeps) -> None:
+        """Cross-configure with other active variants via resolved deps.
+
+        Called after dependency resolution. Only declared deps are accessible.
+        """
 
     def modify_mission(self, mission: CoGameMission) -> None:
         # Override this method to modify the mission.
