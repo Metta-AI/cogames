@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 
+from cogames.cogs_vs_clips.buildings import MachinaArena
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.sites import HELLO_WORLD
-from cogames.cogs_vs_clips.terrain import MachinaArena
 from cogames.cogs_vs_clips.variants import (
     DarkSideVariant,
 )

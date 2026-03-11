@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cogames.cogs_vs_clips.terrain import MachinaArenaConfig
+from cogames.cogs_vs_clips.buildings import MachinaArenaConfig
 from mettagrid.map_builder.ascii import AsciiMapBuilderConfig
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig, MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGenConfig

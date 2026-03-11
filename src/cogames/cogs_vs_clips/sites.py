@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import cast
 
-from cogames.cogs_vs_clips.terrain import MachinaArena, MachinaArenaConfig, RandomTransform, SequentialMachinaArena
+from cogames.cogs_vs_clips.buildings import MachinaArena, MachinaArenaConfig, RandomTransform, SequentialMachinaArena
 from cogames.core import CoGameSite
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen, MapGenConfig

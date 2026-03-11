@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from cogames.cli.mission import get_mission
-from cogames.cogs_vs_clips.terrain import MachinaArenaConfig
+from cogames.cogs_vs_clips.buildings import MachinaArenaConfig
 from mettagrid.mapgen.mapgen import MapGenConfig
 
 

@@ -59,7 +59,7 @@ Important details:
 #### Example: site-level builder
 
 ```python
-from cogames.cogs_vs_clips.terrain import MachinaArenaConfig
+from cogames.cogs_vs_clips.buildings import MachinaArenaConfig
 from cogames.core import CoGameSite
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.mapgen.scenes.base_hub import BaseHubConfig
@@ -164,7 +164,7 @@ Common patterns:
 - Modify terrain config via typed variant helpers:
 
   ```python
-  from cogames.cogs_vs_clips.terrain import MachinaArenaVariant, MachinaArenaConfig
+  from cogames.cogs_vs_clips.buildings import MachinaArenaVariant, MachinaArenaConfig
 
   class CityVariant(MachinaArenaVariant):
       name: str = "city"
@@ -181,7 +181,7 @@ Common patterns:
 - Adjust hub bundles via `BaseHubVariant`:
 
   ```python
-  from cogames.cogs_vs_clips.terrain import BaseHubVariant
+  from cogames.cogs_vs_clips.buildings import BaseHubVariant
   from mettagrid.mapgen.scenes.base_hub import BaseHubConfig
 
   class ExtractorCrossVariant(BaseHubVariant):
@@ -229,7 +229,7 @@ CLI variants are composed in order, so `cogames play -m cogsguard_machina_1.basi
 Example programmatic override using the `MapSeedVariant` helper:
 
 ```python
-from cogames.cogs_vs_clips.terrain import MapSeedVariant
+from cogames.cogs_vs_clips.buildings import MapSeedVariant
 
 base_mission = my_mission
 seeded_mission = base_mission.with_variants([MapSeedVariant(seed=1234)])

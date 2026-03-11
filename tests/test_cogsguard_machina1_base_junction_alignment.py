@@ -1,9 +1,9 @@
 from typing import cast
 
+from cogames.cogs_vs_clips.buildings import MachinaArenaConfig
 from cogames.cogs_vs_clips.config import CvCConfig
 from cogames.cogs_vs_clips.missions import CogsGuardMachina1Mission
 from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
-from cogames.cogs_vs_clips.terrain import MachinaArenaConfig
 from mettagrid.config.tag import typeTag
 from mettagrid.mapgen.mapgen import MapGenConfig
 from mettagrid.mapgen.scenes.building_distributions import DistributionType
