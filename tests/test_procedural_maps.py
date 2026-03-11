@@ -5,7 +5,7 @@ import pytest
 
 from cogames.cogs_vs_clips.buildings import MachinaArenaConfig, SequentialMachinaArena
 from mettagrid.mapgen.mapgen import MapGen
-from mettagrid.mapgen.scenes.base_hub import DEFAULT_EXTRACTORS, BaseHub
+from mettagrid.mapgen.scenes.compound import DEFAULT_EXTRACTORS, Compound
 
 
 def _collect_types(tree: dict) -> list[str]:
@@ -29,9 +29,9 @@ def _find_nodes(tree: dict, type_suffix: str) -> list[dict]:
     return matches
 
 
-def _extract_base_hub_config(tree: dict) -> dict:
-    nodes = _find_nodes(tree, "BaseHub")
-    assert nodes, "BaseHub should be present"
+def _extract_compound_config(tree: dict) -> dict:
+    nodes = _find_nodes(tree, "Compound")
+    assert nodes, "Compound should be present"
     return nodes[0]["config"]
 
 
@@ -76,8 +76,8 @@ def test_procedural_builder_builds_and_has_expected_layers(
         assert any(t.endswith("BoundedLayout.Config") for t in types)
         # UniformExtractorScene should be present
         assert any(t.endswith("UniformExtractorScene.Config") for t in types)
-        # BaseHub should be present
-        assert any(t.endswith("BaseHub.Config") for t in types)
+        # Compound should be present
+        assert any(t.endswith("Compound.Config") for t in types)
 
 
 @pytest.mark.parametrize(
@@ -155,12 +155,12 @@ CornerBundle = Literal["extractors", "none", "custom"]
 CrossBundle = Literal["none", "extractors", "custom"]
 
 
-def _build_base_hub_only(*, corner_bundle: str, cross_bundle: str, cross_distance: int = 4):
+def _build_compound_only(*, corner_bundle: str, cross_bundle: str, cross_distance: int = 4):
     cfg = MapGen.Config(
         width=21,
         height=21,
         border_width=0,
-        instance=BaseHub.Config(
+        instance=Compound.Config(
             spawn_count=0,
             include_inner_wall=False,
             corner_bundle=cast(CornerBundle, corner_bundle),
@@ -191,7 +191,7 @@ def _build_sequential_arena_map(
             building_coverage=0.0,
             map_corner_placements=map_corner_placements,
             map_perimeter_placements=map_perimeter_placements or [],
-            hub=BaseHub.Config(corner_bundle="none", cross_bundle="none"),
+            hub=Compound.Config(corner_bundle="none", cross_bundle="none"),
         ),
     }
     if border_width is not None:
@@ -211,13 +211,13 @@ def _object_positions(grid, obj_name: str) -> set[tuple[int, int]]:
         ("extractors", "extractors", DEFAULT_EXTRACTORS, DEFAULT_EXTRACTORS),
     ],
 )
-def test_base_hub_grid_matches_bundles(
+def test_compound_grid_matches_bundles(
     corner_bundle: str,
     cross_bundle: str,
     expected_corner: tuple[str, str, str, str],
     expected_cross: tuple[str, str, str, str],
 ):
-    grid = _build_base_hub_only(corner_bundle=corner_bundle, cross_bundle=cross_bundle)
+    grid = _build_compound_only(corner_bundle=corner_bundle, cross_bundle=cross_bundle)
 
     for (x, y), name in zip(CORNER_COORDS, expected_corner, strict=False):
         assert grid[y, x] == name, (
