@@ -11,6 +11,7 @@ from cogames.core import CoGameMissionVariant
 if TYPE_CHECKING:
     from cogames.cogs_vs_clips.mission import CvCMission
 from mettagrid.config.mettagrid_config import MettaGridConfig
+from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.area import AreaWhere
 from mettagrid.mapgen.mapgen import MapGen, MapGenConfig
 from mettagrid.mapgen.random.int import IntConstantDistribution
@@ -211,6 +212,16 @@ class EnsureHubReachableJunction(Scene[EnsureHubReachableJunctionConfig]):
             rr, cc = best[idx]
             grid[rr, cc] = cfg.junction_name
             junctions.append((rr, cc))
+
+
+def find_machina_arena(builder: MapBuilderConfig | SceneConfig) -> MachinaArenaConfig | None:
+    """Unwrap nested MapGen.Config layers and return the MachinaArenaConfig, if any."""
+    if not isinstance(builder, MapGen.Config) or builder.instance is None:
+        return None
+    inst = builder.instance
+    if isinstance(inst, MapGen.Config) and inst.instance is not None:
+        inst = inst.instance
+    return inst if isinstance(inst, MachinaArenaConfig) else None
 
 
 class MachinaArenaConfig(SceneConfig):
