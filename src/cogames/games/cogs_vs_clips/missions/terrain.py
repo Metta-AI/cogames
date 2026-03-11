@@ -542,6 +542,24 @@ class MachinaArena(Scene[MachinaArenaConfig]):
             )
         )
 
+        if cfg.map_perimeter_placements:
+            children.append(
+                ChildrenAction(
+                    scene=PerimeterPlacements.Config(placements=cfg.map_perimeter_placements, offset=2),
+                    where="full",
+                )
+            )
+        if cfg.map_corner_placements:
+            children.append(
+                ChildrenAction(
+                    scene=MapCornerPlacements.Config(
+                        placements=cfg.map_corner_placements,
+                        offset=cfg.map_corner_offset,
+                    ),
+                    where="full",
+                )
+            )
+
         return children
 
 
