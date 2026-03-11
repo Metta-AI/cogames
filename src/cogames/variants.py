@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
-from cogames.core import CoGameMission, CoGameMissionVariant, Deps
+import cogames.core as core
 from mettagrid.config.mettagrid_config import MettaGridConfig
+
+if TYPE_CHECKING:
+    from cogames.core import CoGameMission, CoGameMissionVariant, Deps
 
 T = TypeVar("T", bound="CoGameMissionVariant")
 
@@ -154,14 +157,14 @@ class VariantRegistry:
         """Resolve variant names to objects, resolve dependencies, configure in topological order."""
         for name in variants:
             if name not in self._variants:
-                self._variants[name] = CoGameMissionVariant.create(name)
+                self._variants[name] = core.CoGameMissionVariant.create(name)
 
         self._resolve_dependencies()
         self._configure_order = self._topological_order()
 
         for name in self._configure_order:
             v = self._variants[name]
-            deps = self._resolved_deps.get(name, Deps())
+            deps = self._resolved_deps.get(name, core.Deps())
             resolved = ResolvedDeps(self, set(deps.required), set(deps.optional))
             v.configure(resolved)
 
