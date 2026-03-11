@@ -10,9 +10,12 @@ from cogames.cogs_vs_clips.buildings import (
     MachinaArenaVariant,
 )
 from cogames.cogs_vs_clips.config import CvCConfig
+from cogames.cogs_vs_clips.days import DaysVariant
+from cogames.cogs_vs_clips.energy import EnergyVariant
 from cogames.cogs_vs_clips.evals.difficulty_variants import DIFFICULTY_VARIANTS
 from cogames.cogs_vs_clips.ships import remove_clips_ships_from_map_config
-from cogames.core import CoGameMissionVariant
+from cogames.core import CoGameMissionVariant, Deps
+from cogames.variants import ResolvedDeps
 from mettagrid.config.filter import (
     GameValueFilter,
     HandlerTarget,
@@ -180,9 +183,14 @@ class DarkSideVariant(CoGameMissionVariant):
     description: str = "You're on the dark side of the asteroid. You recharge slower."
 
     @override
-    def modify_mission(self, mission: CvCMission) -> None:
-        mission.weather.day_deltas = {"solar": 0}
-        mission.weather.night_deltas = {"solar": 0}
+    def dependencies(self) -> Deps:
+        return Deps(required=[DaysVariant])
+
+    @override
+    def configure(self, deps: ResolvedDeps) -> None:
+        cfg = deps.required(DaysVariant).days_config
+        cfg.day_solar = 0
+        cfg.night_solar = 0
 
 
 class SuperChargedVariant(CoGameMissionVariant):
@@ -190,9 +198,14 @@ class SuperChargedVariant(CoGameMissionVariant):
     description: str = "The sun is shining on you. You recharge faster."
 
     @override
-    def modify_mission(self, mission: CvCMission) -> None:
-        mission.weather.day_deltas = {k: v + 2 for k, v in mission.weather.day_deltas.items()}
-        mission.weather.night_deltas = {k: v + 2 for k, v in mission.weather.night_deltas.items()}
+    def dependencies(self) -> Deps:
+        return Deps(required=[DaysVariant])
+
+    @override
+    def configure(self, deps: ResolvedDeps) -> None:
+        cfg = deps.required(DaysVariant).days_config
+        cfg.day_solar += 2
+        cfg.night_solar += 2
 
 
 class EnergizedVariant(CoGameMissionVariant):
@@ -200,10 +213,16 @@ class EnergizedVariant(CoGameMissionVariant):
     description: str = "Max energy and full regen so agents never run dry."
 
     @override
-    def modify_mission(self, mission: CvCMission) -> None:
-        mission.cog.energy_limit = max(mission.cog.energy_limit, 255)
-        mission.weather.day_deltas = {"solar": 255}
-        mission.weather.night_deltas = {"solar": 255}
+    def dependencies(self) -> Deps:
+        return Deps(required=[EnergyVariant, DaysVariant])
+
+    @override
+    def configure(self, deps: ResolvedDeps) -> None:
+        energy = deps.required(EnergyVariant)
+        energy.limit = max(energy.limit, 255)
+        cfg = deps.required(DaysVariant).days_config
+        cfg.day_solar = 255
+        cfg.night_solar = 255
 
 
 class NoWeatherVariant(CoGameMissionVariant):
@@ -211,9 +230,14 @@ class NoWeatherVariant(CoGameMissionVariant):
     description: str = "Disable the day/night weather cycle."
 
     @override
-    def modify_mission(self, mission: CvCMission) -> None:
-        mission.weather.day_deltas = {}
-        mission.weather.night_deltas = {}
+    def dependencies(self) -> Deps:
+        return Deps(required=[DaysVariant])
+
+    @override
+    def configure(self, deps: ResolvedDeps) -> None:
+        cfg = deps.required(DaysVariant).days_config
+        cfg.day_solar = 0
+        cfg.night_solar = 0
 
 
 class Small50Variant(CoGameMissionVariant):
