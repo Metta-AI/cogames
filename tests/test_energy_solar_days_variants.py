@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from cogames.cogs_vs_clips.days import DayConfig, DaysVariant
+from cogames.cogs_vs_clips.energy import EnergyVariant
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
+from cogames.cogs_vs_clips.solar import SolarVariant
 from cogames.cogs_vs_clips.variants import DarkSideVariant, NoWeatherVariant, SuperChargedVariant
 from cogames.variants import VariantRegistry
 
@@ -38,9 +41,10 @@ class TestEnergyVariant:
         env = mission.make_env()
         registry.apply_to_env(mission, env)
 
+        energy_v = registry.required(EnergyVariant)
         for agent in env.game.agents:
             assert "energy" in agent.inventory.limits
-            assert agent.inventory.initial["energy"] == mission.cog.initial_energy
+            assert agent.inventory.initial["energy"] == energy_v.initial
         assert env.game.actions.move.consumed_resources == {"energy": 4}
 
 
@@ -60,9 +64,10 @@ class TestSolarVariant:
         env = mission.make_env()
         registry.apply_to_env(mission, env)
 
+        solar_v = registry.required(SolarVariant)
         for agent in env.game.agents:
             assert "solar" in agent.inventory.initial
-            assert agent.inventory.initial["solar"] == mission.cog.initial_solar
+            assert agent.inventory.initial["solar"] == solar_v.initial_solar
             assert "solar_to_energy" in agent.on_tick
             # Energy should also be set (auto-created dependency)
             assert "energy" in agent.inventory.limits
@@ -85,8 +90,21 @@ class TestDaysVariant:
         env = mission.make_env()
         registry.apply_to_env(mission, env)
 
-        assert "weather_day" in env.game.events
-        assert "weather_night" in env.game.events
+        assert "day" in env.game.events
+        assert "night" in env.game.events
+
+    def test_custom_day_config(self):
+        cfg = DayConfig(night_solar=2)
+        days = DaysVariant(days_config=cfg)
+        registry = VariantRegistry([days])
+        registry.run_configure(["days"])
+
+        mission = _make_mission(default_variant=None)
+        env = mission.make_env()
+        registry.apply_to_env(mission, env)
+
+        for agent in env.game.agents:
+            assert agent.inventory.initial.get("solar") == 2
 
 
 class TestWeatherModifiers:
@@ -94,24 +112,24 @@ class TestWeatherModifiers:
         mission = _make_mission().with_variants([DarkSideVariant()])
         env = mission.make_env()
 
-        # Weather events should still exist
-        assert "weather_day" in env.game.events
-        assert "weather_night" in env.game.events
+        # Weather events should still exist but with zero delta
+        assert "day" in env.game.events
+        assert "night" in env.game.events
 
     def test_super_charged_boosts_weather(self):
         mission = _make_mission().with_variants([SuperChargedVariant()])
         env = mission.make_env()
 
-        assert "weather_day" in env.game.events
-        assert "weather_night" in env.game.events
+        assert "day" in env.game.events
+        assert "night" in env.game.events
 
     def test_no_weather_disables_cycle(self):
         mission = _make_mission().with_variants([NoWeatherVariant()])
         env = mission.make_env()
 
-        # Weather events still exist but with empty deltas
-        assert "weather_day" in env.game.events
-        assert "weather_night" in env.game.events
+        # Weather events still exist but with zero deltas
+        assert "day" in env.game.events
+        assert "night" in env.game.events
 
 
 class TestMakeEnvWithDefaultVariant:
@@ -119,10 +137,11 @@ class TestMakeEnvWithDefaultVariant:
         mission = _make_mission()  # default_variant="machina_1"
         env = mission.make_env()
 
+        energy_v = EnergyVariant()
         # Energy
         for agent in env.game.agents:
             assert "energy" in agent.inventory.limits
-            assert agent.inventory.initial["energy"] == mission.cog.initial_energy
+            assert agent.inventory.initial["energy"] == energy_v.initial
         assert env.game.actions.move.consumed_resources == {"energy": 4}
 
         # Solar
@@ -131,8 +150,8 @@ class TestMakeEnvWithDefaultVariant:
             assert "solar_to_energy" in agent.on_tick
 
         # Weather
-        assert "weather_day" in env.game.events
-        assert "weather_night" in env.game.events
+        assert "day" in env.game.events
+        assert "night" in env.game.events
 
     def test_label_only_includes_user_variants(self):
         mission = _make_mission()
@@ -159,4 +178,4 @@ class TestMakeEnvWithDefaultVariant:
             assert "energy" not in agent.inventory.initial
             assert "solar" not in agent.inventory.initial
             assert "solar_to_energy" not in agent.on_tick
-        assert "weather_day" not in env.game.events
+        assert "day" not in env.game.events
