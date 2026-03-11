@@ -23,13 +23,13 @@ from mettagrid.config.filter import (
     maxDistance,
 )
 from mettagrid.config.game_value import MaxGameValue, QueryCountValue, QueryInventoryValue, SumGameValue, stat, val
+from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import (
     GridObjectConfig,
     InventoryConfig,
 )
-from mettagrid.config.mutation import addTag, recomputeMaterializedQuery
+from mettagrid.config.mutation import StatsMutation, StatsTarget, addTag, logStatToGame, recomputeMaterializedQuery
 from mettagrid.config.query import ClosureQuery, MaterializedQuery, Query, materializedQuery, query
-from mettagrid.config.stat_writer import StatWriter
 from mettagrid.config.tag import typeTag
 
 
@@ -71,34 +71,40 @@ class TeamConfig(Config):
             )
         ]
 
-    def stat_writers(self, resource_names: list[str]) -> list[StatWriter]:
+    def on_tick_handlers(self, resource_names: list[str]) -> dict[str, Handler]:
         junction_name = f"{self.name}/aligned.junction"
-        return [
-            StatWriter(
-                name=junction_name,
-                value=MaxGameValue(
-                    values=[
-                        SumGameValue(values=[QueryCountValue(query=query(self.net_tag())), val(-1)]),
-                        val(0),
+        junction_value = MaxGameValue(
+            values=[
+                SumGameValue(values=[QueryCountValue(query=query(self.net_tag())), val(-1)]),
+                val(0),
+            ]
+        )
+        return {
+            # SET: junction count = max(net_count - 1, 0)
+            f"{self.name}/junction_count": Handler(
+                mutations=[StatsMutation(stat=junction_name, source=junction_value, target=StatsTarget.GAME)]
+            ),
+            # ADD: held = held + junction_count
+            f"{self.name}/junction_held": Handler(
+                mutations=[logStatToGame(f"{self.name}/aligned.junction.held", source=stat(f"game.{junction_name}"))]
+            ),
+            # SET: resource amounts from hub inventory
+            **{
+                f"{self.name}/{resource}_amount": Handler(
+                    mutations=[
+                        StatsMutation(
+                            stat=f"{self.name}/{resource}.amount",
+                            source=QueryInventoryValue(
+                                query=query(typeTag("hub"), hasTag(self.team_tag())),
+                                item=resource,
+                            ),
+                            target=StatsTarget.GAME,
+                        )
                     ]
-                ),
-            ),
-            StatWriter(
-                name=f"{self.name}/aligned.junction.held",
-                value=stat(f"game.{junction_name}"),
-                accumulate=True,
-            ),
-            *[
-                StatWriter(
-                    name=f"{self.name}/{resource}.amount",
-                    value=QueryInventoryValue(
-                        query=query(typeTag("hub"), hasTag(self.team_tag())),
-                        item=resource,
-                    ),
                 )
                 for resource in resource_names
-            ],
-        ]
+            },
+        }
 
     def hub_query(self) -> Query:
         return query(typeTag("hub"), hasTag(self.team_tag()))
