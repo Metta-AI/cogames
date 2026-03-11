@@ -7,8 +7,8 @@ from cogames.cogs_vs_clips.buildings import MachinaArena, MachinaArenaConfig, Ra
 from cogames.core import CoGameSite
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen, MapGenConfig
-from mettagrid.mapgen.scenes.base_hub import BaseHub, BaseHubConfig
 from mettagrid.mapgen.scenes.building_distributions import DistributionConfig, DistributionType
+from mettagrid.mapgen.scenes.compound import Compound, CompoundConfig
 
 MAPS_DIR = Path(__file__).resolve().parent.parent / "maps"
 
@@ -36,7 +36,7 @@ TRAINING_FACILITY = CoGameSite(
         width=13,
         height=13,
         instance=RandomTransform.Config(
-            scene=BaseHub.Config(
+            scene=Compound.Config(
                 spawn_count=4,
                 corner_bundle="extractors",
                 corner_objects=[
@@ -83,8 +83,8 @@ MACHINA_1 = CoGameSite(
 )
 
 
-def _cogsguard_hub_config() -> BaseHubConfig:
-    return BaseHubConfig(
+def _cogsguard_hub_config() -> CompoundConfig:
+    return CompoundConfig(
         hub_object="c:hub",
         corner_bundle="extractors",
         cross_bundle="none",

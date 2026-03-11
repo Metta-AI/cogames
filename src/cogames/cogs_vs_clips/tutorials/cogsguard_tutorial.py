@@ -5,12 +5,12 @@ from cogames.cogs_vs_clips.cog import CogTeam
 from cogames.cogs_vs_clips.mission import CvCMission
 from cogames.core import CoGameSite
 from mettagrid.mapgen.mapgen import MapGen
-from mettagrid.mapgen.scenes.base_hub import BaseHubConfig
+from mettagrid.mapgen.scenes.compound import CompoundConfig
 
 
 def make_cogsguard_tutorial_site() -> CoGameSite:
     """Create a smaller, simpler CogsGuard arena for the tutorial."""
-    hub_config = BaseHubConfig(
+    hub_config = CompoundConfig(
         hub_object="c:hub",
         corner_bundle="extractors",
         cross_bundle="none",

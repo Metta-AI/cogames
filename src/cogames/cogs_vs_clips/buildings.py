@@ -22,7 +22,6 @@ from mettagrid.mapgen.scene import (
     SceneConfig,
 )
 from mettagrid.mapgen.scenes.asteroid_mask import AsteroidMaskConfig
-from mettagrid.mapgen.scenes.base_hub import BaseHub, BaseHubConfig
 from mettagrid.mapgen.scenes.biome_caves import BiomeCavesConfig
 from mettagrid.mapgen.scenes.biome_city import BiomeCityConfig
 from mettagrid.mapgen.scenes.biome_desert import BiomeDesertConfig
@@ -34,6 +33,7 @@ from mettagrid.mapgen.scenes.building_distributions import (
     DistributionConfig,
     UniformExtractorParams,
 )
+from mettagrid.mapgen.scenes.compound import Compound, CompoundConfig
 from mettagrid.mapgen.scenes.make_connected import MakeConnected
 from mettagrid.mapgen.scenes.maze import MazeConfig
 from mettagrid.mapgen.scenes.radial_maze import RadialMaze
@@ -238,7 +238,7 @@ class MachinaArenaConfig(SceneConfig):
     building_weights: dict[str, float] | None = None
 
     # Hub config. `spawn_count` will be set based on `spawn_count` in this config.
-    hub: BaseHubConfig = BaseHubConfig(
+    hub: CompoundConfig = CompoundConfig(
         hub_object="c:hub",
         corner_bundle="extractors",
         cross_bundle="none",
@@ -248,7 +248,7 @@ class MachinaArenaConfig(SceneConfig):
     # Optional asteroid-shaped boundary mask.
     asteroid_mask: AsteroidMaskConfig | None = None
 
-    # Objects to place at map corners (not BaseHub corners). List of (object_name, corner_index).
+    # Objects to place at map corners (not Compound corners). List of (object_name, corner_index).
     # Corner indices: 0=top-left, 1=top-right, 2=bottom-left, 3=bottom-right.
     map_corner_placements: list[tuple[str, int]] = []
     # Inset used for map_corner_placements.
@@ -794,31 +794,31 @@ class MapSeedVariant(MapGenVariant):
         node.seed = int(self.seed)
 
 
-class BaseHubVariant(EnvNodeVariant[BaseHubConfig]):
+class CompoundVariant(EnvNodeVariant[CompoundConfig]):
     @override
     def compat(self, mission: CvCMission) -> bool:
         env = mission.make_env()
         if not isinstance(env.game.map_builder, MapGen.Config):
             return False
         instance = env.game.map_builder.instance
-        if not isinstance(instance, BaseHub.Config):
+        if not isinstance(instance, Compound.Config):
             return False
-        if isinstance(instance, RandomTransform.Config) and isinstance(instance.scene, BaseHub.Config):
+        if isinstance(instance, RandomTransform.Config) and isinstance(instance.scene, Compound.Config):
             return True
         return isinstance(instance, MachinaArena.Config)
 
     @classmethod
-    def extract_node(cls, env: MettaGridConfig) -> BaseHubConfig:
+    def extract_node(cls, env: MettaGridConfig) -> CompoundConfig:
         assert isinstance(env.game.map_builder, MapGen.Config)
         instance = env.game.map_builder.instance
 
-        if isinstance(instance, RandomTransform.Config) and isinstance(instance.scene, BaseHub.Config):
+        if isinstance(instance, RandomTransform.Config) and isinstance(instance.scene, Compound.Config):
             return instance.scene
 
         elif isinstance(instance, MachinaArena.Config):
             return instance.hub
 
-        raise TypeError("BaseHubVariant can only be applied RandomTransform/BaseHub or MachinaArena scenes")
+        raise TypeError("CompoundVariant can only be applied RandomTransform/Compound or MachinaArena scenes")
 
 
 class MachinaArenaVariant(EnvNodeVariant[MachinaArenaConfig]):

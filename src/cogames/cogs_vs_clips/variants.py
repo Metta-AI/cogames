@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, override
 from pydantic import Field
 
 from cogames.cogs_vs_clips.buildings import (
-    BaseHubVariant,
+    CompoundVariant,
     MachinaArenaConfig,
     MachinaArenaVariant,
 )
@@ -27,8 +27,8 @@ from mettagrid.config.query import query
 from mettagrid.config.tag import typeTag
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen
-from mettagrid.mapgen.scenes.base_hub import DEFAULT_EXTRACTORS as HUB_EXTRACTORS
 from mettagrid.mapgen.scenes.building_distributions import DistributionConfig, DistributionType
+from mettagrid.mapgen.scenes.compound import DEFAULT_EXTRACTORS as HUB_EXTRACTORS
 
 if TYPE_CHECKING:
     from cogames.cogs_vs_clips.mission import CvCMission
@@ -345,7 +345,7 @@ class SingleResourceUniformVariant(MachinaArenaVariant):
         node.distribution = DistributionConfig(type=DistributionType.UNIFORM)
 
 
-class RandomizeSpawnsVariant(BaseHubVariant):
+class RandomizeSpawnsVariant(CompoundVariant):
     name: str = "randomize_spawns"
     description: str = "Randomize agent spawn positions within the hub instead of fixed cardinal directions."
 
@@ -354,7 +354,7 @@ class RandomizeSpawnsVariant(BaseHubVariant):
         node.randomize_spawn_positions = True
 
 
-class EmptyBaseVariant(BaseHubVariant):
+class EmptyBaseVariant(CompoundVariant):
     name: str = "empty_base"
     description: str = "Base hub with extractors removed from the four corners."
     missing: list[str] = list(HUB_EXTRACTORS)
