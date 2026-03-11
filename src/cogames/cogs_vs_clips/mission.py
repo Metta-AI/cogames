@@ -156,7 +156,7 @@ class CvCMission(CoGameMission):
             events=self.clips.events(max_steps=self.max_steps, map_builder=self.map_builder()),
             tags=[tag for t in all_teams for tag in t.all_tags()],
             materialize_queries=[mq for t in all_teams for mq in t.materialized_queries()],
-            stat_writers=[sw for t in all_teams for sw in t.stat_writers(CvCConfig.RESOURCES)],
+            on_tick={k: v for t in all_teams for k, v in t.on_tick_handlers(CvCConfig.RESOURCES).items()},
         )
 
         env = MettaGridConfig(game=game)
