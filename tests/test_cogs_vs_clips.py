@@ -1,5 +1,6 @@
 import pytest
 
+from cogames.cogs_vs_clips.buildings import MachinaArenaConfig
 from cogames.cogs_vs_clips.clips import ClipsConfig
 from cogames.cogs_vs_clips.cog import CogConfig, CogTeam
 from cogames.cogs_vs_clips.config import CvCConfig
@@ -10,7 +11,6 @@ from cogames.cogs_vs_clips.missions import (
 )
 from cogames.cogs_vs_clips.ships import count_clips_ships_in_map_config
 from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
-from cogames.cogs_vs_clips.terrain import MachinaArenaConfig
 from cogames.cogs_vs_clips.tutorials.scrambler_tutorial import ScramblerTutorialMission
 from cogames.cogs_vs_clips.variants import MultiTeamVariant
 from cogames.core import CoGameSite

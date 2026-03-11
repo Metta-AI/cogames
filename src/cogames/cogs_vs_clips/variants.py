@@ -4,14 +4,14 @@ from typing import TYPE_CHECKING, override
 
 from pydantic import Field
 
-from cogames.cogs_vs_clips.config import CvCConfig
-from cogames.cogs_vs_clips.evals.difficulty_variants import DIFFICULTY_VARIANTS
-from cogames.cogs_vs_clips.ships import remove_clips_ships_from_map_config
-from cogames.cogs_vs_clips.terrain import (
+from cogames.cogs_vs_clips.buildings import (
     BaseHubVariant,
     MachinaArenaConfig,
     MachinaArenaVariant,
 )
+from cogames.cogs_vs_clips.config import CvCConfig
+from cogames.cogs_vs_clips.evals.difficulty_variants import DIFFICULTY_VARIANTS
+from cogames.cogs_vs_clips.ships import remove_clips_ships_from_map_config
 from cogames.core import CoGameMissionVariant
 from mettagrid.config.filter import (
     GameValueFilter,

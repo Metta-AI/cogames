@@ -8,12 +8,12 @@ from rich import box
 from rich.table import Table
 
 from cogames.cli.base import console
+from cogames.cogs_vs_clips.buildings import MachinaArena
 from cogames.cogs_vs_clips.clip_difficulty import get_cogsguard_difficulty
 from cogames.cogs_vs_clips.cogsguard_curriculum import split_variants
 from cogames.cogs_vs_clips.mission import CvCMission, NumCogsVariant
 from cogames.cogs_vs_clips.reward_variants import apply_reward_variants
 from cogames.cogs_vs_clips.sites import SITES
-from cogames.cogs_vs_clips.terrain import MachinaArena
 from cogames.cogs_vs_clips.variants import VARIANTS
 from cogames.core import (
     MAP_MISSION_DELIMITER,
