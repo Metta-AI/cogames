@@ -14,7 +14,7 @@ from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.mapgen.scenes.compound import Compound, CompoundConfig
 
 if TYPE_CHECKING:
-    from cogames.cogs_vs_clips.mission import CvCMission
+    from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 
 
 class BaseCompoundVariant(EnvNodeVariant[CompoundConfig]):

@@ -112,6 +112,8 @@ class CoGameMission(Config, ABC):
     description: str
     site: CoGameSite
     num_cogs: int | None = None
+    min_cogs: int = Field(default=1, ge=1)
+    max_cogs: int = Field(default=1000, ge=1)
 
     default_variant: str | None = None
     sub_missions: list[str] = Field(default_factory=list)
@@ -156,6 +158,22 @@ class CoGameMission(Config, ABC):
             copy.variants.append(variant)
             variant.modify_mission(copy)
         return copy
+
+    def make_base_env(self) -> MettaGridConfig:
+        """Create the initial env config before variants are applied. Subclasses must implement."""
+        raise NotImplementedError("Subclasses must implement make_base_env()")
+
+    def make_env(self) -> MettaGridConfig:
+        """Create a complete env config: base env + all variants applied."""
+        extra_names = [n for n in self._variant_registry._variants if n != self.default_variant]
+        default = [self.default_variant] if self.default_variant else []
+        self._variant_registry.run_configure([*default, *extra_names])
+
+        env = self.make_base_env()
+        self._variant_registry.apply_to_env(self, env)
+
+        env.label = self.full_name()
+        return env
 
     def full_name(self) -> str:
         return f"{self.site.name}{MAP_MISSION_DELIMITER}{self.name}"

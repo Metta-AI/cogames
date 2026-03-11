@@ -10,7 +10,7 @@ from cogames.variants import ResolvedDeps
 from mettagrid.config.mettagrid_config import GridObjectConfig, MettaGridConfig
 
 if TYPE_CHECKING:
-    from cogames.cogs_vs_clips.mission import CvCMission
+    from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 
 
 class JunctionVariant(CoGameMissionVariant):

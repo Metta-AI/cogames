@@ -13,7 +13,7 @@ from mettagrid.config.mettagrid_config import MettaGridConfig, ResourceLimitsCon
 from mettagrid.config.mutation import ClearInventoryMutation, EntityTarget
 
 if TYPE_CHECKING:
-    from cogames.cogs_vs_clips.mission import CvCMission
+    from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 
 
 class DamageVariant(CoGameMissionVariant):
