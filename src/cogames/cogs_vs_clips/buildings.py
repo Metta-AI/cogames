@@ -11,4 +11,5 @@ from cogames.games.cogs_vs_clips.missions.terrain import (
     RandomTransform,
     SequentialMachinaArena,
     SequentialMachinaArenaVariant,
+    find_machina_arena,
 )
