@@ -118,17 +118,13 @@ def _register_policies() -> None:
     discover_and_register_policies()
 
 
-def _register_policies_callback() -> None:
-    _register_policies()
-
-
 app = typer.Typer(
     help="CoGames - Multi-agent cooperative and competitive games.",
     context_settings={"help_option_names": ["-h", "--help"]},
     no_args_is_help=True,
     rich_markup_mode="rich",
     pretty_exceptions_show_locals=False,
-    callback=_register_policies_callback,
+    callback=_register_policies,
 )
 
 tutorial_app = typer.Typer(
