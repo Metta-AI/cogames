@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, TypeVar
 
-import cogames.core as core
 from mettagrid.config.mettagrid_config import MettaGridConfig
 
 if TYPE_CHECKING:
@@ -155,16 +154,22 @@ class VariantRegistry:
 
     def run_configure(self, variants: list[str]) -> None:
         """Resolve variant names to objects, resolve dependencies, configure in topological order."""
+        # Lazy import to break the circular dependency between core.py and variants.py.
+        # core.py must import this module at the top level (for VariantRegistry used in
+        # CoGameMission._variant_registry), so this module defers its import of core to
+        # avoid the import cycle.
+        from cogames.core import CoGameMissionVariant, Deps  # noqa: PLC0415
+
         for name in variants:
             if name not in self._variants:
-                self._variants[name] = core.CoGameMissionVariant.create(name)
+                self._variants[name] = CoGameMissionVariant.create(name)
 
         self._resolve_dependencies()
         self._configure_order = self._topological_order()
 
         for name in self._configure_order:
             v = self._variants[name]
-            deps = self._resolved_deps.get(name, core.Deps())
+            deps = self._resolved_deps.get(name, Deps())
             resolved = ResolvedDeps(self, set(deps.required), set(deps.optional))
             v.configure(resolved)
 
