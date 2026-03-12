@@ -69,6 +69,7 @@ class TeamVariant(CoGameMissionVariant):
 
         for i, t in enumerate(self.teams.values()):
             t.team_id = i
+            self._team_by_id[i] = t
 
         # Assign teams to existing agents (preserving prior modifications like
         # inventory limits), adding or trimming agents only if the count changed.

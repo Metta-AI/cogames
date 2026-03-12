@@ -97,7 +97,8 @@ def _remove_from_machina(config: MachinaArenaConfig) -> MachinaArenaConfig:
 
 
 def add_clips_ships_to_map_config(
-    config: AnyMapBuilderConfig | SceneConfig, num_ships: int
+    config: AnyMapBuilderConfig | SceneConfig,
+    num_ships: int,
 ) -> AnyMapBuilderConfig | SceneConfig:
     """Return a copy of *config* with clips ship corner placements added."""
     if isinstance(config, MachinaArenaConfig):
