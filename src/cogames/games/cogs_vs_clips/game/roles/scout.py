@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import override
 
-from cogames.cogs_vs_clips.energy import EnergyVariant
 from cogames.core import Deps
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
+from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.game.roles.role import RoleVariant
 from cogames.variants import ResolvedDeps
 

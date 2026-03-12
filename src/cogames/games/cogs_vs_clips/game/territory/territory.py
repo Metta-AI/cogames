@@ -67,10 +67,12 @@ class TerritoryVariant(CoGameMissionVariant):
         )
 
         tc = TerritoryControlConfig(territory="team_territory", strength=self.control_range)
+        hub_tc = TerritoryControlConfig(territory="team_territory", strength=self.control_range * 2)
 
         for obj in env.game.objects.values():
             if isinstance(obj, GridObjectConfig) and obj.name in ("hub", "junction", "ship"):
-                obj.territory_controls.append(tc.model_copy())
+                is_hub = obj.name == "hub"
+                obj.territory_controls.append((hub_tc if is_hub else tc).model_copy())
 
         team_v = mission.required_variant(TeamVariant)
         clips_v = mission.optional_variant(ClipsVariant)

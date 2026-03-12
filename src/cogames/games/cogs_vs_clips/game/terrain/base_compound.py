@@ -11,6 +11,7 @@ from cogames.games.cogs_vs_clips.missions.terrain import (
 )
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.mapgen.mapgen import MapGen
+from mettagrid.mapgen.scenes.compound import DEFAULT_EXTRACTORS as HUB_EXTRACTORS
 from mettagrid.mapgen.scenes.compound import Compound, CompoundConfig
 
 if TYPE_CHECKING:
@@ -46,3 +47,25 @@ class BaseCompoundVariant(EnvNodeVariant[CompoundConfig]):
             return instance.hub
 
         raise TypeError("BaseCompoundVariant can only be applied to RandomTransform/Compound or MachinaArena scenes")
+
+
+class RandomizeSpawnsVariant(BaseCompoundVariant):
+    name: str = "randomize_spawns"
+    description: str = "Randomize agent spawn positions within the hub instead of fixed cardinal directions."
+
+    @override
+    def modify_node(self, node):
+        node.randomize_spawn_positions = True
+
+
+class EmptyBaseVariant(BaseCompoundVariant):
+    name: str = "empty_base"
+    description: str = "Base hub with extractors removed from the four corners."
+    missing: list[str] = list(HUB_EXTRACTORS)
+
+    @override
+    def modify_node(self, node):
+        missing_set = set(self.missing or [])
+        corner_objects = [name if name not in missing_set else "" for name in HUB_EXTRACTORS]
+        node.corner_objects = corner_objects
+        node.corner_bundle = "custom"
