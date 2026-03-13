@@ -54,15 +54,15 @@ class CvCMission(CoGameMission):
     default_variant: str | None = Field(default="machina_1")
     total_junctions: int = Field(default=118, description="Total junctions on the map (for curriculum scaling)")
 
-    cog: CogConfig = Field(default_factory=lambda: CogConfig())
+    cog: CogConfig = Field(default_factory=CogConfig)
     teams: dict[str, CogTeam] = Field(
         default_factory=lambda: {
             "cogs": CogTeam(name="cogs", num_agents=8, wealth=1),
         }
     )
 
-    clips: ClipsConfig = Field(default_factory=lambda: ClipsConfig())
-    weather: WeatherConfig = Field(default_factory=lambda: WeatherConfig())
+    clips: ClipsConfig = Field(default_factory=ClipsConfig)
+    weather: WeatherConfig = Field(default_factory=WeatherConfig)
 
     @property
     def num_agents(self) -> int:
