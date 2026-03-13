@@ -64,6 +64,9 @@ class CvCMission(CoGameMission):
     clips: ClipsConfig = Field(default_factory=ClipsConfig)
     weather: WeatherConfig = Field(default_factory=WeatherConfig)
 
+    def variant_module_prefixes(self) -> tuple[str, ...]:
+        return ("cogames.cogs_vs_clips.",)
+
     @property
     def num_agents(self) -> int:
         if self.num_cogs is not None:
@@ -95,7 +98,7 @@ class CvCMission(CoGameMission):
         if self.default_variant:
             variant_names.append(self.default_variant)
         variant_names.extend(v.name for v in self.variants)
-        registry.run_configure(variant_names)
+        registry.run_configure(variant_names, preferred_modules=self.variant_module_prefixes())
 
         team_objs = list(self.teams.values())
         for i, t in enumerate(team_objs):

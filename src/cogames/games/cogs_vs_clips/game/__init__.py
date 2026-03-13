@@ -40,13 +40,6 @@ from cogames.games.cogs_vs_clips.game.terrain import (
 from cogames.games.cogs_vs_clips.game.territory import DamageStrangersVariant, HealTeamVariant, TerritoryVariant
 from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant as JunctionNetVariant
 from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
-from cogames.games.cogs_vs_clips.missions.tutorial import (
-    AlignerRewardsVariant,
-    MinerRewardsVariant,
-    OverrunVariant,
-    ScoutRewardsVariant,
-    ScramblerRewardsVariant,
-)
 
 __all__ = [
     "AlignerVariant",
@@ -92,6 +85,27 @@ __all__ = [
     "WildGearStationsVariant",
 ]
 
+
+def _get_tutorial_variants() -> list[CoGameMissionVariant]:
+    # Lazy import to break circular dependency:
+    # game/__init__ -> missions.tutorial -> missions.machina_1 -> game.cargo -> game/__init__
+    from cogames.games.cogs_vs_clips.missions.tutorial import (  # noqa: PLC0415
+        AlignerRewardsVariant,
+        MinerRewardsVariant,
+        OverrunVariant,
+        ScoutRewardsVariant,
+        ScramblerRewardsVariant,
+    )
+
+    return [
+        AlignerRewardsVariant(),
+        MinerRewardsVariant(),
+        ScoutRewardsVariant(),
+        ScramblerRewardsVariant(),
+        OverrunVariant(),
+    ]
+
+
 VARIANTS: list[CoGameMissionVariant] = [
     AlignerVariant(),
     BalancedCornersVariant(),
@@ -129,13 +143,8 @@ VARIANTS: list[CoGameMissionVariant] = [
     TerritoryVariant(),
     VibesVariant(),
     WildGearStationsVariant(),
-    AlignerRewardsVariant(),
-    MinerRewardsVariant(),
-    ScoutRewardsVariant(),
-    ScramblerRewardsVariant(),
-    OverrunVariant(),
 ]
 
 
 def _get_all_variants() -> list[CoGameMissionVariant]:
-    return list(VARIANTS)
+    return list(VARIANTS) + _get_tutorial_variants()

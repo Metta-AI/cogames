@@ -1,7 +1,9 @@
-from cogames.cogs_vs_clips.clips import ClipsConfig
-from cogames.cogs_vs_clips.cog import CogTeam
-from cogames.cogs_vs_clips.hub import CvCHubConfig
-from cogames.cogs_vs_clips.junction import CvCJunctionConfig
+"""Tests that TerritoryVariant assigns territory_controls to hub, junction, and ship."""
+
+from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
+from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant
+from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
+from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 
 
 def _assert_territory_controls(station) -> None:
@@ -12,12 +14,46 @@ def _assert_territory_controls(station) -> None:
 
 
 def test_junction_defines_territory_controls() -> None:
-    cogs = CogTeam()
-    clips = ClipsConfig()
-    station = CvCJunctionConfig().station_cfg(teams=[cogs, clips], owner_team_name=cogs.name)
-    _assert_territory_controls(station)
+    env = (
+        CvCMission(
+            name="test",
+            description="test",
+            map_builder=make_arena_map_builder(num_agents=4),
+            min_cogs=4,
+            max_cogs=4,
+            num_cogs=4,
+            max_steps=100,
+        )
+        .with_variants(
+            [
+                TeamVariant(default_teams={"cogs": TeamConfig(name="cogs", num_agents=4)}),
+                TerritoryVariant(),
+            ]
+        )
+        .make_env()
+    )
+    junction = env.game.objects["junction"]
+    _assert_territory_controls(junction)
 
 
 def test_hub_defines_territory_controls() -> None:
-    station = CvCHubConfig().station_cfg(team=CogTeam())
-    _assert_territory_controls(station)
+    env = (
+        CvCMission(
+            name="test",
+            description="test",
+            map_builder=make_arena_map_builder(num_agents=4),
+            min_cogs=4,
+            max_cogs=4,
+            num_cogs=4,
+            max_steps=100,
+        )
+        .with_variants(
+            [
+                TeamVariant(default_teams={"cogs": TeamConfig(name="cogs", num_agents=4)}),
+                TerritoryVariant(),
+            ]
+        )
+        .make_env()
+    )
+    hub = env.game.objects["c:hub"]
+    _assert_territory_controls(hub)

@@ -1,7 +1,7 @@
 """
 Trainable Policy Template for the CoGames environment.
 
-This template is compatible with CogsGuard missions. It uses only the observation and action
+This template is compatible with CvC missions. It uses only the observation and action
 spaces provided by the environment and makes no game-specific assumptions.
 
 This template provides a minimal trainable neural network policy that can be used with
@@ -17,7 +17,7 @@ clarity and without the pufferlib dependency.
 
 To use this template:
 1. Modify MyNetwork to implement your desired architecture
-2. Run: cogames tutorial train -m cogsguard_machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy
+2. Run: cogames tutorial train -m machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy
 """
 
 from __future__ import annotations

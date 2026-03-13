@@ -28,18 +28,18 @@ cogames --help
 Use a small `--steps` value for a quick tutorial run. The default is very large.
 
 ```bash
-cogames tutorial train -m cogsguard_machina_1.basic -p class=lstm --steps 2000
+cogames tutorial train -m cvc_machina_1.basic -p class=lstm --steps 2000
 ```
 
 Expected terminal output (example):
 ```
-Training on mission: cogsguard_machina_1.basic
+Training on mission: cvc_machina_1.basic
 ...progress logs...
 Training complete. Checkpoints saved to: ./train_dir
 Final checkpoint: ./train_dir/<run_id>/model_000001.pt
 
 To play with this policy:
-  cogames play -m cogsguard_machina_1.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt
+  cogames play -m cvc_machina_1.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt
 ```
 
 Replace `<run_id>` with your actual run ID from your training output.
@@ -64,12 +64,12 @@ cogames tutorial make-policy --trainable -o my_trainable_policy.py
 
 Then run:
 ```bash
-cogames tutorial train -m cogsguard_machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy --steps 2000
+cogames tutorial train -m cvc_machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy --steps 2000
 ```
 
 Expected terminal output (example):
 ```
-Training on mission: cogsguard_machina_1.basic
+Training on mission: cvc_machina_1.basic
 ...progress logs...
 Training complete. Checkpoints saved to: ./train_dir
 Final checkpoint: ./train_dir/<run_id>/model_000001.pt
@@ -78,6 +78,6 @@ Final checkpoint: ./train_dir/<run_id>/model_000001.pt
 
 ## What to do next
 - Play using the saved checkpoint:
-  `cogames play -m cogsguard_machina_1.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
+  `cogames play -m cvc_machina_1.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
 - Evaluate using the same checkpoint:
-  `cogames eval -m cogsguard_machina_1.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
+  `cogames eval -m cvc_machina_1.basic -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`

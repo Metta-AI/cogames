@@ -104,7 +104,7 @@ feature IDs for your configuration.
 
 | Feature Name                      | Description                                                                     | Objects with this Feature | Notes                                                                           |
 | --------------------------------- | ------------------------------------------------------------------------------- | ------------------------- | ------------------------------------------------------------------------------- |
-| `agent:group`                     | Cog's group/team identifier                                                     | cogs                      | Used for team identification in CogsGuard                                       |
+| `agent:group`                     | Cog's group/team identifier                                                     | cogs                      | Used for team identification in CvC                                             |
 | `agent:frozen`                    | Whether cog is frozen or not. Frozen cogs cannot act                            | cogs                      |                                                                                 |
 | `episode_completion_pct`          | Portion of the episode completed, from 0 (start) to 255 (end). Not a percentage | self (global)             |                                                                                 |
 | `last_action`                     | Last action taken by the cog                                                    | self (global)             |                                                                                 |

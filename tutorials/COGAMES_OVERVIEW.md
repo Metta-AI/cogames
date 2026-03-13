@@ -12,9 +12,9 @@ jupyter:
     name: python3
 ---
 
-# CogsGuard: Game Overview
+# CvC: Game Overview
 
-CogsGuard is a cooperative territory-control game where teams of specialized agents capture
+CvC is a cooperative territory-control game where teams of specialized agents capture
 and defend junctions against automated Clips expansion. This notebook covers the game rules,
 shows a sample game in MettaScope, and trains a miner policy from scratch.
 
@@ -101,12 +101,12 @@ the others.
 import torch
 
 import pufferlib.vector as pvector
-from cogames.cogs_vs_clips.clip_difficulty import EASY
-from cogames.cogs_vs_clips.tutorials.miner_tutorial import MinerRewardsVariant
-from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.sites import make_cogsguard_machina1_site
-from cogames.cogs_vs_clips.cog import CogTeam
-from cogames.cogs_vs_clips.variants import NoVibesVariant
+from cogames.games.cogs_vs_clips.clip_difficulty import EASY
+from cogames.games.cogs_vs_clips.missions.tutorial import MinerRewardsVariant
+from cogames.games.cogs_vs_clips.mission import CvCMission
+from cogames.games.cogs_vs_clips.sites import make_cvc_machina1_site
+from cogames.games.cogs_vs_clips.cog import CogTeam
+from cogames.games.cogs_vs_clips.variants import NoVibesVariant
 from cogames.policy.tutorial_policy import TutorialPolicyNet
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
 from mettagrid.envs.early_reset_handler import EarlyResetHandler
@@ -133,7 +133,7 @@ MAX_STEPS = 1000
 mission = CvCMission(
     name="miner_tutorial",
     description="Learn miner role - resource extraction and deposits.",
-    site=make_cogsguard_machina1_site(NUM_AGENTS),
+    site=make_cvc_machina1_site(NUM_AGENTS),
     num_cogs=NUM_AGENTS,
     max_steps=MAX_STEPS,
     teams={"cogs": CogTeam(name="cogs", num_agents=NUM_AGENTS)},
@@ -198,7 +198,7 @@ BATCH_SIZE = max(4096, total_agents * BPTT_HORIZON)
 
 trainer = pufferl.PuffeRL(
     dict(
-        env="cogames.cogs_vs_clips",
+        env="cogames.games.cogs_vs_clips",
         device=DEVICE.type,
         total_timesteps=max(TOTAL_TIMESTEPS, BATCH_SIZE),
         batch_size=BATCH_SIZE,
@@ -300,7 +300,7 @@ cogames tutorial play
 
 **Watch scripted agents** — see baseline behavior on the Arena map:
 ```bash
-cogames play -m cogsguard_machina_1.basic -p class=baseline
+cogames play -m cvc_machina_1.basic -p class=baseline
 ```
 
 **Role-specific training tutorials** — deep-dive into each role:

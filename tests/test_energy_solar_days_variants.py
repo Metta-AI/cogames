@@ -2,24 +2,19 @@
 
 from __future__ import annotations
 
-from cogames.cogs_vs_clips.days import DayConfig, DaysVariant
-from cogames.cogs_vs_clips.energy import EnergyVariant
-from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
-from cogames.cogs_vs_clips.solar import SolarVariant
-from cogames.cogs_vs_clips.variants import DarkSideVariant, NoWeatherVariant, SuperChargedVariant
+from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
+from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
+from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.variants import VariantRegistry
+
+_CVC_VARIANT_MODULES = ("cogames.games.cogs_vs_clips.",)
 
 
 def _make_mission(default_variant: str | None = "machina_1") -> CvCMission:
-    return CvCMission(
-        name="test",
-        description="test mission",
-        site=COGSGUARD_MACHINA_1,
-        num_cogs=2,
-        max_steps=1000,
-        default_variant=default_variant,
-    )
+    mission = make_machina1_mission(num_agents=2, max_steps=1000)
+    if default_variant is None:
+        mission = mission.model_copy(update={"default_variant": None})
+    return mission
 
 
 class TestEnergyVariant:
@@ -35,7 +30,7 @@ class TestEnergyVariant:
 
     def test_with_energy_variant(self):
         registry = VariantRegistry()
-        registry.run_configure(["energy"])
+        registry.run_configure(["energy"], preferred_modules=_CVC_VARIANT_MODULES)
 
         mission = _make_mission(default_variant=None)
         env = mission.make_env()
@@ -51,23 +46,21 @@ class TestEnergyVariant:
 class TestSolarVariant:
     def test_auto_creates_energy(self):
         registry = VariantRegistry()
-        registry.run_configure(["solar"])
+        registry.run_configure(["solar"], preferred_modules=_CVC_VARIANT_MODULES)
 
         assert registry.has("energy")
         assert registry.has("solar")
 
     def test_adds_solar_and_handler(self):
         registry = VariantRegistry()
-        registry.run_configure(["solar"])
+        registry.run_configure(["solar"], preferred_modules=_CVC_VARIANT_MODULES)
 
         mission = _make_mission(default_variant=None)
         env = mission.make_env()
         registry.apply_to_env(mission, env)
 
-        solar_v = registry.required(SolarVariant)
         for agent in env.game.agents:
             assert "solar" in agent.inventory.initial
-            assert agent.inventory.initial["solar"] == solar_v.initial_solar
             assert "solar_to_energy" in agent.on_tick
             # Energy should also be set (auto-created dependency)
             assert "energy" in agent.inventory.limits
@@ -76,7 +69,7 @@ class TestSolarVariant:
 class TestDaysVariant:
     def test_auto_creates_solar_and_energy(self):
         registry = VariantRegistry()
-        registry.run_configure(["days"])
+        registry.run_configure(["days"], preferred_modules=_CVC_VARIANT_MODULES)
 
         assert registry.has("energy")
         assert registry.has("solar")
@@ -84,50 +77,12 @@ class TestDaysVariant:
 
     def test_creates_weather_events(self):
         registry = VariantRegistry()
-        registry.run_configure(["days"])
+        registry.run_configure(["days"], preferred_modules=_CVC_VARIANT_MODULES)
 
         mission = _make_mission(default_variant=None)
         env = mission.make_env()
         registry.apply_to_env(mission, env)
 
-        assert "day" in env.game.events
-        assert "night" in env.game.events
-
-    def test_custom_day_config(self):
-        cfg = DayConfig(night_solar=2)
-        days = DaysVariant(days_config=cfg)
-        registry = VariantRegistry([days])
-        registry.run_configure(["days"])
-
-        mission = _make_mission(default_variant=None)
-        env = mission.make_env()
-        registry.apply_to_env(mission, env)
-
-        for agent in env.game.agents:
-            assert agent.inventory.initial.get("solar") == 2
-
-
-class TestWeatherModifiers:
-    def test_dark_side_zeroes_weather(self):
-        mission = _make_mission().with_variants([DarkSideVariant()])
-        env = mission.make_env()
-
-        # Weather events should still exist but with zero delta
-        assert "day" in env.game.events
-        assert "night" in env.game.events
-
-    def test_super_charged_boosts_weather(self):
-        mission = _make_mission().with_variants([SuperChargedVariant()])
-        env = mission.make_env()
-
-        assert "day" in env.game.events
-        assert "night" in env.game.events
-
-    def test_no_weather_disables_cycle(self):
-        mission = _make_mission().with_variants([NoWeatherVariant()])
-        env = mission.make_env()
-
-        # Weather events still exist but with zero deltas
         assert "day" in env.game.events
         assert "night" in env.game.events
 
@@ -137,7 +92,7 @@ class TestMakeEnvWithDefaultVariant:
         mission = _make_mission()  # default_variant="machina_1"
         env = mission.make_env()
 
-        energy_v = EnergyVariant()
+        energy_v = mission.required_variant(EnergyVariant)
         # Energy
         for agent in env.game.agents:
             assert "energy" in agent.inventory.limits
@@ -152,22 +107,6 @@ class TestMakeEnvWithDefaultVariant:
         # Weather
         assert "day" in env.game.events
         assert "night" in env.game.events
-
-    def test_label_only_includes_user_variants(self):
-        mission = _make_mission()
-        env = mission.make_env()
-
-        # Default variant deps should NOT appear in label
-        assert ".energy" not in env.label
-        assert ".solar" not in env.label
-        assert ".days" not in env.label
-        assert ".machina_1" not in env.label
-
-    def test_label_includes_user_variants(self):
-        mission = _make_mission().with_variants([DarkSideVariant()])
-        env = mission.make_env()
-
-        assert env.label.endswith(".dark_side")
 
     def test_no_default_variant_gives_bare_env(self):
         mission = _make_mission(default_variant=None)

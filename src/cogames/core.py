@@ -44,15 +44,24 @@ class CoGameMissionVariant(Config, ABC):
     depends_on: list[str] = Field(default_factory=list)
 
     _type_registry: ClassVar[dict[str, type[CoGameMissionVariant]]] = {}
+    _type_candidates: ClassVar[dict[str, list[type[CoGameMissionVariant]]]] = {}
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         name_val = cls.__dict__.get("name")
         if isinstance(name_val, str) and name_val:
             CoGameMissionVariant._type_registry[name_val] = cls
+            CoGameMissionVariant._type_candidates.setdefault(name_val, []).append(cls)
 
     @classmethod
-    def create(cls, name: str) -> CoGameMissionVariant:
+    def create(cls, name: str, preferred_modules: Sequence[str] | None = None) -> CoGameMissionVariant:
+        candidates = cls._type_candidates.get(name)
+        assert candidates is not None, f"Unknown variant '{name}'. Available: {sorted(cls._type_registry)}"
+        if preferred_modules:
+            for prefix in preferred_modules:
+                for candidate in reversed(candidates):
+                    if candidate.__module__.startswith(prefix):
+                        return candidate()  # pyright: ignore[reportCallIssue]
         variant_cls = cls._type_registry.get(name)
         assert variant_cls is not None, f"Unknown variant '{name}'. Available: {sorted(cls._type_registry)}"
         return variant_cls()  # pyright: ignore[reportCallIssue]
@@ -142,6 +151,9 @@ class CoGameMission(Config, ABC):
     def has_variant(self, name: str) -> bool:
         return self._variant_registry.has(name)
 
+    def variant_module_prefixes(self) -> tuple[str, ...]:
+        return ()
+
     def with_variants(self, variants: list[CoGameMissionVariant] | Sequence[str | CoGameMissionVariant]) -> Self:
         has_strings = any(isinstance(v, str) for v in variants)
         if not has_strings:
@@ -153,8 +165,13 @@ class CoGameMission(Config, ABC):
             return mission
         # Registry path: resolve names to objects and apply via the standard path
         copy = self.model_copy(deep=True)
+        preferred_modules = copy.variant_module_prefixes()
         for v in variants:
-            variant = v if isinstance(v, CoGameMissionVariant) else CoGameMissionVariant.create(v)
+            variant = (
+                v
+                if isinstance(v, CoGameMissionVariant)
+                else CoGameMissionVariant.create(v, preferred_modules=preferred_modules)
+            )
             copy.variants.append(variant)
             variant.modify_mission(copy)
         return copy
@@ -167,7 +184,10 @@ class CoGameMission(Config, ABC):
         """Create a complete env config: base env + all variants applied."""
         extra_names = [n for n in self._variant_registry._variants if n != self.default_variant]
         default = [self.default_variant] if self.default_variant else []
-        self._variant_registry.run_configure([*default, *extra_names])
+        self._variant_registry.run_configure(
+            [*default, *extra_names],
+            preferred_modules=self.variant_module_prefixes(),
+        )
 
         env = self.make_base_env()
         self._variant_registry.apply_to_env(self, env)

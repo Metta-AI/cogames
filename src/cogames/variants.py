@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, TypeVar
 
 from mettagrid.config.mettagrid_config import MettaGridConfig
@@ -152,7 +153,7 @@ class VariantRegistry:
 
         return order
 
-    def run_configure(self, variants: list[str]) -> None:
+    def run_configure(self, variants: list[str], preferred_modules: Sequence[str] | None = None) -> None:
         """Resolve variant names to objects, resolve dependencies, configure in topological order."""
         # Lazy import to break the circular dependency between core.py and variants.py.
         # core.py must import this module at the top level (for VariantRegistry used in
@@ -162,7 +163,7 @@ class VariantRegistry:
 
         for name in variants:
             if name not in self._variants:
-                self._variants[name] = CoGameMissionVariant.create(name)
+                self._variants[name] = CoGameMissionVariant.create(name, preferred_modules=preferred_modules)
 
         self._resolve_dependencies()
         self._configure_order = self._topological_order()

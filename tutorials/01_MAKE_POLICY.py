@@ -47,7 +47,7 @@
 # Expected output (example):
 # ```
 # Scripted policy template copied to: /path/to/your/project/my_scripted_policy.py
-# Play with: cogames play -m cogsguard_machina_1.basic -p class=my_scripted_policy.StarterPolicy
+# Play with: cogames play -m cvc_machina_1.basic -p class=my_scripted_policy.StarterPolicy
 # ```
 #
 # Note: Replace `/path/to/your/project/` with your local repo path.
@@ -62,14 +62,14 @@
 # Run the scripted policy (no training required):
 #
 # ```bash
-# cogames play -m cogsguard_machina_1.basic -p class=my_scripted_policy.StarterPolicy
+# cogames play -m cvc_machina_1.basic -p class=my_scripted_policy.StarterPolicy
 # ```
 #
 
 # %% [markdown]
 # Expected terminal output (example):
 # ```
-# Playing cogsguard_machina_1.basic
+# Playing cvc_machina_1.basic
 # Max Steps: 1000, Render: gui
 # Initializing Mettascope...
 # Episode Complete!
@@ -92,7 +92,7 @@
 # Expected output (example):
 # ```
 # Trainable policy template copied to: /path/to/your/project/my_trainable_policy.py
-# Train with: cogames tutorial train -m cogsguard_machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy --steps 2000
+# Train with: cogames tutorial train -m cvc_machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy --steps 2000
 # ```
 #
 # Note: Replace `/path/to/your/project/` with your local repo path.
@@ -107,8 +107,8 @@
 # Train and run the trainable policy:
 #
 # ```bash
-# cogames tutorial train -m cogsguard_machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy --steps 2000
-# cogames play -m cogsguard_machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy,data=./train_dir/<run_id>/model_000001.pt
+# cogames tutorial train -m cvc_machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy --steps 2000
+# cogames play -m cvc_machina_1.basic -p class=my_trainable_policy.MyTrainablePolicy,data=./train_dir/<run_id>/model_000001.pt
 # ```
 #
 # Note: Add `--steps` for quick tutorial runs; the default is very large.
@@ -117,7 +117,7 @@
 # %% [markdown]
 # Expected terminal output (example):
 # ```
-# Training on mission: cogsguard_machina_1.basic
+# Training on mission: cvc_machina_1.basic
 # ...progress logs...
 # Training complete. Checkpoints saved to: ./train_dir
 # Final checkpoint: ./train_dir/<run_id>/model_000001.pt
@@ -127,7 +127,7 @@
 # %% [markdown]
 # Expected terminal output (example):
 # ```
-# Playing cogsguard_machina_1.basic
+# Playing cvc_machina_1.basic
 # Max Steps: 1000, Render: gui
 # Initializing Mettascope...
 # Episode Complete!
