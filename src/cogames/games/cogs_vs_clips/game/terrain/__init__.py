@@ -4,7 +4,6 @@ from cogames.games.cogs_vs_clips.game.terrain.base_compound import (
     RandomizeSpawnsVariant,
 )
 from cogames.games.cogs_vs_clips.game.terrain.terrain import (
-    BalancedCornersVariant,
     BuildingsVariant,
     CavesVariant,
     CityVariant,
@@ -16,7 +15,6 @@ from cogames.games.cogs_vs_clips.game.terrain.terrain import (
 )
 
 __all__ = [
-    "BalancedCornersVariant",
     "BaseCompoundVariant",
     "BuildingsVariant",
     "CavesVariant",
