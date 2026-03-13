@@ -1,4 +1,4 @@
-# MISSION BRIEFING: CogsGuard Deployment
+# MISSION BRIEFING: CvC Deployment
 
 ## Territorial Defense Initiative
 

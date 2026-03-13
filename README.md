@@ -119,7 +119,7 @@ If you want help, or to share your experience, join [the Discord](https://discor
 
 # About the game
 
-CogsGuard is a cooperative territory-control game. Teams of AI agents ("Cogs") work together to capture and defend
+CvC is a cooperative territory-control game. Teams of AI agents ("Cogs") work together to capture and defend
 junctions against automated opponents ("Clips") by:
 
 * gathering resources and depositing them at controlled junctions
@@ -131,12 +131,12 @@ junctions against automated opponents ("Clips") by:
 Read [MISSION.md](MISSION.md) for a thorough description of the game mechanics.
 
 <p align="center">
-  <img src="assets/cvc-reel.gif" alt="CogsGuard reel">
-</p>
+  <img src="assets/cvc-reel.gif" alt="CvC reel">
+<br>
 
 There are many mission configurations available, with different map sizes, junction layouts, and game rules.
 
-Overall, CogsGuard aims to present rich environments with:
+Overall, CvC aims to present rich environments with:
 
 - **Territory control**: Capture and defend junctions to score points each tick
 - **Role specialization**: Four roles (Miner, Aligner, Scrambler, Scout) with distinct capabilities and dependencies
@@ -989,7 +989,7 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames diagnose ./train_dir/my_run</span>                         Default CogsGuard evals                               
+ <span style="color: #008080; text-decoration-color: #008080">cogames diagnose ./train_dir/my_run</span>                         Default CvC evals                               
  <span style="color: #008080; text-decoration-color: #008080">cogames diagnose lstm </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--scripted-baseline-policy</span><span style="color: #008080; text-decoration-color: #008080"> scripted.basic</span>   Compare against scripted baseline               
  <span style="color: #008080; text-decoration-color: #008080">cogames diagnose lstm </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--known-strong-policy</span><span style="color: #008080; text-decoration-color: #008080"> my_best_policy</span>         Normalize against known-strong policy          
  <span style="color: #008080; text-decoration-color: #008080">cogames diagnose lstm </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--compare-run-dir</span><span style="color: #008080; text-decoration-color: #008080"> outputs/cogames-diagnose/prev_run</span>  Stability comparison                   
@@ -1892,7 +1892,7 @@ cogames [COMMAND] --help
 
 
 
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> Interactive CogsGuard tutorial - learn roles and territory control.                                               
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> Interactive CvC tutorial - learn roles and territory control.                                               
 
 </pre>
 

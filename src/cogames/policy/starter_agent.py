@@ -1,5 +1,5 @@
 """
-Sample policy for the CoGames CogsGuard environment.
+Sample policy for the CoGames CvC environment.
 
 This starter policy uses simple heuristics:
 - If the agent has no gear, head toward the nearest gear station.

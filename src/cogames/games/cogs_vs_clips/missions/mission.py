@@ -21,13 +21,20 @@ class CvCMission(CoGameMission):
     max_steps: int = 10000
     num_agents: int = 8
 
+    def variant_module_prefixes(self) -> tuple[str, ...]:
+        return ("cogames.games.cogs_vs_clips.",)
+
     def with_variants(self, variants: Sequence[str | CoGameMissionVariant]) -> Self:
         copy = self.model_copy(deep=True)
+        preferred_modules = copy.variant_module_prefixes()
         for v in variants:
             if isinstance(v, CoGameMissionVariant):
                 copy._variant_registry._variants[v.name] = v
             else:
-                copy._variant_registry._variants[v] = CoGameMissionVariant.create(v)
+                copy._variant_registry._variants[v] = CoGameMissionVariant.create(
+                    v,
+                    preferred_modules=preferred_modules,
+                )
         return copy
 
     def full_name(self) -> str:

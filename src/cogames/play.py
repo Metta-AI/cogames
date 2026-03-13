@@ -17,7 +17,7 @@ from mettagrid.runner.types import PureSingleEpisodeResult
 
 logger = logging.getLogger("cogames.play")
 
-# Resources and gear types for CogsGuard
+# Resources and gear types for CvC
 ELEMENTS = ["carbon", "oxygen", "germanium", "silicon"]
 GEAR = ["miner", "aligner", "scrambler", "scout"]
 
@@ -38,18 +38,18 @@ def _print_episode_stats(console: Console, results: PureSingleEpisodeResult) -> 
 
     has_gear_stats = any(f"{gear}.gained" in totals for gear in GEAR)
     if has_gear_stats:
-        _print_cogsguard_stats(console, totals, avg_reward_per_agent)
+        _print_cvc_stats(console, totals, avg_reward_per_agent)
     else:
         # Standard mission - show basic stats
         _print_standard_stats(console, totals, avg_reward_per_agent)
 
 
-def _print_cogsguard_stats(
+def _print_cvc_stats(
     console: Console,
     agent_totals: dict[str, float],
     avg_reward_per_agent: float,
 ) -> None:
-    """Print CogsGuard-specific statistics."""
+    """Print CvC-specific statistics."""
     table = Table(title="Episode Stats", box=box.ROUNDED, show_header=True, header_style="bold cyan")
     table.add_column("Category", style="yellow")
     table.add_column("Stat", style="white")
@@ -95,7 +95,7 @@ def _print_cogsguard_stats(
 
 
 def _print_standard_stats(console: Console, agent_totals: dict[str, float], avg_reward_per_agent: float) -> None:
-    """Print standard statistics for non-CogsGuard missions."""
+    """Print standard statistics for non-CvC missions."""
     # Filter for interesting stats
     interesting = {}
     for key, value in agent_totals.items():

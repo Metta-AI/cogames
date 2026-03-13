@@ -10,8 +10,8 @@ Location: `cogames.policy.starter_agent`
 
 Short name: `starter`
 
-This is a simple multi-role heuristic policy for the CogsGuard arena. It tries to acquire gear and then follows a
-minimal objective loop (e.g., miners go to extractors; scouts wander).
+This is a simple multi-role heuristic policy for the CvC arena. It tries to acquire gear and then follows a minimal
+objective loop (e.g., miners go to extractors; scouts wander).
 
 ### 2. Role Policies (Fixed Gear Preference)
 

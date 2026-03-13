@@ -3,7 +3,7 @@ from typing import Literal, cast
 
 import pytest
 
-from cogames.cogs_vs_clips.buildings import MachinaArenaConfig, SequentialMachinaArena
+from cogames.games.cogs_vs_clips.missions.terrain import MachinaArenaConfig, SequentialMachinaArena
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.mapgen.scenes.compound import DEFAULT_EXTRACTORS, Compound
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run python
-"""CogsGuard env-only performance benchmark.
+"""CvC env-only performance benchmark.
 
-Uses the shared mettagrid perf harness with the CogsGuard mission config.
+Uses the shared mettagrid perf harness with the CvC mission config.
 For toy/arena benchmarks, use packages/mettagrid/benchmarks/perf/perf_benchmark.py.
 """
 
@@ -10,8 +10,9 @@ import json
 import os
 import sys
 
-from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.sites import make_cogsguard_machina1_site
+from cogames.games.cogs_vs_clips.game.damage import DamageVariant
+from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_map_builder
+from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
 from mettagrid.perf.harness import (
     compare_multiple,
@@ -26,15 +27,16 @@ DEFAULT_NUM_AGENTS = 8
 DEFAULT_MAX_STEPS = 10000
 
 
-def create_cogsguard_env(num_agents: int = DEFAULT_NUM_AGENTS, max_steps: int = DEFAULT_MAX_STEPS):
-    site = make_cogsguard_machina1_site(num_agents)
+def create_cvc_env(num_agents: int = DEFAULT_NUM_AGENTS, max_steps: int = DEFAULT_MAX_STEPS):
     mission = CvCMission(
         name="basic",
-        description="CogsGuard env-only benchmark (machina_1 layout)",
-        site=site,
+        description="CvC env-only benchmark (machina_1 layout)",
+        map_builder=make_machina1_map_builder(num_agents),
         num_cogs=num_agents,
+        min_cogs=num_agents,
+        max_cogs=num_agents,
         max_steps=max_steps,
-    )
+    ).with_variants([DamageVariant()])
     cfg = mission.make_env()
     simulator = Simulator()
     env = MettaGridPufferEnv(simulator, cfg)
@@ -44,14 +46,14 @@ def create_cogsguard_env(num_agents: int = DEFAULT_NUM_AGENTS, max_steps: int = 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="CogsGuard env-only performance benchmark",
+        description="CvC env-only performance benchmark",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python perf_benchmark.py --profile
-  python perf_benchmark.py --phase baseline --output /tmp/cogsguard_baseline.json
-  python perf_benchmark.py --phase branch --output /tmp/cogsguard_branch.json \\
-      --baseline /tmp/cogsguard_baseline.json
+  python perf_benchmark.py --phase baseline --output /tmp/cvc_baseline.json
+  python perf_benchmark.py --phase branch --output /tmp/cvc_branch.json \\
+      --baseline /tmp/cvc_baseline.json
         """,
     )
     parser.add_argument("--agents", type=int, default=DEFAULT_NUM_AGENTS, help="Number of agents")
@@ -69,8 +71,8 @@ Examples:
     if args.profile:
         os.environ["METTAGRID_PROFILING"] = "1"
 
-    print(f"Creating CogsGuard environment: {args.agents} agents, machina_1 layout")
-    env = create_cogsguard_env(num_agents=args.agents, max_steps=args.max_steps)
+    print(f"Creating CvC environment: {args.agents} agents, machina_1 layout")
+    env = create_cvc_env(num_agents=args.agents, max_steps=args.max_steps)
     if args.phase:
         print(f"Phase: {args.phase}")
 
@@ -107,7 +109,7 @@ Examples:
 
     print_scorecard_reminder(
         stats,
-        config_label=f"env-only (cogsguard, {args.agents}a, machina_1)",
+        config_label=f"env-only (cvc, {args.agents}a, machina_1)",
         runs_label=f"{args.rounds}x{args.iterations // 1000}K steps",
         num_rounds=args.rounds,
         phase=args.phase,

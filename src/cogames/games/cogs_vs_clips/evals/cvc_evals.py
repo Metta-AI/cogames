@@ -71,6 +71,7 @@ for map_name in CVC_EVAL_MAPS:
             name=stem,
             description=_description_from_stem(stem),
             map_builder=_load_map(map_name),
+            num_agents=num_cogs,
             num_cogs=num_cogs,
             min_cogs=num_cogs,
             max_cogs=num_cogs,

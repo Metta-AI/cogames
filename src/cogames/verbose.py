@@ -4,14 +4,14 @@ import json
 
 from rich.console import Console
 
-from cogames.cogs_vs_clips.mission import CvCMission
+from cogames.core import CoGameMission
 from mettagrid.config.mettagrid_config import MettaGridConfig
 
 
 def print_configs(
     console: Console,
     env_cfg: MettaGridConfig,
-    mission_cfg: CvCMission | None = None,
+    mission_cfg: CoGameMission | None = None,
     print_cvc_config: bool = False,
     print_mg_config: bool = False,
 ) -> None:

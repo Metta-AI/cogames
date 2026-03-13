@@ -51,7 +51,7 @@
 # cogames tutorial play
 # ```
 #
-# ### `cogames tutorial cogsguard`
+# ### `cogames tutorial cvc`
 #
 # This is a deeper tutorial focused on the full Cogs vs Clips game loop on a smaller 35x35 arena.
 # It walks through multi-phase strategy:
@@ -62,7 +62,7 @@
 # - Coordinate roles and maintain the resource-to-heart pipeline
 #
 # ```bash
-# cogames tutorial cogsguard
+# cogames tutorial cvc
 # ```
 #
 # Once you understand the game, come back here to learn how to build environments
@@ -72,7 +72,7 @@
 # ## 2. Creating an Environment
 #
 # A Cogs vs Clips environment is built from a **mission**, which bundles a map, agent count,
-# game rules, and **variants** (modifiers that change difficulty or mechanics).
+# game rules, and **variants** (modifiers that change mechanics).
 #
 # The mission produces a `MettaGridConfig`, which is passed to a `Simulator` and wrapped
 # in a `MettaGridPufferEnv` (a Gymnasium-compatible env).
@@ -81,11 +81,10 @@
 # %pip install mettagrid cogames pufferlib-core --quiet
 
 # %%
-from cogames.cogs_vs_clips.clip_difficulty import EASY
-from cogames.cogs_vs_clips.cog import CogTeam
-from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.sites import make_cogsguard_machina1_site
-from cogames.cogs_vs_clips.variants import NoVibesVariant
+from cogames.games.cogs_vs_clips.game import NoVibesVariant
+from cogames.games.cogs_vs_clips.game.teams import TeamConfig
+from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_map_builder
+from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Simulator
@@ -96,12 +95,13 @@ MAX_STEPS = 1000
 mission = CvCMission(
     name="my_mission",
     description="A simple Cogs vs Clips mission.",
-    site=make_cogsguard_machina1_site(NUM_AGENTS),
+    map_builder=make_machina1_map_builder(NUM_AGENTS),
+    min_cogs=NUM_AGENTS,
+    max_cogs=NUM_AGENTS,
     num_cogs=NUM_AGENTS,
     max_steps=MAX_STEPS,
-    teams={"cogs": CogTeam(name="cogs", num_agents=NUM_AGENTS)},
-    variants=[EASY, NoVibesVariant()],
-)
+    teams={"cogs": TeamConfig(name="cogs", num_agents=NUM_AGENTS)},
+).with_variants([NoVibesVariant()])
 
 env_cfg = mission.make_env()
 policy_env_info = PolicyEnvInterface.from_mg_cfg(env_cfg)
@@ -121,7 +121,7 @@ print(f"Action space: {policy_env_info.action_space}")
 #
 # | Parameter | What it controls |
 # |-----------|------------------|
-# | `site` | Map layout and size. `make_cogsguard_machina1_site(n)` gives an 88x88 arena. |
+# | `map_builder` | Map layout and size. `make_machina1_map_builder(n)` gives an 88x88 arena. |
 # | `num_cogs` | Number of agents on your team. |
 # | `max_steps` | Episode length in ticks. |
 # | `teams` | Team definitions (name, agent count, initial wealth). |
@@ -141,25 +141,16 @@ print(f"Action space: {policy_env_info.action_space}")
 # | `ScramblerRewardsVariant()` | Rewards gear pickup and junction scrambling |
 # | `ScoutRewardsVariant()` | Rewards gear pickup and exploration/cell visitation |
 #
-# **Difficulty** (Clips pressure control):
-#
-# | Variant | Effect |
-# |---------|--------|
-# | `EASY` | Disables Clips events entirely |
-# | `MEDIUM` | A few early Clips events, ending at step 300 |
-# | `HARD` | Full Clips event system active |
-#
 # **Gameplay modifiers**:
 #
 # | Variant | Effect |
 # |---------|--------|
 # | `NoVibesVariant()` | Removes vibe actions (simplifies action space) |
-# | `EnergizedVariant()` | Max energy + full regen, agents never run dry |
-# | `BraveheartVariant()` | Hub starts with 255 hearts |
+# | `EnergizedVariant()` | Max energy capacity so agents never run dry |
+# | `DaysVariant(days_config=DARK_SIDE)` | Zero solar energy regeneration |
+# | `DaysVariant(days_config=SUPER_CHARGED)` | +2 to all energy regen |
 # | `ThickSkinnedVariant()` | No passive HP drain, only in enemy territory |
-# | `DarkSideVariant()` | Zero solar energy regeneration |
-# | `SuperChargedVariant()` | +2 to all energy regen |
-# | `NoClipsVariant()` | Disable Clips entirely (same as EASY) |
+# | `NoClipsVariant()` | Remove Clips faction and ships |
 #
 # ### Under the Hood: `MettaGridConfig`
 #

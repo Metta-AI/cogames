@@ -37,11 +37,10 @@ import torch.nn as nn
 from einops import rearrange
 
 import pufferlib.vector as pvector
-from cogames.cogs_vs_clips.clip_difficulty import EASY
-from cogames.cogs_vs_clips.cog import CogTeam
-from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
-from cogames.cogs_vs_clips.tutorials.miner_tutorial import MinerRewardsVariant
+from cogames.games.cogs_vs_clips.game.teams import TeamConfig
+from cogames.games.cogs_vs_clips.missions.machina_1 import MACHINA_1_MAP_BUILDER
+from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from cogames.games.cogs_vs_clips.missions.tutorial import MinerRewardsVariant
 from mettagrid import MettaGridConfig
 from mettagrid.envs.early_reset_handler import EarlyResetHandler
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
@@ -58,8 +57,8 @@ from pufferlib.pufferlib import set_buffers
 # ## 1. Build the mission and environment config
 #
 # We construct a CvCMission from scratch:
-# - **Site**: CogsGuard Machina 1 (50x50 training map)
-# - **EASY difficulty**: Disables clips events
+# - **Site**: CvC Machina 1 (50x50 training map)
+# - **No clips**: Training without clips pressure
 # - **initial_hearts=0**: No free hearts — miners must earn everything
 # - **1000 max steps** per episode
 
@@ -68,17 +67,18 @@ NUM_AGENTS = 4
 MAX_STEPS = 1000
 
 # Build the mission
-# EASY variant disables clips events
+# No clips variant — training focuses on mining mechanics
 # MinerRewardsVariant adds miner-focused reward shaping (gear, resource extraction, deposits)
 mission = CvCMission(
     name="miner_tutorial",
     description="Learn miner role - resource extraction and deposits (no clips).",
-    site=COGSGUARD_MACHINA_1,
+    map_builder=MACHINA_1_MAP_BUILDER,
+    min_cogs=1,
+    max_cogs=20,
     num_cogs=NUM_AGENTS,
     max_steps=MAX_STEPS,
-    teams={"cogs": CogTeam(name="cogs", num_agents=NUM_AGENTS, wealth=3, initial_hearts=0)},
-    variants=[EASY, MinerRewardsVariant()],
-)
+    teams={"cogs": TeamConfig(name="cogs", num_agents=NUM_AGENTS)},
+).with_variants([MinerRewardsVariant()])
 
 env_cfg: MettaGridConfig = mission.make_env()
 
@@ -313,7 +313,7 @@ BATCH_SIZE = max(4096, total_agents * BPTT_HORIZON)
 MINIBATCH_SIZE = min(4096, BATCH_SIZE)
 
 train_config = dict(
-    env="cogames.cogs_vs_clips",
+    env="cogames.games.cogs_vs_clips",
     device=DEVICE.type,
     total_timesteps=max(TOTAL_TIMESTEPS, BATCH_SIZE),
     batch_size=BATCH_SIZE,

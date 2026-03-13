@@ -54,16 +54,16 @@ from mettagrid.simulator import Simulator
 from mettagrid.simulator.replay_log_writer import InMemoryReplayWriter
 from mettagrid.util.stats_writer import NoopStatsWriter
 
-from cogames.cogs_vs_clips.clip_difficulty import EASY
-from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.tutorials.scout_tutorial import ScoutRewardsVariant
-from cogames.cogs_vs_clips.sites import COGSGUARD_MACHINA_1
-from cogames.cogs_vs_clips.cog import CogTeam
+from cogames.games.cogs_vs_clips.clip_difficulty import EASY
+from cogames.games.cogs_vs_clips.mission import CvCMission
+from cogames.games.cogs_vs_clips.missions.tutorial import ScoutRewardsVariant
+from cogames.games.cogs_vs_clips.sites import CVC_MACHINA_1
+from cogames.games.cogs_vs_clips.cog import CogTeam
 ```
 
 ## 1. Build the mission and environment config
 
-- **Site**: CogsGuard Machina 1 (50x50 training map)
+- **Site**: CvC Machina 1 (50x50 training map)
 - **EASY difficulty**: No clips pressure
 - **initial_hearts=0**: Scouts don't need hearts
 - **1000 max steps** per episode
@@ -75,7 +75,7 @@ MAX_STEPS = 1000
 mission = CvCMission(
     name="scout_tutorial",
     description="Learn scout role - exploration and visiting stale cells.",
-    site=COGSGUARD_MACHINA_1,
+    site=CVC_MACHINA_1,
     num_cogs=NUM_AGENTS,
     max_steps=MAX_STEPS,
     teams={"cogs": CogTeam(name="cogs", num_agents=NUM_AGENTS, wealth=3, initial_hearts=0)},
@@ -301,7 +301,7 @@ BATCH_SIZE = max(4096, total_agents * BPTT_HORIZON)
 MINIBATCH_SIZE = min(4096, BATCH_SIZE)
 
 train_config = dict(
-    env="cogames.cogs_vs_clips",
+    env="cogames.games.cogs_vs_clips",
     device=DEVICE.type,
     total_timesteps=max(TOTAL_TIMESTEPS, BATCH_SIZE),
     batch_size=BATCH_SIZE,
