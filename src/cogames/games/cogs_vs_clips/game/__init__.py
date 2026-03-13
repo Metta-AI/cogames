@@ -25,7 +25,6 @@ from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservati
 from cogames.games.cogs_vs_clips.game.teams.junction import TeamJunctionVariant
 from cogames.games.cogs_vs_clips.game.teams.junction_deposit import JunctionDepositVariant
 from cogames.games.cogs_vs_clips.game.terrain import (
-    BalancedCornersVariant,
     BaseCompoundVariant,
     CavesVariant,
     CityVariant,
@@ -43,7 +42,6 @@ from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
 
 __all__ = [
     "AlignerVariant",
-    "BalancedCornersVariant",
     "BaseCompoundVariant",
     "CargoLimitVariant",
     "CavesVariant",
@@ -108,7 +106,6 @@ def _get_tutorial_variants() -> list[CoGameMissionVariant]:
 
 VARIANTS: list[CoGameMissionVariant] = [
     AlignerVariant(),
-    BalancedCornersVariant(),
     CargoLimitVariant(),
     CavesVariant(),
     CityVariant(),

@@ -168,17 +168,3 @@ class QuadrantBuildingsVariant(MachinaArenaVariant):
             )
         node.building_distributions = dists
         node.distribution = DistributionConfig(type=DistributionType.UNIFORM)
-
-
-# TODO: unchecked variant
-class BalancedCornersVariant(MachinaArenaVariant):
-    name: str = "balanced_corners"
-    description: str = "Balance path distances from center to corners for fair spawns."
-    balance_tolerance: float = 1.5
-    max_balance_shortcuts: int = 10
-
-    @override
-    def modify_node(self, node):
-        node.balance_corners = True
-        node.balance_tolerance = self.balance_tolerance
-        node.max_balance_shortcuts = self.max_balance_shortcuts
