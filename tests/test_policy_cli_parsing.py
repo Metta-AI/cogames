@@ -26,12 +26,12 @@ def test_parse_policy_spec_with_shorthand_class():
 
 
 def test_parse_policy_spec_for_tutorial_overlay_policy():
-    spec = parse_policy_spec("class=tutorial_noop,kw.tutorial=cogsguard")
+    spec = parse_policy_spec("class=tutorial_noop,kw.tutorial=cvc")
 
     assert spec.class_path == resolve_policy_class_path("tutorial_noop")
     assert spec.data_path is None
     assert spec.proportion == 1.0
-    assert spec.init_kwargs == {"tutorial": "cogsguard"}
+    assert spec.init_kwargs == {"tutorial": "cvc"}
 
 
 def test_parse_policy_spec_with_data_proportion_and_kwargs(tmp_path: Path):

@@ -13,7 +13,7 @@ from mettagrid.simulator import Action, AgentObservation
 
 _PLAY_PHASES: tuple[str, ...] = (
     (
-        "Welcome to CogsGuard\n"
+        "Welcome to CvC\n"
         "Your goal: control junctions to outscore the opposing Clips team.\n"
         "Explore the arena using the controls in the next step."
     ),
@@ -61,9 +61,9 @@ _PLAY_PHASES: tuple[str, ...] = (
 )
 
 
-_COGSGUARD_PHASES: tuple[str, ...] = (
+_CVC_PHASES: tuple[str, ...] = (
     (
-        "CogsGuard: stabilization sim\n"
+        "CvC: stabilization sim\n"
         "Outscore Clips by controlling more junctions over time.\n"
         "Each phase introduces a new layer of strategy."
     ),
@@ -104,7 +104,7 @@ _COGSGUARD_PHASES: tuple[str, ...] = (
         "Repeat: scout the map, gather resources, craft hearts, capture junctions, defend them.\n"
         "Run this loop faster than Clips to win."
     ),
-    ("Mission complete\nYou're ready for full CogsGuard missions."),
+    ("Mission complete\nYou're ready for full CvC missions."),
 )
 
 
@@ -132,7 +132,7 @@ class TutorialOverlayPolicy(MultiAgentPolicy):
 
     def __init__(self, policy_env_info: PolicyEnvInterface, tutorial: str = "play", device: str = "cpu"):
         super().__init__(policy_env_info, device=device)
-        self._phases = _COGSGUARD_PHASES if tutorial == "cogsguard" else _PLAY_PHASES
+        self._phases = _CVC_PHASES if tutorial == "cvc" else _PLAY_PHASES
         self._noop_action_value = dtype_actions.type(policy_env_info.action_names.index("noop"))
 
     def agent_policy(self, agent_id: int) -> AgentPolicy:

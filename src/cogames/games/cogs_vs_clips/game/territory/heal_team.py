@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, override
 
 from cogames.core import CoGameMissionVariant, Deps
+from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.game.territory.territory import TerritoryVariant
 from mettagrid.config.filter import sharedTagPrefix
 from mettagrid.config.handler_config import Handler, updateTarget
@@ -28,7 +29,7 @@ class HealTeamVariant(CoGameMissionVariant):
 
     @override
     def dependencies(self) -> Deps:
-        return Deps(required=[TerritoryVariant])
+        return Deps(required=[TerritoryVariant, EnergyVariant])
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:

@@ -1,157 +1,408 @@
+"""CLI mission resolution and display."""
+
+from __future__ import annotations
+
+import importlib.util
+import json
 import re
-from functools import lru_cache
+import sys
 from pathlib import Path
 from typing import Optional
 
 import typer
+import yaml
 from rich import box
+from rich.console import Console
 from rich.table import Table
 
 from cogames.cli.base import console
-from cogames.cogs_vs_clips.buildings import MachinaArena
-from cogames.cogs_vs_clips.clip_difficulty import get_cogsguard_difficulty
-from cogames.cogs_vs_clips.cogsguard_curriculum import split_variants
-from cogames.cogs_vs_clips.mission import CvCMission, NumCogsVariant
-from cogames.cogs_vs_clips.reward_variants import apply_reward_variants
-from cogames.cogs_vs_clips.sites import SITES
-from cogames.cogs_vs_clips.variants import VARIANTS
-from cogames.core import (
-    MAP_MISSION_DELIMITER,
-    CoGameMissionVariant,
-    CoGameSite,
-)
-from cogames.game import load_mission_config, load_mission_config_from_python
-from mettagrid import MettaGridConfig
+from cogames.cli.utils import parse_variants
+from cogames.core import CoGameMission, CoGameMissionVariant
+from cogames.game import CoGame, get_game
+from cogames.variants import VariantRegistry
+from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.mapgen.mapgen import MapGen
 
-
-@lru_cache(maxsize=1)
-def _get_core_missions() -> list[CvCMission]:
-    from cogames.cogs_vs_clips.missions import get_core_missions  # noqa: PLC0415
-
-    return get_core_missions()
+_SUPPORTED_MISSION_EXTENSIONS = [".yaml", ".yml", ".json"]
 
 
-@lru_cache(maxsize=1)
-def _get_eval_missions_all() -> list[CvCMission]:
-    from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
-    from cogames.cogs_vs_clips.evals.integrated_evals import EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS  # noqa: PLC0415
-    from cogames.cogs_vs_clips.evals.spanning_evals import EVAL_MISSIONS as SPANNING_EVAL_MISSIONS  # noqa: PLC0415
-
-    missions: list[CvCMission] = []
-    missions.extend(INTEGRATED_EVAL_MISSIONS)
-    missions.extend(SPANNING_EVAL_MISSIONS)
-    missions.extend(mission_cls() for mission_cls in DIAGNOSTIC_EVALS)  # type: ignore[call-arg]
-    return missions
+# ---------------------------------------------------------------------------
+# Mission lookup
+# ---------------------------------------------------------------------------
 
 
-def load_mission_set(mission_set: str) -> list[CvCMission]:
-    """Load a predefined set of evaluation missions.
+def find_mission(
+    game: CoGame,
+    mission_name: str,
+    *,
+    include_evals: bool = False,
+) -> CoGameMission:
+    parts = mission_name.split(".", 1)
+    base_name = parts[0]
+    sub_name = parts[1] if len(parts) > 1 else None
 
-    Args:
-        mission_set: Name of mission set to load. Options:
-            - "cogsguard_evals": CogsGuard evaluation missions (map-based)
-            - "integrated_evals": Integrated evaluation missions
-            - "spanning_evals": Spanning evaluation missions
-            - "diagnostic_evals": Diagnostic evaluation missions
-            - "all": All missions including core missions
+    # "evals.<name>" is a namespace shortcut — look up <name> directly among eval missions.
+    if base_name == "evals" and sub_name is not None:
+        for mission in game.eval_missions:
+            if mission.name == sub_name:
+                return mission
+        available = [m.name for m in game.eval_missions]
+        raise ValueError(f"Unknown eval mission '{sub_name}'. Available: {', '.join(available)}")
 
-    Returns:
-        List of Mission objects in the specified set
+    search: list[CoGameMission] = list(game.missions)
+    if include_evals:
+        search = [*search, *game.eval_missions]
+    for mission in search:
+        if mission.name == base_name:
+            if sub_name is not None:
+                if sub_name not in mission.sub_missions:
+                    raise ValueError(
+                        f"Unknown sub-mission '{sub_name}' for '{base_name}'. "
+                        f"Available: {', '.join(mission.sub_missions) if mission.sub_missions else 'none'}"
+                    )
+                variant = game.variant_registry.get(sub_name)
+                assert variant is not None, f"Sub-mission variant '{sub_name}' not in game registry"
+                return mission.with_variants([variant])
+            return mission
+    available = [m.name for m in search]
+    raise ValueError(f"Unknown mission '{base_name}'. Available: {', '.join(available)}")
 
-    Raises:
-        ValueError: If mission_set name is unknown
+
+def apply_variants(
+    mission: CoGameMission,
+    variants: list[CoGameMissionVariant],
+    cogs: Optional[int],
+) -> CoGameMission:
+    """Apply variants and cogs override to a mission."""
+    if variants:
+        mission = mission.with_variants(variants)
+    if cogs is not None:
+        mission = mission.model_copy(update={"num_agents": cogs})
+    return mission
+
+
+def resolve_mission(
+    game: CoGame,
+    mission_arg: str,
+    variants_arg: Optional[list[str]] = None,
+    cogs: Optional[int] = None,
+) -> tuple[str, MettaGridConfig, Optional[CoGameMission]]:
+    """Resolve mission by name or file path. Returns (name, env_cfg, mission or None)."""
+    if any(mission_arg.endswith(ext) for ext in [".yaml", ".yml", ".json", ".py"]):
+        path = Path(mission_arg)
+        if not path.exists():
+            raise ValueError(f"File not found: {mission_arg}")
+        if not path.is_file():
+            raise ValueError(f"Not a file: {mission_arg}")
+        if path.suffix == ".py":
+            return mission_arg, load_mission_config_from_python(path), None
+        if path.suffix in [".yaml", ".yml", ".json"]:
+            return mission_arg, load_mission_config(path), None
+        raise ValueError(f"Unsupported file format: {path.suffix}")
+
+    variants = parse_variants(game.variant_registry, variants_arg)
+    mission = find_mission(game, mission_arg, include_evals=True)
+    mission = apply_variants(mission, variants, cogs)
+    return mission.full_name(), mission.make_env(), mission
+
+
+def resolve_missions_by_wildcard(
+    game: CoGame,
+    mission_arg: str,
+    variants_arg: Optional[list[str]],
+    cogs: Optional[int],
+) -> list[tuple[str, MettaGridConfig]]:
+    if "*" not in mission_arg:
+        name, env_cfg, _ = resolve_mission(game, mission_arg, variants_arg, cogs)
+        return [(name, env_cfg)]
+    regex = mission_arg.replace(".", "\\.").replace("*", ".*")
+    all_names = get_all_mission_names(game) + get_all_eval_mission_names(game)
+    matching = [n for n in all_names if re.search(regex, n)]
+    return [(name, env_cfg) for name, env_cfg, _ in (resolve_mission(game, m, variants_arg, cogs) for m in matching)]
+
+
+def get_all_mission_names(game: CoGame) -> list[str]:
+    return [m.full_name() for m in game.missions]
+
+
+def get_all_eval_mission_names(game: CoGame) -> list[str]:
+    return [m.full_name() for m in game.eval_missions]
+
+
+# ---------------------------------------------------------------------------
+# Config I/O
+# ---------------------------------------------------------------------------
+
+
+def load_mission_config_from_python(path: Path) -> MettaGridConfig:
+    """Load a mission configuration from a Python file.
+
+    The Python file should define a function called 'get_config()' that returns a MettaGridConfig.
+    Alternatively, it can define a variable named 'config' that is a MettaGridConfig.
     """
-    missions_list: list[CvCMission]
-    if mission_set == "all":
-        # All missions: eval missions + integrated + spanning + diagnostic + core missions
-        missions_list = list(_get_eval_missions_all())
+    spec = importlib.util.spec_from_file_location("game_config", path)
+    if spec is None or spec.loader is None:
+        raise ValueError(f"Failed to load Python module from {path}")
 
-        # Add core missions that aren't already in eval sets
-        eval_mission_names = {m.name for m in missions_list}
-        for mission in _get_core_missions():
-            if mission.name not in eval_mission_names:
-                missions_list.append(mission)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["game_config"] = module
+    spec.loader.exec_module(module)
 
-    elif mission_set == "diagnostic_evals":
-        from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
-
-        missions_list = [mission_cls() for mission_cls in DIAGNOSTIC_EVALS]  # type: ignore[call-arg]
-    elif mission_set == "cogsguard_evals":
-        from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS  # noqa: PLC0415
-
-        missions_list = list(COGSGUARD_EVAL_MISSIONS)
-    elif mission_set == "integrated_evals":
-        from cogames.cogs_vs_clips.evals.integrated_evals import (  # noqa: PLC0415
-            EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS,
+    if hasattr(module, "get_config") and callable(module.get_config):
+        config = module.get_config()
+    elif hasattr(module, "config"):
+        config = module.config
+    else:
+        raise ValueError(
+            f"Python file {path} must define either a 'get_config()' function "
+            "or a 'config' variable that returns/contains a MettaGridConfig"
         )
 
-        missions_list = list(INTEGRATED_EVAL_MISSIONS)
-    elif mission_set == "spanning_evals":
-        from cogames.cogs_vs_clips.evals.spanning_evals import EVAL_MISSIONS as SPANNING_EVAL_MISSIONS  # noqa: PLC0415
+    if not isinstance(config, MettaGridConfig):
+        raise ValueError(f"Python file {path} must return a MettaGridConfig instance")
 
-        missions_list = list(SPANNING_EVAL_MISSIONS)
+    del sys.modules["game_config"]
+    return config
+
+
+def save_mission_config(config: MettaGridConfig, output_path: Path) -> None:
+    """Save a mission configuration to file."""
+    if output_path.suffix in [".yaml", ".yml"]:
+        with open(output_path, "w") as f:
+            yaml.dump(config.model_dump(mode="yaml"), f, default_flow_style=False, sort_keys=False)
+    elif output_path.suffix == ".json":
+        with open(output_path, "w") as f:
+            json.dump(config.model_dump(mode="json"), f, indent=2)
     else:
-        available = "cogsguard_evals, integrated_evals, spanning_evals, diagnostic_evals, all"
-        raise ValueError(f"Unknown mission set: {mission_set}\nAvailable sets: {available}")
-
-    return missions_list
-
-
-def parse_difficulty(difficulty_arg: Optional[str]) -> Optional[CoGameMissionVariant]:
-    if difficulty_arg is None:
-        return None
-    return get_cogsguard_difficulty(difficulty_arg)
+        raise ValueError(
+            f"Unsupported file format: {output_path.suffix}. Supported: {', '.join(_SUPPORTED_MISSION_EXTENSIONS)}"
+        )
 
 
-def get_all_missions() -> list[str]:
-    """Get all core mission names in the format site.mission (excludes evals)."""
-    return [mission.full_name() for mission in _get_core_missions()]
+def load_mission_config(path: Path) -> MettaGridConfig:
+    """Load a mission configuration from file."""
+    if path.suffix in [".yaml", ".yml"]:
+        with open(path, "r") as f:
+            config_dict = yaml.safe_load(f)
+    elif path.suffix == ".json":
+        with open(path, "r") as f:
+            config_dict = json.load(f)
+    else:
+        raise ValueError(
+            f"Unsupported file format: {path.suffix}. Supported: {', '.join(_SUPPORTED_MISSION_EXTENSIONS)}"
+        )
+    return MettaGridConfig(**config_dict)
 
 
-def get_all_eval_missions() -> list[str]:
-    """Get all eval mission names in the format site.mission."""
-    return [mission.full_name() for mission in _get_eval_missions_all()]
+# ---------------------------------------------------------------------------
+# Display helpers
+# ---------------------------------------------------------------------------
 
 
-def get_site_by_name(site_name: str) -> CoGameSite:
-    """Get a site by name.
+def print_missions(game: CoGame, con: Console, mission_filter: Optional[str] = None) -> None:
+    """List available missions."""
+    missions = game.missions
+    if not missions:
+        con.print("No missions found")
+        return
+    if mission_filter:
+        missions = [m for m in missions if mission_filter in m.name]
+        if not missions:
+            con.print(f"[red]No missions matching '{mission_filter}'[/red]")
+            return
+    table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED, padding=(0, 1))
+    table.add_column("Mission", style="blue", no_wrap=True)
+    table.add_column("Cogs", style="green", justify="center")
+    table.add_column("Map Size", style="green", justify="center")
+    table.add_column("Description", style="white")
+    for m in missions:
+        mb = m.map_builder
+        map_size = f"{mb.width}x{mb.height}" if hasattr(mb, "width") and hasattr(mb, "height") else "N/A"  # type: ignore[attr-defined]
+        agent_range = f"{m.min_cogs}-{m.max_cogs}"
+        table.add_row(m.name, agent_range, map_size, m.description)
+        for sub_name in m.sub_missions:
+            sub_variant = game.variant_registry.get(sub_name)
+            desc = sub_variant.description if sub_variant else ""
+            table.add_row(
+                f"  [dim]{m.name}.[/dim]{sub_name}",
+                agent_range,
+                map_size,
+                desc or f"[dim]{sub_name}[/dim]",
+            )
+    con.print(table)
+    con.print("\nTo set [bold blue]-m[/bold blue]:")
+    con.print("  • Use [blue]<mission>[/blue] (e.g., machina_1)")
+    con.print("  • Use [blue]<mission>.<sub>[/blue] (e.g., machina_1.desert)")
+    con.print("  • Or pass a mission config file path")
+    con.print("\nCogs:")
+    con.print("  • [green]--cogs N[/green] or [green]-c N[/green]")
+    con.print("\n[bold green]Examples:[/bold green]")
+    con.print("  cogames missions")
+    con.print("  cogames play --mission [blue]machina_1[/blue]")
+    con.print("  cogames play --mission [blue]machina_1.desert[/blue]")
+    con.print("  cogames play --mission [blue]machina_1[/blue] --cogs [green]8[/green]")
+    con.print("  cogames train --mission [blue]machina_1[/blue] --cogs [green]4[/green]")
 
-    Raises:
-        ValueError: If site not found
-    """
-    matching_sites = [site for site in SITES if site.name == site_name]
-    if not matching_sites:
-        raise ValueError(f"Could not find site {site_name}")
-    elif len(matching_sites) > 1:
-        raise ValueError(f"Invalid site catalog: more than one site named {site_name}")
-    return matching_sites[0]
+
+def print_evals(game: CoGame, con: Console) -> None:
+    """Print a table listing all available eval missions."""
+    evals = game.eval_missions
+    if not evals:
+        con.print("No eval missions found")
+        return
+    table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED, padding=(0, 1))
+    table.add_column("Mission", style="blue", no_wrap=True)
+    table.add_column("Cogs", style="green", justify="center")
+    table.add_column("Map Size", style="green", justify="center")
+    table.add_column("Description", style="white")
+    for m in evals:
+        mb = m.map_builder
+        map_size = "N/A"
+        if hasattr(mb, "width") and hasattr(mb, "height"):
+            map_size = f"{mb.width}x{mb.height}"  # type: ignore[attr-defined]
+        agent_range = f"{m.min_cogs}-{m.max_cogs}"
+        table.add_row(m.name, agent_range, map_size, m.description)
+    con.print(table)
+    con.print("\nTo play an eval mission:")
+    con.print("  [bold]cogames play[/bold] --mission [blue]oxygen_bottleneck[/blue]")
+
+
+def print_variants(game: CoGame, con: Console) -> None:
+    """Print a table listing all available variants."""
+    variants = game.variant_registry.all()
+    if not variants:
+        return
+    con.print("\n")
+    table = Table(
+        title="Available Variants",
+        show_header=True,
+        header_style="bold magenta",
+        box=box.ROUNDED,
+        padding=(0, 1),
+    )
+    table.add_column("Variant", style="yellow", no_wrap=True)
+    table.add_column("Description", style="white")
+    for v in variants:
+        table.add_row(v.name, v.description)
+    con.print(table)
+
+
+def print_mission_dependencies(game: CoGame, con: Console) -> None:
+    """Print the variant dependency tree for each mission."""
+    for mission in game.missions:
+        copy = mission.model_copy(deep=True)
+        extra_names = [n for n in copy._variant_registry._variants if n != copy.default_variant]
+        default = [copy.default_variant] if copy.default_variant else []
+        copy._variant_registry.run_configure([*default, *extra_names])
+        edges = copy._variant_registry._edges
+
+        con.print(f"\n[bold cyan]{mission.name}[/bold cyan]", end="")
+        if mission.description:
+            con.print(f" [dim]— {mission.description}[/dim]")
+        else:
+            con.print()
+
+        if not edges:
+            con.print("  [dim](no variant dependencies)[/dim]")
+            continue
+
+        _print_dependency_tree(copy._variant_registry, edges, con, indent="  ")
+
+
+def _print_dependency_tree(
+    registry: "VariantRegistry",
+    edges: list[tuple[str, str, str]],
+    con: Console,
+    indent: str = "",
+) -> None:
+    """Render a dependency tree from edges."""
+    # Build adjacency
+    deps: dict[str, list[tuple[str, str]]] = {}
+    all_nodes: set[str] = set()
+    for src, dst, kind in edges:
+        deps.setdefault(src, []).append((dst, kind))
+        all_nodes.update((src, dst))
+
+    # Roots: nodes not depended on by others
+    depended_on = {dst for _, dst, _ in edges}
+    roots = sorted(all_nodes - depended_on)
+
+    printed: set[str] = set()
+
+    def _walk(name: str, prefix: str, is_last: bool) -> None:
+        connector = "└── " if is_last else "├── "
+        if name in printed:
+            con.print(f"{prefix}{connector}[dim]{name} (see above)[/dim]")
+            return
+        printed.add(name)
+        variant = registry.get(name)
+        desc = f" [dim]— {variant.description}[/dim]" if variant and variant.description else ""
+        con.print(f"{prefix}{connector}[yellow]{name}[/yellow]{desc}")
+        children = deps.get(name, [])
+        child_prefix = prefix + ("    " if is_last else "│   ")
+        for i, (child, kind) in enumerate(children):
+            tag = "" if kind == "required" else " [dim](optional)[/dim]"
+            if child in printed:
+                child_connector = "└── " if i == len(children) - 1 else "├── "
+                con.print(f"{child_prefix}{child_connector}[dim]{child} (see above)[/dim]{tag}")
+            else:
+                # Recurse for full depth
+                printed.add(child)
+                child_variant = registry.get(child)
+                child_desc = (
+                    f" [dim]— {child_variant.description}[/dim]" if child_variant and child_variant.description else ""
+                )
+                child_connector = "└── " if i == len(children) - 1 else "├── "
+                con.print(f"{child_prefix}{child_connector}[yellow]{child}[/yellow]{child_desc}{tag}")
+                gc = deps.get(child, [])
+                gc_prefix = child_prefix + ("    " if i == len(children) - 1 else "│   ")
+                for j, (grandchild, _gc_kind) in enumerate(gc):
+                    _walk(grandchild, gc_prefix, j == len(gc) - 1)
+
+    for i, root in enumerate(roots):
+        _walk(root, indent, i == len(roots) - 1)
+
+
+def print_variant_graph(game: CoGame, con: Console) -> None:
+    """Print the variant dependency graph."""
+    edges = game.variant_registry.build_dependency_graph()
+    con.print("\n[bold]Variant Dependency Graph[/bold]\n")
+    _print_dependency_tree(game.variant_registry, edges, con)
+
+
+# ---------------------------------------------------------------------------
+# CLI-level convenience wrappers (resolve game by name, use default console)
+# ---------------------------------------------------------------------------
 
 
 def get_mission_name_and_config(
     ctx: typer.Context,
     mission_arg: Optional[str],
+    *,
+    game_name: str = "cogs_vs_clips",
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
     steps: Optional[int] = None,
-    difficulty: Optional[str] = None,
-) -> tuple[str, MettaGridConfig, Optional[CvCMission]]:
+) -> tuple[str, MettaGridConfig, Optional[CoGameMission]]:
     if not mission_arg:
         console.print(ctx.get_help())
         console.print("[yellow]Missing: --mission / -m[/yellow]\n")
     else:
         try:
-            return get_mission(mission_arg, variants_arg=variants_arg, cogs=cogs, steps=steps, difficulty=difficulty)
+            game = get_game(game_name)
+            name, env_cfg, mission_cfg = resolve_mission(game, mission_arg, variants_arg, cogs)
+            if steps is not None:
+                env_cfg.game.max_steps = steps
+            return name, env_cfg, mission_cfg
         except ValueError as e:
             error_msg = str(e)
-            if "variant" in error_msg.lower() or "difficulty" in error_msg.lower():
+            if "variant" in error_msg.lower():
                 console.print(f"[red]{error_msg}[/red]")
             else:
                 console.print(f"[red]Mission '{mission_arg}' not found.[/red]")
-                console.print("[dim]Run: cogames missions (or cogames missions <site>) to list options.[/dim]\n")
+                console.print("[dim]Run: cogames missions to list options.[/dim]\n")
             raise typer.Exit(1) from e
-    list_missions()
-
+    print_missions(get_game(game_name), console)
     console.print("\n" + ctx.get_usage())
     console.print("\n")
     raise typer.Exit(1)
@@ -161,376 +412,97 @@ def get_mission_names_and_configs(
     ctx: typer.Context,
     missions_arg: Optional[list[str]],
     *,
+    game_name: str = "cogs_vs_clips",
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
     steps: Optional[int] = None,
-    difficulty: Optional[str] = None,
 ) -> list[tuple[str, MettaGridConfig]]:
     if not missions_arg:
         console.print(ctx.get_help())
         console.print("[yellow]Supply at least one: --mission / -m[/yellow]\n")
     else:
         try:
+            game = get_game(game_name)
             not_deduped = [
-                mission
-                for missions in missions_arg
-                for mission in _get_missions_by_possible_wildcard(missions, variants_arg, cogs, steps, difficulty)
+                (name, env_cfg)
+                for mission in missions_arg
+                for name, env_cfg in resolve_missions_by_wildcard(game, mission, variants_arg, cogs)
             ]
-            name_set: set[str] = set()
+            seen: set[str] = set()
             deduped = []
-            for m, c in not_deduped:
-                if m not in name_set:
-                    name_set.add(m)
-                    deduped.append((m, c))
+            for name, env_cfg in not_deduped:
+                if name not in seen:
+                    seen.add(name)
+                    deduped.append((name, env_cfg))
             if not deduped:
                 raise ValueError(f"No missions found for {missions_arg}")
-
+            if steps is not None:
+                for _, env_cfg in deduped:
+                    env_cfg.game.max_steps = steps
             return deduped
         except ValueError as e:
             console.print(f"[red]{e}[/red]")
-            console.print("[dim]Run: cogames missions (or cogames missions <site>) to list options.[/dim]\n")
+            console.print("[dim]Run: cogames missions to list options.[/dim]\n")
             raise typer.Exit(1) from e
-    list_missions()
-
+    print_missions(get_game(game_name), console)
     console.print("\n" + ctx.get_usage())
     console.print("\n")
     raise typer.Exit(1)
-
-
-def _get_missions_by_possible_wildcard(
-    mission_arg: str,
-    variants_arg: Optional[list[str]],
-    cogs: Optional[int],
-    steps: Optional[int],
-    difficulty: Optional[str],
-) -> list[tuple[str, MettaGridConfig]]:
-    if "*" in mission_arg:
-        # Convert shell-style wildcard to regex pattern
-        regex_pattern = mission_arg.replace(".", "\\.").replace("*", ".*")
-        missions = [m for m in (get_all_missions() + get_all_eval_missions()) if re.search(regex_pattern, m)]
-        # Drop the Mission (3rd element) for wildcard results
-        return [
-            (name, env_cfg)
-            for name, env_cfg, _ in (
-                get_mission(m, variants_arg=variants_arg, cogs=cogs, steps=steps, difficulty=difficulty)
-                for m in missions
-            )
-        ]
-    # Drop the Mission for single mission
-    name, env_cfg, _ = get_mission(
-        mission_arg,
-        variants_arg=variants_arg,
-        cogs=cogs,
-        steps=steps,
-        difficulty=difficulty,
-    )
-    return [(name, env_cfg)]
-
-
-def find_mission(
-    site_name: str,
-    mission_name: str | None = None,  # None means first mission on the site
-    *,
-    include_evals: bool = False,
-    include_legacy: bool = False,
-) -> CvCMission:
-    missions: list[CvCMission] = list(_get_core_missions())
-    if include_evals:
-        missions = [*missions, *_get_eval_missions_all()]
-
-    found_site = False
-    for mission in missions:
-        if mission.site.name != site_name:
-            continue
-        found_site = True
-        if mission_name is not None and mission.name != mission_name:
-            continue
-        return mission
-
-    if mission_name is None and not found_site:
-        for mission in missions:
-            if mission.name == site_name:
-                return mission
-
-    if mission_name is not None:
-        raise ValueError(f"Mission {mission_name} not available on site {site_name}")
-    else:
-        if site_name in [site.name for site in SITES]:
-            raise ValueError(f"No missions available on site {site_name}")
-        else:
-            raise ValueError(f"Could not find mission name or site {site_name}")
 
 
 def get_mission(
     mission_arg: str,
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
-    steps: Optional[int] = None,
-    include_legacy: bool = False,
-    difficulty: Optional[str] = None,
-) -> tuple[str, MettaGridConfig, Optional[CvCMission]]:
-    """Get a specific mission configuration by name or file path.
-
-    Args:
-        mission_arg: Name of the map or path to config file (.yaml, .json, or .py)
-        variants_arg: List of variant names like ["solar_flare", "dark_side"]
-        cogs: Number of cogs (agents) to use, overrides the default from the mission
-        include_legacy: Whether to include legacy (pre-CogsGuard) missions
-        difficulty: Difficulty name (easy, medium, hard) controlling clips events
-
-    Returns:
-        Tuple of (mission name, MettaGridConfig, CvCMission or None)
-
-    Raises:
-        ValueError: If mission not found or file cannot be loaded
-    """
-    # Check if it's a file path
-    if any(mission_arg.endswith(ext) for ext in [".yaml", ".yml", ".json", ".py"]):
-        if difficulty is not None:
-            raise ValueError("Difficulty can only be used with mission names, not config files.")
-        path = Path(mission_arg)
-        if not path.exists():
-            raise ValueError(f"File not found: {mission_arg}")
-        if not path.is_file():
-            raise ValueError(f"Not a file: {mission_arg}")
-
-        # Load config based on file extension - no Mission available for file-based configs
-        if path.suffix == ".py":
-            env_cfg = load_mission_config_from_python(path)
-        elif path.suffix in [".yaml", ".yml", ".json"]:
-            env_cfg = load_mission_config(path)
-        else:
-            raise ValueError(f"Unsupported file format: {path.suffix}")
-        if steps is not None:
-            env_cfg.game.max_steps = steps
-        return mission_arg, env_cfg, None
-
-    # Parse variants if provided
-    variants, reward_variants = split_variants(variants_arg)
-    difficulty_variant = parse_difficulty(difficulty)
-
-    # Otherwise, treat it as a fully qualified mission name, or as a site name
-    if (delim_count := mission_arg.count(MAP_MISSION_DELIMITER)) == 0:
-        site_name, mission_name = mission_arg, None
-    elif delim_count > 1:
-        raise ValueError(f"Mission name can contain at most one `{MAP_MISSION_DELIMITER}` delimiter")
-    else:
-        site_name, mission_name = mission_arg.split(MAP_MISSION_DELIMITER)
-
-    mission: CvCMission = find_mission(
-        site_name,
-        mission_name,
-        include_evals=True,
-        include_legacy=include_legacy,
-    ).model_copy(deep=True)
-
-    if steps is not None:
-        mission.max_steps = steps
-    if difficulty_variant is not None:
-        mission = mission.with_variants([difficulty_variant])
-    if variants:
-        mission = mission.with_variants(variants)
-    if cogs is not None:
-        mission = mission.with_variants([NumCogsVariant(num_cogs=cogs)])
-
-    env_cfg = mission.make_env()
-    if reward_variants:
-        apply_reward_variants(env_cfg, variants=reward_variants)
-
-    return (mission.full_name(), env_cfg, mission)
+    game_name: str = "cogs_vs_clips",
+) -> tuple[str, MettaGridConfig, Optional[CoGameMission]]:
+    """Get a specific mission configuration by name."""
+    game = get_game(game_name)
+    return resolve_mission(game, mission_arg, variants_arg, cogs)
 
 
-def list_variants() -> None:
-    """Print a table listing all available variants."""
-    if not VARIANTS:
-        return
-
-    console.print("\n")
-    variant_table = Table(
-        title="Available Variants", show_header=True, header_style="bold magenta", box=box.ROUNDED, padding=(0, 1)
-    )
-    variant_table.add_column("Variant", style="yellow", no_wrap=True)
-    variant_table.add_column("Description", style="white")
-
-    for variant in VARIANTS:
-        variant_table.add_row(variant.name, variant.description)
-
-    console.print(variant_table)
+def get_all_missions(game_name: str = "cogs_vs_clips") -> list[str]:
+    """Get all core mission names (excludes evals)."""
+    return get_all_mission_names(get_game(game_name))
 
 
-def list_missions(site_filter: Optional[str] = None) -> None:
-    """List missions: sites only by default; expand sub-missions when a site is provided."""
-
-    if not SITES:
-        console.print("No missions found")
-        return
-
-    normalized_filter = site_filter.rstrip(".") if site_filter is not None else None
-    core_missions = _get_core_missions()
-
-    # Create a single table for all missions
-    table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED, padding=(0, 1))
-    table.add_column("Mission", style="blue", no_wrap=True)
-    table.add_column("Cogs", style="green", justify="center")
-    table.add_column("Map Size", style="green", justify="center")
-    table.add_column("Description", style="white")
-
-    core_sites = [site for site in SITES if any(m.site.name == site.name for m in core_missions)]
-
-    if normalized_filter is not None:
-        core_sites = [site for site in core_sites if site.name == normalized_filter]
-        if not core_sites:
-            console.print(f"[red]No missions found for site '{normalized_filter}'[/red]")
-            return
-
-    for site in core_sites:
-        # Get missions for this site
-        site_missions = [mission for mission in core_missions if mission.site.name == site.name]
-
-        # Get map size from the map builder
-        try:
-            map_builder = site.map_builder
-            if hasattr(map_builder, "width") and hasattr(map_builder, "height"):
-                map_size = f"{map_builder.width}x{map_builder.height}"  # type: ignore[attr-defined]
-            else:
-                map_size = "N/A"
-        except Exception:
-            map_size = "N/A"
-
-        # Add site header row with map size and agent range
-        agent_range = f"{site.min_cogs}-{site.max_cogs}"
-        table.add_row(
-            f"[bold white]{site.name}[/bold white]",
-            agent_range,
-            map_size,
-            f"[dim]{site.description}[/dim]",
-            end_section=normalized_filter is None,
-        )
-
-        if normalized_filter is None:
-            continue
-
-        # Add missions for this site
-        for mission_idx, mission in enumerate(site_missions):
-            is_last_mission = mission_idx == len(site_missions) - 1
-
-            # Add mission row with description in column
-            table.add_row(
-                mission.full_name(),
-                "",
-                "",
-                mission.description,
-            )
-
-            # Add blank row for spacing between missions (except before section separator)
-            if not is_last_mission:
-                table.add_row("", "", "", "")
-
-    console.print(table)
-
-    console.print("\nTo set [bold blue]-m[/bold blue]:")
-    console.print("  • Use [blue]<site>.<mission>[/blue] (e.g., cogsguard_machina_1.basic)")
-    console.print("  • Or pass a mission config file path")
-    console.print("  • List a site's missions: [blue]cogames missions cogsguard_machina_1[/blue]")
-    console.print("\nCogs:")
-    console.print("  • [green]--cogs N[/green] or [green]-c N[/green]")
-    console.print("\n[bold green]Examples:[/bold green]")
-    console.print("  cogames missions")
-    console.print("  cogames missions cogsguard_machina_1")
-    console.print("  cogames play --mission [blue]cogsguard_machina_1.basic[/blue]")
-    console.print("  cogames play --mission [blue]cogsguard_machina_1.basic[/blue] --cogs [green]8[/green]")
-    console.print("  cogames train --mission [blue]cogsguard_machina_1.basic[/blue] --cogs [green]4[/green]")
+def get_all_missions_list(game_name: str = "cogs_vs_clips") -> list[CoGameMission]:
+    """Get all core mission objects (excludes evals)."""
+    return list(get_game(game_name).missions)
 
 
-def list_evals() -> None:
-    """Print a table listing all available eval missions."""
-    evals = _get_eval_missions_all()
-    if not evals:
-        console.print("No eval missions found")
-        return
-
-    # Group missions by site
-    missions_by_site: dict[str, list[CvCMission]] = {}
-    for m in evals:
-        missions_by_site.setdefault(m.site.name, []).append(m)
-
-    table = Table(show_header=True, header_style="bold magenta", box=box.ROUNDED, padding=(0, 1))
-    table.add_column("Mission", style="blue", no_wrap=True)
-    table.add_column("Cogs", style="green", justify="center")
-    table.add_column("Map Size", style="green", justify="center")
-    table.add_column("Description", style="white")
-
-    site_names = sorted(missions_by_site)
-    for idx, site_name in enumerate(site_names):
-        site = next((s for s in SITES if s.name == site_name), None)
-        # Determine map size if possible
-        try:
-            if site is not None and hasattr(site.map_builder, "width") and hasattr(site.map_builder, "height"):
-                map_size = f"{site.map_builder.width}x{site.map_builder.height}"  # type: ignore[attr-defined]
-            else:
-                map_size = "N/A"
-        except Exception:
-            map_size = "N/A"
-
-        agent_range = f"{site.min_cogs}-{site.max_cogs}" if site is not None else ""
-        description = site.description if site is not None else ""
-        table.add_row(
-            f"[bold white]{site_name}[/bold white]",
-            agent_range,
-            map_size,
-            f"[dim]{description}[/dim]",
-            end_section=True,
-        )
-
-        site_missions = missions_by_site[site_name]
-        for mission_idx, mission in enumerate(site_missions):
-            is_last_mission = mission_idx == len(site_missions) - 1
-            is_last_site = idx == len(site_names) - 1
-            table.add_row(
-                mission.full_name(),
-                "",
-                "",
-                mission.description,
-            )
-            if not is_last_mission:
-                table.add_row("", "", "", "")
-            elif not is_last_site:
-                table.add_row("", "", "", "", end_section=True)
-
-    console.print(table)
-    console.print("\nTo play an eval mission:")
-    console.print("  [bold]cogames play[/bold] --mission [blue]evals.divide_and_conquer[/blue]")
+def list_missions(mission_filter: Optional[str] = None, game_name: str = "cogs_vs_clips") -> None:
+    print_missions(get_game(game_name), console, mission_filter)
 
 
-def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cfg: CvCMission | None = None) -> None:
-    """Print detailed information about a specific mission.
+def list_evals(game_name: str = "cogs_vs_clips") -> None:
+    print_evals(get_game(game_name), console)
 
-    Args:
-        mission_name: Name of the mission
-        game_config: Environment configuration
-        mission_cfg: Mission object if available (to show description and variants)
-    """
+
+def list_variants(game_name: str = "cogs_vs_clips") -> None:
+    print_variants(get_game(game_name), console)
+
+
+def describe_mission(
+    mission_name: str,
+    game_config: MettaGridConfig,
+    mission_cfg: Optional[CoGameMission] = None,
+) -> None:
+    """Print detailed information about a specific mission."""
+    from cogames.games.cogs_vs_clips.missions.terrain import MachinaArena  # noqa: PLC0415
 
     console.print(f"\n[bold cyan]{mission_name}[/bold cyan]\n")
 
     if mission_cfg is not None:
-        # Human-facing mission description
         console.print("[bold]Description:[/bold]")
         console.print(f"  {mission_cfg.description}\n")
+        console.print(f"[bold]Default Variant:[/bold] {mission_cfg.default_variant}")
+        console.print("")
 
-        if mission_cfg.variants:
-            console.print("[bold]Variants Applied:[/bold]")
-            for v in mission_cfg.variants:
-                desc = f" - {v.description}" if getattr(v, "description", "") else ""
-                console.print(f"  • {v.name}{desc}")
-            console.print("")
-
-    # Display mission configuration
     console.print("[bold]Mission Configuration:[/bold]")
     console.print(f"  • Number of agents: {game_config.game.num_agents}")
     if isinstance(game_config.game.map_builder, MapGen.Config):
         console.print(f"  • Map size: {game_config.game.map_builder.width}x{game_config.game.map_builder.height}")
-        # Show procedural map details (e.g., biome from variants like -v desert)
         instance = getattr(game_config.game.map_builder, "instance", None)
         if isinstance(instance, MachinaArena.Config):
             console.print("\n[bold]MapGen (MachinaArena):[/bold]")
@@ -538,21 +510,17 @@ def describe_mission(mission_name: str, game_config: MettaGridConfig, mission_cf
             if instance.biome_weights:
                 console.print(f"  • Biome weights: {instance.biome_weights}")
             console.print(f"  • Building coverage: {instance.building_coverage}")
-    # Key knobs
     console.print(f"  • Move energy cost: {game_config.game.actions.move.consumed_resources.get('energy', 0)}")
 
-    # Display available actions
     console.print("\n[bold]Available Actions:[/bold]")
     for n, a in game_config.game.actions.model_dump().items():
         if a["enabled"]:
             console.print(f"  • {n}: {a['consumed_resources']}")
 
-    # Display objects
     console.print("\n[bold]Stations:[/bold]")
-    for obj_name, _obj_config in game_config.game.objects.items():
+    for obj_name in game_config.game.objects:
         console.print(f"  • {obj_name}")
 
-    # Display agent configuration
     console.print("\n[bold]Agent Configuration:[/bold]")
     console.print(f"  • Default resource limit: {game_config.game.agent.inventory.default_limit}")
     if game_config.game.agent.inventory.limits:

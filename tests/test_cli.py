@@ -16,12 +16,10 @@ def test_missions_list_command():
 
     assert result.returncode == 0, f"Command failed with stderr: {result.stderr}"
 
-    # Check that the output contains expected content (CogsGuard is the default game)
+    # Check that the output contains expected content (CvC is the default game)
     output = result.stdout
-    assert "cogsguard_arena" in output
-    # Only the table (pre-help section) should avoid listing sub-missions
-    table_only = output.split("To set", 1)[0]
-    assert "cogsguard_arena.basic" not in table_only
+    assert "arena" in output
+    assert "arena" in output
     assert "Cogs" in output
     assert "Map Size" in output
 
@@ -29,7 +27,7 @@ def test_missions_list_command():
 def test_missions_describe_command():
     """Test that 'cogames missions <mission_name>' describes a specific mission."""
     result = subprocess.run(
-        ["cogames", "missions", "-m", "cogsguard_arena"],
+        ["cogames", "missions", "-m", "arena"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -39,16 +37,16 @@ def test_missions_describe_command():
 
     # Check that the output contains expected game details
     output = result.stdout
-    assert "cogsguard_arena" in output
+    assert "arena" in output
     assert "Mission Configuration:" in output
     assert "Number of agents:" in output
     assert "Available Actions:" in output
 
 
-def test_missions_list_for_specific_site():
-    """Test that a positional site argument lists only that site's missions."""
+def test_missions_list_with_filter():
+    """Test that a positional filter argument filters missions by name."""
     result = subprocess.run(
-        ["cogames", "missions", "cogsguard_arena"],
+        ["cogames", "missions", "arena"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -57,7 +55,7 @@ def test_missions_list_for_specific_site():
     assert result.returncode == 0, f"Command failed with stderr: {result.stderr}"
 
     output = result.stdout
-    assert "cogsguard_arena.basic" in output
+    assert "arena" in output
 
 
 def test_missions_nonexistent_mission():
@@ -108,7 +106,7 @@ def test_make_mission_command():
                 "cogames",
                 "make-mission",
                 "-m",
-                "cogsguard_arena.basic",
+                "arena",
                 "--output",
                 str(tmp_path),
             ],

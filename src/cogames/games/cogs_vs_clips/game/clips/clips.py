@@ -17,6 +17,7 @@ from cogames.games.cogs_vs_clips.game.clips.ship import (
     clips_ship_map_names_in_map_config,
 )
 from cogames.games.cogs_vs_clips.game.junction import JunctionVariant
+from cogames.games.cogs_vs_clips.game.multi_team import MultiTeamVariant
 from cogames.games.cogs_vs_clips.game.teams import TeamConfig
 from cogames.games.cogs_vs_clips.game.teams.team import TeamVariant
 from cogames.variants import ResolvedDeps
@@ -158,7 +159,7 @@ class ClipsVariant(CoGameMissionVariant):
 
     @override
     def dependencies(self) -> Deps:
-        return Deps(required=[TeamVariant, JunctionVariant])
+        return Deps(required=[TeamVariant, JunctionVariant], optional=[MultiTeamVariant])
 
     @override
     def configure(self, deps: ResolvedDeps) -> None:

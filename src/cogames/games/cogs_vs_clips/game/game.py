@@ -8,7 +8,7 @@ from cogames.games.cogs_vs_clips.evals.integrated_evals import (
 from cogames.games.cogs_vs_clips.evals.spanning_evals import (
     EVAL_MISSIONS as SPANNING_EVAL_MISSIONS,
 )
-from cogames.games.cogs_vs_clips.game import VARIANTS
+from cogames.games.cogs_vs_clips.game import _get_all_variants
 from cogames.games.cogs_vs_clips.missions.arena import make_basic_mission
 from cogames.games.cogs_vs_clips.missions.empty import make_empty_mission
 from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
@@ -33,7 +33,7 @@ class CvCGame(CoGame):
                 make_basic_mission(),
                 make_tutorial_mission(),
             ],
-            variants=list(VARIANTS),
+            variants=_get_all_variants(),
             eval_missions=eval_missions,
         )
 

@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.core import CoGameSite as Site
+from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.mapgen import MapGen, MapGenConfig
 
@@ -22,15 +21,6 @@ def _load_map(map_name: str) -> MapGenConfig:
     )
 
 
-COGSGUARD_EVALS_BASE = Site(
-    name="cogsguard_evals",
-    description="CogsGuard evaluation arenas.",
-    map_builder=_load_map("evals/eval_balanced_spread.map"),
-    min_cogs=1,
-    max_cogs=20,
-)
-
-
 def _count_spawn_pads(map_path: Path) -> int:
     text = map_path.read_text()
     if "map_data:" not in text:
@@ -42,26 +32,15 @@ def _count_spawn_pads(map_path: Path) -> int:
     return count
 
 
-def _make_eval_site(map_name: str, num_cogs: int) -> Site:
-    site = COGSGUARD_EVALS_BASE.model_copy(
-        update={
-            "map_builder": _load_map(map_name),
-            "min_cogs": num_cogs,
-            "max_cogs": num_cogs,
-        }
-    )
-    return site
-
-
 def _description_from_stem(stem: str) -> str:
     display = stem
     if display.startswith("eval_"):
         display = display[len("eval_") :]
     display = display.replace("_", " ")
-    return f"CogsGuard eval: {display}."
+    return f"CvC eval: {display}."
 
 
-COGSGUARD_EVAL_MAPS: list[str] = [
+CVC_EVAL_MAPS: list[str] = [
     "evals/eval_balanced_spread.map",
     "evals/eval_clip_oxygen.map",
     "evals/eval_collect_resources.map",
@@ -79,18 +58,19 @@ COGSGUARD_EVAL_MAPS: list[str] = [
     "evals/extractor_hub_100x100.map",
 ]
 
-COGSGUARD_EVAL_COGS = {map_name: _count_spawn_pads(MAPS_DIR / map_name) for map_name in COGSGUARD_EVAL_MAPS}
+CVC_EVAL_COGS = {map_name: _count_spawn_pads(MAPS_DIR / map_name) for map_name in CVC_EVAL_MAPS}
 
-COGSGUARD_EVAL_MISSIONS: list[CvCMission] = []
-for map_name in COGSGUARD_EVAL_MAPS:
+CVC_EVAL_MISSIONS: list[CvCMission] = []
+for map_name in CVC_EVAL_MAPS:
     stem = Path(map_name).stem
-    num_cogs = COGSGUARD_EVAL_COGS[map_name]
-    site = _make_eval_site(map_name, num_cogs)
-    COGSGUARD_EVAL_MISSIONS.append(
+    num_cogs = CVC_EVAL_COGS[map_name]
+    CVC_EVAL_MISSIONS.append(
         CvCMission(
             name=stem,
             description=_description_from_stem(stem),
-            site=site,
+            map_builder=_load_map(map_name),
             num_cogs=num_cogs,
+            min_cogs=num_cogs,
+            max_cogs=num_cogs,
         )
     )

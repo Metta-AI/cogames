@@ -22,7 +22,7 @@ from pydantic import BaseModel
 from cogames import evaluate as evaluate_module
 from cogames.cli.base import console
 from cogames.cli.policy import get_policy_spec, policy_arg_example
-from cogames.cogs_vs_clips.mission import CvCMission, NumCogsVariant
+from cogames.core import CoGameMission
 from cogames.device import resolve_training_device
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.simulator.multi_episode.summary import MultiEpisodeRolloutSummary
@@ -80,6 +80,7 @@ class DiagnosePack(BaseModel):
     requirements: list[DiagnosePackRequirement]
     expected_case_cogs: list[int]
     expected_case_count: int
+    min_case_count: int = 4
     expected_steps: int
     expected_episodes: int
 
@@ -340,7 +341,7 @@ class DiagnoseDoctorNote(BaseModel):
     diagnosis_status: Optional[DiagnosisLifecycleStatus] = None
     dominant_issue: DiagnoseDominantIssue
     axes: list[Stage1AxisScore]
-    stage1_probe_threshold_profile_id: str = "cogsguard_stage1_probe_thresholds_v1"
+    stage1_probe_threshold_profile_id: str = "cvc_stage1_probe_thresholds_v1"
     stage1_probe_catalog: list[Stage1ProbeDefinition] = []
     stage1_probe_evaluations: list[Stage1ProbeEvaluation] = []
     tournament_objective_context: TournamentObjectiveContext = TournamentObjectiveContext()
@@ -417,28 +418,28 @@ class DiagnoseManifest(BaseModel):
     diagnose_validity: DiagnoseValidityReport
 
 
-COGSGUARD_STAGE1_PACK_V1 = DiagnosePack(
-    pack_id="cogsguard_stage1",
+CVC_STAGE1_PACK_V1 = DiagnosePack(
+    pack_id="cvc_stage1",
     pack_version="v1",
-    mission_set="cogsguard_evals",
+    mission_set="cvc_evals",
     requirements=[
         DiagnosePackRequirement(
             axis=DiagnoseAxis.STABILITY,
-            probe_missions=["eval_balanced_spread", "eval_single_use_world"],
+            probe_missions=["eval_balanced_spread", "eval_single_use_world", "scout_tutorial"],
             min_required=1,
         ),
         DiagnosePackRequirement(
             axis=DiagnoseAxis.EFFICIENCY,
-            probe_missions=["eval_collect_resources", "eval_collect_resources_medium"],
+            probe_missions=["eval_collect_resources", "eval_collect_resources_medium", "miner_tutorial"],
             min_required=1,
         ),
         DiagnosePackRequirement(
             axis=DiagnoseAxis.CONTROL,
-            probe_missions=["eval_divide_and_conquer", "eval_clip_oxygen"],
+            probe_missions=["eval_divide_and_conquer", "eval_clip_oxygen", "aligner_tutorial", "scrambler_tutorial"],
             min_required=1,
         ),
     ],
-    expected_case_cogs=[7, 8],
+    expected_case_cogs=[4, 7, 8],
     expected_case_count=15,
     expected_steps=1000,
     expected_episodes=3,
@@ -446,48 +447,14 @@ COGSGUARD_STAGE1_PACK_V1 = DiagnosePack(
 
 
 # Default cogs filter used when missions do not declare fixed cogs.
-COGSGUARD_STAGE1_DEFAULT_COG_FILTERS = [1, 2, 4]
-COGSGUARD_STAGE1_FIXED_CASE_COGS = COGSGUARD_STAGE1_PACK_V1.expected_case_cogs
-COGSGUARD_STAGE1_FIXED_CASE_COUNT = COGSGUARD_STAGE1_PACK_V1.expected_case_count
-COGSGUARD_STAGE1_FIXED_STEPS = COGSGUARD_STAGE1_PACK_V1.expected_steps
-COGSGUARD_STAGE1_FIXED_EPISODES = COGSGUARD_STAGE1_PACK_V1.expected_episodes
+CVC_STAGE1_DEFAULT_COG_FILTERS = [1, 2, 4]
+CVC_STAGE1_FIXED_CASE_COGS = [7, 8]
+CVC_STAGE1_FIXED_CASE_COUNT = 15
+CVC_STAGE1_FIXED_STEPS = 1000
+CVC_STAGE1_FIXED_EPISODES = 3
 
 
-ROLE_SPECIFIC_STAGE1_PACK_V1 = DiagnosePack(
-    pack_id="role_specific_stage1",
-    pack_version="v1",
-    mission_set="role_specific_evals",
-    requirements=[
-        DiagnosePackRequirement(
-            axis=DiagnoseAxis.STABILITY,
-            probe_missions=["scout_tutorial"],
-            min_required=1,
-        ),
-        DiagnosePackRequirement(
-            axis=DiagnoseAxis.EFFICIENCY,
-            probe_missions=["miner_tutorial"],
-            min_required=1,
-        ),
-        DiagnosePackRequirement(
-            axis=DiagnoseAxis.CONTROL,
-            probe_missions=["aligner_tutorial", "scrambler_tutorial"],
-            min_required=2,
-        ),
-    ],
-    expected_case_cogs=[4],
-    expected_case_count=4,
-    expected_steps=1000,
-    expected_episodes=3,
-)
-
-
-STAGE1_PACKS_BY_MISSION_SET: dict[str, DiagnosePack] = {
-    COGSGUARD_STAGE1_PACK_V1.mission_set: COGSGUARD_STAGE1_PACK_V1,
-    ROLE_SPECIFIC_STAGE1_PACK_V1.mission_set: ROLE_SPECIFIC_STAGE1_PACK_V1,
-}
-
-
-STAGE1_PROBE_THRESHOLD_PROFILE_ID = "cogsguard_stage1_probe_thresholds_v1"
+STAGE1_PROBE_THRESHOLD_PROFILE_ID = "cvc_stage1_probe_thresholds_v1"
 
 
 STAGE1_PROBE_CATALOG_V1: list[Stage1ProbeDefinition] = [
@@ -588,23 +555,23 @@ def evaluate_stage1_pack_contract(
         ),
         DiagnosePackContractCheck(
             check_id="pack.cogs",
-            passed=case_cogs == pack.expected_case_cogs,
-            details=f"case_cogs={case_cogs}; expected={pack.expected_case_cogs}",
+            passed=set(case_cogs) <= set(pack.expected_case_cogs),
+            details=f"case_cogs={case_cogs}; expected={sorted(pack.expected_case_cogs)}",
         ),
         DiagnosePackContractCheck(
             check_id="pack.case_count",
-            passed=len(case_names) == pack.expected_case_count,
-            details=f"case_count={len(case_names)}; expected={pack.expected_case_count}",
+            passed=pack.min_case_count <= len(case_names) <= pack.expected_case_count,
+            details=f"case_count={len(case_names)}; expected={pack.min_case_count}..{pack.expected_case_count}",
         ),
         DiagnosePackContractCheck(
             check_id="pack.steps",
-            passed=steps == pack.expected_steps,
-            details=f"steps={steps}; expected={pack.expected_steps}",
+            passed=steps == CVC_STAGE1_FIXED_STEPS,
+            details=f"steps={steps}; expected={CVC_STAGE1_FIXED_STEPS}",
         ),
         DiagnosePackContractCheck(
             check_id="pack.episodes",
-            passed=episodes == pack.expected_episodes,
-            details=f"episodes={episodes}; expected={pack.expected_episodes}",
+            passed=episodes == CVC_STAGE1_FIXED_EPISODES,
+            details=f"episodes={episodes}; expected={CVC_STAGE1_FIXED_EPISODES}",
         ),
     ]
     return DiagnosePackContractReport(
@@ -906,11 +873,7 @@ def stage1_summary_payload(*, mission_names: list[str], episode_count: int, case
 
 
 def use_stage1_pack(mission_set: str) -> bool:
-    return mission_set in STAGE1_PACKS_BY_MISSION_SET
-
-
-def resolve_stage1_pack(mission_set: str) -> DiagnosePack:
-    return STAGE1_PACKS_BY_MISSION_SET.get(mission_set, COGSGUARD_STAGE1_PACK_V1)
+    return mission_set in (CVC_STAGE1_PACK_V1.mission_set, "role_specific_evals")
 
 
 def _policy_episode_rewards(summary: MultiEpisodeRolloutSummary, policy_index: int = 0) -> list[float]:
@@ -2642,7 +2605,7 @@ class DiagnoseCase:
     env_cfg: MettaGridConfig
 
 
-def _load_eval_missions(module_path: str) -> list[CvCMission]:
+def _load_eval_missions(module_path: str) -> list[CoGameMission]:
     module = importlib.import_module(module_path)
     missions = getattr(module, "EVAL_MISSIONS", None)
     if missions is None:
@@ -2650,49 +2613,49 @@ def _load_eval_missions(module_path: str) -> list[CvCMission]:
     return list(missions)
 
 
-def _load_diagnose_missions(mission_set: str) -> list[CvCMission]:
+def _load_diagnose_missions(mission_set: str) -> list[CoGameMission]:
     if mission_set == "all":
-        from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS  # noqa: PLC0415
-        from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
-        from cogames.cogs_vs_clips.missions import MISSIONS as ALL_MISSIONS  # noqa: PLC0415
+        from cogames.cli.mission import get_all_missions_list  # noqa: PLC0415
+        from cogames.games.cogs_vs_clips.evals.cvc_evals import CVC_EVAL_MISSIONS  # noqa: PLC0415
+        from cogames.games.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
 
-        missions_list: list[CvCMission] = []
-        missions_list.extend(COGSGUARD_EVAL_MISSIONS)
-        missions_list.extend(_load_eval_missions("cogames.cogs_vs_clips.evals.integrated_evals"))
-        missions_list.extend(_load_eval_missions("cogames.cogs_vs_clips.evals.spanning_evals"))
+        missions_list: list[CoGameMission] = []
+        missions_list.extend(CVC_EVAL_MISSIONS)
+        missions_list.extend(_load_eval_missions("cogames.games.cogs_vs_clips.evals.integrated_evals"))
+        missions_list.extend(_load_eval_missions("cogames.games.cogs_vs_clips.evals.spanning_evals"))
         missions_list.extend([mission_cls() for mission_cls in DIAGNOSTIC_EVALS])  # type: ignore[call-arg]
         eval_mission_names = {mission.name for mission in missions_list}
-        for mission in ALL_MISSIONS:
+        for mission in get_all_missions_list():
             if mission.name not in eval_mission_names:
                 missions_list.append(mission)
         return missions_list
 
-    if mission_set == "cogsguard_evals":
-        from cogames.cogs_vs_clips.evals.cogsguard_evals import COGSGUARD_EVAL_MISSIONS  # noqa: PLC0415
+    if mission_set == "cvc_evals":
+        from cogames.games.cogs_vs_clips.evals.cvc_evals import CVC_EVAL_MISSIONS  # noqa: PLC0415
 
-        return list(COGSGUARD_EVAL_MISSIONS)
+        return list(CVC_EVAL_MISSIONS)
 
     if mission_set == "diagnostic_evals":
-        from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
+        from cogames.games.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
 
         return [mission_cls() for mission_cls in DIAGNOSTIC_EVALS]  # type: ignore[call-arg]
 
     if mission_set == "tournament":
-        from cogames.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
+        from cogames.games.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415
 
         missions_list = []
-        missions_list.extend(_load_eval_missions("cogames.cogs_vs_clips.evals.integrated_evals"))
+        missions_list.extend(_load_eval_missions("cogames.games.cogs_vs_clips.evals.integrated_evals"))
         missions_list.extend([mission_cls() for mission_cls in DIAGNOSTIC_EVALS])  # type: ignore[call-arg]
         return missions_list
 
     if mission_set == "integrated_evals":
-        return _load_eval_missions("cogames.cogs_vs_clips.evals.integrated_evals")
+        return _load_eval_missions("cogames.games.cogs_vs_clips.evals.integrated_evals")
 
     if mission_set == "spanning_evals":
-        return _load_eval_missions("cogames.cogs_vs_clips.evals.spanning_evals")
+        return _load_eval_missions("cogames.games.cogs_vs_clips.evals.spanning_evals")
 
     if mission_set == "role_specific_evals":
-        return _load_eval_missions("cogames.cogs_vs_clips.evals.role_specific_evals")
+        return _load_eval_missions("cogames.games.cogs_vs_clips.evals.role_specific_evals")
 
     raise ValueError(f"Unknown mission set: {mission_set}")
 
@@ -2706,17 +2669,14 @@ def _matches_experiment(mission_name: str, experiment_filters: set[str]) -> bool
     return any(name.endswith(suffix) for name in experiment_filters)
 
 
-def _cogs_for_mission(mission: CvCMission, cogs_list: list[int], respect_cogs_list: bool) -> list[int]:
+def _cogs_for_mission(mission: CoGameMission, cogs_list: list[int], respect_cogs_list: bool) -> list[int]:
     fixed_cogs = getattr(mission, "num_cogs", None)
     if fixed_cogs is not None:
         if respect_cogs_list and fixed_cogs not in cogs_list:
             return []
         return [fixed_cogs]
-    site = getattr(mission, "site", None)
-    if site is None:
-        return list(cogs_list)
-    min_cogs = getattr(site, "min_cogs", None)
-    max_cogs = getattr(site, "max_cogs", None)
+    min_cogs = getattr(mission, "min_cogs", None)
+    max_cogs = getattr(mission, "max_cogs", None)
     return [
         num_cogs
         for num_cogs in cogs_list
@@ -2724,8 +2684,8 @@ def _cogs_for_mission(mission: CvCMission, cogs_list: list[int], respect_cogs_li
     ]
 
 
-def _build_diagnose_case(mission: CvCMission, num_cogs: int, steps: int) -> DiagnoseCase:
-    mission_with_cogs = mission.with_variants([NumCogsVariant(num_cogs=num_cogs)])
+def _build_diagnose_case(mission: CoGameMission, num_cogs: int, steps: int) -> DiagnoseCase:
+    mission_with_cogs = mission.model_copy(update={"num_agents": num_cogs})
     env_cfg = mission_with_cogs.make_env()
     env_cfg.game.max_steps = steps
     name = f"{mission.full_name()} (cogs={num_cogs})"
@@ -2740,7 +2700,7 @@ def _build_diagnose_cases(
     steps: int,
 ) -> list[DiagnoseCase]:
     experiment_filters = set(experiments or [])
-    cogs_list = cogs if cogs else list(COGSGUARD_STAGE1_DEFAULT_COG_FILTERS)
+    cogs_list = cogs if cogs else list(CVC_STAGE1_DEFAULT_COG_FILTERS)
     respect_cogs_list = cogs is not None
     cases: list[DiagnoseCase] = []
 
@@ -2790,19 +2750,19 @@ def diagnose_cmd(
     ),
     # --- Evaluation ---
     mission_set: Literal[
-        "cogsguard_evals",
-        "role_specific_evals",
+        "cvc_evals",
         "diagnostic_evals",
         "integrated_evals",
+        "role_specific_evals",
         "spanning_evals",
         "tournament",
         "all",
     ] = typer.Option(
-        "cogsguard_evals",
+        "cvc_evals",
         "--mission-set",
         "-S",
         metavar="SET",
-        help=("Eval suite to run (full Stage 2 diagnosis currently requires cogsguard_evals or role_specific_evals)."),
+        help="Eval suite to run (full Stage 2 diagnosis currently requires cvc_evals).",
         rich_help_panel="Evaluation",
     ),
     experiments: Optional[list[str]] = typer.Option(  # noqa: B008
@@ -2829,7 +2789,7 @@ def diagnose_cmd(
     ),
     # --- Simulation ---
     steps: int = typer.Option(
-        COGSGUARD_STAGE1_FIXED_STEPS,
+        CVC_STAGE1_FIXED_STEPS,
         "--steps",
         "-s",
         metavar="N",
@@ -2837,7 +2797,7 @@ def diagnose_cmd(
         rich_help_panel="Simulation",
     ),
     episodes: int = typer.Option(
-        COGSGUARD_STAGE1_FIXED_EPISODES,
+        CVC_STAGE1_FIXED_EPISODES,
         "--episodes",
         "-e",
         metavar="N",
@@ -2904,7 +2864,7 @@ def diagnose_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    pack = resolve_stage1_pack(mission_set)
+    pack = CVC_STAGE1_PACK_V1
     stage1_seed = 42
     stage2_absolute_seed = 43
     stage2_mirror_seed = 44

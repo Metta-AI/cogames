@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from cogames.cogs_vs_clips.missions import CogsGuardBasicMission
+from cogames.games.cogs_vs_clips.missions.arena import make_basic_mission
 from cogames.policy.starter_agent import StarterCogPolicyImpl
 from mettagrid.config.id_map import ObservationFeatureSpec
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
@@ -140,7 +140,7 @@ def test_aligner_without_heart_targets_hub() -> None:
 
 
 def test_cogsguard_tags_resolve_role_station_targets() -> None:
-    policy_env_info = PolicyEnvInterface.from_mg_cfg(CogsGuardBasicMission.make_env())
+    policy_env_info = PolicyEnvInterface.from_mg_cfg(make_basic_mission().make_env())
     for role in ["miner", "aligner", "scrambler", "scout"]:
         impl = StarterCogPolicyImpl(policy_env_info, agent_id=0, preferred_gear=role)
         expected_tag_name = f"type:c:{role}"

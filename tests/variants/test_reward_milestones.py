@@ -1,9 +1,13 @@
+"""Tests for the milestones_2 reward variant."""
+
 import pytest
 
-from cogames.cogs_vs_clips.cog import CogTeam
-from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.reward_variants import apply_reward_variants
-from cogames.cogs_vs_clips.sites import make_cogsguard_arena_site
+from cogames.games.cogs_vs_clips.game.damage import DamageVariant
+from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
+from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant
+from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
+from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from cogames.games.cogs_vs_clips.train.reward_variants import apply_reward_variants
 from mettagrid.config.game_value import Scope, StatValue, SumGameValue
 
 
@@ -11,9 +15,16 @@ def _make_env():
     mission = CvCMission(
         name="basic",
         description="test",
-        site=make_cogsguard_arena_site(num_agents=4),
-        teams={"cogs": CogTeam(num_agents=4)},
+        map_builder=make_arena_map_builder(num_agents=4),
+        min_cogs=4,
+        max_cogs=4,
         max_steps=100,
+    ).with_variants(
+        [
+            TeamVariant(default_teams={"cogs": TeamConfig(num_agents=4)}),
+            TerritoryVariant(),
+            DamageVariant(),
+        ]
     )
     return mission.make_env()
 
