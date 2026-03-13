@@ -75,10 +75,6 @@ def _format_score(value: Any) -> str:
     return "—"
 
 
-def _get_authenticated_client(login_server: str, server: str) -> TournamentServerClient | None:
-    return TournamentServerClient.from_login(server_url=server, login_server=login_server)
-
-
 def _help_callback(ctx: typer.Context, value: bool) -> None:
     """Callback for custom help option."""
     if value:
@@ -133,7 +129,7 @@ def submissions_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    client = _get_authenticated_client(login_server, server)
+    client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
     if not client:
         return
 
@@ -335,7 +331,7 @@ def leaderboard_cmd(
 
     # Apply --mine filter: keep only entries matching the user's own policy IDs
     if mine:
-        auth_client = _get_authenticated_client(login_server, server)
+        auth_client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
         if not auth_client:
             return
         try:
