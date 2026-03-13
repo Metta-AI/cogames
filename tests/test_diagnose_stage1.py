@@ -25,7 +25,7 @@ _ROLE_SPECIFIC_PROBE_MISSIONS = (
 )
 
 
-def _stage1_case_names(*, cogs: int = 8, mission_set: str = "cogsguard_evals") -> list[str]:
+def _stage1_case_names(*, cogs: int = 8, mission_set: str = "cvc_evals") -> list[str]:
     return [f"{mission_set}.{mission} (cogs={cogs})" for mission in _STAGE1_PROBE_MISSIONS]
 
 
@@ -79,7 +79,7 @@ def test_diagnose_cli_does_not_force_default_cogs_into_case_filters(
 
     monkeypatch.setattr(diagnose_module, "_build_diagnose_cases", _capture_build_cases)
 
-    result = _run_diagnose(output_dir=tmp_path, mission_set="cogsguard_evals")
+    result = _run_diagnose(output_dir=tmp_path, mission_set="cvc_evals")
 
     assert result.exit_code == 1
     assert captured["cogs"] is None
@@ -97,7 +97,7 @@ def test_diagnose_cli_forwards_explicit_cogs_to_case_filters(
 
     monkeypatch.setattr(diagnose_module, "_build_diagnose_cases", _capture_build_cases)
 
-    result = _run_diagnose(output_dir=tmp_path, mission_set="cogsguard_evals", extra_args=["--cogs", "8"])
+    result = _run_diagnose(output_dir=tmp_path, mission_set="cvc_evals", extra_args=["--cogs", "8"])
 
     assert result.exit_code == 1
     assert captured["cogs"] == [8]
@@ -164,7 +164,7 @@ def test_evaluate_stage1_gate_marks_missing_axes() -> None:
     case_names = [_stage1_case_names()[0]]
     gate = diagnose_module.evaluate_stage1_gate(
         case_names=case_names,
-        pack=diagnose_module.COGSGUARD_STAGE1_PACK_V1,
+        pack=diagnose_module.CVC_STAGE1_PACK_V1,
     )
 
     assert not gate.satisfied
@@ -177,7 +177,7 @@ def test_evaluate_stage1_gate_marks_missing_axes() -> None:
 def test_evaluate_stage1_gate_role_specific_pack_requires_all_role_probes() -> None:
     gate = diagnose_module.evaluate_stage1_gate(
         case_names=_role_specific_case_names(),
-        pack=diagnose_module.ROLE_SPECIFIC_STAGE1_PACK_V1,
+        pack=diagnose_module.CVC_STAGE1_PACK_V1,
     )
 
     assert gate.satisfied
@@ -193,7 +193,7 @@ def test_evaluate_stage1_gate_role_specific_pack_requires_all_role_probes() -> N
 def test_assess_stage1_signals_confirms_with_metrics_and_replays() -> None:
     gate = diagnose_module.evaluate_stage1_gate(
         case_names=_stage1_case_names(),
-        pack=diagnose_module.COGSGUARD_STAGE1_PACK_V1,
+        pack=diagnose_module.CVC_STAGE1_PACK_V1,
     )
     metrics_by_mission = {
         mission: [
@@ -222,15 +222,15 @@ def test_assess_stage1_signals_confirms_with_metrics_and_replays() -> None:
 
 
 def test_evaluate_stage1_pack_contract_uses_case_cogs_and_case_count() -> None:
-    case_names = [f"cogsguard_evals.case_{idx} (cogs=8)" for idx in range(14)]
-    case_names.append("cogsguard_evals.case_14 (cogs=7)")
+    case_names = [f"cvc_evals.case_{idx} (cogs=8)" for idx in range(14)]
+    case_names.append("cvc_evals.case_14 (cogs=7)")
 
     report = diagnose_module.evaluate_stage1_pack_contract(
-        mission_set="cogsguard_evals",
-        steps=diagnose_module.COGSGUARD_STAGE1_FIXED_STEPS,
-        episodes=diagnose_module.COGSGUARD_STAGE1_FIXED_EPISODES,
+        mission_set="cvc_evals",
+        steps=diagnose_module.CVC_STAGE1_FIXED_STEPS,
+        episodes=diagnose_module.CVC_STAGE1_FIXED_EPISODES,
         case_names=case_names,
-        pack=diagnose_module.COGSGUARD_STAGE1_PACK_V1,
+        pack=diagnose_module.CVC_STAGE1_PACK_V1,
     )
 
     assert report.valid
@@ -238,11 +238,11 @@ def test_evaluate_stage1_pack_contract_uses_case_cogs_and_case_count() -> None:
 
 def test_evaluate_stage1_pack_contract_fails_for_case_cogs_and_case_count_mismatch() -> None:
     report = diagnose_module.evaluate_stage1_pack_contract(
-        mission_set="cogsguard_evals",
-        steps=diagnose_module.COGSGUARD_STAGE1_FIXED_STEPS,
-        episodes=diagnose_module.COGSGUARD_STAGE1_FIXED_EPISODES,
+        mission_set="cvc_evals",
+        steps=diagnose_module.CVC_STAGE1_FIXED_STEPS,
+        episodes=diagnose_module.CVC_STAGE1_FIXED_EPISODES,
         case_names=_stage1_case_names(cogs=1),
-        pack=diagnose_module.COGSGUARD_STAGE1_PACK_V1,
+        pack=diagnose_module.CVC_STAGE1_PACK_V1,
     )
 
     assert not report.valid
@@ -252,7 +252,7 @@ def test_evaluate_stage1_pack_contract_fails_for_case_cogs_and_case_count_mismat
 
 
 def test_evaluate_stage1_pack_contract_role_specific_pack_defaults() -> None:
-    pack = diagnose_module.ROLE_SPECIFIC_STAGE1_PACK_V1
+    pack = diagnose_module.CVC_STAGE1_PACK_V1
     report = diagnose_module.evaluate_stage1_pack_contract(
         mission_set=pack.mission_set,
         steps=pack.expected_steps,
@@ -397,7 +397,7 @@ def test_diagnose_cli_reused_output_dir_does_not_count_stale_replays(
     monkeypatch.setattr(diagnose_module, "_build_diagnose_cases", lambda **_kwargs: _stage1_pack_cases())
     _patch_diagnose_runtime(monkeypatch, evaluate_fn=_fake_evaluate_without_replays)
 
-    result = _run_diagnose(output_dir=output_dir, mission_set="cogsguard_evals")
+    result = _run_diagnose(output_dir=output_dir, mission_set="cvc_evals")
 
     assert result.exit_code == 0, result.output
     assert not list(stale_replay_dir.glob("*.json.z"))
@@ -414,7 +414,7 @@ def test_diagnose_cli_writes_portable_replay_refs(
     monkeypatch.setattr(diagnose_module, "_build_diagnose_cases", lambda **_kwargs: _stage1_pack_cases())
     _patch_diagnose_runtime(monkeypatch, evaluate_fn=_fake_evaluate_with_replays)
 
-    result = _run_diagnose(output_dir=output_dir, mission_set="cogsguard_evals")
+    result = _run_diagnose(output_dir=output_dir, mission_set="cvc_evals")
 
     assert result.exit_code == 0, result.output
     doctor_note = diagnose_module.load_doctor_note(output_dir / "doctor_note.json")
@@ -432,7 +432,7 @@ def test_diagnose_cli_completes_stage2_with_replays(
     monkeypatch.setattr(diagnose_module, "_build_diagnose_cases", lambda **_kwargs: _stage1_pack_cases())
     _patch_diagnose_runtime(monkeypatch, evaluate_fn=_fake_evaluate_with_replays)
 
-    result = _run_diagnose(output_dir=output_dir, mission_set="cogsguard_evals")
+    result = _run_diagnose(output_dir=output_dir, mission_set="cvc_evals")
 
     assert result.exit_code == 0, result.output
     state = _read_state(output_dir)
@@ -460,7 +460,7 @@ def test_diagnose_cli_role_specific_pack_completes_stage2_with_replays(
     assert state.run_status == diagnose_module.DiagnoseRunStatus.COMPLETE
 
     manifest = json.loads((output_dir / "manifest.json").read_text())
-    assert manifest["pack_id"] == diagnose_module.ROLE_SPECIFIC_STAGE1_PACK_V1.pack_id
+    assert manifest["pack_id"] == diagnose_module.CVC_STAGE1_PACK_V1.pack_id
     assert manifest["stage_status"] == "stage2_completed"
     assert manifest["run_status"] == "complete"
 
@@ -476,7 +476,7 @@ def test_diagnose_cli_writes_uploadable_bundle_zip(
 
     result = _run_diagnose(
         output_dir=output_dir,
-        mission_set="cogsguard_evals",
+        mission_set="cvc_evals",
         extra_args=["--bundle-zip", str(bundle_path)],
     )
 

@@ -1,18 +1,29 @@
-from cogames.cogs_vs_clips.cog import CogTeam
-from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.reward_variants import apply_reward_variants
-from cogames.cogs_vs_clips.sites import make_cogsguard_arena_site
-from cogames.cogs_vs_clips.variants import ForcedRoleVibesVariant
+"""Tests for the role_conditional reward variant."""
+
+from cogames.games.cogs_vs_clips.game import ForcedRoleVibesVariant
+from cogames.games.cogs_vs_clips.game.damage import DamageVariant
+from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
+from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
+from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
+from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from cogames.games.cogs_vs_clips.train.reward_variants import apply_reward_variants
 
 
 def test_role_conditional_applies_per_agent_shaping_using_role_id_when_present() -> None:
     mission = CvCMission(
         name="basic",
         description="test",
-        site=make_cogsguard_arena_site(num_agents=4),
-        teams={"cogs": CogTeam(num_agents=4)},
+        map_builder=make_arena_map_builder(num_agents=4),
+        min_cogs=4,
+        max_cogs=4,
         max_steps=100,
-        variants=[ForcedRoleVibesVariant()],
+    ).with_variants(
+        [
+            TeamVariant(default_teams={"cogs": TeamConfig(num_agents=4)}),
+            DamageVariant(),
+            VibesVariant(),
+            ForcedRoleVibesVariant(),
+        ]
     )
     env = mission.make_env()
     apply_reward_variants(env, variants=["role_conditional"])
@@ -39,10 +50,17 @@ def test_role_conditional_respects_custom_role_order_from_forced_vibes() -> None
     mission = CvCMission(
         name="basic",
         description="test",
-        site=make_cogsguard_arena_site(num_agents=4),
-        teams={"cogs": CogTeam(num_agents=4)},
+        map_builder=make_arena_map_builder(num_agents=4),
+        min_cogs=4,
+        max_cogs=4,
         max_steps=100,
-        variants=[ForcedRoleVibesVariant(role_order=["scout", "miner", "aligner", "scrambler"])],
+    ).with_variants(
+        [
+            TeamVariant(default_teams={"cogs": TeamConfig(num_agents=4)}),
+            DamageVariant(),
+            VibesVariant(),
+            ForcedRoleVibesVariant(role_order=["scout", "miner", "aligner", "scrambler"]),
+        ]
     )
     env = mission.make_env()
     apply_reward_variants(env, variants=["role_conditional"])

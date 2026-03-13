@@ -58,7 +58,8 @@ class MultiTeamVariant(CoGameMissionVariant):
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
         team_v = mission.required_variant(TeamVariant)
-        agents_per_team = max(t.num_agents for t in team_v.teams.values())
+        player_teams = [t for t in team_v.teams.values() if t.num_agents > 0]
+        agents_per_team = max(t.num_agents for t in player_teams)
         original_builder = env.game.map_builder
         if isinstance(original_builder, MapGen.Config):
             original_builder = original_builder.model_copy(deep=True)
@@ -68,7 +69,7 @@ class MultiTeamVariant(CoGameMissionVariant):
         # Normalize hub object names from team-specific prefixes (e.g.
         # "cogs_green:hub") back to the template "c:" prefix so that
         # instance_object_remap can remap them per-instance.
-        team_prefixes = {f"{t.short_name}:" for t in team_v.teams.values()}
+        team_prefixes = {f"{t.short_name}:" for t in player_teams}
         arena = find_machina_arena(original_builder) if isinstance(original_builder, MapGen.Config) else None
         if arena is not None:
             arena.hub.hub_object = self._normalize(arena.hub.hub_object, team_prefixes)
@@ -93,7 +94,7 @@ class MultiTeamVariant(CoGameMissionVariant):
             instance=original_builder,
             instances=self.num_teams,
             set_team_by_instance=True,
-            instance_names=[t.short_name for t in team_v.teams.values()],
+            instance_names=[t.short_name for t in player_teams],
             instance_object_remap=object_remap,
             border_width=0,
             instance_border_width=0,

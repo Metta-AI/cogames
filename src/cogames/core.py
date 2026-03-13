@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
@@ -10,19 +10,15 @@ from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 from pydantic import Field, PrivateAttr
 from typing_extensions import Self
 
-import cogames.variants as variants
+from cogames.variants import VariantRegistry
 from mettagrid.base_config import Config
 from mettagrid.config.mettagrid_config import GridObjectConfig, MettaGridConfig
 from mettagrid.map_builder.map_builder import AnyMapBuilderConfig
 
 if TYPE_CHECKING:
-    from cogames.variants import ResolvedDeps, VariantRegistry
+    from cogames.variants import ResolvedDeps
 
-# Type variable for mission types
-TMission = TypeVar("TMission", bound="CoGameMission")
 T = TypeVar("T", bound="CoGameMissionVariant")
-
-MAP_MISSION_DELIMITER = "."
 
 
 @dataclass
@@ -41,7 +37,6 @@ class CvCStationConfig(Config):
 class CoGameMissionVariant(Config, ABC):
     name: str
     description: str = Field(default="")
-    depends_on: list[str] = Field(default_factory=list)
 
     _type_registry: ClassVar[dict[str, type[CoGameMissionVariant]]] = {}
     _type_candidates: ClassVar[dict[str, list[type[CoGameMissionVariant]]]] = {}
@@ -80,38 +75,11 @@ class CoGameMissionVariant(Config, ABC):
         Called after dependency resolution. Only declared deps are accessible.
         """
 
-    def modify_mission(self, mission: CoGameMission) -> None:
-        # Override this method to modify the mission.
-        # Variants are allowed to modify the mission in-place - it's guaranteed to be a one-time only instance.
-        pass
-
     def modify_env(self, mission: CoGameMission, env: MettaGridConfig) -> None:
-        # Override this method to modify the produced environment.
-        # Variants are allowed to modify the environment in-place.
         pass
 
     def compat(self, mission: CoGameMission) -> bool:
-        """Check if this variant is compatible with the given mission.
-
-        Returns True if the variant can be safely applied to the mission.
-        Override this method to add compatibility checks.
-        """
         return True
-
-    def apply(self, mission: TMission) -> TMission:
-        mission = mission.model_copy(deep=True)
-        mission.variants.append(self)
-        self.modify_mission(mission)
-        return mission
-
-
-class CoGameSite(Config):
-    name: str
-    description: str
-    map_builder: AnyMapBuilderConfig
-
-    min_cogs: int = Field(default=1, ge=1)
-    max_cogs: int = Field(default=1000, ge=1)
 
 
 class CoGameMission(Config, ABC):
@@ -119,7 +87,7 @@ class CoGameMission(Config, ABC):
 
     name: str
     description: str
-    site: CoGameSite
+    map_builder: AnyMapBuilderConfig
     num_cogs: int | None = None
     min_cogs: int = Field(default=1, ge=1)
     max_cogs: int = Field(default=1000, ge=1)
@@ -127,18 +95,10 @@ class CoGameMission(Config, ABC):
     default_variant: str | None = None
     sub_missions: list[str] = Field(default_factory=list)
 
-    # Variants are applied to the mission immediately, and to its env when make_env is called
-    variants: list[CoGameMissionVariant] = Field(default_factory=list)
-
     max_steps: int = Field(default=10000)
 
-    _variant_registry: VariantRegistry = PrivateAttr(default_factory=lambda: variants.VariantRegistry())
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Can't call `variant.apply` here because it will create a new mission instance
-        for variant in self.variants:
-            variant.modify_mission(self)
+    _base_variants: dict[str, CoGameMissionVariant] = PrivateAttr(default_factory=dict)
+    _variant_registry: VariantRegistry = PrivateAttr(default_factory=VariantRegistry)
 
     def required_variant(self, variant_type: type[T]) -> T:
         """Look up a configured variant by type. Only valid after configure phase."""
@@ -154,34 +114,24 @@ class CoGameMission(Config, ABC):
     def variant_module_prefixes(self) -> tuple[str, ...]:
         return ()
 
-    def with_variants(self, variants: list[CoGameMissionVariant] | Sequence[str | CoGameMissionVariant]) -> Self:
-        has_strings = any(isinstance(v, str) for v in variants)
-        if not has_strings:
-            # Legacy path: all variant objects, apply eagerly
-            mission = self
-            for variant in variants:
-                assert isinstance(variant, CoGameMissionVariant)
-                mission = variant.apply(mission)
-            return mission
-        # Registry path: resolve names to objects and apply via the standard path
+    def with_variants(self, variants: Sequence[str | CoGameMissionVariant]) -> Self:
         copy = self.model_copy(deep=True)
         preferred_modules = copy.variant_module_prefixes()
         for v in variants:
-            variant = (
-                v
-                if isinstance(v, CoGameMissionVariant)
-                else CoGameMissionVariant.create(v, preferred_modules=preferred_modules)
-            )
-            copy.variants.append(variant)
-            variant.modify_mission(copy)
+            if isinstance(v, CoGameMissionVariant):
+                copy._base_variants[v.name] = v
+            else:
+                copy._base_variants[v] = CoGameMissionVariant.create(v, preferred_modules=preferred_modules)
         return copy
 
+    @abstractmethod
     def make_base_env(self) -> MettaGridConfig:
         """Create the initial env config before variants are applied. Subclasses must implement."""
-        raise NotImplementedError("Subclasses must implement make_base_env()")
+        ...
 
     def make_env(self) -> MettaGridConfig:
         """Create a complete env config: base env + all variants applied."""
+        self._variant_registry = VariantRegistry(list(self._base_variants.values()))
         extra_names = [n for n in self._variant_registry._variants if n != self.default_variant]
         default = [self.default_variant] if self.default_variant else []
         self._variant_registry.run_configure(
@@ -196,4 +146,4 @@ class CoGameMission(Config, ABC):
         return env
 
     def full_name(self) -> str:
-        return f"{self.site.name}{MAP_MISSION_DELIMITER}{self.name}"
+        return self.name

@@ -9,7 +9,7 @@ import numpy as np
 from cogames.core import CoGameMissionVariant
 
 if TYPE_CHECKING:
-    from cogames.cogs_vs_clips.mission import CvCMission
+    from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.map_builder.map_builder import MapBuilderConfig
 from mettagrid.mapgen.area import AreaWhere
@@ -34,7 +34,7 @@ from mettagrid.mapgen.scenes.building_distributions import (
     DistributionConfig,
     UniformExtractorParams,
 )
-from mettagrid.mapgen.scenes.compound import Compound, CompoundConfig
+from mettagrid.mapgen.scenes.compound import CompoundConfig
 from mettagrid.mapgen.scenes.make_connected import MakeConnected
 from mettagrid.mapgen.scenes.maze import MazeConfig
 from mettagrid.mapgen.scenes.radial_maze import RadialMaze
@@ -250,8 +250,8 @@ class MachinaArenaConfig(SceneConfig):
 
     # Hub config. `spawn_count` will be set based on `spawn_count` in this config.
     hub: CompoundConfig = CompoundConfig(
-        hub_object="c:hub",
-        corner_bundle="extractors",
+        hub_object="empty",
+        corner_bundle="none",
         cross_bundle="none",
         cross_distance=7,
     )
@@ -308,13 +308,7 @@ class MachinaArena(Scene[MachinaArenaConfig]):
         base_cfg: SceneConfig = BaseCfgModel.model_validate(cfg.base_biome_config or {})
 
         # Building weights
-        default_building_weights = {
-            "junction": 0.7,
-            "germanium_extractor": 0.3,
-            "silicon_extractor": 0.3,
-            "oxygen_extractor": 0.3,
-            "carbon_extractor": 0.3,
-        }
+        default_building_weights: dict[str, float] = {}
 
         weights_dict: dict[str, float] = (
             {str(k): v for k, v in cfg.building_weights.items()} if cfg.building_weights is not None else {}
@@ -508,20 +502,20 @@ class MachinaArena(Scene[MachinaArenaConfig]):
         if asteroid_mask is not None:
             children.append(ChildrenAction(scene=asteroid_mask, where="full"))
 
-        # Resources
-        children.append(
-            ChildrenAction(
-                scene=UniformExtractorParams(
-                    target_coverage=cfg.building_coverage,
-                    building_names=building_names_final,
-                    building_weights=building_weights_final,
-                    clear_existing=False,
-                    distribution=cfg.distribution,
-                    building_distributions=cfg.building_distributions,
-                ),
-                where="full",
+        if building_names_final:
+            children.append(
+                ChildrenAction(
+                    scene=UniformExtractorParams(
+                        target_coverage=cfg.building_coverage,
+                        building_names=building_names_final,
+                        building_weights=building_weights_final,
+                        clear_existing=False,
+                        distribution=cfg.distribution,
+                        building_distributions=cfg.building_distributions,
+                    ),
+                    where="full",
+                )
             )
-        )
 
         # Connectivity + hub
         children.append(
@@ -584,13 +578,7 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
         if BaseCfgModel is None:
             raise ValueError(f"Unknown base_biome '{cfg.base_biome}'. Valid: {sorted(biome_map)}")
         base_cfg: SceneConfig = BaseCfgModel.model_validate(cfg.base_biome_config or {})
-        default_building_weights = {
-            "junction": 0.6,
-            "germanium_extractor": 0.2,
-            "silicon_extractor": 0.2,
-            "oxygen_extractor": 0.2,
-            "carbon_extractor": 0.2,
-        }
+        default_building_weights: dict[str, float] = {}
         weights_dict: dict[str, float] = {str(k): v for k, v in (cfg.building_weights or {}).items()}
         if not weights_dict:
             names = cfg.building_names or list(default_building_weights)
@@ -708,19 +696,20 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
             asteroid_mask = AsteroidMaskConfig()
         if asteroid_mask is not None:
             children.append(ChildrenAction(scene=asteroid_mask, where="full"))
-        children.append(
-            ChildrenAction(
-                scene=UniformExtractorParams(
-                    target_coverage=cfg.building_coverage,
-                    building_names=building_names_final,
-                    building_weights=building_weights_final,
-                    clear_existing=False,
-                    distribution=cfg.distribution,
-                    building_distributions=cfg.building_distributions,
-                ),
-                where="full",
+        if building_names_final:
+            children.append(
+                ChildrenAction(
+                    scene=UniformExtractorParams(
+                        target_coverage=cfg.building_coverage,
+                        building_names=building_names_final,
+                        building_weights=building_weights_final,
+                        clear_existing=False,
+                        distribution=cfg.distribution,
+                        building_distributions=cfg.building_distributions,
+                    ),
+                    where="full",
+                )
             )
-        )
         children.append(
             ChildrenAction(
                 scene=cfg.hub.model_copy(deep=True, update={"spawn_count": cfg.spawn_count}),
@@ -804,6 +793,7 @@ class MapGenVariant(EnvNodeVariant[MapGenConfig]):
         return map_builder
 
 
+# TODO: unchecked variant
 class MapSeedVariant(MapGenVariant):
     """Variant that sets the MapGen seed for deterministic map generation.
 
@@ -821,33 +811,6 @@ class MapSeedVariant(MapGenVariant):
     @override
     def modify_node(self, node: MapGenConfig) -> None:
         node.seed = int(self.seed)
-
-
-class CompoundVariant(EnvNodeVariant[CompoundConfig]):
-    @override
-    def compat(self, mission: CvCMission) -> bool:
-        env = mission.make_env()
-        if not isinstance(env.game.map_builder, MapGen.Config):
-            return False
-        instance = env.game.map_builder.instance
-        if not isinstance(instance, Compound.Config):
-            return False
-        if isinstance(instance, RandomTransform.Config) and isinstance(instance.scene, Compound.Config):
-            return True
-        return isinstance(instance, MachinaArena.Config)
-
-    @classmethod
-    def extract_node(cls, env: MettaGridConfig) -> CompoundConfig:
-        assert isinstance(env.game.map_builder, MapGen.Config)
-        instance = env.game.map_builder.instance
-
-        if isinstance(instance, RandomTransform.Config) and isinstance(instance.scene, Compound.Config):
-            return instance.scene
-
-        elif isinstance(instance, MachinaArena.Config):
-            return instance.hub
-
-        raise TypeError("CompoundVariant can only be applied RandomTransform/Compound or MachinaArena scenes")
 
 
 class MachinaArenaVariant(EnvNodeVariant[MachinaArenaConfig]):

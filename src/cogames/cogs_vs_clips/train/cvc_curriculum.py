@@ -4,10 +4,10 @@ import json
 from dataclasses import dataclass
 from typing import Sequence
 
-from cogames.cogs_vs_clips.mission import CvCMission
-from cogames.cogs_vs_clips.reward_variants import AVAILABLE_REWARD_VARIANTS
-from cogames.cogs_vs_clips.variants import HIDDEN_VARIANTS, VARIANTS
 from cogames.core import CoGameMissionVariant
+from cogames.games.cogs_vs_clips.game import VARIANTS
+from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from cogames.games.cogs_vs_clips.train.reward_variants import AVAILABLE_REWARD_VARIANTS
 
 
 @dataclass(frozen=True)
@@ -17,7 +17,7 @@ class EventProfile:
     weather_overrides: dict[str, object]
 
 
-COGSGUARD_FIXED_MAPS: list[str] = [
+CVC_FIXED_MAPS: list[str] = [
     "machina_100_stations.map",
     "machina_200_stations.map",
     "cave_base_50.map",
@@ -25,7 +25,7 @@ COGSGUARD_FIXED_MAPS: list[str] = [
 ]
 
 DEFAULT_EVENT_PROFILE = EventProfile("events_baseline", {}, {})
-COGSGUARD_EVENT_PROFILES: list[EventProfile] = [
+CVC_EVENT_PROFILES: list[EventProfile] = [
     DEFAULT_EVENT_PROFILE,
     EventProfile(
         "events_fast_clips_short_day",
@@ -74,7 +74,7 @@ def normalize_variant_names(variants: str | Sequence[str] | None) -> list[str]:
 
 
 def _is_parametrized_reward_variant(name: str) -> bool:
-    return name.startswith("objective_mine:")
+    return name.startswith("milestones_2:")
 
 
 def split_variants(
@@ -84,7 +84,7 @@ def split_variants(
         names: list[str] = []
     else:
         names = normalize_variant_names(variants)
-    all_variants = {variant.name: variant for variant in [*VARIANTS, *HIDDEN_VARIANTS]}
+    all_variants = {variant.name: variant for variant in VARIANTS}
     reward_variants = set(AVAILABLE_REWARD_VARIANTS)
 
     resolved: list[CoGameMissionVariant] = []

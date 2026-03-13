@@ -8,8 +8,6 @@ from pydantic import Field
 
 from cogames.core import CoGameMissionVariant, Deps
 from cogames.games.cogs_vs_clips.game.clips import ClipsConfig, ClipsVariant
-from cogames.games.cogs_vs_clips.game.damage import DamageVariant
-from cogames.games.cogs_vs_clips.game.days import DaysVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
 from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
 from cogames.games.cogs_vs_clips.game.heart import HeartVariant
@@ -60,9 +58,7 @@ class CvCTutorialVariant(CoGameMissionVariant):
                 ScramblerVariant,
                 MinerVariant,
                 ScoutVariant,
-                DaysVariant,
                 TeamGearStationsVariant,
-                DamageVariant,
                 ElementsVariant,
                 HeartVariant,
                 TeamJunctionVariant,

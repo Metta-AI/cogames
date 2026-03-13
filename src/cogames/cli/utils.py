@@ -1,7 +1,24 @@
 import logging
 import warnings
+from typing import Optional
 
 from pydantic.warnings import UnsupportedFieldAttributeWarning
+
+from cogames.core import CoGameMissionVariant
+from cogames.variants import VariantRegistry
+
+
+def parse_variants(registry: VariantRegistry, variants_arg: Optional[list[str]]) -> list[CoGameMissionVariant]:
+    if not variants_arg:
+        return []
+    out: list[CoGameMissionVariant] = []
+    for name in variants_arg:
+        v = registry.get(name)
+        if v is None:
+            available = ", ".join(v.name for v in registry.all())
+            raise ValueError(f"Unknown variant '{name}'.\nAvailable variants: {available}")
+        out.append(v)
+    return out
 
 
 def suppress_noisy_logs() -> None:
