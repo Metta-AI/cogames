@@ -17,10 +17,6 @@ from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 
 
-def _get_client(login_server: str, server: str) -> TournamentServerClient | None:
-    return TournamentServerClient.from_login(server_url=server, login_server=login_server)
-
-
 def _help_callback(ctx: typer.Context, value: bool) -> None:
     """Callback for custom help option."""
     if value:
@@ -103,7 +99,7 @@ def matches_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
     if not client:
         return
 
@@ -436,7 +432,7 @@ def match_artifacts_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
     if not client:
         return
 
