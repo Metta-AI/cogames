@@ -96,6 +96,25 @@ class _AuthLeaderboardClient:
         return self._mine_entries
 
 
+class _LeaderboardClientFactory:
+    def __init__(
+        self,
+        *,
+        public_client: _PublicLeaderboardClient,
+        auth_client: _AuthLeaderboardClient,
+    ) -> None:
+        self._public_client = public_client
+        self._auth_client = auth_client
+
+    def __call__(self, server_url: str) -> _PublicLeaderboardClient:
+        _ = server_url
+        return self._public_client
+
+    def from_login(self, *, server_url: str, login_server: str) -> _AuthLeaderboardClient:
+        _ = (server_url, login_server)
+        return self._auth_client
+
+
 def test_leaderboard_mine_uses_season_policies_for_filtering(monkeypatch: pytest.MonkeyPatch) -> None:
     printed = _capture(monkeypatch)
     all_entries = [
@@ -122,8 +141,11 @@ def test_leaderboard_mine_uses_season_policies_for_filtering(monkeypatch: pytest
     public_client = _PublicLeaderboardClient(entries=all_entries)
     auth_client = _AuthLeaderboardClient(mine_entries=mine_entries)
 
-    monkeypatch.setattr(leaderboard, "TournamentServerClient", lambda server_url: public_client)
-    monkeypatch.setattr(leaderboard, "_get_authenticated_client", lambda login_server, server: auth_client)
+    monkeypatch.setattr(
+        leaderboard,
+        "TournamentServerClient",
+        _LeaderboardClientFactory(public_client=public_client, auth_client=auth_client),
+    )
 
     leaderboard.leaderboard_cmd(
         season_arg="test-season",
