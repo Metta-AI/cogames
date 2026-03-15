@@ -237,7 +237,6 @@
 #
 # - Use a mission name from the registry given by `cogames missions` (e.g. `training_facility_1`).
 # - Use a path to a mission configuration file (e.g. `path/to/mission.yaml`).
-# - Alternatively, specify a set of missions with `--mission-set`.
 #
 # To specify a `POLICY`, use one of two formats:
 #

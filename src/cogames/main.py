@@ -848,7 +848,7 @@ def make_mission(
         raise typer.Exit(1) from exc
 
 
-# TODO (cvc migration): Verify make-policy templates work with CvC game mechanics
+# TODO: Verify make-policy templates work with CvC game mechanics
 @tutorial_app.command(
     name="make-policy",
     help="Create a new policy from a template. Requires --trainable or --scripted.",
@@ -1178,8 +1178,6 @@ With one policy, this command is equivalent to `cogames scrimmage`.
 [cyan]cogames run -m machina_1.basic -p lstm[/cyan]               Evaluate single policy
 
 [cyan]cogames run -m machina_1 -p ./train_dir/my_run:v5[/cyan]     Evaluate a checkpoint bundle
-
-[cyan]cogames run -S integrated_evals -p ./train_dir/my_run:v5[/cyan]    Evaluate on mission set
 
 [cyan]cogames run -m 'arena.*' -p lstm -p random -e 20[/cyan]            Evaluate multiple policies together
 
