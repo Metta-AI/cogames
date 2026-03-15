@@ -36,7 +36,7 @@ from cogames.games.cogs_vs_clips.missions.terrain import (
     SequentialMachinaArena,
 )
 from cogames.variants import ResolvedDeps
-from mettagrid.config.game_value import num_tagged
+from mettagrid.config.game_value import num_tagged, val
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.reward_config import reward
 from mettagrid.mapgen.mapgen import MapGen, MapGenConfig
@@ -148,8 +148,10 @@ class CvCMachina1Variant(CoGameMissionVariant):
         for agent in env.game.agents:
             team_name = team_v.team_name(agent.team_id)
             if team_name is not None:
+                # net:* includes the team's hub, so subtract the root node and
+                # reward only held junctions.
                 agent.rewards["aligned_junction_held"] = reward(
-                    num_tagged(f"net:{team_name}"),
+                    [num_tagged(f"net:{team_name}"), val(-1.0)],
                     weight=1.0 / mission.max_steps,
                     per_tick=True,
                 )

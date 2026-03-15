@@ -8,6 +8,7 @@ from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservati
 from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant as JunctionNetVariant
 from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from mettagrid.config.game_value import ConstValue, QueryCountValue, SumGameValue
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.query import ClosureQuery, MaterializedQuery
 from mettagrid.simulator import Simulation
@@ -66,6 +67,20 @@ def test_team_net_tag_uses_type_hub_source():
     assert mq.tag == "net:cogs"
     assert isinstance(mq.query, ClosureQuery)
     assert "type:hub" in str(mq.query.source), "Source query should include type:hub"
+
+
+def test_machina_objective_reward_excludes_hub_baseline() -> None:
+    env = make_machina1_mission(num_agents=2, max_steps=1000).make_env()
+    reward_cfg = env.game.agents[0].rewards["aligned_junction_held"]
+
+    assert isinstance(reward_cfg.reward, SumGameValue)
+    assert reward_cfg.per_tick is True
+    assert reward_cfg.reward.weights == [0.001, 0.001]
+    assert len(reward_cfg.reward.values) == 2
+    assert isinstance(reward_cfg.reward.values[0], QueryCountValue)
+    assert reward_cfg.reward.values[0].query.source == "net:cogs"
+    assert isinstance(reward_cfg.reward.values[1], ConstValue)
+    assert reward_cfg.reward.values[1].value == -1.0
 
 
 def test_hub_global_obs_shows_own_team_only():
