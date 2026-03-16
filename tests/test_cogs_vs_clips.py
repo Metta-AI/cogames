@@ -11,16 +11,45 @@ from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from mettagrid.config.game_value import ConstValue, QueryCountValue, SumGameValue
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.query import ClosureQuery, MaterializedQuery
+from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Simulation
 from mettagrid.test_support.map_builders import ObjectNameMapBuilder
 
 ELEMENTS = ElementsVariant().elements
 
 
+def _normalize_dinky_tag_name(tag_name: str) -> str:
+    if tag_name.startswith("type:"):
+        tag_name = tag_name[5:]
+    first_colon = tag_name.find(":")
+    if 0 <= first_colon < len(tag_name) - 1:
+        tag_name = tag_name[first_colon + 1 :]
+    variant_colon = tag_name.rfind(":")
+    if 0 <= variant_colon < len(tag_name) - 1 and tag_name[variant_colon + 1 :].isdigit():
+        tag_name = tag_name[:variant_colon]
+    return tag_name
+
+
 def test_make_cogs_vs_clips_scenario():
     """Test that make_cogs_vs_clips_scenario creates a valid configuration."""
     config = make_machina1_mission(num_agents=2).make_env()
     assert isinstance(config, MettaGridConfig)
+
+
+def test_machina_1_team_station_tags_win_under_dinky_normalization() -> None:
+    env = make_machina1_mission(num_agents=8).make_env()
+    pei = PolicyEnvInterface.from_mg_cfg(env)
+    normalized_tag_to_id = {_normalize_dinky_tag_name(name): idx for idx, name in enumerate(pei.tags)}
+    tag_to_id = {name: idx for idx, name in enumerate(pei.tags)}
+
+    assert normalized_tag_to_id["aligner"] == tag_to_id["type:c:aligner"]
+    assert normalized_tag_to_id["miner"] == tag_to_id["type:c:miner"]
+    assert normalized_tag_to_id["scout"] == tag_to_id["type:c:scout"]
+    assert normalized_tag_to_id["scrambler"] == tag_to_id["type:c:scrambler"]
+    assert "type:aligner" not in tag_to_id
+    assert "type:miner" not in tag_to_id
+    assert "type:scout" not in tag_to_id
+    assert "type:scrambler" not in tag_to_id
 
 
 def test_cvc_enables_aoe_mask_observation() -> None:

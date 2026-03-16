@@ -11,6 +11,7 @@ from cogames.games.cogs_vs_clips.game.days import DayConfig, DaysVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
+from cogames.games.cogs_vs_clips.game.gear_stations import GearStationsVariant
 from cogames.games.cogs_vs_clips.game.heart import HeartVariant
 from cogames.games.cogs_vs_clips.game.junction import JunctionVariant
 from cogames.games.cogs_vs_clips.game.roles.aligner import AlignerVariant
@@ -19,7 +20,7 @@ from cogames.games.cogs_vs_clips.game.roles.scout import ScoutVariant
 from cogames.games.cogs_vs_clips.game.roles.scrambler import ScramblerVariant
 from cogames.games.cogs_vs_clips.game.solar import SolarVariant
 from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
-from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStationsVariant
+from cogames.games.cogs_vs_clips.game.teams.gear_stations import DEFAULT_TEAM_GEAR_SYMBOLS, TeamGearStationsVariant
 from cogames.games.cogs_vs_clips.game.teams.hub import TeamHubVariant
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
 from cogames.games.cogs_vs_clips.game.territory import DamageStrangersVariant, HealTeamVariant, TerritoryVariant
@@ -118,7 +119,9 @@ class TestGearVariant:
             assert set(gear.resources) == set(GEAR)
 
     def test_adds_gear_stations(self):
-        env = _make_mission([AlignerVariant(), ScramblerVariant(), MinerVariant(), ScoutVariant()]).make_env()
+        env = _make_mission(
+            [AlignerVariant(), ScramblerVariant(), MinerVariant(), ScoutVariant(), GearStationsVariant()]
+        ).make_env()
         for role in GEAR:
             assert role in env.game.objects, (
                 f"Missing gear station {role}. Available: {sorted(env.game.objects.keys())}"
@@ -133,6 +136,10 @@ class TestGearVariant:
             assert key in env.game.objects, (
                 f"Missing team gear station {key}. Available: {sorted(env.game.objects.keys())}"
             )
+            assert role not in env.game.objects, (
+                f"Unexpected generic gear station {role}. Available: {sorted(env.game.objects.keys())}"
+            )
+            assert env.game.render.symbols[key] == DEFAULT_TEAM_GEAR_SYMBOLS[role]
 
 
 class TestTeamHubVariant:
