@@ -2685,7 +2685,9 @@ def _cogs_for_mission(mission: CoGameMission, cogs_list: list[int], respect_cogs
 
 
 def _build_diagnose_case(mission: CoGameMission, num_cogs: int, steps: int) -> DiagnoseCase:
-    mission_with_cogs = mission.model_copy(update={"num_agents": num_cogs})
+    from cogames.cli.mission import apply_cogs_override  # noqa: PLC0415
+
+    mission_with_cogs = apply_cogs_override(mission, num_cogs)
     env_cfg = mission_with_cogs.make_env()
     env_cfg.game.max_steps = steps
     name = f"{mission.full_name()} (cogs={num_cogs})"

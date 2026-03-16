@@ -1,4 +1,6 @@
 import json
+import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
@@ -7,6 +9,8 @@ from typer.testing import CliRunner
 
 import cogames.diagnose as diagnose_module
 import cogames.main as main_module
+from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
+from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
 from mettagrid.simulator.multi_episode.summary import MultiEpisodeRolloutPolicySummary, MultiEpisodeRolloutSummary
 
 runner = CliRunner()
@@ -101,6 +105,41 @@ def test_diagnose_cli_forwards_explicit_cogs_to_case_filters(
 
     assert result.exit_code == 1
     assert captured["cogs"] == [8]
+
+
+def test_importing_diagnose_does_not_eagerly_import_cli_mission() -> None:
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                [
+                    "import sys",
+                    "import cogames.diagnose",
+                    "assert 'cogames.cli.mission' not in sys.modules",
+                ]
+            ),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_build_diagnose_case_updates_cvc_spawn_count_with_cogs_override() -> None:
+    case = diagnose_module._build_diagnose_case(
+        mission=make_machina1_mission(num_agents=8, max_steps=50),
+        num_cogs=2,
+        steps=123,
+    )
+
+    arena = find_machina_arena(case.env_cfg.game.map_builder)
+
+    assert arena is not None
+    assert case.env_cfg.game.num_agents == 2
+    assert case.env_cfg.game.max_steps == 123
+    assert arena.spawn_count == 2
 
 
 def _patch_evaluate_to_fail(monkeypatch: pytest.MonkeyPatch, *, message: str) -> None:
