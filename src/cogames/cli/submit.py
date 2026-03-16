@@ -365,6 +365,7 @@ def upload_submission(
     zip_path: Path,
     submission_name: str,
     season: str | None = None,
+    secret_env: dict[str, str] | None = None,
 ) -> UploadResult | None:
     """Upload submission to CoGames backend using a presigned S3 URL."""
     console.print("[bold]Uploading[/bold]")
@@ -390,7 +391,9 @@ def upload_submission(
     # Server checks actual S3 object size (catches old clients or misreported sizes). Only
     # the server knows the real size, so this try/except can't be replaced by a client-side check.
     try:
-        result = client.complete_policy_upload(str(presigned.upload_id), submission_name, season=season)
+        result = client.complete_policy_upload(
+            str(presigned.upload_id), submission_name, season=season, secret_env=secret_env
+        )
     except httpx.HTTPStatusError as e:
         if e.response.status_code == 413:
             detail = e.response.json().get("detail", "Policy too large")
@@ -418,6 +421,7 @@ def upload_policy(
     setup_script: str | None = None,
     season: str | None = None,
     image: str = DEFAULT_EPISODE_RUNNER_IMAGE,
+    secret_env: dict[str, str] | None = None,
 ) -> UploadResult | None:
     if dry_run:
         console.print("[dim]Dry run mode - no upload[/dim]\n")
@@ -472,7 +476,7 @@ def upload_policy(
             return None
 
         with client:
-            result = upload_submission(client, zip_path, name, season=season)
+            result = upload_submission(client, zip_path, name, season=season, secret_env=secret_env)
         if not result:
             console.print("\n[red]Upload failed.[/red]")
             raise typer.Exit(1)

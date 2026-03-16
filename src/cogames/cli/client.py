@@ -210,10 +210,18 @@ class TournamentServerClient:
     def get_presigned_upload_url(self) -> PresignedUploadUrlResponse:
         return self._post("/stats/policies/submit/presigned-url", PresignedUploadUrlResponse, timeout=60.0)
 
-    def complete_policy_upload(self, upload_id: str, name: str, season: str | None = None) -> PolicyVersionResponse:
+    def complete_policy_upload(
+        self,
+        upload_id: str,
+        name: str,
+        season: str | None = None,
+        secret_env: dict[str, str] | None = None,
+    ) -> PolicyVersionResponse:
         payload: dict[str, Any] = {"upload_id": upload_id, "name": name}
         if season is not None:
             payload["season"] = season
+        if secret_env:
+            payload["policy_secret_env"] = secret_env
         return self._post(
             "/stats/policies/submit/complete",
             PolicyVersionResponse,

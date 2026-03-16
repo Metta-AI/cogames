@@ -1858,6 +1858,14 @@ def _parse_init_kwarg(value: str) -> tuple[str, str]:
     return key.replace("-", "_"), val
 
 
+def _parse_secret_env(value: str) -> tuple[str, str]:
+    """Parse KEY=VALUE into a tuple for secret environment variables."""
+    if "=" not in value:
+        raise typer.BadParameter(f"Expected KEY=VALUE format, got: {value}")
+    key, _, val = value.partition("=")
+    return key, val
+
+
 @app.command(
     name="upload",
     help="Upload a policy to CoGames.",
@@ -1916,6 +1924,14 @@ def upload_cmd(
         metavar="PATH",
         help="Python setup script to run before loading the policy.",
         rich_help_panel="Files",
+    ),
+    # --- Secrets ---
+    secret_env: Optional[list[str]] = typer.Option(  # noqa: B008
+        None,
+        "--secret-env",
+        metavar="KEY=VALUE",
+        help="Secret environment variable for policy execution (can be repeated). Stored in AWS Secrets Manager.",
+        rich_help_panel="Secrets",
     ),
     # --- Tournament ---
     season: Optional[str] = typer.Option(
@@ -1992,6 +2008,12 @@ def upload_cmd(
             init_kwargs[key] = val
 
     submitting = not no_submit
+    parsed_secret_env: dict[str, str] = {}
+    if secret_env:
+        for kv in secret_env:
+            key, val = _parse_secret_env(kv)
+            parsed_secret_env[key] = val
+
     result = upload_policy(
         ctx=ctx,
         policy=policy,
@@ -2005,6 +2027,7 @@ def upload_cmd(
         setup_script=setup_script,
         season=season_info.name if submitting else None,
         image=image,
+        secret_env=parsed_secret_env if parsed_secret_env else None,
     )
 
     if result:
