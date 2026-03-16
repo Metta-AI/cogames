@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from cogames.games.cogs_vs_clips.game.teams import TeamConfig
 
 CLIPS_SHIP_MAP_NAME = "clips:ship"
+DEFAULT_CLIPS_SHIP_COUNT = 4
 
 
 class CvCShipConfig(CvCStationConfig):
@@ -114,6 +115,41 @@ def add_clips_ships_to_map_config(
         return config.model_copy(deep=True, update={"instance": updated})
 
     return config.model_copy(deep=True)
+
+
+def set_clips_ships_in_map_config(
+    config: AnyMapBuilderConfig | SceneConfig,
+    num_ships: Optional[int],
+) -> AnyMapBuilderConfig | SceneConfig:
+    """Return a copy of *config* with the resolved clips ship count applied."""
+    if isinstance(config, MapGenConfig):
+        if config.instance is None:
+            return config.model_copy(deep=True)
+        updated = set_clips_ships_in_map_config(config.instance, num_ships)
+        return config.model_copy(deep=True, update={"instance": updated})
+
+    if num_ships is None:
+        if count_clips_ships_in_map_config(config) > 0:
+            return config.model_copy(deep=True)
+        if isinstance(config, MachinaArenaConfig):
+            return add_clips_ships_to_map_config(config, DEFAULT_CLIPS_SHIP_COUNT)
+        return config.model_copy(deep=True)
+
+    if isinstance(config, AsciiMapBuilderConfig):
+        if num_ships == 0:
+            return _remove_from_ascii(config)
+        current_ships = count_clips_ships_in_map_config(config)
+        if current_ships == num_ships:
+            return config.model_copy(deep=True)
+        raise ValueError(
+            f"ASCII maps define clips ship placements explicitly; cannot set clips ship count to {num_ships} "
+            f"when the map contains {current_ships} placements."
+        )
+
+    config_without_ships = remove_clips_ships_from_map_config(config)
+    if num_ships <= 0:
+        return config_without_ships
+    return add_clips_ships_to_map_config(config_without_ships, num_ships)
 
 
 def _remove_from_ascii(config: AsciiMapBuilderConfig) -> AsciiMapBuilderConfig:

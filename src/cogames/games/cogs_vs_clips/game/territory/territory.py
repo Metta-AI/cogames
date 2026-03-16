@@ -8,6 +8,7 @@ from pydantic import Field
 
 from cogames.core import CoGameMissionVariant, Deps
 from cogames.games.cogs_vs_clips.game.clips.clips import ClipsVariant
+from cogames.games.cogs_vs_clips.game.clips.ship import clips_ship_map_names_in_map_config
 from cogames.games.cogs_vs_clips.game.junction import JunctionVariant
 from cogames.games.cogs_vs_clips.game.teams.hub import CvCHubConfig, TeamHubVariant
 from cogames.games.cogs_vs_clips.game.teams.team import TeamVariant
@@ -76,9 +77,16 @@ class TerritoryVariant(CoGameMissionVariant):
 
         team_v = mission.required_variant(TeamVariant)
         clips_v = mission.optional_variant(ClipsVariant)
-        all_teams = list(team_v.teams.values())
-        if clips_v is not None and clips_v.clips is not None:
-            all_teams.append(clips_v.clips)
+        has_clips_ships = bool(clips_ship_map_names_in_map_config(env.game.map_builder))
+        all_teams = [
+            team
+            for team in team_v.teams.values()
+            if (
+                team.name != "clips"
+                or clips_v is None
+                or (clips_v.clips is not None and not clips_v.clips.disabled and has_clips_ships)
+            )
+        ]
 
         for team in all_teams:
             env.game.materialize_queries.append(net_materialized_query(team))

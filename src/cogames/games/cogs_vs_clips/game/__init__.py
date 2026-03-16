@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from cogames.core import CoGameMissionVariant
 from cogames.games.cogs_vs_clips.game.cargo import CargoLimitVariant
-from cogames.games.cogs_vs_clips.game.clips import ClipsVariant
+from cogames.games.cogs_vs_clips.game.clips import ClipsVariant, NoClipsVariant
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
 from cogames.games.cogs_vs_clips.game.days import DaysVariant
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
@@ -47,6 +47,7 @@ __all__ = [
     "CavesVariant",
     "CityVariant",
     "ClipsVariant",
+    "NoClipsVariant",
     "CvCExtractorConfig",
     "DamageStrangersVariant",
     "DamageVariant",
@@ -110,6 +111,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     CavesVariant(),
     CityVariant(),
     ClipsVariant(),
+    NoClipsVariant(),
     DamageStrangersVariant(),
     DamageVariant(),
     DaysVariant(),
