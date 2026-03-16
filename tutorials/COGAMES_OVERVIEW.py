@@ -150,7 +150,7 @@ print(f"Action space: {policy_env_info.action_space}")
 # | `DaysVariant(days_config=DARK_SIDE)` | Zero solar energy regeneration |
 # | `DaysVariant(days_config=SUPER_CHARGED)` | +2 to all energy regen |
 # | `ThickSkinnedVariant()` | No passive HP drain, only in enemy territory |
-# | `NoClipsVariant()` | Remove Clips faction and ships |
+# | `NoClipsVariant()` | Remove Clips ships and the resulting spread pressure |
 #
 # ### Under the Hood: `MettaGridConfig`
 #

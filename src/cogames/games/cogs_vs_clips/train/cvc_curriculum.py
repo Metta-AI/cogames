@@ -98,7 +98,7 @@ def split_variants(
         if variant is None:
             unknown.append(name)
             continue
-        resolved.append(variant)
+        resolved.append(variant.model_copy(deep=True))
 
     if unknown:
         available_mission = ", ".join(v.name for v in VARIANTS)

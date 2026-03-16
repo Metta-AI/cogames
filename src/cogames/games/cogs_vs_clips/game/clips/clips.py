@@ -13,8 +13,8 @@ from pydantic import Field
 from cogames.core import CoGameMissionVariant, Deps
 from cogames.games.cogs_vs_clips.game.clips.ship import (
     CvCShipConfig,
-    add_clips_ships_to_map_config,
     clips_ship_map_names_in_map_config,
+    set_clips_ships_in_map_config,
 )
 from cogames.games.cogs_vs_clips.game.junction import JunctionVariant
 from cogames.games.cogs_vs_clips.game.multi_team import MultiTeamVariant
@@ -62,9 +62,6 @@ class ClipsConfig(TeamConfig):
     align_end: Optional[int] = Field(default=None)
 
     presence_end: Optional[int] = Field(default=None)
-
-    def _ship_map_names(self) -> list[str]:
-        return [f"{self.short_name}:ship", *[f"{self.short_name}:ship:{idx}" for idx in range(4)]]
 
     def ship_query(self) -> Query:
         return query(typeTag("ship"), hasTag(self.team_tag()))
@@ -138,10 +135,11 @@ class ClipsConfig(TeamConfig):
             )
         return events
 
-    def ship_stations(self) -> dict[str, GridObjectConfig]:
+    def ship_stations(self, map_builder: AnyMapBuilderConfig) -> dict[str, GridObjectConfig]:
         ship = CvCShipConfig()
         stations: dict[str, GridObjectConfig] = {}
-        for ship_map_name in self._ship_map_names():
+        ship_map_names = list(dict.fromkeys(clips_ship_map_names_in_map_config(map_builder)))
+        for ship_map_name in ship_map_names:
             cfg = ship.station_cfg(team=self, map_name=ship_map_name)
             cfg.tags = [*cfg.tags, ship_map_name]
             stations[ship_map_name] = cfg
@@ -153,7 +151,10 @@ class ClipsVariant(CoGameMissionVariant):
 
     name: str = "clips"
     description: str = "Add clips faction with ships that spread across junctions."
-    num_ships: int = Field(default=4, description="Number of clips ships to place on the map")
+    num_ships: Optional[int] = Field(
+        default=None,
+        description="Resolved clips ship count. Defaults to the mission's built-in ship layout.",
+    )
     clips_config: ClipsConfig = Field(default_factory=ClipsConfig)
     clips: ClipsConfig | None = Field(default=None, exclude=True)
 
@@ -169,12 +170,12 @@ class ClipsVariant(CoGameMissionVariant):
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
-        env.game.map_builder = add_clips_ships_to_map_config(env.game.map_builder, self.num_ships)  # type: ignore[assignment]
+        env.game.map_builder = set_clips_ships_in_map_config(env.game.map_builder, self.num_ships)  # type: ignore[assignment]
 
         if self.clips is None or not isinstance(self.clips, ClipsConfig):
             return
 
-        for name, station in self.clips.ship_stations().items():
+        for name, station in self.clips.ship_stations(env.game.map_builder).items():
             env.game.objects.setdefault(name, station)
             env.game.render.symbols.setdefault(name, "🚀")
 
@@ -183,3 +184,19 @@ class ClipsVariant(CoGameMissionVariant):
             map_builder=env.game.map_builder,
         )
         env.game.events.update(clips_events)
+
+
+class NoClipsVariant(CoGameMissionVariant):
+    """Set the resolved clips ship count to zero."""
+
+    name: str = "no_clips"
+    description: str = "Remove all clips ships so clips cannot spread."
+
+    @override
+    def dependencies(self) -> Deps:
+        return Deps(required=[ClipsVariant])
+
+    @override
+    def configure(self, deps: ResolvedDeps) -> None:
+        clips_variant = deps.required(ClipsVariant)
+        clips_variant.num_ships = 0
