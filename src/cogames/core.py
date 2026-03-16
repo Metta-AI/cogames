@@ -111,7 +111,8 @@ class CoGameMission(Config, ABC):
     def has_variant(self, name: str) -> bool:
         return self._variant_registry.has(name)
 
-    def variant_module_prefixes(self) -> tuple[str, ...]:
+    @classmethod
+    def variant_module_prefixes(cls) -> tuple[str, ...]:
         return ()
 
     def with_variants(self, variants: Sequence[str | CoGameMissionVariant]) -> Self:

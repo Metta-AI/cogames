@@ -14,7 +14,8 @@ class CvCMission(CoGameMission):
     max_steps: int = 10000
     num_agents: int = 8
 
-    def variant_module_prefixes(self) -> tuple[str, ...]:
+    @classmethod
+    def variant_module_prefixes(cls) -> tuple[str, ...]:
         return ("cogames.games.cogs_vs_clips.",)
 
     def make_base_env(self) -> MettaGridConfig:
