@@ -8,7 +8,6 @@ from pydantic import Field
 
 from cogames.core import CoGameMissionVariant, Deps
 from cogames.games.cogs_vs_clips.game.gear import GearVariant
-from cogames.games.cogs_vs_clips.game.gear_stations import GearStationsVariant
 from cogames.games.cogs_vs_clips.game.teams.hub import CvCHubConfig, TeamHubVariant
 from cogames.games.cogs_vs_clips.game.teams.team import TeamVariant
 from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
@@ -29,28 +28,39 @@ if TYPE_CHECKING:
     from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 
 
+DEFAULT_TEAM_GEAR_SYMBOLS = {
+    "aligner": "🔗",
+    "scrambler": "🌀",
+    "miner": "⛏️",
+    "scout": "🔭",
+}
+
+
 class TeamGearStationsVariant(CoGameMissionVariant):
     """Create per-team gear stations that charge costs from the team hub."""
 
     name: str = "team_gear_stations"
     description: str = "Per-team gear stations with hub-based costs."
+    symbols: dict[str, str] = Field(
+        default_factory=lambda: DEFAULT_TEAM_GEAR_SYMBOLS.copy(),
+        description="Render symbols by gear item name.",
+    )
     costs: dict[str, dict[str, int]] = Field(
         default_factory=dict, description="Gear costs by item name, set by composing variants."
     )
 
     @override
     def dependencies(self) -> Deps:
-        return Deps(required=[GearStationsVariant, TeamHubVariant, GearVariant, TeamVariant])
+        return Deps(required=[TeamHubVariant, GearVariant, TeamVariant])
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
         gear = mission.required_variant(GearVariant)
-        stations = mission.required_variant(GearStationsVariant)
         team_v = mission.required_variant(TeamVariant)
         station_keys: list[str] = []
         for team in (t for t in team_v.teams.values() if t.num_agents > 0):
             for item_name in gear.items:
-                symbol = stations.symbols.get(item_name, "📦")
+                symbol = self.symbols.get(item_name, "📦")
                 self._add_station(env, team, item_name, symbol, self.costs.get(item_name))
                 station_keys.append(f"{team.short_name}:{item_name}")
 
