@@ -8,6 +8,7 @@ import typer
 from rich import box
 from rich.table import Table
 
+from cogames.auth import DEFAULT_COGAMES_SERVER
 from cogames.cli.base import console, emit_json
 from cogames.cli.client import (
     LeaderboardEntry,
@@ -17,7 +18,6 @@ from cogames.cli.client import (
 )
 from cogames.cli.generated_models import Phase
 from cogames.cli.leaderboard import _format_score, _format_timestamp
-from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 
 LeaderboardEntries = list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]

@@ -1,11 +1,16 @@
 """cogames auth — token management commands."""
 
-import typer
+import sys
 
+import typer
+from rich.panel import Panel
+
+from cogames.auth import DEFAULT_COGAMES_SERVER, build_browser_login_url, has_saved_token, load_token, save_token
 from cogames.cli.base import console
 from cogames.cli.client import TournamentServerClient
-from cogames.cli.login import DEFAULT_COGAMES_SERVER, CoGamesAuthenticator, perform_login
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
+from cogames.perform_login import do_interactive_login_for_token
+from cogames.token_storage import TokenKind
 
 auth_app = typer.Typer(
     help="Manage authentication tokens",
@@ -15,17 +20,47 @@ auth_app = typer.Typer(
 )
 
 
-def _authenticator() -> CoGamesAuthenticator:
-    return CoGamesAuthenticator()
+def _build_manual_set_token_command(*, login_server: str) -> str:
+    command = "cogames auth set-token '<TOKEN>'"
+    if login_server != DEFAULT_COGAMES_SERVER:
+        command += f" --login-server '{login_server}'"
+    return command
+
+
+def _print_non_tty_login_instructions(*, login_server: str) -> None:
+    auth_url = build_browser_login_url(login_server)
+    console.print("Interactive login requires a TTY.", style="red")
+    console.print()
+    console.print("Open this URL in any browser to sign in:", style="yellow")
+    console.print()
+    console.print("    ", auth_url)
+    console.print()
+    console.print("Copy the auth token from the browser, then run:", style="yellow")
+    console.print()
+    console.print("    ", _build_manual_set_token_command(login_server=login_server))
+    console.print()
+    console.print(
+        Panel(
+            "If you are a coding agent, ask your human to open the URL above and give you the resulting auth token. "
+            "Then run the set-token command above.",
+            title="🤖 Agent Hint",
+            border_style="cyan",
+        )
+    )
 
 
 @auth_app.command(name="login")
 def login_cmd(
-    server: str = typer.Option(
+    login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
         metavar="URL",
         help="Authentication server URL",
+    ),
+    no_browser: bool = typer.Option(
+        False,
+        "--no-browser",
+        help="Skip opening browser automatically.",
     ),
     force: bool = typer.Option(
         False,
@@ -33,48 +68,71 @@ def login_cmd(
         "-f",
         help="Re-authenticate even if already logged in",
     ),
-    timeout: int = typer.Option(
-        300,
-        "--timeout",
-        "-t",
-        metavar="SECS",
-        help="Authentication timeout in seconds",
-    ),
 ) -> None:
-    """Authenticate with CoGames server via browser OAuth flow."""
+    """Sign in to cogames interactively."""
     from urllib.parse import urlparse  # noqa: PLC0415
 
-    auth = _authenticator()
-    if auth.has_saved_token(server) and not force:
-        console.print(f"[green]Already authenticated with {urlparse(server).hostname}[/green]")
+    if has_saved_token(token_kind=TokenKind.COGAMES, server=login_server) and not force:
+        console.print(f"Already authenticated with {urlparse(login_server).hostname}", style="green")
         return
 
-    console.print(f"[cyan]Authenticating with {server}...[/cyan]")
-    if perform_login(auth_server_url=server, force=force, timeout=timeout):
-        console.print("[green]Authentication successful![/green]")
-    else:
-        console.print("[red]Authentication failed![/red]")
+    if not sys.stdin.isatty():
+        _print_non_tty_login_instructions(login_server=login_server)
         raise typer.Exit(1)
+
+    try:
+        do_interactive_login_for_token(
+            login_server=login_server,
+            server_to_save_token_under=login_server,
+            token_kind=TokenKind.COGAMES,
+            agent_hint=(
+                "If you are a coding agent, ask your human to open the URL below and give you "
+                "the auth token. Then paste the token into this window or run:\n"
+                "\n"
+                f"{_build_manual_set_token_command(login_server=login_server)}"
+            ),
+            open_browser=not no_browser,
+        )
+    except Exception as e:
+        console.print(f"Error: {e}")
+        console.print()
+        console.print("Authentication failed.", style="red")
+        raise typer.Exit(1) from e
+
+    console.print("Authentication successful.", style="green")
+
+
+@auth_app.command(name="get-login-url")
+def get_login_url_cmd(
+    login_server: str = typer.Option(
+        DEFAULT_COGAMES_SERVER,
+        "--login-server",
+        metavar="URL",
+        help="Authentication server URL",
+    ),
+) -> None:
+    """Print a browser sign-in URL for manual login."""
+    print(build_browser_login_url(login_server))
 
 
 @auth_app.command(name="status")
 def status_cmd(
-    server: str = typer.Option(
+    login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
-        "--server",
-        "-s",
+        "--login-server",
         metavar="URL",
         help="Authentication server URL",
     ),
-    api_server: str = typer.Option(
+    server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
-        "--api-server",
+        "--server",
+        "-s",
         metavar="URL",
-        help="API server URL to check against",
+        help="Tournament API server URL to check against",
     ),
 ) -> None:
     """Check authentication status by calling /whoami."""
-    client = TournamentServerClient.from_login(api_server, server)
+    client = TournamentServerClient.from_login(server, login_server)
     if not client:
         raise typer.Exit(1)
 
@@ -85,17 +143,15 @@ def status_cmd(
 
 @auth_app.command(name="get-token")
 def get_token_cmd(
-    server: str = typer.Option(
+    login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
-        "--server",
-        "-s",
+        "--login-server",
         metavar="URL",
         help="Authentication server URL",
     ),
 ) -> None:
     """Print the saved token to stdout (for scripting)."""
-    auth = _authenticator()
-    token = auth.load_token(server)
+    token = load_token(token_kind=TokenKind.COGAMES, server=login_server)
     if not token:
         console.print("[red]No token found.[/red] Run [cyan]cogames auth login[/cyan] first.", style="bold")
         raise typer.Exit(1)
@@ -105,14 +161,13 @@ def get_token_cmd(
 @auth_app.command(name="set-token")
 def set_token_cmd(
     token: str = typer.Argument(help="Bearer token to save"),
-    server: str = typer.Option(
+    login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
-        "--server",
-        "-s",
+        "--login-server",
         metavar="URL",
         help="Authentication server URL",
     ),
 ) -> None:
     """Manually set a token (for CI or headless environments)."""
-    auth = _authenticator()
-    auth.config_reader_writer.save_token(token, server)
+    save_token(token_kind=TokenKind.COGAMES, token=token, server=login_server)
+    print(f"\nToken saved for {login_server}")

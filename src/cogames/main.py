@@ -38,7 +38,8 @@ from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import train as train_module
 from cogames import verbose
-from cogames.cli.auth import CoGamesAuthenticator, auth_app
+from cogames.auth import DEFAULT_COGAMES_SERVER, load_token
+from cogames.cli.auth import auth_app
 from cogames.cli.base import console, emit_json
 from cogames.cli.client import SeasonDetail, TournamentServerClient
 from cogames.cli.episode import episode_app
@@ -47,7 +48,6 @@ from cogames.cli.leaderboard import (
     parse_policy_identifier,
     submissions_cmd,
 )
-from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.matches import match_artifacts_cmd, matches_cmd
 from cogames.cli.mission import (
     describe_mission,
@@ -82,6 +82,7 @@ from cogames.device import resolve_training_device
 from cogames.display_detect import has_display
 from cogames.games.cogs_vs_clips.train.curricula import make_rotation
 from cogames.seed import seed_rollout_rng
+from cogames.token_storage import TokenKind
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.loader import discover_and_register_policies
 from mettagrid.policy.policy_registry import get_policy_registry
@@ -1597,31 +1598,29 @@ def policies_cmd() -> None:
 
 @app.command(
     name="login",
-    help="Shortcut for `cogames auth login`.",
+    help="Sign in to cogames interactively.",
     rich_help_panel="Tournament",
     add_help_option=False,
 )
 def login_cmd(
-    server: str = typer.Option(
+    login_server: str = typer.Option(
         DEFAULT_COGAMES_SERVER,
         "--login-server",
         metavar="URL",
         help="Authentication server URL.",
         rich_help_panel="Server",
     ),
+    no_browser: bool = typer.Option(
+        False,
+        "--no-browser",
+        help="Skip opening browser automatically.",
+        rich_help_panel="Options",
+    ),
     force: bool = typer.Option(
         False,
         "--force",
         "-f",
         help="Re-authenticate even if already logged in.",
-        rich_help_panel="Options",
-    ),
-    timeout: int = typer.Option(
-        300,
-        "--timeout",
-        "-t",
-        metavar="SECS",
-        help="Authentication timeout in seconds.",
         rich_help_panel="Options",
     ),
     _help: bool = typer.Option(
@@ -1636,7 +1635,7 @@ def login_cmd(
 ) -> None:
     from cogames.cli.auth import login_cmd as auth_login  # noqa: PLC0415
 
-    auth_login(server=server, force=force, timeout=timeout)
+    auth_login(login_server=login_server, no_browser=no_browser, force=force)
 
 
 app.command(
@@ -1718,7 +1717,7 @@ app.command(
 
 
 def _resolve_season(server: str, login_server: str | None = None, season_name: str | None = None) -> SeasonDetail:
-    auth_token = CoGamesAuthenticator().load_token(login_server) if login_server else None
+    auth_token = load_token(token_kind=TokenKind.COGAMES, server=login_server) if login_server else None
     try:
         with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
             if season_name is None:

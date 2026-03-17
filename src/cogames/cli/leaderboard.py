@@ -10,9 +10,9 @@ import typer
 from rich import box
 from rich.table import Table
 
+from cogames.auth import DEFAULT_COGAMES_SERVER
 from cogames.cli.base import console, emit_json
 from cogames.cli.client import TournamentServerClient
-from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 
 

@@ -17,9 +17,9 @@ from typing import Any
 import httpx
 import typer
 
+from cogames.auth import DEFAULT_COGAMES_SERVER
 from cogames.cli.base import console
 from cogames.cli.client import TournamentServerClient
-from cogames.cli.login import DEFAULT_COGAMES_SERVER
 from cogames.cli.policy import PolicySpec, get_policy_spec
 from mettagrid.policy.prepare_policy_spec import extract_submission_archive
 from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec, write_submission_policy_spec
