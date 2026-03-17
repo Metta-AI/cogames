@@ -16,6 +16,7 @@ from cogames.cli.base import console, emit_json
 from cogames.cli.client import EpisodeResponse, TournamentServerClient
 from cogames.cli.leaderboard import _format_score, _format_timestamp
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
+from cogames.display_detect import has_display
 
 episode_app = typer.Typer(
     name="episode",
@@ -268,6 +269,11 @@ def episode_replay_cmd(
 
     if not ep.replay_url:
         console.print("[red]No replay available for this episode.[/red]")
+        raise typer.Exit(1)
+
+    # Only block when we intend to launch MettaScope; saving to `--output` still works headless.
+    if output is None and not has_display():
+        console.print("[red]Error: This command requires a GUI display.[/red]")
         raise typer.Exit(1)
 
     console.print(f"[cyan]Downloading replay for episode {str(ep.id)[:8]}...[/cyan]")
