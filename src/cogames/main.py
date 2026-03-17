@@ -79,12 +79,12 @@ from cogames.cli.submit import (
     validate_bundle_docker,
 )
 from cogames.device import resolve_training_device
+from cogames.display_detect import has_display
 from cogames.games.cogs_vs_clips.train.curricula import make_rotation
 from cogames.seed import seed_rollout_rng
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.loader import discover_and_register_policies
 from mettagrid.policy.policy_registry import get_policy_registry
-from mettagrid.renderer.renderer import RenderMode
 from mettagrid.simulator import Simulator
 
 # Always add current directory to Python path so optional plugins in the repo are discoverable.
@@ -161,6 +161,10 @@ def tutorial_cmd(
     ctx: typer.Context,
 ) -> None:
     """Run the CoGames tutorial."""
+    if not has_display():
+        console.print("[red]Error: This command requires a GUI display.[/red]")
+        raise typer.Exit(1)
+
     # Suppress logs during tutorial to keep output focused.
     logging.getLogger().setLevel(logging.ERROR)
     os.environ["METTASCOPE_SHOW_VALIDATION"] = "0"
@@ -209,6 +213,10 @@ def cvc_tutorial_cmd(
     ctx: typer.Context,
 ) -> None:
     """Run the CvC tutorial."""
+    if not has_display():
+        console.print("[red]Error: This command requires a GUI display.[/red]")
+        raise typer.Exit(1)
+
     # Suppress logs during tutorial to keep output focused.
     logging.getLogger().setLevel(logging.ERROR)
     os.environ["METTASCOPE_SHOW_VALIDATION"] = "0"
@@ -570,11 +578,12 @@ def play_cmd(
         help="Max steps per episode (note: -s is steps, not seed).",
         rich_help_panel="Simulation",
     ),
-    render: RenderMode = typer.Option(  # noqa: B008
-        "gui",
+    render: Literal["auto", "gui", "vibescope", "unicode", "log", "none"] = typer.Option(  # noqa: B008
+        "auto",
         "--render",
         "-r",
         help=(
+            "[bold]auto[/bold]=gui when display is available, otherwise unicode; "
             "[bold]gui[/bold]=MettaScope, [bold]vibescope[/bold]=VibeScope, "
             "[bold]unicode[/bold]=terminal, [bold]log[/bold]=metrics only."
         ),
@@ -643,6 +652,13 @@ def play_cmd(
 ) -> None:
     if save_replay_dir is not None and save_replay_file is not None:
         console.print("[red]Error: Use only one of --save-replay-dir or --save-replay-file.[/red]")
+        raise typer.Exit(1)
+
+    display_available = has_display()
+    if render == "auto":
+        render = "gui" if display_available else "unicode"
+    if render in {"gui", "vibescope"} and not display_available:
+        console.print("[red]Error: This render mode requires a GUI display.[/red]")
         raise typer.Exit(1)
 
     _explicit_steps = ctx.get_parameter_source("steps") in (
@@ -722,6 +738,10 @@ def replay_cmd(
 ) -> None:
     if not replay_path.exists():
         console.print(f"[red]Error: Replay file not found: {replay_path}[/red]")
+        raise typer.Exit(1)
+
+    if not has_display():
+        console.print("[red]Error: This command requires a GUI display.[/red]")
         raise typer.Exit(1)
 
     try:
