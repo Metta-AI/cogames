@@ -6,10 +6,15 @@ import os
 import sys
 
 
-def _macos_session_flag(core_foundation: ctypes.CDLL, session: int, key: str) -> bool:
+def _macos_session_flag(core_foundation: ctypes.CDLL, core_graphics: ctypes.CDLL, session: int, key: str) -> bool:
+    core_foundation.CFDictionaryGetValue.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
     core_foundation.CFDictionaryGetValue.restype = ctypes.c_void_p
+    core_foundation.CFBooleanGetValue.argtypes = [ctypes.c_void_p]
     core_foundation.CFBooleanGetValue.restype = ctypes.c_bool
-    symbol = ctypes.c_void_p.in_dll(core_foundation, key)
+    try:
+        symbol = ctypes.c_void_p.in_dll(core_graphics, key)
+    except ValueError:
+        return False
     value = core_foundation.CFDictionaryGetValue(session, symbol)
     return bool(value and core_foundation.CFBooleanGetValue(value))
 
@@ -26,14 +31,21 @@ def _macos_has_display() -> bool:
     core_graphics = ctypes.CDLL(core_graphics_path)
     core_foundation = ctypes.CDLL(core_foundation_path)
 
+    core_graphics.CGSessionCopyCurrentDictionary.argtypes = []
     core_graphics.CGSessionCopyCurrentDictionary.restype = ctypes.c_void_p
+    core_foundation.CFRelease.argtypes = [ctypes.c_void_p]
     session = core_graphics.CGSessionCopyCurrentDictionary()
     if not session:
         return False
 
     try:
-        return _macos_session_flag(core_foundation, session, "kCGSessionOnConsoleKey") and _macos_session_flag(
-            core_foundation, session, "kCGSessionLoginDoneKey"
+        return _macos_session_flag(
+            core_foundation, core_graphics, session, "kCGSessionOnConsoleKey"
+        ) and _macos_session_flag(
+            core_foundation,
+            core_graphics,
+            session,
+            "kCGSessionLoginDoneKey",
         )
     finally:
         core_foundation.CFRelease(session)
