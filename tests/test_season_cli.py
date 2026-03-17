@@ -48,6 +48,7 @@ def _make_season_summary(**overrides: Any) -> SeasonSummary:
         "entry_pool": "entry",
         "leaderboard_pool": "leaderboard",
         "is_default": True,
+        "status": "in_progress",
         "compat_version": "0.15",
         "created_at": "2026-01-01T00:00:00Z",
         "public": True,

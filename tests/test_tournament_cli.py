@@ -42,6 +42,7 @@ def _season_summary(
         "version": 1,
         "canonical": True,
         "is_default": is_default,
+        "status": "in_progress",
         "created_at": "2026-02-25T12:00:00Z",
         "public": True,
         "tournament_type": "freeplay",
