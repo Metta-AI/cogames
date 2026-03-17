@@ -11,6 +11,7 @@ from cogames.games.cogs_vs_clips.game.days import DayConfig, DaysVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
+from cogames.games.cogs_vs_clips.game.gear import GearVariant
 from cogames.games.cogs_vs_clips.game.gear_stations import GearStationsVariant
 from cogames.games.cogs_vs_clips.game.heart import HeartVariant
 from cogames.games.cogs_vs_clips.game.junction import JunctionVariant
@@ -20,7 +21,7 @@ from cogames.games.cogs_vs_clips.game.roles.scout import ScoutVariant
 from cogames.games.cogs_vs_clips.game.roles.scrambler import ScramblerVariant
 from cogames.games.cogs_vs_clips.game.solar import SolarVariant
 from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
-from cogames.games.cogs_vs_clips.game.teams.gear_stations import DEFAULT_TEAM_GEAR_SYMBOLS, TeamGearStationsVariant
+from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStationsVariant
 from cogames.games.cogs_vs_clips.game.teams.hub import TeamHubVariant
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
 from cogames.games.cogs_vs_clips.game.territory import DamageStrangersVariant, HealTeamVariant, TerritoryVariant
@@ -28,6 +29,7 @@ from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
 from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
 from cogames.games.cogs_vs_clips.missions.machina_1 import CvCMachina1Variant
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from mettagrid.config.filter import GameValueFilter, ResourceFilter
 
 ELEMENTS = ElementsVariant().elements
 VIBE_NAMES = [v.name for v in VibesVariant().vibes]
@@ -43,6 +45,10 @@ def _make_mission(variants, num_cogs=4, max_steps=100):
         max_cogs=num_cogs,
         max_steps=max_steps,
     ).with_variants([TeamVariant(default_teams={"cogs": TeamConfig(name="cogs", num_agents=num_cogs)}), *variants])
+
+
+def _make_env_without_default(variants):
+    return _make_mission(variants).model_copy(update={"default_variant": None}).make_env()
 
 
 class TestElementsVariant:
@@ -119,27 +125,39 @@ class TestGearVariant:
             assert set(gear.resources) == set(GEAR)
 
     def test_adds_gear_stations(self):
-        env = _make_mission(
-            [AlignerVariant(), ScramblerVariant(), MinerVariant(), ScoutVariant(), GearStationsVariant()]
-        ).make_env()
-        for role in GEAR:
-            assert role in env.game.objects, (
-                f"Missing gear station {role}. Available: {sorted(env.game.objects.keys())}"
-            )
+        env = _make_env_without_default(
+            [
+                GearVariant(station_costs={"aligner": {"carbon": 2}}, station_symbols={"aligner": "A"}),
+                AlignerVariant(),
+                ScramblerVariant(),
+                MinerVariant(),
+                ScoutVariant(),
+                GearStationsVariant(),
+            ]
+        )
+        assert set(GEAR) <= env.game.objects.keys()
+        assert env.game.render.symbols["aligner"] == "A"
+        cost_filter = env.game.objects["aligner"].on_use_handlers["change_gear"].filters[0]
+        assert isinstance(cost_filter, ResourceFilter)
+        assert cost_filter.resources == {"carbon": 2}
 
     def test_adds_team_gear_stations(self):
-        env = _make_mission(
-            [AlignerVariant(), ScramblerVariant(), MinerVariant(), ScoutVariant(), TeamGearStationsVariant()]
-        ).make_env()
-        for role in GEAR:
-            key = f"c:{role}"
-            assert key in env.game.objects, (
-                f"Missing team gear station {key}. Available: {sorted(env.game.objects.keys())}"
-            )
-            assert role not in env.game.objects, (
-                f"Unexpected generic gear station {role}. Available: {sorted(env.game.objects.keys())}"
-            )
-            assert env.game.render.symbols[key] == DEFAULT_TEAM_GEAR_SYMBOLS[role]
+        env = _make_env_without_default(
+            [
+                GearVariant(station_costs={"miner": {"carbon": 2}}, station_symbols={"miner": "M"}),
+                AlignerVariant(),
+                ScramblerVariant(),
+                MinerVariant(),
+                ScoutVariant(),
+                TeamGearStationsVariant(),
+            ]
+        )
+        assert {f"c:{role}" for role in GEAR} <= env.game.objects.keys()
+        assert set(GEAR).isdisjoint(env.game.objects)
+        assert env.game.render.symbols["c:miner"] == "M"
+        cost_filter = env.game.objects["c:miner"].on_use_handlers["change_gear"].filters[1]
+        assert isinstance(cost_filter, GameValueFilter)
+        assert cost_filter.min == 2
 
 
 class TestTeamHubVariant:

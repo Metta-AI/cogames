@@ -17,6 +17,7 @@ from cogames.games.cogs_vs_clips.game.days import DaysVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
+from cogames.games.cogs_vs_clips.game.gear import GearVariant
 from cogames.games.cogs_vs_clips.game.heart import HeartVariant
 from cogames.games.cogs_vs_clips.game.roles.aligner import AlignerVariant
 from cogames.games.cogs_vs_clips.game.roles.miner import MinerVariant
@@ -117,6 +118,7 @@ class CvCMachina1Variant(CoGameMissionVariant):
                 EnergyVariant,
                 CargoLimitVariant,
                 ExtractorsVariant,
+                GearVariant,
                 AlignerVariant,
                 ScramblerVariant,
                 MinerVariant,
@@ -140,7 +142,7 @@ class CvCMachina1Variant(CoGameMissionVariant):
         tj.align_cost = {"heart": 1}
         tj.scramble_cost = {"heart": 1}
 
-        deps.required(TeamGearStationsVariant).costs = GEAR_COSTS
+        deps.required(GearVariant).station_costs = GEAR_COSTS
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:

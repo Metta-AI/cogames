@@ -13,8 +13,6 @@ def _make_gear_station(team: TeamConfig, gear_type: str, symbol: str, cost: dict
 
     env = MettaGridConfig(game=GameConfig())
     v = TeamGearStationsVariant()
-    if cost:
-        v.costs[gear_type] = cost
     v._add_station(env, team, gear_type, symbol, cost)
     return env.game.objects[f"{team.short_name}:{gear_type}"]
 

@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, override
 
-from pydantic import Field
-
 from cogames.core import CoGameMissionVariant, Deps
 from cogames.games.cogs_vs_clips.game.gear import GearVariant
 from cogames.games.cogs_vs_clips.game.teams.hub import CvCHubConfig, TeamHubVariant
@@ -41,13 +39,6 @@ class TeamGearStationsVariant(CoGameMissionVariant):
 
     name: str = "team_gear_stations"
     description: str = "Per-team gear stations with hub-based costs."
-    symbols: dict[str, str] = Field(
-        default_factory=lambda: DEFAULT_TEAM_GEAR_SYMBOLS.copy(),
-        description="Render symbols by gear item name.",
-    )
-    costs: dict[str, dict[str, int]] = Field(
-        default_factory=dict, description="Gear costs by item name, set by composing variants."
-    )
 
     @override
     def dependencies(self) -> Deps:
@@ -60,11 +51,10 @@ class TeamGearStationsVariant(CoGameMissionVariant):
         station_keys: list[str] = []
         for team in (t for t in team_v.teams.values() if t.num_agents > 0):
             for item_name in gear.items:
-                symbol = self.symbols.get(item_name, "📦")
-                self._add_station(env, team, item_name, symbol, self.costs.get(item_name))
+                symbol = gear.station_symbols.get(item_name, DEFAULT_TEAM_GEAR_SYMBOLS.get(item_name, "📦"))
+                self._add_station(env, team, item_name, symbol, gear.station_costs.get(item_name))
                 station_keys.append(f"{team.short_name}:{item_name}")
 
-        # Add stations to the compound config so they get placed on the map.
         arena = find_machina_arena(env.game.map_builder)
         if arena is not None:
             existing = set(arena.hub.stations)
@@ -80,7 +70,7 @@ class TeamGearStationsVariant(CoGameMissionVariant):
     ) -> None:
         key = f"{team.short_name}:{gear_type}"
         station = env.game.objects.setdefault(key, GridObjectConfig(name=key, tags=[f"team:{team.name}"]))
-        env.game.render.symbols.setdefault(key, symbol)
+        env.game.render.symbols[key] = symbol
         if not isinstance(station, GridObjectConfig):
             return
 

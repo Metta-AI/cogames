@@ -12,6 +12,7 @@ from cogames.games.cogs_vs_clips.game.damage import DamageVariant
 from cogames.games.cogs_vs_clips.game.days import DaysVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
 from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
+from cogames.games.cogs_vs_clips.game.gear import GearVariant
 from cogames.games.cogs_vs_clips.game.heart import HeartVariant
 from cogames.games.cogs_vs_clips.game.roles.aligner import AlignerVariant
 from cogames.games.cogs_vs_clips.game.roles.miner import MinerVariant
@@ -56,6 +57,7 @@ class CvCTutorialVariant(CoGameMissionVariant):
                 HubObservationsVariant,
                 TerritoryVariant,
                 ExtractorsVariant,
+                GearVariant,
                 AlignerVariant,
                 ScramblerVariant,
                 MinerVariant,
@@ -71,7 +73,7 @@ class CvCTutorialVariant(CoGameMissionVariant):
 
     @override
     def configure(self, deps: ResolvedDeps) -> None:
-        deps.required(TeamGearStationsVariant).costs = GEAR_COSTS
+        deps.required(GearVariant).station_costs = GEAR_COSTS
 
         elements = deps.required(ElementsVariant).elements
         deps.required(HeartVariant).cost = {e: 7 for e in elements}
