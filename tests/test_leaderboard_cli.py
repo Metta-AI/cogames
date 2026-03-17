@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
-import sys
 import uuid
 from typing import Any, cast
 
 import pytest
+from _test_support import capture_output, season_summary
 
 from cogames.cli import leaderboard
 from cogames.cli.client import TournamentServerClient
@@ -13,24 +13,6 @@ from cogames.cli.generated_models import LeaderboardEntry, PolicySummary, Policy
 
 POLICY_ID_1 = uuid.UUID("00000000-0000-0000-0000-000000000001")
 POLICY_ID_2 = uuid.UUID("00000000-0000-0000-0000-000000000002")
-
-
-def _capture(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    printed: list[str] = []
-    monkeypatch.setattr(leaderboard.console, "print", lambda value, *args, **kwargs: printed.append(str(value)))
-    buffer: list[str] = []
-
-    def _stdout_write(text: str) -> int:
-        buffer.append(text)
-        if "\n" in text:
-            payload = "".join(buffer).rstrip("\n")
-            buffer.clear()
-            if payload:
-                printed.append(payload)
-        return len(text)
-
-    monkeypatch.setattr(sys.stdout, "write", _stdout_write)
-    return printed
 
 
 class _FakeClient:
@@ -49,7 +31,7 @@ class _FakeClient:
 
 def test_show_season_submissions_calls_client(monkeypatch: pytest.MonkeyPatch) -> None:
     client = _FakeClient()
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, leaderboard.console)
 
     leaderboard._show_season_submissions(
         cast(TournamentServerClient, client),
@@ -73,7 +55,7 @@ class _PublicLeaderboardClient:
         pass
 
     def get_default_season(self) -> Any:
-        return type("SeasonSummary", (), {"name": "test-season"})()
+        return season_summary(name="test-season")
 
     def get_leaderboard(self, season_name: str) -> list[LeaderboardEntry]:
         _ = season_name
@@ -116,7 +98,7 @@ class _LeaderboardClientFactory:
 
 
 def test_leaderboard_mine_uses_season_policies_for_filtering(monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, leaderboard.console)
     all_entries = [
         LeaderboardEntry(
             rank=1,
@@ -158,5 +140,5 @@ def test_leaderboard_mine_uses_season_policies_for_filtering(monkeypatch: pytest
     )
 
     assert auth_client.called_with == ("test-season", True)
-    payload = json.loads(printed[0])
+    payload = json.loads(str(printed[0]))
     assert [entry["policy"]["id"] for entry in payload] == [str(POLICY_ID_1)]

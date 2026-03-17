@@ -1,16 +1,22 @@
 from __future__ import annotations
 
-import io
 import json
-import sys
 import uuid
-from datetime import datetime
 from typing import Any
 
 import httpx
 import pytest
 import typer
-from rich.console import Console
+from _test_support import (
+    TEST_UUID_2,
+    capture_output,
+    leaderboard_entry,
+    match_response,
+    policy_version_summary,
+    render_output,
+    season_detail,
+    season_summary,
+)
 
 from cogames.cli import season
 from cogames.cli.client import PoolConfigInfo
@@ -19,7 +25,6 @@ from cogames.cli.generated_models import (
     LeaderboardEntry,
     MatchPlayerInfo,
     MatchResponse,
-    PolicyVersionSummary,
     PoolInfo,
     ProgressStage,
     ScorePoliciesLeaderboardEntry,
@@ -33,75 +38,23 @@ from cogames.cli.generated_models import (
     TeamTournamentProgress,
 )
 
-FAKE_UUID = uuid.UUID("00000000-0000-0000-0000-000000000001")
-FAKE_UUID_2 = uuid.UUID("00000000-0000-0000-0000-000000000002")
-
-
-def _make_season_summary(**overrides: Any) -> SeasonSummary:
-    defaults: dict[str, Any] = {
-        "id": FAKE_UUID,
-        "name": "test-season",
-        "display_name": "Test Season",
-        "version": 1,
-        "canonical": True,
-        "summary": "A test season",
-        "entry_pool": "entry",
-        "leaderboard_pool": "leaderboard",
-        "is_default": True,
-        "status": "in_progress",
-        "compat_version": "0.15",
-        "created_at": "2026-01-01T00:00:00Z",
-        "public": True,
-        "tournament_type": "freeplay",
-        "pools": [PoolInfo(name="entry", description="Entry pool")],
-    }
-    defaults.update(overrides)
-    return SeasonSummary(**defaults)
-
-
-def _make_season_info(**overrides: Any) -> SeasonDetail:
-    defaults: dict[str, Any] = {
-        "id": FAKE_UUID,
-        "name": "test-season",
-        "display_name": "Test Season",
-        "version": 1,
-        "canonical": True,
-        "summary": "A test season",
-        "entry_pool": "entry",
-        "leaderboard_pool": "leaderboard",
-        "is_default": True,
-        "compat_version": "0.15",
-        "created_at": "2026-01-01T00:00:00Z",
-        "public": True,
-        "tournament_type": "freeplay",
-        "pools": [],
-        "status": "in_progress",
-        "started_at": "2026-01-01T00:00:00Z",
-        "entrant_count": 10,
-        "active_entrant_count": 8,
-        "match_count": 50,
-        "stage_count": 3,
-    }
-    defaults.update(overrides)
-    return SeasonDetail(**defaults)
-
-
-def _policy_summary(name: str = "policy-a", version: int = 1) -> PolicyVersionSummary:
-    return PolicyVersionSummary(id=FAKE_UUID, name=name, version=version)
-
-
-def _render(*objects: Any) -> str:
-    buf = io.StringIO()
-    c = Console(file=buf, force_terminal=False, width=200)
-    for obj in objects:
-        c.print(obj)
-    return buf.getvalue()
-
 
 class _FakeClient:
     def __init__(self) -> None:
-        self.seasons: list[SeasonSummary] = [_make_season_summary()]
-        self.season_info: SeasonDetail = _make_season_info()
+        self.seasons: list[SeasonSummary] = [
+            season_summary(
+                display_name="Test Season",
+                entry_pool="entry",
+                leaderboard_pool="leaderboard",
+                pools=[PoolInfo(name="entry", description="Entry pool")],
+            )
+        ]
+        self.season_info: SeasonDetail = season_detail(
+            display_name="Test Season",
+            entry_pool="entry",
+            leaderboard_pool="leaderboard",
+            pools=[],
+        )
         self.versions: list[SeasonVersionInfo] = [
             SeasonVersionInfo(
                 version=1,
@@ -157,38 +110,31 @@ class _FakeClient:
         )
         self.teams: list[TeamSummary] = [
             TeamSummary(
-                id=FAKE_UUID_2,
+                id=TEST_UUID_2,
                 pool_name="pool-a",
                 eliminated=False,
                 score=100.0,
                 matches=12,
-                cogs=[TeamCogSummary(position=0, policy=_policy_summary())],
+                cogs=[TeamCogSummary(position=0, policy=policy_version_summary())],
                 created_at="2026-01-01T00:00:00Z",
             ),
         ]
         self.leaderboard: list[LeaderboardEntry] = [
-            LeaderboardEntry(rank=1, policy=_policy_summary(), score=95.5, score_stddev=2.1, matches=10),
+            leaderboard_entry(policy=policy_version_summary()),
         ]
         self.score_policies_leaderboard: list[ScorePoliciesLeaderboardEntry] = [
             ScorePoliciesLeaderboardEntry(
                 rank=1,
-                policy=_policy_summary(),
+                policy=policy_version_summary(),
                 placement_score=7.0,
                 team_appearances=3,
                 team_ranks=[1, 2, 3],
             ),
         ]
         self.matches: list[MatchResponse] = [
-            MatchResponse(
-                id=FAKE_UUID_2,
-                season_name="test-season",
-                pool_name="pool-a",
-                status="completed",
-                assignments=[0, 1],
-                players=[MatchPlayerInfo(policy=_policy_summary(), num_agents=1, score=10.0)],
-                error=None,
-                episode_id=None,
-                created_at=datetime.fromisoformat("2026-01-01T00:00:00+00:00"),
+            match_response(
+                id=TEST_UUID_2,
+                players=[MatchPlayerInfo(policy=policy_version_summary(), num_agents=1, score=10.0)],
             ),
         ]
         self.pool_config: PoolConfigInfo = PoolConfigInfo(pool_name="pool-a", config={"max_steps": 1000})
@@ -262,26 +208,8 @@ def fake_client(monkeypatch: pytest.MonkeyPatch) -> _FakeClient:
     return client
 
 
-def _capture(monkeypatch: pytest.MonkeyPatch) -> list[Any]:
-    printed: list[Any] = []
-    monkeypatch.setattr(season.console, "print", lambda value, *args, **kwargs: printed.append(value))
-    buf: list[str] = []
-
-    def _stdout_write(s: str) -> int:
-        buf.append(s)
-        if "\n" in s:
-            text = "".join(buf).rstrip("\n")
-            buf.clear()
-            if text:
-                printed.append(text)
-        return len(s)
-
-    monkeypatch.setattr(sys.stdout, "write", _stdout_write)
-    return printed
-
-
 def test_season_list_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_list(json_output=True, login_server="x", server="y")
     output = json.loads(str(printed[0]))
     assert len(output) == 1
@@ -289,14 +217,14 @@ def test_season_list_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPa
 
 
 def test_season_list_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_list(json_output=False, login_server="x", server="y")
-    rendered = _render(*printed)
+    rendered = render_output(*printed)
     assert "test-season" in rendered
 
 
 def test_season_show_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_show(season_name="test-season", json_output=True, login_server="x", server="y")
     output = json.loads(str(printed[0]))
     assert output["name"] == "test-season"
@@ -304,15 +232,15 @@ def test_season_show_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPa
 
 
 def test_season_show_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_show(season_name="test-season", json_output=False, login_server="x", server="y")
-    rendered = _render(*printed)
+    rendered = render_output(*printed)
     assert "Test Season" in rendered
     assert "in_progress" in rendered
 
 
 def test_season_versions_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_versions(season_name="test-season", json_output=True, login_server="x", server="y")
     output = json.loads(str(printed[0]))
     assert len(output) == 1
@@ -320,7 +248,7 @@ def test_season_versions_json(fake_client: _FakeClient, monkeypatch: pytest.Monk
 
 
 def test_season_stages_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_stages(season_name="test-season", json_output=True, login_server="x", server="y")
     output = json.loads(str(printed[0]))
     assert len(output) == 2
@@ -328,15 +256,15 @@ def test_season_stages_json(fake_client: _FakeClient, monkeypatch: pytest.Monkey
 
 
 def test_season_stages_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_stages(season_name="test-season", json_output=False, login_server="x", server="y")
-    rendered = _render(*printed)
+    rendered = render_output(*printed)
     assert "stage-1" in rendered
     assert "stage-2" in rendered
 
 
 def test_season_progress_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_progress(season_name="test-season", json_output=True, login_server="x", server="y")
     output = json.loads(str(printed[0]))
     assert output["phase"] == "policy_eval"
@@ -344,7 +272,7 @@ def test_season_progress_json(fake_client: _FakeClient, monkeypatch: pytest.Monk
 
 
 def test_season_progress_400_shows_detail(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
 
     def _raise_400(season_name: str) -> TeamTournamentProgress:
         _ = season_name
@@ -361,7 +289,7 @@ def test_season_progress_400_shows_detail(fake_client: _FakeClient, monkeypatch:
 
 
 def test_season_leaderboard_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_leaderboard(
         season_name="test-season",
         pool=None,
@@ -376,7 +304,7 @@ def test_season_leaderboard_json(fake_client: _FakeClient, monkeypatch: pytest.M
 
 
 def test_season_leaderboard_with_pool_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_leaderboard(
         season_name="test-season",
         pool="pool-a",
@@ -390,7 +318,7 @@ def test_season_leaderboard_with_pool_json(fake_client: _FakeClient, monkeypatch
 
 
 def test_season_leaderboard_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_leaderboard(
         season_name="test-season",
         pool=None,
@@ -399,13 +327,13 @@ def test_season_leaderboard_table(fake_client: _FakeClient, monkeypatch: pytest.
         login_server="x",
         server="y",
     )
-    rendered = _render(*printed)
+    rendered = render_output(*printed)
     assert "policy-a" in rendered
     assert "95.50" in rendered
 
 
 def test_season_leaderboard_team_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_leaderboard(
         season_name="test-season",
         pool="pool-a",
@@ -414,14 +342,14 @@ def test_season_leaderboard_team_table(fake_client: _FakeClient, monkeypatch: py
         login_server="x",
         server="y",
     )
-    rendered = _render(*printed)
+    rendered = render_output(*printed)
     assert "Team Leaderboard" in rendered
     assert "pool-a" in rendered
     assert "policy-a" in rendered
 
 
 def test_season_leaderboard_400_shows_detail(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
 
     def _raise_400(season_name: str, leaderboard_type: str, pool_name: str) -> list[LeaderboardEntry]:
         _ = season_name, leaderboard_type, pool_name
@@ -450,8 +378,8 @@ def test_season_leaderboard_400_shows_detail(fake_client: _FakeClient, monkeypat
 def test_season_leaderboard_uses_server_default_when_omitted(
     fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    fake_client.seasons = [_make_season_summary(name="server-default", is_default=True)]
-    printed = _capture(monkeypatch)
+    fake_client.seasons = [season_summary(name="server-default", is_default=True)]
+    printed = capture_output(monkeypatch, season.console)
     season.season_leaderboard(
         season_name=None,
         pool=None,
@@ -468,7 +396,7 @@ def test_season_leaderboard_uses_server_default_when_omitted(
 def test_season_leaderboard_score_policies_without_pool(
     fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
 
     def _fail_stage(*args: Any, **kwargs: Any) -> list[LeaderboardEntry]:
         _ = args, kwargs
@@ -489,7 +417,7 @@ def test_season_leaderboard_score_policies_without_pool(
 
 
 def test_season_leaderboard_team_requires_pool(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     with pytest.raises(typer.Exit):
         season.season_leaderboard(
             season_name="test-season",
@@ -503,7 +431,7 @@ def test_season_leaderboard_team_requires_pool(fake_client: _FakeClient, monkeyp
 
 
 def test_season_teams_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_teams(season_name="test-season", json_output=True, login_server="x", server="y")
     output = json.loads(str(printed[0]))
     assert len(output) == 1
@@ -511,29 +439,29 @@ def test_season_teams_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyP
 
 
 def test_season_teams_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_teams(season_name="test-season", json_output=False, login_server="x", server="y")
-    rendered = _render(*printed)
+    rendered = render_output(*printed)
     assert "pool-a" in rendered
     assert "policy-a" in rendered
 
 
 def test_season_matches_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_matches(season_name="test-season", limit=20, json_output=True, login_server="x", server="y")
     output = json.loads(str(printed[0]))
     assert len(output) == 1
 
 
 def test_season_matches_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_matches(season_name="test-season", limit=20, json_output=False, login_server="x", server="y")
-    rendered = _render(*printed)
+    rendered = render_output(*printed)
     assert "pool-a" in rendered
 
 
 def test_season_pool_config_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_pool_config(
         season_name="test-season",
         pool_name="pool-a",
@@ -547,7 +475,7 @@ def test_season_pool_config_json(fake_client: _FakeClient, monkeypatch: pytest.M
 
 
 def test_season_pool_config_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_pool_config(
         season_name="test-season",
         pool_name="pool-a",
@@ -555,14 +483,14 @@ def test_season_pool_config_table(fake_client: _FakeClient, monkeypatch: pytest.
         login_server="x",
         server="y",
     )
-    rendered = _render(*printed)
+    rendered = render_output(*printed)
     assert "pool-a" in rendered
     assert "max_steps" in rendered
 
 
 def test_season_list_empty(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     fake_client.seasons = []
-    printed = _capture(monkeypatch)
+    printed = capture_output(monkeypatch, season.console)
     season.season_list(json_output=False, login_server="x", server="y")
     assert any("No seasons found" in str(p) for p in printed)
 
