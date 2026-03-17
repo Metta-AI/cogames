@@ -11,7 +11,7 @@ from rich import box
 from rich.table import Table
 
 from cogames.auth import DEFAULT_COGAMES_SERVER
-from cogames.cli.base import console, emit_json
+from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 
@@ -146,15 +146,12 @@ def _show_all_uploads(
     json_output: bool,
 ) -> None:
     """Show all uploaded policies."""
-    try:
+    with cli_http_errors("policy versions"):
         name_filter = None
         version_filter = None
         if policy_name:
             name_filter, version_filter = parse_policy_identifier(policy_name)
         entries = client.get_my_policy_versions(name=name_filter, version=version_filter)
-    except httpx.HTTPError as exc:
-        console.print(f"[red]Failed to reach server:[/red] {exc}")
-        raise typer.Exit(1) from exc
 
     if json_output:
         emit_json([e.model_dump(mode="json") for e in entries])
@@ -169,7 +166,8 @@ def _show_all_uploads(
 
     try:
         memberships = client.get_my_memberships()
-    except httpx.HTTPError:
+    except httpx.HTTPError as exc:
+        console.print(f"[dim yellow]Could not load membership data: {exc}[/dim yellow]")
         memberships = {}
 
     table = Table(title="Your Uploaded Policies", box=box.SIMPLE_HEAVY, show_lines=False, pad_edge=False)
@@ -197,18 +195,8 @@ def _show_season_submissions(
     json_output: bool,
 ) -> None:
     """Show submissions for a specific season."""
-    try:
+    with cli_http_errors(f"Season '{season}'"):
         entries = client.get_season_policies(season, mine=True)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Season '{season}' not found[/red]")
-            raise typer.Exit(1) from exc
-        console.print(f"[red]Request failed with status {exc.response.status_code}[/red]")
-        console.print(f"[dim]{exc.response.text}[/dim]")
-        raise typer.Exit(1) from exc
-    except httpx.HTTPError as exc:
-        console.print(f"[red]Failed to reach server:[/red] {exc}")
-        raise typer.Exit(1) from exc
 
     if policy_name:
         name, version = parse_policy_identifier(policy_name)
@@ -313,34 +301,19 @@ def leaderboard_cmd(
         raise typer.Exit(1)
     effective_season = season_arg or season
 
-    resolved_season = effective_season or "<default>"
-    try:
-        with TournamentServerClient(server_url=server) as client:
-            resolved_season = effective_season or client.get_default_season().name
+    with TournamentServerClient(server_url=server) as client:
+        resolved_season = effective_season or client.get_default_season().name
+        with cli_http_errors(f"Season '{resolved_season}'"):
             entries = client.get_leaderboard(resolved_season)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Season '{resolved_season}' not found[/red]")
-            raise typer.Exit(1) from exc
-        console.print(f"[red]Request failed with status {exc.response.status_code}[/red]")
-        console.print(f"[dim]{exc.response.text}[/dim]")
-        raise typer.Exit(1) from exc
-    except httpx.HTTPError as exc:
-        console.print(f"[red]Failed to reach server:[/red] {exc}")
-        raise typer.Exit(1) from exc
 
     # Apply --mine filter: keep only entries matching the user's own policy IDs
     if mine:
         auth_client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
         if not auth_client:
             return
-        try:
-            with auth_client:
-                my_entries = auth_client.get_season_policies(resolved_season, mine=True)
-                my_ids = {entry.policy.id for entry in my_entries}
-        except httpx.HTTPError as exc:
-            console.print(f"[red]Failed to reach server:[/red] {exc}")
-            raise typer.Exit(1) from exc
+        with cli_http_errors("authenticated policies"), auth_client:
+            my_entries = auth_client.get_season_policies(resolved_season, mine=True)
+            my_ids = {entry.policy.id for entry in my_entries}
         entries = [e for e in entries if e.policy.id in my_ids]
 
     # Apply --policy filter: match by name, optionally by version

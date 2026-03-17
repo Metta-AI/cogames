@@ -11,7 +11,7 @@ from rich import box
 from rich.table import Table
 
 from cogames.auth import DEFAULT_COGAMES_SERVER
-from cogames.cli.base import console, emit_json
+from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import MatchResponse, TournamentServerClient
 from cogames.cli.leaderboard import _format_score, _format_timestamp, parse_policy_identifier, parse_season_ref
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
@@ -118,7 +118,7 @@ def _list_matches(
     policy_filter: Optional[str] = None,
 ) -> None:
     """List recent matches for the user's policies."""
-    try:
+    with cli_http_errors(f"Season '{season or '<default>'}'"):
         filter_name: str | None = None
         filter_version: int | None = None
         if policy_filter:
@@ -151,16 +151,6 @@ def _list_matches(
             policy_version_ids=policy_version_ids,
             limit=limit,
         )
-
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Season '{season}' not found[/red]")
-            raise typer.Exit(1) from exc
-        console.print(f"[red]Request failed with status {exc.response.status_code}[/red]")
-        raise typer.Exit(1) from exc
-    except httpx.HTTPError as exc:
-        console.print(f"[red]Failed to reach server:[/red] {exc}")
-        raise typer.Exit(1) from exc
 
     if json_output:
         emit_json([m.model_dump(mode="json") for m in matches])
@@ -250,17 +240,8 @@ def _show_match_detail(
     """Show details for a specific match."""
     match_uuid = _resolve_match_id(client, match_id_str)
 
-    try:
+    with cli_http_errors(f"Match '{match_id_str}'"):
         match = client.get_match(match_uuid)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Match '{match_id_str}' not found[/red]")
-            raise typer.Exit(1) from exc
-        console.print(f"[red]Request failed with status {exc.response.status_code}[/red]")
-        raise typer.Exit(1) from exc
-    except httpx.HTTPError as exc:
-        console.print(f"[red]Failed to reach server:[/red] {exc}")
-        raise typer.Exit(1) from exc
 
     if json_output:
         result: dict[str, Any] = match.model_dump(mode="json")

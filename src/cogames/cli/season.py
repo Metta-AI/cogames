@@ -3,13 +3,12 @@ from __future__ import annotations
 import json
 from typing import Literal, Optional, TypeGuard, cast
 
-import httpx
 import typer
 from rich import box
 from rich.table import Table
 
 from cogames.auth import DEFAULT_COGAMES_SERVER
-from cogames.cli.base import console, emit_json
+from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import (
     LeaderboardEntry,
     ScorePoliciesLeaderboardEntry,
@@ -33,18 +32,6 @@ LEADERBOARD_TYPE_OPTION = typer.Option(
 def _get_client(login_server: str, server: str) -> TournamentServerClient:
     _ = login_server
     return TournamentServerClient(server_url=server)
-
-
-def _http_error_detail(exc: httpx.HTTPStatusError) -> str | None:
-    try:
-        payload = exc.response.json()
-    except ValueError:
-        return None
-    if isinstance(payload, dict):
-        detail = payload.get("detail")
-        if isinstance(detail, str):
-            return detail
-    return None
 
 
 def _team_label(team: TeamSummary) -> str:
@@ -141,14 +128,8 @@ def season_show(
 ) -> None:
     client = _get_client(login_server, server)
 
-    try:
-        with client:
-            info = client.get_season(season_name)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Season '{season_name}' not found[/red]")
-            raise typer.Exit(1) from exc
-        raise
+    with cli_http_errors(f"Season '{season_name}'"), client:
+        info = client.get_season(season_name)
 
     if json_output:
         emit_json(info.model_dump(mode="json"))
@@ -240,14 +221,8 @@ def season_stages(
 ) -> None:
     client = _get_client(login_server, server)
 
-    try:
-        with client:
-            stages = client.get_stages(season_name)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Season '{season_name}' not found[/red]")
-            raise typer.Exit(1) from exc
-        raise
+    with cli_http_errors(f"Season '{season_name}'"), client:
+        stages = client.get_stages(season_name)
 
     if json_output:
         emit_json([s.model_dump(mode="json") for s in stages])
@@ -300,18 +275,8 @@ def season_progress(
 ) -> None:
     client = _get_client(login_server, server)
 
-    try:
-        with client:
-            progress = client.get_progress(season_name)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Season '{season_name}' not found[/red]")
-            raise typer.Exit(1) from exc
-        if exc.response.status_code == 400:
-            detail = _http_error_detail(exc) or "Season progress is not available."
-            console.print(f"[red]{detail}[/red]")
-            raise typer.Exit(1) from exc
-        raise
+    with cli_http_errors(f"Season '{season_name}'"), client:
+        progress = client.get_progress(season_name)
 
     if json_output:
         emit_json(progress.model_dump(mode="json"))
@@ -361,24 +326,14 @@ def season_leaderboard(
         console.print("[red]Team leaderboard requires --pool <POOL>.[/red]")
         raise typer.Exit(1)
 
-    try:
-        with client:
-            season = season_name or client.get_default_season().name
-            if leaderboard_type == "score-policies" and pool is None:
-                entries = client.get_score_policies_leaderboard(season)
-            elif pool:
-                entries = client.get_stage_leaderboard(season, leaderboard_type, pool)
-            else:
-                entries = client.get_leaderboard(season)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Season '{season}' not found[/red]")
-            raise typer.Exit(1) from exc
-        if exc.response.status_code == 400:
-            detail = _http_error_detail(exc) or "Leaderboard request was invalid."
-            console.print(f"[red]{detail}[/red]")
-            raise typer.Exit(1) from exc
-        raise
+    with cli_http_errors(f"Season '{season}'"), client:
+        season = season_name or client.get_default_season().name
+        if leaderboard_type == "score-policies" and pool is None:
+            entries = client.get_score_policies_leaderboard(season)
+        elif pool:
+            entries = client.get_stage_leaderboard(season, leaderboard_type, pool)
+        else:
+            entries = client.get_leaderboard(season)
 
     if json_output:
         emit_json([e.model_dump(mode="json") for e in entries])
@@ -461,14 +416,8 @@ def season_teams(
 ) -> None:
     client = _get_client(login_server, server)
 
-    try:
-        with client:
-            teams = client.get_teams(season_name)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Season '{season_name}' not found[/red]")
-            raise typer.Exit(1) from exc
-        raise
+    with cli_http_errors(f"Season '{season_name}'"), client:
+        teams = client.get_teams(season_name)
 
     if json_output:
         emit_json([t.model_dump(mode="json") for t in teams])
@@ -522,14 +471,8 @@ def season_matches(
 ) -> None:
     client = _get_client(login_server, server)
 
-    try:
-        with client:
-            matches = client.get_season_matches(season_name, limit=limit)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Season '{season_name}' not found[/red]")
-            raise typer.Exit(1) from exc
-        raise
+    with cli_http_errors(f"Season '{season_name}'"), client:
+        matches = client.get_season_matches(season_name, limit=limit)
 
     if json_output:
         emit_json([m.model_dump(mode="json") for m in matches])
@@ -591,14 +534,8 @@ def season_pool_config(
 ) -> None:
     client = _get_client(login_server, server)
 
-    try:
-        with client:
-            config = client.get_pool_config(season_name, pool_name)
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
-            console.print(f"[red]Pool '{pool_name}' in season '{season_name}' not found[/red]")
-            raise typer.Exit(1) from exc
-        raise
+    with cli_http_errors(f"Pool '{pool_name}' in season '{season_name}'"), client:
+        config = client.get_pool_config(season_name, pool_name)
 
     if isinstance(config, dict):
         config_payload = {"pool_name": pool_name, "config": config}
