@@ -22,6 +22,8 @@ class GearVariant(CoGameMissionVariant):
     description: str = "Agents can equip one gear item."
     items: list[str] = Field(default_factory=list, description="Gear item names, registered by role variants.")
     limit: int = Field(default=1)
+    station_costs: dict[str, dict[str, int]] = Field(default_factory=dict, description="Station costs by item name.")
+    station_symbols: dict[str, str] = Field(default_factory=dict, description="Render symbols by gear item name.")
 
     destroy_gear_on_death: bool = True
 

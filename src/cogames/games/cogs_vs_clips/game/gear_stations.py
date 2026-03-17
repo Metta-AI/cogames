@@ -28,23 +28,20 @@ class GearStationsVariant(CoGameMissionVariant):
 
     name: str = "gear_stations"
     description: str = "Place gear stations on the map."
-    costs: dict[str, dict[str, int]] = Field(default_factory=dict, description="Gear costs by item name.")
-    symbols: dict[str, str] = Field(default_factory=dict, description="Render symbols by gear item name.")
 
     @override
     def dependencies(self) -> Deps:
         return Deps(required=[GearVariant])
 
     @override
-    def configure(self, deps: ResolvedDeps) -> None:
-        deps.required(GearVariant)
-
-    @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
         gear = mission.required_variant(GearVariant)
         for item_name in gear.items:
-            cost = self.costs.get(item_name, {})
+            cost = gear.station_costs.get(item_name, {})
             station = env.game.objects[item_name] = GridObjectConfig(name=item_name)
+            symbol = gear.station_symbols.get(item_name)
+            if symbol is not None:
+                env.game.render.symbols[item_name] = symbol
             station.on_use_handlers.update(
                 {
                     "keep_gear": Handler(filters=[actorHas({item_name: 1})], mutations=[]),
