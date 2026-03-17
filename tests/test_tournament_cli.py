@@ -16,17 +16,30 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from _test_support import (
+    TEST_UUID,
+    TEST_UUID_2,
+    TEST_UUID_3,
+    TEST_UUID_4,
+    leaderboard_entry,
+    match_response,
+    policy_version_row,
+    policy_version_summary,
+    season_detail,
+    season_summary,
+)
 from pytest_httpserver import HTTPServer
 from typer.testing import CliRunner
 
 from cogames.auth import AuthConfigReaderWriter
 from cogames.cli.client import TournamentServerClient
+from cogames.cli.generated_models import MatchPlayerInfo
 from cogames.main import app
 
-_SEASON_ID = str(uuid.uuid4())
-_POLICY_VERSION_ID = str(uuid.uuid4())
-_POLICY_ID = str(uuid.uuid4())
-_MATCH_ID = str(uuid.uuid4())
+_SEASON_ID = str(TEST_UUID)
+_POLICY_VERSION_ID = str(TEST_UUID_2)
+_POLICY_ID = str(TEST_UUID_3)
+_MATCH_ID = str(TEST_UUID_4)
 
 runner = CliRunner()
 
@@ -35,91 +48,78 @@ def _season_summary(
     name: str = "test-season",
     is_default: bool = True,
 ) -> dict[str, Any]:
-    return {
-        "id": _SEASON_ID,
-        "name": name,
-        "display_name": name,
-        "version": 1,
-        "canonical": True,
-        "is_default": is_default,
-        "status": "in_progress",
-        "created_at": "2026-02-25T12:00:00Z",
-        "public": True,
-        "tournament_type": "freeplay",
-        "entry_pool": None,
-        "leaderboard_pool": "ranked",
-        "summary": "A test season",
-        "pools": [{"name": "ranked", "description": "ranked pool", "config_id": None}],
-    }
+    return season_summary(
+        name=name,
+        display_name=name,
+        is_default=is_default,
+        created_at="2026-02-25T12:00:00Z",
+        entry_pool=None,
+        leaderboard_pool="ranked",
+        pools=[{"name": "ranked", "description": "ranked pool", "config_id": None}],
+    ).model_dump(mode="json")
 
 
 def _season_info(name: str = "test-season") -> dict[str, Any]:
-    return {
-        **_season_summary(name),
-        "status": "in_progress",
-        "display_name": name,
-        "tournament_type": "freeplay",
-        "entrant_count": 5,
-        "active_entrant_count": 3,
-        "match_count": 10,
-        "stage_count": 1,
-    }
+    return season_detail(
+        name=name,
+        display_name=name,
+        created_at="2026-02-25T12:00:00Z",
+        entry_pool=None,
+        leaderboard_pool="ranked",
+        pools=[{"name": "ranked", "description": "ranked pool", "config_id": None}],
+        entrant_count=5,
+        active_entrant_count=3,
+        match_count=10,
+        stage_count=1,
+    ).model_dump(mode="json")
 
 
 def _leaderboard_entries() -> list[dict[str, Any]]:
     return [
-        {
-            "rank": 1,
-            "policy": {"id": _POLICY_VERSION_ID, "name": "top-policy", "version": 3},
-            "score": 42.5,
-            "score_stddev": 1.2,
-            "matches": 20,
-        },
-        {
-            "rank": 2,
-            "policy": {"id": str(uuid.uuid4()), "name": "runner-up", "version": 1},
-            "score": 38.0,
-            "score_stddev": 2.1,
-            "matches": 18,
-        },
+        leaderboard_entry(
+            rank=1,
+            policy=policy_version_summary(id=TEST_UUID_2, name="top-policy", version=3),
+            score=42.5,
+            score_stddev=1.2,
+            matches=20,
+        ).model_dump(mode="json"),
+        leaderboard_entry(
+            rank=2,
+            policy=policy_version_summary(id=uuid.uuid4(), name="runner-up", version=1),
+            score=38.0,
+            score_stddev=2.1,
+            matches=18,
+        ).model_dump(mode="json"),
     ]
 
 
 def _match_response() -> dict[str, Any]:
-    return {
-        "id": _MATCH_ID,
-        "season_name": "test-season",
-        "pool_name": "ranked",
-        "status": "completed",
-        "assignments": [0, 1],
-        "players": [
-            {
-                "policy": {"id": _POLICY_VERSION_ID, "name": "my-policy", "version": 1},
-                "num_agents": 2,
-                "score": 10.0,
-            },
-            {
-                "policy": {"id": str(uuid.uuid4()), "name": "opponent", "version": 1},
-                "num_agents": 2,
-                "score": 5.0,
-            },
+    return match_response(
+        id=TEST_UUID_4,
+        pool_name="ranked",
+        created_at="2026-02-25T12:00:00+00:00",
+        players=[
+            MatchPlayerInfo(
+                policy=policy_version_summary(id=TEST_UUID_2, name="my-policy", version=1),
+                num_agents=2,
+                score=10.0,
+            ),
+            MatchPlayerInfo(
+                policy=policy_version_summary(id=uuid.uuid4(), name="opponent", version=1),
+                num_agents=2,
+                score=5.0,
+            ),
         ],
-        "error": None,
-        "episode_id": None,
-        "created_at": "2026-02-25T12:00:00Z",
-    }
+    ).model_dump(mode="json")
 
 
 def _policy_version_info() -> dict[str, Any]:
-    return {
-        "id": _POLICY_VERSION_ID,
-        "policy_id": _POLICY_ID,
-        "created_at": "2026-02-25T12:00:00Z",
-        "policy_created_at": "2026-02-25T11:00:00Z",
-        "user_id": "test-user",
-        "name": "my-policy",
-        "version": 1,
-    }
+    return policy_version_row(
+        id=TEST_UUID_2,
+        policy_id=TEST_UUID_3,
+        created_at="2026-02-25T12:00:00+00:00",
+        policy_created_at="2026-02-25T11:00:00+00:00",
+    ).model_dump(mode="json")
 
 
 def _setup_read_endpoints(httpserver: HTTPServer) -> None:
@@ -152,6 +152,13 @@ def _mock_from_login(httpserver: HTTPServer):
         return TournamentServerClient(server_url=server_url, token="fake-token")
 
     return patch.object(TournamentServerClient, "from_login", side_effect=fake_from_login)
+
+
+def _invoke_with_server(httpserver: HTTPServer, *args: str):
+    return runner.invoke(
+        app,
+        [*args, "--server", httpserver.url_for(""), "--login-server", "http://fake-login-server"],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -216,18 +223,7 @@ class TestTournamentCommands:
 
     def test_season_list_returns_data(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "season",
-                "list",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "season", "list", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert len(data) == 1
@@ -235,19 +231,7 @@ class TestTournamentCommands:
 
     def test_season_show_returns_data(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "season",
-                "show",
-                "test-season",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "season", "show", "test-season", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, dict)
@@ -256,35 +240,13 @@ class TestTournamentCommands:
 
     def test_season_versions_requires_name(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "season",
-                "versions",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "season", "versions")
         assert result.exit_code == 2
         assert "missing argument 'season'" in result.output.lower()
 
     def test_leaderboard_returns_data(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "leaderboard",
-                "--season",
-                "test-season",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "leaderboard", "--season", "test-season", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert len(data) == 2
@@ -292,17 +254,7 @@ class TestTournamentCommands:
 
     def test_leaderboard_uses_server_default_when_omitted(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "leaderboard",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "leaderboard", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert len(data) == 2
@@ -340,18 +292,7 @@ class TestJsonOutputStability:
 
     def test_season_list_json_output(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "season",
-                "list",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "season", "list", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, list)
@@ -365,18 +306,7 @@ class TestJsonOutputStability:
 
     def test_season_list_json_has_pools(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "season",
-                "list",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "season", "list", "--json")
         data = json.loads(result.output)
         season = data[0]
         assert "pools" in season
@@ -385,19 +315,7 @@ class TestJsonOutputStability:
 
     def test_season_versions_json_output(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "season",
-                "versions",
-                "test-season",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "season", "versions", "test-season", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, list)
@@ -408,19 +326,7 @@ class TestJsonOutputStability:
 
     def test_leaderboard_json_output(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "leaderboard",
-                "--season",
-                "test-season",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "leaderboard", "--season", "test-season", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, list)
@@ -435,19 +341,7 @@ class TestJsonOutputStability:
 
     def test_leaderboard_json_policy_fields(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "leaderboard",
-                "--season",
-                "test-season",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "leaderboard", "--season", "test-season", "--json")
         data = json.loads(result.output)
         policy = data[0]["policy"]
         assert "id" in policy
@@ -485,17 +379,7 @@ class TestJsonOutputStability:
         ).respond_with_json([_match_response()])
 
         with _mock_from_login(httpserver):
-            result = runner.invoke(
-                app,
-                [
-                    "matches",
-                    "--json",
-                    "--server",
-                    httpserver.url_for(""),
-                    "--login-server",
-                    "http://fake-login-server",
-                ],
-            )
+            result = _invoke_with_server(httpserver, "matches", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, list)
@@ -571,18 +455,7 @@ class TestJsonOutputStability:
         ).respond_with_json(_match_response())
 
         with _mock_from_login(httpserver):
-            result = runner.invoke(
-                app,
-                [
-                    "matches",
-                    _MATCH_ID,
-                    "--json",
-                    "--server",
-                    httpserver.url_for(""),
-                    "--login-server",
-                    "http://fake-login-server",
-                ],
-            )
+            result = _invoke_with_server(httpserver, "matches", _MATCH_ID, "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, dict)
@@ -601,17 +474,7 @@ class TestJsonOutputStability:
         ).respond_with_json({_POLICY_VERSION_ID: ["test-season"]})
 
         with _mock_from_login(httpserver):
-            result = runner.invoke(
-                app,
-                [
-                    "submissions",
-                    "--json",
-                    "--server",
-                    httpserver.url_for(""),
-                    "--login-server",
-                    "http://fake-login-server",
-                ],
-            )
+            result = _invoke_with_server(httpserver, "submissions", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, list)
@@ -637,19 +500,7 @@ class TestJsonOutputStability:
         )
 
         with _mock_from_login(httpserver):
-            result = runner.invoke(
-                app,
-                [
-                    "submissions",
-                    "--season",
-                    "test-season",
-                    "--json",
-                    "--server",
-                    httpserver.url_for(""),
-                    "--login-server",
-                    "http://fake-login-server",
-                ],
-            )
+            result = _invoke_with_server(httpserver, "submissions", "--season", "test-season", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert isinstance(data, list)
@@ -669,94 +520,35 @@ class TestAuthBehavior:
 
     def test_leaderboard_works_without_auth(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "leaderboard",
-                "--season",
-                "test-season",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "leaderboard", "--season", "test-season", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert len(data) == 2
 
     def test_season_list_works_without_auth(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "season",
-                "list",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "season", "list", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert len(data) == 1
 
     def test_season_show_works_without_auth(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "season",
-                "show",
-                "test-season",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "season", "show", "test-season", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["name"] == "test-season"
 
     def test_season_versions_works_without_auth(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        result = runner.invoke(
-            app,
-            [
-                "season",
-                "versions",
-                "test-season",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        result = _invoke_with_server(httpserver, "season", "versions", "test-season", "--json")
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert len(data) == 1
 
     def test_season_show_no_auth_header_sent_for_public_read(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        runner.invoke(
-            app,
-            [
-                "season",
-                "show",
-                "test-season",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        _invoke_with_server(httpserver, "season", "show", "test-season", "--json")
         for req, _ in httpserver.log:
             if req.path == "/tournament/seasons/test-season":
                 assert "X-Auth-Token" not in req.headers
@@ -830,18 +622,7 @@ class TestAuthBehavior:
 
     def test_season_list_no_auth_header_sent_for_public_read(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        runner.invoke(
-            app,
-            [
-                "season",
-                "list",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        _invoke_with_server(httpserver, "season", "list", "--json")
         for req, _ in httpserver.log:
             if req.path == "/tournament/seasons":
                 assert "X-Auth-Token" not in req.headers
@@ -849,19 +630,7 @@ class TestAuthBehavior:
 
     def test_leaderboard_no_auth_header_sent_for_public_read(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
-        runner.invoke(
-            app,
-            [
-                "leaderboard",
-                "--season",
-                "test-season",
-                "--json",
-                "--server",
-                httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
-            ],
-        )
+        _invoke_with_server(httpserver, "leaderboard", "--season", "test-season", "--json")
         for req, _ in httpserver.log:
             if req.path == "/tournament/seasons/test-season/leaderboard":
                 assert "X-Auth-Token" not in req.headers
