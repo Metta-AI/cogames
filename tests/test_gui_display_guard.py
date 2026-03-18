@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typer.testing import CliRunner
 
 import cogames.cli.episode as episode_module
+import cogames.display_detect as display_detect
 import cogames.main as main_module
 
 runner = CliRunner()
@@ -28,6 +29,42 @@ def test_tutorial_cvc_requires_display(monkeypatch) -> None:
 
     assert result.exit_code == 1
     assert "This command requires a GUI display" in result.stdout
+
+
+def test_macos_display_env_without_session_is_false(monkeypatch) -> None:
+    monkeypatch.setenv("DISPLAY", ":0")
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    monkeypatch.setattr(display_detect, "_macos_session_has_display", lambda: False)
+    monkeypatch.setattr(display_detect, "_macos_launchctl_has_display", lambda: False)
+
+    assert display_detect._macos_has_display() is False
+
+
+def test_macos_display_uses_session_check(monkeypatch) -> None:
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    monkeypatch.setattr(display_detect, "_macos_session_has_display", lambda: True)
+    monkeypatch.setattr(display_detect, "_macos_launchctl_has_display", lambda: False)
+
+    assert display_detect._macos_has_display() is True
+
+
+def test_macos_display_uses_launchctl_fallback(monkeypatch) -> None:
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    monkeypatch.setattr(display_detect, "_macos_session_has_display", lambda: False)
+    monkeypatch.setattr(display_detect.shutil, "which", lambda _: "/usr/bin/launchctl")
+    monkeypatch.setattr(
+        display_detect.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=0,
+            stdout="gui/501 = {\n\tsession = Aqua\n}",
+            stderr="",
+        ),
+    )
+
+    assert display_detect._macos_has_display() is True
 
 
 def test_play_gui_requires_display_before_loading_mission(monkeypatch) -> None:

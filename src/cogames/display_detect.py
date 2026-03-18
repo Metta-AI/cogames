@@ -3,6 +3,8 @@ from __future__ import annotations
 import ctypes
 import ctypes.util
 import os
+import shutil
+import subprocess
 import sys
 
 
@@ -19,7 +21,7 @@ def _macos_session_flag(core_foundation: ctypes.CDLL, core_graphics: ctypes.CDLL
     return bool(value and core_foundation.CFBooleanGetValue(value))
 
 
-def _macos_has_display() -> bool:
+def _macos_session_has_display() -> bool:
     core_graphics_path = ctypes.util.find_library("CoreGraphics")
     if core_graphics_path is None:
         return False
@@ -28,27 +30,61 @@ def _macos_has_display() -> bool:
     if core_foundation_path is None:
         return False
 
-    core_graphics = ctypes.CDLL(core_graphics_path)
-    core_foundation = ctypes.CDLL(core_foundation_path)
+    try:
+        core_graphics = ctypes.CDLL(core_graphics_path)
+        core_foundation = ctypes.CDLL(core_foundation_path)
 
-    core_graphics.CGSessionCopyCurrentDictionary.argtypes = []
-    core_graphics.CGSessionCopyCurrentDictionary.restype = ctypes.c_void_p
-    core_foundation.CFRelease.argtypes = [ctypes.c_void_p]
-    session = core_graphics.CGSessionCopyCurrentDictionary()
-    if not session:
+        core_graphics.CGSessionCopyCurrentDictionary.argtypes = []
+        core_graphics.CGSessionCopyCurrentDictionary.restype = ctypes.c_void_p
+        core_foundation.CFRelease.argtypes = [ctypes.c_void_p]
+        session = core_graphics.CGSessionCopyCurrentDictionary()
+        if not session:
+            return False
+
+        try:
+            return _macos_session_flag(
+                core_foundation, core_graphics, session, "kCGSessionOnConsoleKey"
+            ) and _macos_session_flag(
+                core_foundation,
+                core_graphics,
+                session,
+                "kCGSessionLoginDoneKey",
+            )
+        finally:
+            core_foundation.CFRelease(session)
+    except (OSError, TypeError, ValueError):
+        return False
+
+
+def _macos_launchctl_has_display() -> bool:
+    if shutil.which("launchctl") is None:
         return False
 
     try:
-        return _macos_session_flag(
-            core_foundation, core_graphics, session, "kCGSessionOnConsoleKey"
-        ) and _macos_session_flag(
-            core_foundation,
-            core_graphics,
-            session,
-            "kCGSessionLoginDoneKey",
+        result = subprocess.run(
+            ["launchctl", "print", f"gui/{os.getuid()}"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=0.25,
         )
-    finally:
-        core_foundation.CFRelease(session)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+    if result.returncode != 0:
+        return False
+
+    return "session = Aqua" in (result.stdout or "") or "session = Aqua" in (result.stderr or "")
+
+
+def _macos_has_display() -> bool:
+    # Prefer session-based checks on macOS.
+    # Env vars can be set in SSH/XQuartz sessions without an active WindowServer GUI,
+    # so we avoid treating them as sufficient on their own.
+    if _macos_session_has_display():
+        return True
+
+    return _macos_launchctl_has_display()
 
 
 def _linux_has_display() -> bool:
