@@ -54,11 +54,23 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         self._fallback_action_name = "noop" if "noop" in self._action_name_set else self._action_names[0]
         self._center = (policy_env_info.obs_height // 2, policy_env_info.obs_width // 2)
         self._tag_name_to_id = {name: idx for idx, name in enumerate(policy_env_info.tags)}
-        self._gear_station_tags_by_gear = {gear: self._resolve_tag_ids([f"{gear}_station"]) for gear in GEAR}
+        self._gear_station_tags_by_gear = {
+            gear: self._resolve_tag_ids(self._gear_station_names(policy_env_info.tags, gear)) for gear in GEAR
+        }
         self._gear_station_tags = set().union(*self._gear_station_tags_by_gear.values())
         self._extractor_tags = self._resolve_tag_ids([f"{element}_extractor" for element in ELEMENTS])
         self._junction_tags = self._resolve_tag_ids(["junction"])
-        self._chest_tags = self._resolve_tag_ids(["chest"])
+        self._hub_tags = self._resolve_tag_ids(["hub"])
+
+    def _gear_station_names(self, all_tags: list[str], gear: str) -> list[str]:
+        names = {f"{gear}_station"}
+        for tag_name in all_tags:
+            if not tag_name.startswith("type:"):
+                continue
+            object_name = tag_name.removeprefix("type:")
+            if object_name == gear or object_name.endswith(f":{gear}"):
+                names.add(object_name)
+        return sorted(names)
 
     def _resolve_tag_ids(self, names: Iterable[str]) -> set[int]:
         tag_ids: set[int] = set()
@@ -147,9 +159,9 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         elif gear is None:
             target_tags = self._gear_station_tags
         elif gear == "aligner":
-            target_tags = self._junction_tags if has_heart else self._chest_tags
+            target_tags = self._junction_tags if has_heart else self._hub_tags
         elif gear == "scrambler":
-            target_tags = self._junction_tags if has_heart else self._chest_tags
+            target_tags = self._junction_tags if has_heart else self._hub_tags
         elif gear == "miner":
             target_tags = self._extractor_tags
         else:
