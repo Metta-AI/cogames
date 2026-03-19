@@ -1,16 +1,16 @@
 from __future__ import annotations
 
+import logging
 import json
 import os
 import time
-import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable
 
 import httpx
 
 from cogames.policy.llm_miner_prompt import SKILL_DESCRIPTIONS, build_llm_miner_prompt
-from cogames.policy.mine_closest_policy import MineClosestPolicyImpl, MineClosestState
+from cogames.policy.llm_skills import MinerSkillImpl, MinerSkillState
 from mettagrid.policy.policy import MultiAgentPolicy, StatefulAgentPolicy, StatefulPolicyImpl
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Action
@@ -20,7 +20,7 @@ logger = logging.getLogger("cogames.policy.llm_miner")
 
 
 @dataclass
-class LLMMinerState(MineClosestState):
+class LLMMinerState(MinerSkillState):
     current_skill: str | None = None
     current_reason: str = ""
     skill_steps: int = 0
@@ -139,7 +139,7 @@ def _parse_skill_choice(text: str) -> tuple[str | None, str]:
     return (normalized_skill if normalized_skill in SKILL_DESCRIPTIONS else None, str(reason))
 
 
-class LLMMinerPolicyImpl(MineClosestPolicyImpl, StatefulPolicyImpl[LLMMinerState]):
+class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
     _UNSTUCK_DIRECTIONS = ("north", "east", "south", "west")
 
     def __init__(
@@ -166,13 +166,19 @@ class LLMMinerPolicyImpl(MineClosestPolicyImpl, StatefulPolicyImpl[LLMMinerState
             remembered_hub_col_from_spawn=base.remembered_hub_col_from_spawn,
         )
 
-    def _copy_with(self, state: LLMMinerState, base: MineClosestState) -> LLMMinerState:
-        return LLMMinerState(
+    def _copy_with(self, state: LLMMinerState, base: MinerSkillState) -> LLMMinerState:
+        return replace(
+            state,
             wander_direction_index=base.wander_direction_index,
             wander_steps_remaining=base.wander_steps_remaining,
             last_mode=base.last_mode,
             remembered_hub_row_from_spawn=base.remembered_hub_row_from_spawn,
             remembered_hub_col_from_spawn=base.remembered_hub_col_from_spawn,
+            known_free_cells=set(base.known_free_cells),
+            blocked_cells=set(base.blocked_cells),
+            known_hubs=set(base.known_hubs),
+            known_miner_stations=set(base.known_miner_stations),
+            known_extractors=set(base.known_extractors),
             current_skill=state.current_skill,
             current_reason=state.current_reason,
             skill_steps=state.skill_steps,
@@ -193,6 +199,9 @@ class LLMMinerPolicyImpl(MineClosestPolicyImpl, StatefulPolicyImpl[LLMMinerState
 
     def _hub_visible(self, obs: AgentObservation) -> bool:
         return self._starter._closest_tag_location(obs, self._hub_tags) is not None
+
+    def _frontier_count(self, state: LLMMinerState) -> int:
+        return len(self._frontier_cells(state))
 
     def _update_progress(self, obs: AgentObservation, state: LLMMinerState) -> None:
         carried_total = self._carried_total(obs)
@@ -215,6 +224,8 @@ class LLMMinerPolicyImpl(MineClosestPolicyImpl, StatefulPolicyImpl[LLMMinerState
             has_miner=self._starter._current_gear(self._starter._inventory_items(obs)) == "miner",
             hub_visible=self._hub_visible(obs),
             remembered_hub=(state.remembered_hub_row_from_spawn, state.remembered_hub_col_from_spawn),
+            known_extractors=len(state.known_extractors),
+            frontier_count=self._frontier_count(state),
             current_skill=state.current_skill,
             no_move_steps=state.no_move_steps,
             recent_events=state.recent_events,
@@ -227,7 +238,12 @@ class LLMMinerPolicyImpl(MineClosestPolicyImpl, StatefulPolicyImpl[LLMMinerState
         skill, reason = _parse_skill_choice(text)
         if skill is None:
             carried_total = self._carried_total(obs)
-            skill = "deposit_to_hub" if carried_total >= self._return_load else "mine_until_full"
+            if carried_total >= self._return_load:
+                skill = "deposit_to_hub"
+            elif state.known_extractors:
+                skill = "mine_until_full"
+            else:
+                skill = "explore"
             reason = f"fallback after invalid planner response: {reason}"
         state.current_skill = skill
         state.current_reason = reason
@@ -241,6 +257,9 @@ class LLMMinerPolicyImpl(MineClosestPolicyImpl, StatefulPolicyImpl[LLMMinerState
             state.current_skill = None
         elif state.current_skill == "deposit_to_hub" and carried_total == 0:
             self._event(state, "deposit_to_hub completed after deposit")
+            state.current_skill = None
+        elif state.current_skill == "explore" and state.known_extractors:
+            self._event(state, f"explore completed after discovering {len(state.known_extractors)} extractor(s)")
             state.current_skill = None
         elif state.current_skill == "unstuck" and state.skill_steps >= self._unstuck_horizon:
             self._event(state, "unstuck finished its bounded horizon")
@@ -274,6 +293,9 @@ class LLMMinerPolicyImpl(MineClosestPolicyImpl, StatefulPolicyImpl[LLMMinerState
             state = self._copy_with(state, base_state)
         elif state.current_skill == "deposit_to_hub":
             action, base_state = self._deposit_to_hub(obs, state)
+            state = self._copy_with(state, base_state)
+        elif state.current_skill == "explore":
+            action, base_state = self._explore(obs, state)
             state = self._copy_with(state, base_state)
         else:
             action, state = self._unstuck(state)

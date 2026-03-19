@@ -9,6 +9,8 @@ def test_build_llm_miner_prompt_mentions_skills_and_state() -> None:
         has_miner=True,
         hub_visible=False,
         remembered_hub=(3, -2),
+        known_extractors=0,
+        frontier_count=12,
         current_skill="mine_until_full",
         no_move_steps=2,
         recent_events=["cargo increased from 10 to 20"],
@@ -16,8 +18,11 @@ def test_build_llm_miner_prompt_mentions_skills_and_state() -> None:
 
     assert "mine_until_full" in prompt
     assert "deposit_to_hub" in prompt
+    assert "explore" in prompt
     assert "unstuck" in prompt
     assert "carried_total: 20" in prompt
+    assert "known_extractors: 0" in prompt
+    assert "frontier_count: 12" in prompt
     assert "remembered_hub: spawn_relative_row=3, spawn_relative_col=-2" in prompt
 
 

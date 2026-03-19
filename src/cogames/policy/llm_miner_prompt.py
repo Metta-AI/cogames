@@ -2,8 +2,9 @@ from __future__ import annotations
 
 
 SKILL_DESCRIPTIONS = {
-    "mine_until_full": "Acquire miner gear if needed, then mine nearby extractors until cargo is full or progress stalls.",
-    "deposit_to_hub": "Return carried resources to the hub using visible hub cues and remembered hub position.",
+    "mine_until_full": "Acquire miner gear if needed, then route to known extractors and mine until cargo is full.",
+    "deposit_to_hub": "Route to the hub using map memory and deposit carried resources.",
+    "explore": "Move to a frontier of the known map to reveal new territory and discover new extractors or routes.",
     "unstuck": "Try a short escape pattern to recover from repeated blocked moves, then hand control back for replanning.",
 }
 
@@ -15,6 +16,8 @@ def build_llm_miner_prompt(
     has_miner: bool,
     hub_visible: bool,
     remembered_hub: tuple[int | None, int | None],
+    known_extractors: int,
+    frontier_count: int,
     current_skill: str | None,
     no_move_steps: int,
     recent_events: list[str],
@@ -28,6 +31,7 @@ def build_llm_miner_prompt(
     return (
         "You control one miner cog in CoGames. Maximize deposited resources.\n"
         "Choose exactly one next skill from the available skills.\n"
+        "Valid skill names are exactly: mine_until_full, deposit_to_hub, explore, unstuck. Do not invent new names.\n"
         "Respond as JSON like {\"skill\": \"mine_until_full\", \"reason\": \"...\"}.\n\n"
         f"Available skills:\n{skills}\n\n"
         f"State:\n"
@@ -36,6 +40,8 @@ def build_llm_miner_prompt(
         f"- return_load: {return_load}\n"
         f"- hub_visible: {hub_visible}\n"
         f"- remembered_hub: {remembered_hub_text}\n"
+        f"- known_extractors: {known_extractors}\n"
+        f"- frontier_count: {frontier_count}\n"
         f"- current_skill: {current_skill or 'none'}\n"
         f"- no_move_steps: {no_move_steps}\n\n"
         f"Recent events:\n{events}\n"
