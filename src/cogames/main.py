@@ -581,6 +581,14 @@ def play_cmd(
         help="Max steps per episode (note: -s is steps, not seed).",
         rich_help_panel="Simulation",
     ),
+    action_timeout_ms: int = typer.Option(
+        10000,
+        "--action-timeout-ms",
+        metavar="MS",
+        help="Max ms per action before noop.",
+        min=1,
+        rich_help_panel="Simulation",
+    ),
     render: Literal["auto", "gui", "vibescope", "unicode", "log", "none"] = typer.Option(  # noqa: B008
         "auto",
         "--render",
@@ -706,6 +714,7 @@ def play_cmd(
         seed=seed,
         device=str(resolved_device),
         render_mode=render,
+        action_timeout_ms=action_timeout_ms,
         game_name=resolved_mission,
         save_replay=save_replay_dir,
         save_replay_file=save_replay_file,

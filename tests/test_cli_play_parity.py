@@ -60,6 +60,24 @@ def test_play_seeds_global_rng_with_seed_flag(monkeypatch) -> None:
     assert samples[0] == samples[1]
 
 
+def test_play_forwards_action_timeout_ms(monkeypatch) -> None:
+    captured: dict[str, int] = {}
+    _patch_play_dependencies(monkeypatch)
+
+    def _capture_play(*_args, **kwargs):  # type: ignore[no-untyped-def]
+        captured["action_timeout_ms"] = kwargs["action_timeout_ms"]
+
+    monkeypatch.setattr(main_module.play_module, "play", _capture_play)
+
+    result = runner.invoke(
+        main_module.app,
+        ["play", "-m", "dummy", "--render", "none", "--action-timeout-ms", "1234"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["action_timeout_ms"] == 1234
+
+
 def test_pickup_forwards_steps_without_posthoc_override(monkeypatch) -> None:
     captured_steps: dict[str, int | None] = {}
     env_cfg = SimpleNamespace(game=SimpleNamespace(max_steps=777))
