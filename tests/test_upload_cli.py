@@ -115,6 +115,52 @@ def test_upload_command_sends_correct_requests(
     assert complete_body["name"] == "my-test-policy"
 
 
+def test_upload_with_secret_env_sends_secrets_to_server(
+    httpserver: HTTPServer,
+    fake_home: Path,
+    tmp_path: Path,
+) -> None:
+    """Test that --secret-env values are sent to the server in the complete request."""
+    upload_id = _UPLOAD_ID
+    _setup_mock_upload_server(httpserver, upload_id=upload_id)
+
+    result = subprocess.run(
+        [
+            "cogames",
+            "upload",
+            "--policy",
+            "class=cogames.policy.starter_agent.StarterPolicy",
+            "--name",
+            "secrets-test-policy",
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "http://fake-login-server",
+            "--skip-validation",
+            "--secret-env",
+            "ANTHROPIC_API_KEY=sk-ant-test-key",
+            "--secret-env",
+            "OTHER_SECRET=other-value",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        env={
+            "HOME": str(fake_home),
+            "PATH": os.environ.get("PATH", ""),
+        },
+    )
+
+    assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+
+    complete_req, _ = httpserver.log[4]
+    complete_body = complete_req.json
+    assert complete_body["policy_secret_env"] == {
+        "ANTHROPIC_API_KEY": "sk-ant-test-key",
+        "OTHER_SECRET": "other-value",
+    }
+
+
 def test_upload_command_fails_without_auth(
     httpserver: HTTPServer,
     tmp_path: Path,

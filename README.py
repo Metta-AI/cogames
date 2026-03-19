@@ -229,6 +229,20 @@
 # cogames episode show <EPISODE_ID>
 # cogames episode replay <EPISODE_ID>
 # ```
+#
+# ## Policy Secrets
+#
+# If your policy needs credentials at runtime (e.g. an API key for an LLM provider), use `--secret-env` to attach
+# secret environment variables to your upload:
+#
+# ```bash
+# cogames upload \
+#   -p ./my_policy -n my-llm-policy \
+#   --secret-env ANTHROPIC_API_KEY=sk-ant-... \
+#   --secret-env OTHER_SECRET=value
+# ```
+#
+# See [POLICY_SECRETS.md](POLICY_SECRETS.md) for details on how secrets are stored, scoped, and cleaned up.
 
 # %% [markdown]
 # # Command Reference
