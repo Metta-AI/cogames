@@ -37,6 +37,7 @@ from typer.testing import CliRunner
 from cogames.auth import save_token
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.generated_models import MatchPlayerInfo
+from cogames.cli.submit import observatory_profile_url
 from cogames.main import app
 from cogames.token_storage import TokenKind
 
@@ -942,7 +943,8 @@ class TestSeasonLookupAuth:
                         "name": "test-policy",
                         "version": 1,
                     }
-                ]
+                ],
+                "total_count": 1,
             }
         )
         httpserver.expect_request("/tournament/seasons/test-season/submissions", method="POST").respond_with_json(
@@ -995,3 +997,151 @@ class TestSeasonLookupAuth:
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons/test-season"]
         assert season_reqs, "Expected a request to /tournament/seasons/test-season"
         assert "X-Auth-Token" not in season_reqs[0].headers
+
+
+class TestSubmitProfileLaunch:
+    @staticmethod
+    def _policy_versions_response(policy_version_id: str, policy_id: str) -> dict[str, Any]:
+        return {
+            "entries": [
+                {
+                    "id": policy_version_id,
+                    "policy_id": policy_id,
+                    "created_at": "2026-02-25T12:00:00+00:00",
+                    "policy_created_at": "2026-02-25T11:00:00+00:00",
+                    "user_id": "u1",
+                    "name": "test-policy",
+                    "version": 1,
+                }
+            ],
+            "total_count": 1,
+        }
+
+    @pytest.mark.parametrize(
+        ("login_server_url", "expected_base_url"),
+        [
+            (
+                "https://softmax.com/api",
+                "https://softmax.com",
+            ),
+            (
+                "https://softmax.com/api/observatory",
+                "https://softmax.com",
+            ),
+            (
+                "http://localhost:3002",
+                "http://localhost:3002",
+            ),
+        ],
+    )
+    def test_observatory_profile_url_uses_browser_origin_of_selected_login_server(
+        self,
+        login_server_url: str,
+        expected_base_url: str,
+    ) -> None:
+        policy_version_id = uuid.uuid4()
+
+        assert (
+            observatory_profile_url(
+                policy_version_id,
+                login_server_url=login_server_url,
+            )
+            == f"{expected_base_url}/observatory/profile?policyVersionId={policy_version_id}"
+        )
+
+    def test_submit_opens_profile_page_after_success(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr("cogames.main.has_display", lambda: True)
+        _setup_read_endpoints(httpserver)
+
+        policy_version_id = str(uuid.uuid4())
+        policy_id = str(uuid.uuid4())
+        httpserver.expect_request("/stats/policy-versions", method="GET").respond_with_json(
+            self._policy_versions_response(policy_version_id, policy_id)
+        )
+        httpserver.expect_request("/tournament/seasons/test-season/submissions", method="POST").respond_with_json(
+            {"pools": ["ranked"]}
+        )
+
+        with patch("cogames.main.webbrowser.open", return_value=True) as mock_open, _mock_from_login(httpserver):
+            result = runner.invoke(
+                app,
+                [
+                    "submit",
+                    "test-policy",
+                    "--season",
+                    "test-season",
+                    "--server",
+                    httpserver.url_for(""),
+                    "--login-server",
+                    "http://localhost:3002",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert "Submitted to season 'test-season'" in result.output
+        assert "Profile:" in result.output
+        mock_open.assert_called_once_with(
+            f"http://localhost:3002/observatory/profile?policyVersionId={policy_version_id}"
+        )
+
+    def test_submit_skips_profile_browser_launch_without_display(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr("cogames.main.has_display", lambda: False)
+        _setup_read_endpoints(httpserver)
+
+        policy_version_id = str(uuid.uuid4())
+        policy_id = str(uuid.uuid4())
+        httpserver.expect_request("/stats/policy-versions", method="GET").respond_with_json(
+            self._policy_versions_response(policy_version_id, policy_id)
+        )
+        httpserver.expect_request("/tournament/seasons/test-season/submissions", method="POST").respond_with_json(
+            {"pools": ["ranked"]}
+        )
+
+        with patch("cogames.main.webbrowser.open", return_value=True) as mock_open, _mock_from_login(httpserver):
+            result = runner.invoke(
+                app,
+                [
+                    "submit",
+                    "test-policy",
+                    "--season",
+                    "test-season",
+                    "--server",
+                    httpserver.url_for(""),
+                    "--login-server",
+                    "http://localhost:3002",
+                ],
+            )
+
+        assert result.exit_code == 0
+        assert "Browser launch skipped: no GUI display detected" in result.output
+        mock_open.assert_not_called()
+
+    def test_submit_does_not_open_profile_page_on_submit_failure(
+        self,
+        httpserver: HTTPServer,
+    ) -> None:
+        _setup_read_endpoints(httpserver)
+
+        policy_version_id = str(uuid.uuid4())
+        policy_id = str(uuid.uuid4())
+        httpserver.expect_request("/stats/policy-versions", method="GET").respond_with_json(
+            self._policy_versions_response(policy_version_id, policy_id)
+        )
+        httpserver.expect_request("/tournament/seasons/test-season/submissions", method="POST").respond_with_data(
+            "already submitted",
+            status=409,
+        )
+
+        with patch("cogames.main.webbrowser.open", return_value=True) as mock_open, _mock_from_login(httpserver):
+            result = _invoke_with_server(httpserver, "submit", "test-policy", "--season", "test-season")
+
+        assert result.exit_code == 1
+        mock_open.assert_not_called()

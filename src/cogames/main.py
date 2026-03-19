@@ -16,6 +16,7 @@ import os
 import shutil
 import subprocess
 import sys
+import webbrowser
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -75,6 +76,7 @@ from cogames.cli.submit import (
     RESULTS_URL,
     create_bundle,
     ensure_docker_daemon_access,
+    observatory_profile_url,
     upload_policy,
     validate_bundle_docker,
 )
@@ -2151,6 +2153,12 @@ def submit_cmd(
     console.print(f"\n[bold green]Submitted to season '{season_name}'[/bold green]")
     if result.pools:
         console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
+    profile_url = observatory_profile_url(pv.id, login_server_url=login_server)
+    console.print(f"[dim]Profile:[/dim] {profile_url}")
+    if has_display():
+        webbrowser.open(profile_url)
+    else:
+        console.print("[dim]Browser launch skipped: no GUI display detected[/dim]")
     console.print(f"[dim]Results:[/dim] {RESULTS_URL}")
     console.print(f"[dim]CLI:[/dim] cogames leaderboard --season {season_name}")
 
