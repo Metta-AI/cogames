@@ -13,6 +13,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 import httpx
 import typer
@@ -37,6 +38,31 @@ class UploadResult:
     name: str
     version: int
     pools: list[str] | None = None
+
+
+def observatory_profile_url(policy_version_id: uuid.UUID, *, login_server_url: str) -> str:
+    parsed = urlsplit(login_server_url)
+    hostname = (parsed.hostname or "").removeprefix("api.")
+    if parsed.port is None:
+        netloc = hostname
+    else:
+        netloc = f"{hostname}:{parsed.port}" if hostname else str(parsed.port)
+
+    browser_path = parsed.path.rstrip("/")
+    if "/api/" in browser_path:
+        browser_path = browser_path.split("/api/", 1)[0]
+    else:
+        browser_path = browser_path.removesuffix("/api")
+
+    return urlunsplit(
+        (
+            parsed.scheme,
+            netloc,
+            f"{browser_path}/observatory/profile",
+            urlencode({"policyVersionId": str(policy_version_id)}),
+            "",
+        )
+    )
 
 
 def _resolve_path_within_cwd(path_str: str, cwd: Path) -> Path:
