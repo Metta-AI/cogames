@@ -2838,7 +2838,7 @@ def diagnose_cmd(
         None,
         "--bundle-zip",
         metavar="FILE",
-        help="Write a portable diagnose artifact zip suitable for upload/import in dashboard tools.",
+        help="Write a portable diagnose artifact zip suitable for upload/import in profile tools.",
         rich_help_panel="Output",
     ),
     stability_reruns: int = typer.Option(
