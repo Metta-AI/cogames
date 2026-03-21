@@ -1,5 +1,63 @@
 # Autoresearch 19 March
 
+## Score Progression
+
+```mermaid
+xychart-beta
+    title "All Recorded Experiment Rewards"
+    x-axis [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+    y-axis "Total reward" 0 --> 3.5
+    line [0.400002, 1.697615, 0.400002, 3.223984, 2.921576, 1.532017, 2.837563, 1.956813, 0.800009, 1.460016, 1.460016, 0.800009, 1.460016, 0.800009, 2.063995, 1.991994, 1.987994, 0.784004, 0.784004, 0.784004, 0.784004, 0.784004, 0.400002, 0.400002, 3.299986, 3.227985, 0.800009, 0.800009, 2.524006, 2.869563, 1.463216, 3.299986, 0.800009, 3.299986, 0.906570, 1.141291]
+```
+
+Chart index mapping to `autoresearch_19_results.csv`:
+
+| # | Experiment |
+| --- | --- |
+| 1 | `all_miners_8_agents` |
+| 2 | `all_aligners_8_agents` |
+| 3 | `one_aligner_seven_miners_1A_7M` |
+| 4 | `two_aligners_six_miners_default_pair_0_1` |
+| 5 | `three_aligners_five_miners` |
+| 6 | `four_aligners_four_miners` |
+| 7 | `two_aligners_one_scrambler_five_miners_2A_1S_5M` |
+| 8 | `two_aligners_six_scouts_2A_6Scout` |
+| 9 | `two_aligners_six_scramblers_2A_6Scrambler` |
+| 10 | `two_aligners_three_miners_three_scouts_2A_3M_3Scout` |
+| 11 | `two_aligners_two_miners_two_scramblers_two_scouts_2A_2M_2S_2Scout` |
+| 12 | `two_aligners_six_mine_closest` |
+| 13 | `two_aligners_six_llm_miners` |
+| 14 | `custom_deficit_miner_variant` |
+| 15 | `aligner_pair_0_5` |
+| 16 | `aligner_pair_0_2` |
+| 17 | `aligner_pair_0_1` |
+| 18 | `aligner_pair_5_7` |
+| 19 | `aligner_pair_4_5` |
+| 20 | `aligner_pair_3_5` |
+| 21 | `aligner_pair_2_5` |
+| 22 | `aligner_pair_1_5` |
+| 23 | `aligner_pair_6_7` |
+| 24 | `aligner_pair_5_6` |
+| 25 | `aligner_pair_0_5_full_horizon` |
+| 26 | `aligner_pair_0_2_full_horizon` |
+| 27 | `aligner_pair_0_3_full_horizon` |
+| 28 | `aligner_pair_0_4_full_horizon` |
+| 29 | `aligner_triple_0_5_1` |
+| 30 | `aligner_triple_0_5_2` |
+| 31 | `aligner_triple_0_5_3` |
+| 32 | `aligner_triple_0_5_4` |
+| 33 | `aligner_triple_0_5_6` |
+| 34 | `aligner_triple_0_5_7` |
+| 35 | `seed_average_default_pair_0_1` |
+| 36 | `seed_average_best_pair_0_5` |
+
+The strongest improvement path was:
+
+- weak miner-heavy baseline: `0.400002`
+- all aligners: `1.697615`
+- mixed `2 aligners + 6 miners`: `3.223984`
+- tuned aligner spawn pair `(0,5)`: `3.299986`
+
 ## Goal
 
 Improve the score on `cogsguard_machina_1` with a runnable scripted baseline that can later support LLM coordination.
