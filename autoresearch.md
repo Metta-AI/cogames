@@ -61,11 +61,11 @@ The experiment runs on a dedicated branch (e.g. cogames/mar5 or cogames/mar5-gpu
 LOOP FOREVER:
 
 1. Look at the git state: the current branch/commit we're on
-2. Tune skills and LLM policy with experimental idea by directly hacking the code.
-3. git commit
+2. Tune skills and LLM policy with experimental idea by directly hacking the code - consult previous commits in the results file and see what they tried/worked didn't work
+3. git commit - in the commit description explain what you are trying, and what you are expecting to see in the experiments
 4. Run the experiment
 5. Read out the results
-6. Record the results in the tsv and commit the results
+6. Record the results in the tsv and commit the results - in the commit comment what you saw in the results and what you think the good and bad things are about the experiments
 7. If reward improved you "advance" the branch, keeping the git commit
 8. If reward is equal or worse, you git reset back to where you started
 
@@ -74,4 +74,3 @@ The idea is that you are a completely autonomous researcher trying things out. I
 Crashes: If a run crashes (OOM, or a bug, or etc.), use your judgment: If it's something dumb and easy to fix (e.g. a typo, a missing import), fix it and re-run. If the idea itself is fundamentally broken, just skip it, log "crash" as the status in the tsv, and move on.
 
 NEVER STOP: Once the experiment loop has begun (after the initial setup), do NOT pause to ask the human if you should continue. Do NOT ask "should I keep going?" or "is this a good stopping point?". The human might be asleep, or gone from a computer and expects you to continue working indefinitely until you are manually stopped. You are autonomous. If you run out of ideas, think harder — read papers referenced in the code, re-read the in-scope files for new angles, try combining previous near-misses, try more radical architectural changes. The loop runs until the human interrupts you, period.
-
