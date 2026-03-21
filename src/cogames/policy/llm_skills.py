@@ -13,6 +13,8 @@ from mettagrid.simulator.interface import AgentObservation
 logger = logging.getLogger("cogames.policy.llm_skills")
 
 Coord = tuple[int, int]
+_HUB_SEARCH_DISTANCE = 20
+_HUB_EXTRACTOR_OFFSETS: tuple[Coord, ...] = ((-8, -8), (-8, 8), (8, -8), (8, 8))
 _DIRECTION_DELTAS: tuple[tuple[str, Coord], ...] = (
     ("north", (-1, 0)),
     ("east", (0, 1)),
@@ -164,6 +166,9 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             return None
         return min(candidates, key=lambda coord: (abs(coord[0] - current_abs[0]) + abs(coord[1] - current_abs[1]), coord))
 
+    def _closest_visible_location(self, obs: AgentObservation, tag_ids: set[int]) -> Coord | None:
+        return self._starter._closest_tag_location(obs, tag_ids)
+
     def _frontier_cells(self, state: MinerSkillState) -> set[Coord]:
         frontier: set[Coord] = set()
         for cell in state.known_free_cells:
@@ -182,6 +187,13 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             if min(abs(cell[0] - anchor[0]) + abs(cell[1] - anchor[1]) for anchor in anchors) <= max_anchor_distance:
                 near_frontier.add(cell)
         return near_frontier or frontier
+
+    def _predicted_extractor_positions(self, state: MinerSkillState) -> set[Coord]:
+        predicted: set[Coord] = set()
+        for hub_row, hub_col in state.known_hubs:
+            for d_row, d_col in _HUB_EXTRACTOR_OFFSETS:
+                predicted.add((hub_row + d_row, hub_col + d_col))
+        return predicted
 
     def _bfs_first_direction(self, state: MinerSkillState, start: Coord, goal: Coord) -> str | None:
         if start == goal:
@@ -276,7 +288,7 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             logger.info("agent=%s mode=explore", obs.agent_id)
             state.last_mode = "explore"
         current_abs = self._current_abs(obs)
-        frontier_cells = self._frontier_near(state, state.known_hubs, max_anchor_distance=10)
+        frontier_cells = self._frontier_near(state, state.known_hubs, max_anchor_distance=_HUB_SEARCH_DISTANCE)
         if current_abs in frontier_cells:
             ordered = sorted(
                 self._neighbors(current_abs),
@@ -301,6 +313,10 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         if state.last_mode != "gear_up":
             logger.info("agent=%s mode=gear_up", obs.agent_id)
             state.last_mode = "gear_up"
+        visible_target = self._closest_visible_location(obs, self._miner_station_tags)
+        if visible_target is not None:
+            action, next_state = self._starter._move_toward(state, visible_target)
+            return action, replace(next_state, last_mode=state.last_mode)
         current_abs = self._current_abs(obs)
         target_abs = self._nearest_known(current_abs, state.known_miner_stations)
         if target_abs is None:
@@ -314,9 +330,20 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         if state.last_mode != "mine_until_full":
             logger.info("agent=%s mode=mine_until_full", obs.agent_id)
             state.last_mode = "mine_until_full"
+        visible_target = self._closest_visible_location(obs, self._starter._extractor_tags)
+        if visible_target is not None:
+            action, next_state = self._starter._move_toward(state, visible_target)
+            return action, replace(next_state, last_mode=state.last_mode)
         current_abs = self._current_abs(obs)
         target_abs = self._nearest_known(current_abs, state.known_extractors)
         if target_abs is None:
+            if state.known_hubs:
+                predicted = self._predicted_extractor_positions(state)
+                predicted_target = self._nearest_known(current_abs, predicted)
+                if predicted_target is not None:
+                    action, next_state = self._move_toward_target(state, current_abs, predicted_target)
+                    return action, replace(next_state, last_mode=state.last_mode)
+                return self._explore_near_hub(obs, state)
             return self._explore(obs, state)
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
@@ -325,6 +352,10 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         if state.last_mode != "deposit_to_hub":
             logger.info("agent=%s mode=deposit_to_hub load=%s", obs.agent_id, self._carried_total(obs))
             state.last_mode = "deposit_to_hub"
+        visible_target = self._closest_visible_location(obs, self._hub_tags)
+        if visible_target is not None:
+            action, next_state = self._starter._move_toward(state, visible_target)
+            return action, replace(next_state, last_mode=state.last_mode)
         current_abs = self._current_abs(obs)
         target_abs = self._nearest_known(current_abs, state.known_hubs)
         if target_abs is None and state.remembered_hub_row_from_spawn is not None and state.remembered_hub_col_from_spawn is not None:

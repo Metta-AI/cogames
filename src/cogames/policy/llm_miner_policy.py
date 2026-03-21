@@ -209,10 +209,13 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
 
     def _update_progress(self, obs: AgentObservation, state: LLMMinerState) -> None:
         carried_total = self._carried_total(obs)
+        made_progress = False
         if state.current_skill == "deposit_to_hub" and carried_total < state.last_carried_total:
             self._event(state, f"deposited cargo from {state.last_carried_total} to {carried_total}")
+            made_progress = True
         elif state.current_skill == "mine_until_full" and carried_total > state.last_carried_total:
             self._event(state, f"cargo increased from {state.last_carried_total} to {carried_total}")
+            made_progress = True
         state.last_carried_total = carried_total
 
         last_action_move = self._feature_value(obs, "last_action_move")
@@ -222,7 +225,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             or (state.current_skill == "deposit_to_hub" and current_abs in state.known_hubs)
             or (state.current_skill == "gear_up" and current_abs in state.known_miner_stations)
         )
-        if stationary_on_valid_target:
+        if made_progress or stationary_on_valid_target:
             state.no_move_steps = 0
         elif state.current_skill is not None and last_action_move == 0:
             state.no_move_steps += 1
