@@ -1,0 +1,9 @@
+2026-03-21 11:28:35 PDT: autoresearch starting, my plan is to push the LLM-backed machina policy to longer horizons than 80 steps, verify real OpenRouter planner calls are happening, inspect long-run dynamics from logs, and iterate only on experiments where the LLM path is active.
+
+2026-03-21 11:28:35 PDT: starting to run baseline
+
+2026-03-21 11:34:48 PDT: baseline result is the longer-horizon 240-step trace confirmed real OpenRouter planning for all three agents, but a single ReadTimeout around step 21 permanently disabled the planner and the run devolved into fallback loops. The important long-term dynamics were: miners repeatedly got stuck bouncing between mine/deposit and aligner lost gear then got trapped because planner-selected unstuck was being overridden back into gear_up.
+
+2026-03-21 11:34:48 PDT: starting new experiment loop, in this experiment I want to preserve LLM-selected unstuck when prerequisites are temporarily unmet and stop transient OpenRouter failures from permanently disabling the planner. my hypothesis is that long-horizon behavior is being dominated by control-policy overrides and one-shot network failures rather than by bad high-level planner choices.
+
+2026-03-21 11:34:48 PDT: I run my experiment, I found out that the patched policy now keeps the LLM live through a 100-step episode with kw.llm_timeout_s=20 and allows the aligner to choose unstuck while gearless instead of force-looping gear_up. this is a good result because it satisfies the "LLM must actually be working" constraint past 80 steps and surfaces the next real long-term bottleneck: miners still spend too many late steps oscillating around deposit/mine pathing, while the aligner can still re-enter gear recovery loops after dropping gear. next experiment next agent should probably try explicit failure-memory or alternative-route skills for deposit_to_hub / mine_until_full rather than only repeating unstuck.
