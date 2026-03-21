@@ -263,6 +263,8 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         self,
         policy_env_info: PolicyEnvInterface,
         device: str = "cpu",
+        num_aligners: int | str = 1,
+        aligner_ids: str = "",
         return_load: int | str = 40,
         stuck_threshold: int | str = 6,
         unstuck_horizon: int | str = 4,
@@ -275,6 +277,11 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         llm_responder: Callable[[str], str] | None = None,
     ):
         super().__init__(policy_env_info, device=device)
+        parsed_aligner_ids = tuple(int(part.strip()) for part in aligner_ids.split(",") if part.strip())
+        if parsed_aligner_ids:
+            self._aligner_ids = frozenset(parsed_aligner_ids)
+        else:
+            self._aligner_ids = frozenset(range(min(int(num_aligners), policy_env_info.num_agents)))
         self._planner = LLMMinerPlannerClient(
             api_url=llm_api_url,
             model=llm_model,
@@ -291,7 +298,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
 
     def agent_policy(self, agent_id: int) -> StatefulAgentPolicy[LLMAlignerState | LLMMinerState]:
         if agent_id not in self._agent_policies:
-            if agent_id == 0:
+            if agent_id in self._aligner_ids:
                 impl = LLMAlignerPolicyImpl(
                     self._policy_env_info,
                     agent_id,

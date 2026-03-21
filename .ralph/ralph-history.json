@@ -61,18 +61,54 @@
         "Vertex shader compilation failed:",
         "ValueError: too many values to unpack (expected 2)"
       ]
+    },
+    {
+      "iteration": 3,
+      "startedAt": "2026-03-21T08:16:55.834Z",
+      "endedAt": "2026-03-21T08:22:44.930Z",
+      "durationMs": 346251,
+      "agent": "codex",
+      "model": "",
+      "toolsUsed": {
+        "map": 3,
+        "type": 1,
+        "the": 4,
+        "via": 1,
+        "your": 1,
+        "in": 1,
+        "that": 1,
+        "those": 1
+      },
+      "filesModified": [
+        "docs/results_autoresearch_21_march.tsv",
+        "src/cogames/policy/__pycache__/llm_miner_policy.cpython-312.pyc",
+        "src/cogames/policy/__pycache__/machina_llm_roles_policy.cpython-312.pyc",
+        "src/cogames/policy/llm_miner_policy.py",
+        "src/cogames/policy/machina_llm_roles_policy.py",
+        "tests/test_llm_aligner_prompt.py"
+      ],
+      "exitCode": 0,
+      "completionDetected": false,
+      "errors": [
+        "error: Failed to spawn: `pytest`",
+        "Vertex shader compilation failed:",
+        "+        self._disabled_error: str | None = None",
+        "WARNING - cogames.policy.llm_miner - LLM planner disabled after request failure: ConnectError: [Errno 8] nodename nor servname provided, or not known"
+      ]
     }
   ],
-  "totalDurationMs": 508477,
+  "totalDurationMs": 854728,
   "struggleIndicators": {
     "repeatedErrors": {
       "def test_chaos_monkey_raises_at_fail_step() -> None:": 1,
-      "error: Failed to spawn: `pytest`": 2,
+      "error: Failed to spawn: `pytest`": 3,
       "ModuleNotFoundError: No module named 'typer'": 1,
       "The blocker is the actual OpenRouter experiment run. A real rollout with `machina_llm_roles` fails h": 1,
       "`uv run pytest` failed because `pytest` is not exposed that way in this environment. I’m retrying wi": 1,
-      "Vertex shader compilation failed:": 1,
-      "ValueError: too many values to unpack (expected 2)": 1
+      "Vertex shader compilation failed:": 2,
+      "ValueError: too many values to unpack (expected 2)": 1,
+      "+        self._disabled_error: str | None = None": 1,
+      "WARNING - cogames.policy.llm_miner - LLM planner disabled after request failure: ConnectError: [Errn": 1
     },
     "noProgressIterations": 0,
     "shortIterations": 0

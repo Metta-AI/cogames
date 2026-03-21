@@ -1,5 +1,10 @@
 from cogames.policy.llm_aligner_prompt import build_llm_aligner_prompt
-from cogames.policy.machina_llm_roles_policy import LLMAlignerPolicyImpl, LLMMinerPlannerClient, _parse_role_skill_choice
+from cogames.policy.machina_llm_roles_policy import (
+    LLMAlignerPolicyImpl,
+    LLMMinerPlannerClient,
+    MachinaLLMRolesPolicy,
+    _parse_role_skill_choice,
+)
 from cogames.cli.mission import get_mission
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import AgentObservation
@@ -78,3 +83,24 @@ def test_aligner_planner_overrides_explore_to_align_neutral_when_target_known() 
 
     assert state.current_skill == "align_neutral"
     assert "alignable neutral junction" in state.current_reason
+
+
+def test_machina_llm_roles_defaults_to_one_aligner() -> None:
+    env_cfg = get_mission("cogsguard_machina_1")[1]
+    policy = MachinaLLMRolesPolicy(
+        PolicyEnvInterface.from_mg_cfg(env_cfg),
+        llm_responder=lambda _: '{"skill":"explore","reason":"test"}',
+    )
+
+    assert policy._aligner_ids == frozenset({0})
+
+
+def test_machina_llm_roles_accepts_explicit_aligner_ids() -> None:
+    env_cfg = get_mission("cogsguard_machina_1")[1]
+    policy = MachinaLLMRolesPolicy(
+        PolicyEnvInterface.from_mg_cfg(env_cfg),
+        aligner_ids="0,2",
+        llm_responder=lambda _: '{"skill":"explore","reason":"test"}',
+    )
+
+    assert policy._aligner_ids == frozenset({0, 2})

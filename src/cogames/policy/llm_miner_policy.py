@@ -48,23 +48,31 @@ class LLMMinerPlannerClient:
         self._app_name = app_name
         self._timeout_s = timeout_s
         self._responder = responder
+        self._disabled_error: str | None = None
 
     def complete(self, prompt: str) -> str:
         if self._responder is not None:
             return self._responder(prompt)
+        if self._disabled_error is not None:
+            return ""
         api_key = os.environ.get(self._api_key_env)
-        if self._model:
-            return self._complete_openrouter(prompt, api_key)
-        if not self._api_url:
-            raise RuntimeError("LLM planner API is not configured")
-        with httpx.Client(timeout=self._timeout_s) as client:
-            response = client.post(self._api_url, json={"prompt": prompt})
-            response.raise_for_status()
-            payload = response.json()
-        text = payload.get("text")
-        if not isinstance(text, str) or not text.strip():
-            raise RuntimeError("LLM planner response missing non-empty 'text'")
-        return text
+        try:
+            if self._model:
+                return self._complete_openrouter(prompt, api_key)
+            if not self._api_url:
+                raise RuntimeError("LLM planner API is not configured")
+            with httpx.Client(timeout=self._timeout_s) as client:
+                response = client.post(self._api_url, json={"prompt": prompt})
+                response.raise_for_status()
+                payload = response.json()
+            text = payload.get("text")
+            if not isinstance(text, str) or not text.strip():
+                raise RuntimeError("LLM planner response missing non-empty 'text'")
+            return text
+        except Exception as exc:
+            self._disabled_error = f"{type(exc).__name__}: {exc}"
+            logger.warning("LLM planner disabled after request failure: %s", self._disabled_error)
+            return ""
 
     def _complete_openrouter(self, prompt: str, api_key: str | None) -> str:
         if not api_key:
