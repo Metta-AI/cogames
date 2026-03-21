@@ -85,6 +85,37 @@ def test_aligner_planner_overrides_explore_to_align_neutral_when_target_known() 
     assert "alignable neutral junction" in state.current_reason
 
 
+def test_aligner_planner_keeps_unstuck_when_gear_is_missing() -> None:
+    policy = _make_aligner_policy(lambda _: '{"skill":"unstuck","reason":"blocked near station"}')
+    state = policy.initial_agent_state()
+    state.known_hubs = {(0, 0)}
+    obs = AgentObservation(agent_id=0, tokens=[])
+
+    policy._current_gear = lambda _: "none"  # type: ignore[method-assign]
+    policy._inventory_count = lambda _obs, item: 0 if item == "heart" else 0  # type: ignore[method-assign]
+
+    policy._plan_skill(obs, state)
+
+    assert state.current_skill == "unstuck"
+    assert state.current_reason == "blocked near station"
+
+
+def test_aligner_planner_keeps_unstuck_when_hub_or_target_is_known() -> None:
+    policy = _make_aligner_policy(lambda _: '{"skill":"unstuck","reason":"need escape first"}')
+    state = policy.initial_agent_state()
+    state.known_hubs = {(0, 0)}
+    state.known_neutral_junctions = {(0, 5)}
+    obs = AgentObservation(agent_id=0, tokens=[])
+
+    policy._current_gear = lambda _: "aligner"  # type: ignore[method-assign]
+    policy._inventory_count = lambda _obs, item: 1 if item == "heart" else 0  # type: ignore[method-assign]
+
+    policy._plan_skill(obs, state)
+
+    assert state.current_skill == "unstuck"
+    assert state.current_reason == "need escape first"
+
+
 def test_machina_llm_roles_defaults_to_one_aligner() -> None:
     env_cfg = get_mission("cogsguard_machina_1")[1]
     policy = MachinaLLMRolesPolicy(

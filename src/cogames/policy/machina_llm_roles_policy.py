@@ -174,7 +174,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             else:
                 skill = "explore"
             reason = f"fallback after invalid planner response: {reason}"
-        if not has_aligner and skill != "gear_up":
+        if not has_aligner and skill not in {"gear_up", "unstuck"}:
             reason = f"overrode {skill} to gear_up because aligner gear is missing"
             skill = "gear_up"
         if has_aligner and skill == "gear_up":
@@ -187,13 +187,13 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             else:
                 reason = "overrode gear_up to explore because aligner gear is already equipped"
                 skill = "explore"
-        if has_aligner and not has_heart and state.known_hubs and skill in {"explore", "unstuck"}:
+        if has_aligner and not has_heart and state.known_hubs and skill == "explore":
             reason = f"overrode {skill} to get_heart because aligner gear is equipped and a hub is known"
             skill = "get_heart"
         if has_aligner and not has_heart and skill == "align_neutral":
             reason = "overrode align_neutral to get_heart because no heart is held"
             skill = "get_heart"
-        if has_aligner and has_heart and known_alignable_junctions and skill in {"explore", "get_heart", "unstuck"}:
+        if has_aligner and has_heart and known_alignable_junctions and skill in {"explore", "get_heart"}:
             reason = f"overrode {skill} to align_neutral because an alignable neutral junction is already known"
             skill = "align_neutral"
         state.current_skill = skill

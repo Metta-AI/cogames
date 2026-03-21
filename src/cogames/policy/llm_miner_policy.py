@@ -48,12 +48,12 @@ class LLMMinerPlannerClient:
         self._app_name = app_name
         self._timeout_s = timeout_s
         self._responder = responder
-        self._disabled_error: str | None = None
+        self._permanent_error: str | None = None
 
     def complete(self, prompt: str) -> str:
         if self._responder is not None:
             return self._responder(prompt)
-        if self._disabled_error is not None:
+        if self._permanent_error is not None:
             return ""
         api_key = os.environ.get(self._api_key_env)
         try:
@@ -70,8 +70,14 @@ class LLMMinerPlannerClient:
                 raise RuntimeError("LLM planner response missing non-empty 'text'")
             return text
         except Exception as exc:
-            self._disabled_error = f"{type(exc).__name__}: {exc}"
-            logger.warning("LLM planner disabled after request failure: %s", self._disabled_error)
+            error_text = f"{type(exc).__name__}: {exc}"
+            if isinstance(exc, RuntimeError) and (
+                "Missing API key" in str(exc) or "LLM planner API is not configured" in str(exc)
+            ):
+                self._permanent_error = error_text
+                logger.warning("LLM planner disabled after permanent configuration error: %s", self._permanent_error)
+            else:
+                logger.warning("LLM planner request failed; keeping planner enabled for future retries: %s", error_text)
             return ""
 
     def _complete_openrouter(self, prompt: str, api_key: str | None) -> str:
@@ -271,7 +277,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             else:
                 skill = "explore"
             reason = f"fallback after invalid planner response: {reason}"
-        if not has_miner and skill != "gear_up":
+        if not has_miner and skill not in {"gear_up", "unstuck"}:
             reason = f"overrode {skill} to gear_up because miner gear is missing"
             skill = "gear_up"
         if has_miner and skill == "gear_up":
