@@ -1,0 +1,13 @@
+{
+  "active": true,
+  "iteration": 1,
+  "minIterations": 1,
+  "maxIterations": 0,
+  "completionPromise": "COMPLETE",
+  "tasksMode": false,
+  "taskPromise": "READY_FOR_NEXT_TASK",
+  "prompt": "follow instructions in autoresearch.md",
+  "startedAt": "2026-03-21T08:08:13.349Z",
+  "model": "",
+  "agent": "codex"
+}

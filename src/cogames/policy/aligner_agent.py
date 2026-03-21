@@ -19,6 +19,7 @@ _DIRECTION_DELTAS: tuple[tuple[str, Coord], ...] = (
     ("south", (1, 0)),
     ("west", (0, -1)),
 )
+_HUB_SEARCH_DISTANCE = 20
 _HUB_ALIGN_DISTANCE = 25
 _JUNCTION_ALIGN_DISTANCE = 15
 
@@ -160,6 +161,16 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                     break
         return frontier
 
+    def _frontier_near(self, state: AlignerState, anchors: set[Coord], max_anchor_distance: int) -> set[Coord]:
+        frontier = self._frontier_cells(state)
+        if not anchors:
+            return frontier
+        near_frontier: set[Coord] = set()
+        for cell in frontier:
+            if min(abs(cell[0] - anchor[0]) + abs(cell[1] - anchor[1]) for anchor in anchors) <= max_anchor_distance:
+                near_frontier.add(cell)
+        return near_frontier or frontier
+
     def _inventory_count(self, obs: AgentObservation, item: str) -> int:
         for token in obs.tokens:
             if token.location != self._starter._center:
@@ -228,17 +239,64 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             logger.info("agent=%s mode=%s", obs.agent_id, mode)
             state.last_mode = mode
 
-    def _explore(self, obs: AgentObservation, state: AlignerState) -> tuple[Action, AlignerState]:
+    def _move_toward_target(
+        self,
+        state: AlignerState,
+        current_abs: Coord,
+        target_abs: Coord | None,
+    ) -> tuple[Action, AlignerState]:
+        if target_abs is None:
+            return self._starter._wander(state)
+        direction = self._bfs_first_direction(state, current_abs, target_abs)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), state
+
+        frontier_cells = self._frontier_cells(state)
+        if not frontier_cells:
+            return self._starter._wander(state)
+
+        best_frontier = min(
+            frontier_cells,
+            key=lambda cell: (
+                abs(cell[0] - target_abs[0]) + abs(cell[1] - target_abs[1]),
+                abs(cell[0] - current_abs[0]) + abs(cell[1] - current_abs[1]),
+                cell,
+            ),
+        )
+        return self._move_to(state, current_abs, best_frontier)
+
+    def _explore_frontier(
+        self,
+        obs: AgentObservation,
+        state: AlignerState,
+        frontier_cells: set[Coord],
+    ) -> tuple[Action, AlignerState]:
         self._log_mode(obs, state, "explore")
-        action, next_state = self._starter._wander(state)
+        current_abs = self._spawn_offset(obs)
+        if current_abs in frontier_cells:
+            for direction, neighbor in self._neighbors(current_abs):
+                if neighbor in state.blocked_cells or neighbor in state.known_free_cells:
+                    continue
+                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+        target_abs = self._nearest_known(current_abs, frontier_cells)
+        action, next_state = self._move_to(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
+
+    def _explore(self, obs: AgentObservation, state: AlignerState) -> tuple[Action, AlignerState]:
+        return self._explore_frontier(obs, state, self._frontier_cells(state))
+
+    def _explore_near_hub(self, obs: AgentObservation, state: AlignerState) -> tuple[Action, AlignerState]:
+        frontier_cells = self._frontier_near(state, state.known_hubs, max_anchor_distance=_HUB_SEARCH_DISTANCE)
+        return self._explore_frontier(obs, state, frontier_cells)
 
     def _gear_up(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
         self._log_mode(obs, state, "gear_up")
         target_abs = self._nearest_known(current_abs, state.known_aligner_stations)
         if target_abs is None:
+            if state.known_hubs:
+                return self._explore_near_hub(obs, state)
             return self._explore(obs, state)
-        action, next_state = self._move_to(state, current_abs, target_abs)
+        action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def _get_heart(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
@@ -246,7 +304,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         target_abs = self._nearest_known(current_abs, state.known_hubs)
         if target_abs is None:
             return self._explore(obs, state)
-        action, next_state = self._move_to(state, current_abs, target_abs)
+        action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def _is_alignable(self, junction: Coord, state: AlignerState) -> bool:
@@ -262,9 +320,11 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         alignable = {junction for junction in state.known_neutral_junctions if self._is_alignable(junction, state)}
         target_abs = self._nearest_known(current_abs, alignable)
         if target_abs is None:
+            if state.known_hubs:
+                return self._explore_near_hub(obs, state)
             return self._explore(obs, state)
         self._log_mode(obs, state, "align_neutral")
-        action, next_state = self._move_to(state, current_abs, target_abs)
+        action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def step_with_state(self, obs: AgentObservation, state: AlignerState) -> tuple[Action, AlignerState]:
