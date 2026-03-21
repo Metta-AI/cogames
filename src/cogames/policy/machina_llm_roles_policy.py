@@ -110,9 +110,13 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
     def _hub_visible(self, obs: AgentObservation) -> bool:
         return self._starter._closest_tag_location(obs, self._hub_tags) is not None
 
+    def _known_alignable_junctions(self, state: LLMAlignerState) -> set[tuple[int, int]]:
+        return {junction for junction in state.known_neutral_junctions if self._is_alignable(junction, state)}
+
     def _update_progress(self, obs: AgentObservation, state: LLMAlignerState) -> None:
         has_heart = self._inventory_count(obs, "heart") > 0
         friendly_count = len(state.known_friendly_junctions)
+        current_abs = self._spawn_offset(obs)
         if state.current_skill == "get_heart" and has_heart and not state.last_has_heart:
             self._event(state, "acquired a heart")
         if state.current_skill == "align_neutral" and friendly_count > state.last_friendly_junctions:
@@ -121,7 +125,14 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         state.last_friendly_junctions = friendly_count
 
         last_action_move = self._feature_value(obs, "last_action_move")
-        if state.current_skill is not None and last_action_move == 0:
+        stationary_on_valid_target = (
+            (state.current_skill == "get_heart" and current_abs in state.known_hubs)
+            or (state.current_skill == "align_neutral" and current_abs in self._known_alignable_junctions(state))
+            or (state.current_skill == "gear_up" and current_abs in state.known_aligner_stations)
+        )
+        if stationary_on_valid_target:
+            state.no_move_steps = 0
+        elif state.current_skill is not None and last_action_move == 0:
             state.no_move_steps += 1
         else:
             state.no_move_steps = 0
@@ -129,11 +140,14 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
     def _plan_skill(self, obs: AgentObservation, state: LLMAlignerState) -> None:
         has_aligner = self._current_gear(obs) == "aligner"
         has_heart = self._inventory_count(obs, "heart") > 0
+        known_alignable_junctions = self._known_alignable_junctions(state)
         prompt = build_llm_aligner_prompt(
             has_aligner=has_aligner,
             has_heart=has_heart,
             hub_visible=self._hub_visible(obs),
+            known_hubs=len(state.known_hubs),
             known_neutral_junctions=len(state.known_neutral_junctions),
+            known_alignable_junctions=len(known_alignable_junctions),
             known_friendly_junctions=len(state.known_friendly_junctions),
             current_skill=state.current_skill,
             no_move_steps=state.no_move_steps,
@@ -153,9 +167,9 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         if skill is None:
             if not has_aligner:
                 skill = "gear_up"
-            elif not has_heart:
+            elif not has_heart and state.known_hubs:
                 skill = "get_heart"
-            elif state.known_neutral_junctions:
+            elif known_alignable_junctions:
                 skill = "align_neutral"
             else:
                 skill = "explore"
@@ -173,9 +187,15 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             else:
                 reason = "overrode gear_up to explore because aligner gear is already equipped"
                 skill = "explore"
+        if has_aligner and not has_heart and state.known_hubs and skill in {"explore", "unstuck"}:
+            reason = f"overrode {skill} to get_heart because aligner gear is equipped and a hub is known"
+            skill = "get_heart"
         if has_aligner and not has_heart and skill == "align_neutral":
             reason = "overrode align_neutral to get_heart because no heart is held"
             skill = "get_heart"
+        if has_aligner and has_heart and known_alignable_junctions and skill in {"explore", "get_heart", "unstuck"}:
+            reason = f"overrode {skill} to align_neutral because an alignable neutral junction is already known"
+            skill = "align_neutral"
         state.current_skill = skill
         state.current_reason = reason
         state.skill_steps = 0

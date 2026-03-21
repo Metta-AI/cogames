@@ -15,7 +15,9 @@ def build_llm_aligner_prompt(
     has_aligner: bool,
     has_heart: bool,
     hub_visible: bool,
+    known_hubs: int,
     known_neutral_junctions: int,
+    known_alignable_junctions: int,
     known_friendly_junctions: int,
     current_skill: str | None,
     no_move_steps: int,
@@ -30,14 +32,17 @@ def build_llm_aligner_prompt(
         "Preconditions:\n"
         "- If has_aligner is false, prefer gear_up.\n"
         "- Do not choose align_neutral unless has_aligner is true and has_heart is true.\n"
-        "- If has_aligner is true and has_heart is false, prefer get_heart unless exploring is clearly necessary to discover a target.\n"
+        "- If has_aligner is true and has_heart is false and a hub is known, prefer get_heart.\n"
+        "- If has_aligner is true and has_heart is true and known_alignable_junctions > 0, prefer align_neutral.\n"
         "Respond as JSON like {\"skill\": \"align_neutral\", \"reason\": \"...\"}.\n\n"
         f"Available skills:\n{skills}\n\n"
         f"State:\n"
         f"- has_aligner: {has_aligner}\n"
         f"- has_heart: {has_heart}\n"
         f"- hub_visible: {hub_visible}\n"
+        f"- known_hubs: {known_hubs}\n"
         f"- known_neutral_junctions: {known_neutral_junctions}\n"
+        f"- known_alignable_junctions: {known_alignable_junctions}\n"
         f"- known_friendly_junctions: {known_friendly_junctions}\n"
         f"- current_skill: {current_skill or 'none'}\n"
         f"- no_move_steps: {no_move_steps}\n\n"
