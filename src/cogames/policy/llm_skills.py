@@ -173,6 +173,16 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
                     break
         return frontier
 
+    def _frontier_near(self, state: MinerSkillState, anchors: set[Coord], max_anchor_distance: int) -> set[Coord]:
+        frontier = self._frontier_cells(state)
+        if not anchors:
+            return frontier
+        near_frontier: set[Coord] = set()
+        for cell in frontier:
+            if min(abs(cell[0] - anchor[0]) + abs(cell[1] - anchor[1]) for anchor in anchors) <= max_anchor_distance:
+                near_frontier.add(cell)
+        return near_frontier or frontier
+
     def _bfs_first_direction(self, state: MinerSkillState, start: Coord, goal: Coord) -> str | None:
         if start == goal:
             return self._starter._fallback_action_name
@@ -206,6 +216,45 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             return self._starter._wander(state)
         return self._starter._action(f"move_{direction}"), state
 
+    def _move_toward_target(
+        self,
+        state: MinerSkillState,
+        current_abs: Coord,
+        target_abs: Coord | None,
+    ) -> tuple[Action, MinerSkillState]:
+        if target_abs is None:
+            return self._starter._wander(state)
+        direction = self._bfs_first_direction(state, current_abs, target_abs)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), state
+
+        frontier_cells = self._frontier_cells(state)
+        if not frontier_cells:
+            return self._starter._wander(state)
+
+        best_frontier = min(
+            frontier_cells,
+            key=lambda cell: (
+                abs(cell[0] - target_abs[0]) + abs(cell[1] - target_abs[1]),
+                abs(cell[0] - current_abs[0]) + abs(cell[1] - current_abs[1]),
+                cell,
+            ),
+        )
+        if current_abs == best_frontier:
+            for direction_name, neighbor in sorted(
+                self._neighbors(current_abs),
+                key=lambda item: (
+                    item[1] in state.blocked_cells,
+                    item[1] in state.known_free_cells,
+                    abs(item[1][0] - target_abs[0]) + abs(item[1][1] - target_abs[1]),
+                ),
+            ):
+                if neighbor in state.blocked_cells or neighbor in state.known_free_cells:
+                    continue
+                return self._starter._action(f"move_{direction_name}"), state
+            return self._starter._wander(state)
+        return self._move_to(state, current_abs, best_frontier)
+
     def _explore(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
         if state.last_mode != "explore":
             logger.info("agent=%s mode=explore", obs.agent_id)
@@ -222,6 +271,32 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         action, next_state = self._move_to(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
+    def _explore_near_hub(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
+        if state.last_mode != "explore":
+            logger.info("agent=%s mode=explore", obs.agent_id)
+            state.last_mode = "explore"
+        current_abs = self._current_abs(obs)
+        frontier_cells = self._frontier_near(state, state.known_hubs, max_anchor_distance=10)
+        if current_abs in frontier_cells:
+            ordered = sorted(
+                self._neighbors(current_abs),
+                key=lambda item: (
+                    item[1] in state.blocked_cells,
+                    item[1] in state.known_free_cells,
+                    min(
+                        (abs(item[1][0] - hub[0]) + abs(item[1][1] - hub[1]) for hub in state.known_hubs),
+                        default=9999,
+                    ),
+                ),
+            )
+            for direction, neighbor in ordered:
+                if neighbor in state.blocked_cells or neighbor in state.known_free_cells:
+                    continue
+                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+        target_abs = self._nearest_known(current_abs, frontier_cells)
+        action, next_state = self._move_to(state, current_abs, target_abs)
+        return action, replace(next_state, last_mode=state.last_mode)
+
     def _gear_up(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
         if state.last_mode != "gear_up":
             logger.info("agent=%s mode=gear_up", obs.agent_id)
@@ -229,8 +304,10 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         current_abs = self._current_abs(obs)
         target_abs = self._nearest_known(current_abs, state.known_miner_stations)
         if target_abs is None:
+            if state.known_hubs:
+                return self._explore_near_hub(obs, state)
             return self._explore(obs, state)
-        action, next_state = self._move_to(state, current_abs, target_abs)
+        action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def _mine_until_full(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
@@ -241,7 +318,7 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         target_abs = self._nearest_known(current_abs, state.known_extractors)
         if target_abs is None:
             return self._explore(obs, state)
-        action, next_state = self._move_to(state, current_abs, target_abs)
+        action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def _deposit_to_hub(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
@@ -255,7 +332,7 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             state.known_free_cells.add(target_abs)
         if target_abs is None:
             return self._explore(obs, state)
-        action, next_state = self._move_to(state, current_abs, target_abs)
+        action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def step_with_state(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:

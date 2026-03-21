@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass, field, replace
 from typing import Callable
@@ -21,6 +22,9 @@ def _parse_role_skill_choice(text: str, valid_skills: set[str]) -> tuple[str | N
     text = text.strip()
     if not text:
         return None, "empty response"
+    fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1).strip()
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
@@ -123,9 +127,11 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             state.no_move_steps = 0
 
     def _plan_skill(self, obs: AgentObservation, state: LLMAlignerState) -> None:
+        has_aligner = self._current_gear(obs) == "aligner"
+        has_heart = self._inventory_count(obs, "heart") > 0
         prompt = build_llm_aligner_prompt(
-            has_aligner=self._current_gear(obs) == "aligner",
-            has_heart=self._inventory_count(obs, "heart") > 0,
+            has_aligner=has_aligner,
+            has_heart=has_heart,
             hub_visible=self._hub_visible(obs),
             known_neutral_junctions=len(state.known_neutral_junctions),
             known_friendly_junctions=len(state.known_friendly_junctions),
@@ -145,13 +151,31 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         )
         skill, reason = _parse_role_skill_choice(text, set(ALIGNER_SKILL_DESCRIPTIONS))
         if skill is None:
-            if self._inventory_count(obs, "heart") <= 0:
+            if not has_aligner:
+                skill = "gear_up"
+            elif not has_heart:
                 skill = "get_heart"
             elif state.known_neutral_junctions:
                 skill = "align_neutral"
             else:
                 skill = "explore"
             reason = f"fallback after invalid planner response: {reason}"
+        if not has_aligner and skill != "gear_up":
+            reason = f"overrode {skill} to gear_up because aligner gear is missing"
+            skill = "gear_up"
+        if has_aligner and skill == "gear_up":
+            if has_heart and state.known_neutral_junctions:
+                reason = "overrode gear_up to align_neutral because aligner gear is already equipped and a target is known"
+                skill = "align_neutral"
+            elif not has_heart:
+                reason = "overrode gear_up to get_heart because aligner gear is already equipped"
+                skill = "get_heart"
+            else:
+                reason = "overrode gear_up to explore because aligner gear is already equipped"
+                skill = "explore"
+        if has_aligner and not has_heart and skill == "align_neutral":
+            reason = "overrode align_neutral to get_heart because no heart is held"
+            skill = "get_heart"
         state.current_skill = skill
         state.current_reason = reason
         state.skill_steps = 0
@@ -159,7 +183,11 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
 
     def _maybe_finish_skill(self, obs: AgentObservation, state: LLMAlignerState) -> None:
         has_heart = self._inventory_count(obs, "heart") > 0
-        if state.current_skill == "get_heart" and has_heart:
+        has_aligner = self._current_gear(obs) == "aligner"
+        if state.current_skill == "gear_up" and has_aligner:
+            self._event(state, "gear_up completed after acquiring aligner gear")
+            state.current_skill = None
+        elif state.current_skill == "get_heart" and has_heart:
             self._event(state, "get_heart completed after acquiring heart")
             state.current_skill = None
         elif state.current_skill == "align_neutral" and not has_heart:
@@ -185,16 +213,14 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         current_abs = self._update_map_memory(obs, state)
         self._update_progress(obs, state)
 
-        if self._current_gear(obs) != "aligner":
-            state.current_skill = None
-            action, base_state = self._gear_up(obs, state, current_abs)
-            return action, self._copy_with(state, base_state)
-
         self._maybe_finish_skill(obs, state)
         if state.current_skill is None:
             self._plan_skill(obs, state)
 
-        if state.current_skill == "get_heart":
+        if state.current_skill == "gear_up":
+            action, base_state = self._gear_up(obs, state, current_abs)
+            state = self._copy_with(state, base_state)
+        elif state.current_skill == "get_heart":
             action, base_state = self._get_heart(obs, state, current_abs)
             state = self._copy_with(state, base_state)
         elif state.current_skill == "align_neutral":

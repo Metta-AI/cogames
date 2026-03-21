@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import json
 import os
+import re
 import time
 from dataclasses import dataclass, field, replace
 from typing import Callable
@@ -124,6 +125,9 @@ def _parse_skill_choice(text: str) -> tuple[str | None, str]:
     text = text.strip()
     if not text:
         return None, "empty response"
+    fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1).strip()
     try:
         payload = json.loads(text)
     except json.JSONDecodeError:
@@ -212,16 +216,25 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         state.last_carried_total = carried_total
 
         last_action_move = self._feature_value(obs, "last_action_move")
-        if state.current_skill is not None and last_action_move == 0:
+        current_abs = self._current_abs(obs)
+        stationary_on_valid_target = (
+            (state.current_skill == "mine_until_full" and current_abs in state.known_extractors)
+            or (state.current_skill == "deposit_to_hub" and current_abs in state.known_hubs)
+            or (state.current_skill == "gear_up" and current_abs in state.known_miner_stations)
+        )
+        if stationary_on_valid_target:
+            state.no_move_steps = 0
+        elif state.current_skill is not None and last_action_move == 0:
             state.no_move_steps += 1
         else:
             state.no_move_steps = 0
 
     def _plan_skill(self, obs: AgentObservation, state: LLMMinerState) -> None:
+        has_miner = self._starter._current_gear(self._starter._inventory_items(obs)) == "miner"
         prompt = build_llm_miner_prompt(
             carried_total=self._carried_total(obs),
             return_load=self._return_load,
-            has_miner=self._starter._current_gear(self._starter._inventory_items(obs)) == "miner",
+            has_miner=has_miner,
             hub_visible=self._hub_visible(obs),
             remembered_hub=(state.remembered_hub_row_from_spawn, state.remembered_hub_col_from_spawn),
             known_extractors=len(state.known_extractors),
@@ -238,13 +251,31 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         skill, reason = _parse_skill_choice(text)
         if skill is None:
             carried_total = self._carried_total(obs)
-            if carried_total >= self._return_load:
+            if not has_miner:
+                skill = "gear_up"
+            elif carried_total >= self._return_load:
                 skill = "deposit_to_hub"
             elif state.known_extractors:
                 skill = "mine_until_full"
             else:
                 skill = "explore"
             reason = f"fallback after invalid planner response: {reason}"
+        if not has_miner and skill != "gear_up":
+            reason = f"overrode {skill} to gear_up because miner gear is missing"
+            skill = "gear_up"
+        if has_miner and skill == "gear_up":
+            if self._carried_total(obs) >= self._return_load:
+                reason = "overrode gear_up to deposit_to_hub because miner gear is already equipped and cargo is full"
+                skill = "deposit_to_hub"
+            elif state.known_extractors:
+                reason = "overrode gear_up to mine_until_full because miner gear is already equipped"
+                skill = "mine_until_full"
+            else:
+                reason = "overrode gear_up to explore because miner gear is already equipped and no extractor is known"
+                skill = "explore"
+        if has_miner and self._carried_total(obs) >= self._return_load and skill == "mine_until_full":
+            reason = "overrode mine_until_full to deposit_to_hub because cargo is full"
+            skill = "deposit_to_hub"
         state.current_skill = skill
         state.current_reason = reason
         state.skill_steps = 0
@@ -252,7 +283,11 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
 
     def _maybe_finish_skill(self, obs: AgentObservation, state: LLMMinerState) -> None:
         carried_total = self._carried_total(obs)
-        if state.current_skill == "mine_until_full" and carried_total >= self._return_load:
+        has_miner = self._starter._current_gear(self._starter._inventory_items(obs)) == "miner"
+        if state.current_skill == "gear_up" and has_miner:
+            self._event(state, "gear_up completed after acquiring miner gear")
+            state.current_skill = None
+        elif state.current_skill == "mine_until_full" and carried_total >= self._return_load:
             self._event(state, f"mine_until_full completed at load={carried_total}")
             state.current_skill = None
         elif state.current_skill == "deposit_to_hub" and carried_total == 0:
@@ -275,20 +310,17 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         return self._starter._action(f"move_{direction}"), state
 
     def step_with_state(self, obs: AgentObservation, state: LLMMinerState) -> tuple[Action, LLMMinerState]:
-        self._remember_visible_hub(obs, state)
+        self._update_map_memory(obs, state)
         self._update_progress(obs, state)
-
-        gear = self._starter._current_gear(self._starter._inventory_items(obs))
-        if gear != "miner":
-            state.current_skill = None
-            base_action, base_state = self._gear_up(obs, state)
-            return base_action, self._copy_with(state, base_state)
 
         self._maybe_finish_skill(obs, state)
         if state.current_skill is None:
             self._plan_skill(obs, state)
 
-        if state.current_skill == "mine_until_full":
+        if state.current_skill == "gear_up":
+            action, base_state = self._gear_up(obs, state)
+            state = self._copy_with(state, base_state)
+        elif state.current_skill == "mine_until_full":
             action, base_state = self._mine_until_full(obs, state)
             state = self._copy_with(state, base_state)
         elif state.current_skill == "deposit_to_hub":

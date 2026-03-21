@@ -2,6 +2,7 @@ from __future__ import annotations
 
 
 ALIGNER_SKILL_DESCRIPTIONS = {
+    "gear_up": "Route to the aligner station and acquire aligner gear.",
     "get_heart": "Route to the hub and obtain a heart if possible.",
     "align_neutral": "Route to a known alignable neutral junction and align it.",
     "explore": "Wander to reveal more map area and discover new neutral junctions or routes.",
@@ -25,7 +26,11 @@ def build_llm_aligner_prompt(
     return (
         "You control one aligner cog in CoGames. Maximize aligned_junction_held by capturing neutral junctions early and repeatedly.\n"
         "Choose exactly one next skill from the available skills.\n"
-        "Valid skill names are exactly: get_heart, align_neutral, explore, unstuck. Do not invent new names.\n"
+        "Valid skill names are exactly: gear_up, get_heart, align_neutral, explore, unstuck. Do not invent new names.\n"
+        "Preconditions:\n"
+        "- If has_aligner is false, prefer gear_up.\n"
+        "- Do not choose align_neutral unless has_aligner is true and has_heart is true.\n"
+        "- If has_aligner is true and has_heart is false, prefer get_heart unless exploring is clearly necessary to discover a target.\n"
         "Respond as JSON like {\"skill\": \"align_neutral\", \"reason\": \"...\"}.\n\n"
         f"Available skills:\n{skills}\n\n"
         f"State:\n"
