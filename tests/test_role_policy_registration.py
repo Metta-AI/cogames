@@ -12,6 +12,10 @@ from mettagrid.policy.loader import resolve_policy_class_path
         ("scout", "cogames.policy.role_policies.ScoutRolePolicy"),
         ("aligner", "cogames.policy.role_policies.AlignerRolePolicy"),
         ("scrambler", "cogames.policy.role_policies.ScramblerRolePolicy"),
+        ("machina_roles", "cogames.policy.machina_roles_policy.MachinaRolesPolicy"),
+        ("machina_mixed", "cogames.policy.machina_roles_policy.MachinaRolesPolicy"),
+        ("mine_closest", "cogames.policy.mine_closest_policy.MineClosestPolicy"),
+        ("llm_miner", "cogames.policy.llm_miner_policy.LLMMinerPolicy"),
     ],
 )
 def test_canonical_role_short_names_resolve_in_cogames(short_name: str, class_suffix: str) -> None:
