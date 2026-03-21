@@ -57,6 +57,7 @@ short text description of what this experiment tried
 
 # The experiment loop
 The experiment runs on a dedicated branch (e.g. cogames/mar5 or cogames/mar5-gpu0).
+That branch must also exist on GitHub so progress is backed up and visible remotely.
 
 LOOP FOREVER:
 
@@ -66,12 +67,12 @@ LOOP FOREVER:
 4. Run the experiment
 5. Read out the results
 6. Record the results in the tsv and commit the results
-7. If reward improved you "advance" the branch, keeping the git commit
-8. If reward is equal or worse, you git reset back to where you started
+7. Push the branch to GitHub. If the branch does not exist remotely yet, create it with `git push -u origin <branch_name>`. After that, use `git push` after each kept result so the remote branch stays current.
+8. If reward improved you "advance" the branch, keeping the git commit
+9. If reward is equal or worse, you git reset back to where you started. If you had already pushed a discarded commit, bring the remote branch back in sync too.
 
 The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
 
 Crashes: If a run crashes (OOM, or a bug, or etc.), use your judgment: If it's something dumb and easy to fix (e.g. a typo, a missing import), fix it and re-run. If the idea itself is fundamentally broken, just skip it, log "crash" as the status in the tsv, and move on.
 
 NEVER STOP: Once the experiment loop has begun (after the initial setup), do NOT pause to ask the human if you should continue. Do NOT ask "should I keep going?" or "is this a good stopping point?". The human might be asleep, or gone from a computer and expects you to continue working indefinitely until you are manually stopped. You are autonomous. If you run out of ideas, think harder — read papers referenced in the code, re-read the in-scope files for new angles, try combining previous near-misses, try more radical architectural changes. The loop runs until the human interrupts you, period.
-
