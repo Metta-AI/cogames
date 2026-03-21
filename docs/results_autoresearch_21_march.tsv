@@ -1,0 +1,2 @@
+commit	reward	steps	status	description
+ea1802b	0.040800	80	keep	Baseline 3-agent LLM team on cogsguard_machina_1; command: source .env.openrouter.local && export PATH="$HOME/.nimble/bin:$PATH" && uv run cogames play -m cogsguard_machina_1 -c 3 -p class=machina_llm_roles,kw.llm_timeout_s=10 -s 80; per-agent reward=0.0135999918; aligned.junction.held=56; germanium.deposited=80
