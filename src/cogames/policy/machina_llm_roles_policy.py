@@ -247,7 +247,12 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             action, base_state = self._align_neutral(obs, state, current_abs)
             state = self._copy_with(state, base_state)
         elif state.current_skill == "explore":
-            action, base_state = self._explore(obs, state)
+            if self._inventory_count(obs, "heart") > 0:
+                action, base_state = self._explore_for_alignment(obs, state)
+            elif state.known_hubs:
+                action, base_state = self._explore_near_hub(obs, state)
+            else:
+                action, base_state = self._explore(obs, state)
             state = self._copy_with(state, base_state)
         else:
             action, state = self._unstuck(state)

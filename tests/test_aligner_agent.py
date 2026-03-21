@@ -29,3 +29,17 @@ def test_explore_uses_map_memory_before_wandering() -> None:
     action, _ = policy._explore(obs, state)
 
     assert action.name == "move_east"
+
+
+def test_alignment_frontier_prefers_network_expansion() -> None:
+    policy = _make_policy()
+    state = policy.initial_agent_state()
+    state.known_friendly_junctions = {(0, 0)}
+    state.known_free_cells = {(0, 0), (0, 1), (0, 2), (0, 20), (0, 21)}
+
+    frontier = policy._alignment_frontier_cells(state)
+
+    assert (0, 1) in frontier
+    assert (0, 2) in frontier
+    assert (0, 20) not in frontier
+    assert (0, 21) not in frontier

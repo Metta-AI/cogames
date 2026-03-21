@@ -115,8 +115,7 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
                 cells.add((current_abs[0] + d_row, current_abs[1] + d_col))
         return cells
 
-    def _update_known_objects(self, visible_cells: set[Coord], target_set: set[Coord], current_values: set[Coord]) -> None:
-        target_set.difference_update(visible_cells)
+    def _remember_static_objects(self, target_set: set[Coord], current_values: set[Coord]) -> None:
         target_set.update(current_values)
 
     def _remember_visible_hub(self, obs: AgentObservation, state: MinerSkillState) -> None:
@@ -153,9 +152,9 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         state.known_free_cells.difference_update(state.blocked_cells)
         state.known_free_cells.add(current_abs)
 
-        self._update_known_objects(visible_cells, state.known_hubs, hubs_now)
-        self._update_known_objects(visible_cells, state.known_miner_stations, miner_stations_now)
-        self._update_known_objects(visible_cells, state.known_extractors, extractors_now)
+        self._remember_static_objects(state.known_hubs, hubs_now)
+        self._remember_static_objects(state.known_miner_stations, miner_stations_now)
+        self._remember_static_objects(state.known_extractors, extractors_now)
         self._remember_visible_hub(obs, state)
 
     def _neighbors(self, cell: Coord) -> list[tuple[str, Coord]]:
@@ -313,11 +312,12 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         if state.last_mode != "gear_up":
             logger.info("agent=%s mode=gear_up", obs.agent_id)
             state.last_mode = "gear_up"
+        current_abs = self._current_abs(obs)
         visible_target = self._closest_visible_location(obs, self._miner_station_tags)
         if visible_target is not None:
-            action, next_state = self._starter._move_toward(state, visible_target)
+            target_abs = self._visible_abs_cell(current_abs, visible_target)
+            action, next_state = self._move_toward_target(state, current_abs, target_abs)
             return action, replace(next_state, last_mode=state.last_mode)
-        current_abs = self._current_abs(obs)
         target_abs = self._nearest_known(current_abs, state.known_miner_stations)
         if target_abs is None:
             if state.known_hubs:
@@ -330,11 +330,12 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         if state.last_mode != "mine_until_full":
             logger.info("agent=%s mode=mine_until_full", obs.agent_id)
             state.last_mode = "mine_until_full"
+        current_abs = self._current_abs(obs)
         visible_target = self._closest_visible_location(obs, self._starter._extractor_tags)
         if visible_target is not None:
-            action, next_state = self._starter._move_toward(state, visible_target)
+            target_abs = self._visible_abs_cell(current_abs, visible_target)
+            action, next_state = self._move_toward_target(state, current_abs, target_abs)
             return action, replace(next_state, last_mode=state.last_mode)
-        current_abs = self._current_abs(obs)
         target_abs = self._nearest_known(current_abs, state.known_extractors)
         if target_abs is None:
             if state.known_hubs:
@@ -352,11 +353,12 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         if state.last_mode != "deposit_to_hub":
             logger.info("agent=%s mode=deposit_to_hub load=%s", obs.agent_id, self._carried_total(obs))
             state.last_mode = "deposit_to_hub"
+        current_abs = self._current_abs(obs)
         visible_target = self._closest_visible_location(obs, self._hub_tags)
         if visible_target is not None:
-            action, next_state = self._starter._move_toward(state, visible_target)
+            target_abs = self._visible_abs_cell(current_abs, visible_target)
+            action, next_state = self._move_toward_target(state, current_abs, target_abs)
             return action, replace(next_state, last_mode=state.last_mode)
-        current_abs = self._current_abs(obs)
         target_abs = self._nearest_known(current_abs, state.known_hubs)
         if target_abs is None and state.remembered_hub_row_from_spawn is not None and state.remembered_hub_col_from_spawn is not None:
             target_abs = (state.remembered_hub_row_from_spawn, state.remembered_hub_col_from_spawn)

@@ -182,7 +182,10 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
     def _current_gear(self, obs: AgentObservation) -> str | None:
         return self._starter._current_gear(self._starter._inventory_items(obs))
 
-    def _update_known_objects(self, visible_cells: set[Coord], target_set: set[Coord], current_values: set[Coord]) -> None:
+    def _remember_static_objects(self, target_set: set[Coord], current_values: set[Coord]) -> None:
+        target_set.update(current_values)
+
+    def _refresh_dynamic_objects(self, visible_cells: set[Coord], target_set: set[Coord], current_values: set[Coord]) -> None:
         target_set.difference_update(visible_cells)
         target_set.update(current_values)
 
@@ -225,11 +228,11 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         state.known_free_cells.difference_update(state.blocked_cells)
         state.known_free_cells.add(current_abs)
 
-        self._update_known_objects(visible_cells, state.known_hubs, hubs_now)
-        self._update_known_objects(visible_cells, state.known_aligner_stations, stations_now)
-        self._update_known_objects(visible_cells, state.known_neutral_junctions, neutral_now)
-        self._update_known_objects(visible_cells, state.known_friendly_junctions, friendly_now)
-        self._update_known_objects(visible_cells, state.known_enemy_junctions, enemy_now)
+        self._remember_static_objects(state.known_hubs, hubs_now)
+        self._remember_static_objects(state.known_aligner_stations, stations_now)
+        self._refresh_dynamic_objects(visible_cells, state.known_neutral_junctions, neutral_now)
+        self._refresh_dynamic_objects(visible_cells, state.known_friendly_junctions, friendly_now)
+        self._refresh_dynamic_objects(visible_cells, state.known_enemy_junctions, enemy_now)
         state.known_neutral_junctions.difference_update(state.known_friendly_junctions)
         state.known_neutral_junctions.difference_update(state.known_enemy_junctions)
         return current_abs
@@ -289,8 +292,46 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         frontier_cells = self._frontier_near(state, state.known_hubs, max_anchor_distance=_HUB_SEARCH_DISTANCE)
         return self._explore_frontier(obs, state, frontier_cells)
 
+    def _alignment_frontier_cells(self, state: AlignerState) -> set[Coord]:
+        frontier = self._frontier_cells(state)
+        if not frontier:
+            return frontier
+
+        aligned_network = set(state.known_hubs) | set(state.known_friendly_junctions)
+        if not aligned_network:
+            return frontier
+
+        vision_margin = max(self._obs_radius_row, self._obs_radius_col)
+        hub_search_radius = _HUB_ALIGN_DISTANCE + vision_margin
+        junction_search_radius = _JUNCTION_ALIGN_DISTANCE + vision_margin
+
+        preferred_frontier = {
+            cell
+            for cell in frontier
+            if any(
+                (
+                    anchor in state.known_hubs
+                    and abs(cell[0] - anchor[0]) + abs(cell[1] - anchor[1]) <= hub_search_radius
+                )
+                or (
+                    anchor in state.known_friendly_junctions
+                    and abs(cell[0] - anchor[0]) + abs(cell[1] - anchor[1]) <= junction_search_radius
+                )
+                for anchor in aligned_network
+            )
+        }
+        return preferred_frontier or frontier
+
+    def _explore_for_alignment(self, obs: AgentObservation, state: AlignerState) -> tuple[Action, AlignerState]:
+        return self._explore_frontier(obs, state, self._alignment_frontier_cells(state))
+
     def _gear_up(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
         self._log_mode(obs, state, "gear_up")
+        visible_target = self._starter._closest_tag_location(obs, self._aligner_station_tags)
+        if visible_target is not None:
+            target_abs = self._visible_abs_cell(current_abs, visible_target)
+            action, next_state = self._move_toward_target(state, current_abs, target_abs)
+            return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_aligner_stations)
         if target_abs is None:
             if state.known_hubs:
@@ -301,6 +342,11 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
 
     def _get_heart(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
         self._log_mode(obs, state, "get_heart")
+        visible_target = self._starter._closest_tag_location(obs, self._hub_tags)
+        if visible_target is not None:
+            target_abs = self._visible_abs_cell(current_abs, visible_target)
+            action, next_state = self._move_toward_target(state, current_abs, target_abs)
+            return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_hubs)
         if target_abs is None:
             return self._explore(obs, state)
@@ -320,9 +366,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         alignable = {junction for junction in state.known_neutral_junctions if self._is_alignable(junction, state)}
         target_abs = self._nearest_known(current_abs, alignable)
         if target_abs is None:
-            if state.known_hubs:
-                return self._explore_near_hub(obs, state)
-            return self._explore(obs, state)
+            return self._explore_for_alignment(obs, state)
         self._log_mode(obs, state, "align_neutral")
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
