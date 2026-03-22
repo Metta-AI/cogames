@@ -220,6 +220,14 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         if has_aligner and has_heart and known_alignable_junctions and skill in {"explore", "get_heart"}:
             reason = f"overrode {skill} to align_neutral because an alignable neutral junction is already known"
             skill = "align_neutral"
+        # Prevent immediate-completion loops: get_heart already done if has_heart=True
+        if has_aligner and has_heart and skill == "get_heart":
+            if known_alignable_junctions:
+                reason = "overrode get_heart to align_neutral (heart already held)"
+                skill = "align_neutral"
+            else:
+                reason = "overrode get_heart to explore (heart already held, no target known)"
+                skill = "explore"
         # Break consecutive unstuck loops: after 2+ unstuck in a row, force explore to find new routes
         if skill == "unstuck":
             state.consecutive_unstuck += 1
@@ -241,13 +249,13 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
     def _maybe_finish_skill(self, obs: AgentObservation, state: LLMAlignerState) -> None:
         has_heart = self._inventory_count(obs, "heart") > 0
         has_aligner = self._current_gear(obs) == "aligner"
-        if state.current_skill == "gear_up" and has_aligner:
+        if state.current_skill == "gear_up" and has_aligner and state.skill_steps > 0:
             self._event(state, "gear_up completed after acquiring aligner gear")
             state.current_skill = None
-        elif state.current_skill == "get_heart" and has_heart:
+        elif state.current_skill == "get_heart" and has_heart and state.skill_steps > 0:
             self._event(state, "get_heart completed after acquiring heart")
             state.current_skill = None
-        elif state.current_skill == "align_neutral" and not has_heart:
+        elif state.current_skill == "align_neutral" and not has_heart and state.skill_steps > 0:
             self._event(state, "align_neutral completed after spending heart")
             state.current_skill = None
         elif state.current_skill == "explore" and len(state.known_neutral_junctions) > state.explore_start_junctions:
