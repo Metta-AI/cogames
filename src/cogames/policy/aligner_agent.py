@@ -171,6 +171,16 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                 return self._starter._action(f"move_{direction}"), state
         return self._starter._wander(state)
 
+    def _greedy_move_toward_abs(self, state: AlignerState, current_abs: Coord, target_abs: Coord) -> tuple[Action, AlignerState]:
+        """Move greedily toward a known absolute position without BFS (ignores terrain knowledge)."""
+        dr = target_abs[0] - current_abs[0]
+        dc = target_abs[1] - current_abs[1]
+        if abs(dr) >= abs(dc):
+            direction = "south" if dr > 0 else "north"
+        else:
+            direction = "east" if dc > 0 else "west"
+        return self._starter._action(f"move_{direction}"), state
+
     def _move_to(self, state: AlignerState, current_abs: Coord, target_abs: Coord | None) -> tuple[Action, AlignerState]:
         if target_abs is None:
             return self._safe_wander(state, current_abs)
@@ -387,6 +397,10 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                 return self._explore_near_hub(obs, state)
             return self._explore(obs, state)
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
+        if action.name != self._starter._fallback_action_name:
+            return action, replace(next_state, last_mode=state.last_mode)
+        # Last resort: greedy absolute navigation toward known station
+        action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def _get_heart(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
@@ -407,7 +421,11 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+        # BFS failed: try frontier-toward-hub, then greedy absolute navigation
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
+        if action.name != self._starter._fallback_action_name:
+            return action, replace(next_state, last_mode=state.last_mode)
+        action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def _is_alignable(self, junction: Coord, state: AlignerState) -> bool:
@@ -429,8 +447,12 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        # BFS failed: navigate toward the junction via frontier cells (better than hub-biased exploration)
+        # BFS failed (path through unexplored territory): try frontier-toward-junction, then greedy
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
+        if action.name != self._starter._fallback_action_name:
+            return action, replace(next_state, last_mode=state.last_mode)
+        # Last resort: greedy absolute navigation toward known junction position
+        action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def step_with_state(self, obs: AgentObservation, state: AlignerState) -> tuple[Action, AlignerState]:
