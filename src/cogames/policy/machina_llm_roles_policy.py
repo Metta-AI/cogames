@@ -300,10 +300,10 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
                         state.align_neutral_timeouts = 0
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps without completion")
             state.current_skill = None
-        elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
+        elif state.current_skill not in {None, "gear_up"} and state.no_move_steps >= self._stuck_threshold:
             self._event(state, f"{state.current_skill} exited as stuck after {state.no_move_steps} blocked steps")
             state.current_skill = None
-        elif state.current_skill is not None and state.no_progress_on_target_steps >= self._stuck_threshold:
+        elif state.current_skill not in {None, "gear_up"} and state.no_progress_on_target_steps >= self._stuck_threshold:
             self._event(state, f"{state.current_skill} exited as stale on target after {state.no_progress_on_target_steps} steps without progress")
             state.current_skill = None
 
