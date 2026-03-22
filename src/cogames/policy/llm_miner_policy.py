@@ -28,6 +28,7 @@ class LLMMinerState(MinerSkillState):
     current_reason: str = ""
     skill_steps: int = 0
     no_move_steps: int = 0
+    no_progress_on_target_steps: int = 0
     last_carried_total: int = 0
     recent_events: list[str] = field(default_factory=list)
 
@@ -241,6 +242,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             current_reason=state.current_reason,
             skill_steps=state.skill_steps,
             no_move_steps=state.no_move_steps,
+            no_progress_on_target_steps=state.no_progress_on_target_steps,
             last_carried_total=state.last_carried_total,
             recent_events=list(state.recent_events),
         )
@@ -279,12 +281,18 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             or (state.current_skill == "deposit_to_hub" and current_abs in state.known_hubs)
             or (state.current_skill == "gear_up" and current_abs in state.known_miner_stations)
         )
-        if made_progress or stationary_on_valid_target:
+        if made_progress:
             state.no_move_steps = 0
+            state.no_progress_on_target_steps = 0
+        elif stationary_on_valid_target and not made_progress:
+            state.no_move_steps = 0
+            state.no_progress_on_target_steps += 1
         elif state.current_skill is not None and last_action_move == 0:
             state.no_move_steps += 1
+            state.no_progress_on_target_steps = 0
         else:
             state.no_move_steps = 0
+            state.no_progress_on_target_steps = 0
 
     def _plan_skill(self, obs: AgentObservation, state: LLMMinerState) -> None:
         has_miner = self._starter._current_gear(self._starter._inventory_items(obs)) == "miner"
@@ -298,6 +306,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             frontier_count=self._frontier_count(state),
             current_skill=state.current_skill,
             no_move_steps=state.no_move_steps,
+            no_progress_on_target_steps=state.no_progress_on_target_steps,
             recent_events=state.recent_events,
         )
         logger.info("agent=%s llm_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
@@ -346,6 +355,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         state.current_skill = skill
         state.current_reason = reason
         state.skill_steps = 0
+        state.no_progress_on_target_steps = 0
         self._event(state, f"planner selected {skill}: {reason}")
 
     def _maybe_finish_skill(self, obs: AgentObservation, state: LLMMinerState) -> None:
@@ -368,6 +378,13 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             state.current_skill = None
         elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
             self._event(state, f"{state.current_skill} exited as stuck after {state.no_move_steps} blocked steps")
+            state.current_skill = None
+        elif state.current_skill is not None and state.no_progress_on_target_steps >= self._stuck_threshold:
+            current_abs = self._current_abs(obs)
+            if state.current_skill == "mine_until_full" and current_abs in state.known_extractors:
+                state.known_extractors.discard(current_abs)
+                self._event(state, f"removed depleted extractor at {current_abs} from memory")
+            self._event(state, f"{state.current_skill} exited as stale on target after {state.no_progress_on_target_steps} steps without progress")
             state.current_skill = None
 
     def _unstuck(self, state: LLMMinerState) -> tuple[Action, LLMMinerState]:

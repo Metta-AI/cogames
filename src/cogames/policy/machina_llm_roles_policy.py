@@ -46,6 +46,7 @@ class LLMAlignerState(AlignerState):
     current_reason: str = ""
     skill_steps: int = 0
     no_move_steps: int = 0
+    no_progress_on_target_steps: int = 0
     last_has_heart: bool = False
     last_friendly_junctions: int = 0
     recent_events: list[str] = field(default_factory=list)
@@ -92,6 +93,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             current_reason=state.current_reason,
             skill_steps=state.skill_steps,
             no_move_steps=state.no_move_steps,
+            no_progress_on_target_steps=state.no_progress_on_target_steps,
             last_has_heart=state.last_has_heart,
             last_friendly_junctions=state.last_friendly_junctions,
             recent_events=list(state.recent_events),
@@ -125,17 +127,28 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         state.last_friendly_junctions = friendly_count
 
         last_action_move = self._feature_value(obs, "last_action_move")
+        made_progress = (
+            (state.current_skill == "get_heart" and has_heart and not state.last_has_heart)
+            or (state.current_skill == "align_neutral" and friendly_count > state.last_friendly_junctions)
+            or (state.current_skill == "gear_up" and self._current_gear(obs) == "aligner")
+        )
         stationary_on_valid_target = (
             (state.current_skill == "get_heart" and current_abs in state.known_hubs)
             or (state.current_skill == "align_neutral" and current_abs in self._known_alignable_junctions(state))
             or (state.current_skill == "gear_up" and current_abs in state.known_aligner_stations)
         )
-        if stationary_on_valid_target:
+        if made_progress:
             state.no_move_steps = 0
+            state.no_progress_on_target_steps = 0
+        elif stationary_on_valid_target and not made_progress:
+            state.no_move_steps = 0
+            state.no_progress_on_target_steps += 1
         elif state.current_skill is not None and last_action_move == 0:
             state.no_move_steps += 1
+            state.no_progress_on_target_steps = 0
         else:
             state.no_move_steps = 0
+            state.no_progress_on_target_steps = 0
 
     def _plan_skill(self, obs: AgentObservation, state: LLMAlignerState) -> None:
         has_aligner = self._current_gear(obs) == "aligner"
@@ -204,6 +217,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         state.current_skill = skill
         state.current_reason = reason
         state.skill_steps = 0
+        state.no_progress_on_target_steps = 0
         self._event(state, f"planner selected {skill}: {reason}")
 
     def _maybe_finish_skill(self, obs: AgentObservation, state: LLMAlignerState) -> None:
@@ -226,6 +240,9 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             state.current_skill = None
         elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
             self._event(state, f"{state.current_skill} exited as stuck after {state.no_move_steps} blocked steps")
+            state.current_skill = None
+        elif state.current_skill is not None and state.no_progress_on_target_steps >= self._stuck_threshold:
+            self._event(state, f"{state.current_skill} exited as stale on target after {state.no_progress_on_target_steps} steps without progress")
             state.current_skill = None
 
     def _unstuck(self, state: LLMAlignerState) -> tuple[Action, LLMAlignerState]:

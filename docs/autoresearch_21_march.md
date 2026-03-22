@@ -7,3 +7,14 @@
 2026-03-21 11:34:48 PDT: starting new experiment loop, in this experiment I want to preserve LLM-selected unstuck when prerequisites are temporarily unmet and stop transient OpenRouter failures from permanently disabling the planner. my hypothesis is that long-horizon behavior is being dominated by control-policy overrides and one-shot network failures rather than by bad high-level planner choices.
 
 2026-03-21 11:34:48 PDT: I run my experiment, I found out that the patched policy now keeps the LLM live through a 100-step episode with kw.llm_timeout_s=20 and allows the aligner to choose unstuck while gearless instead of force-looping gear_up. this is a good result because it satisfies the "LLM must actually be working" constraint past 80 steps and surfaces the next real long-term bottleneck: miners still spend too many late steps oscillating around deposit/mine pathing, while the aligner can still re-enter gear recovery loops after dropping gear. next experiment next agent should probably try explicit failure-memory or alternative-route skills for deposit_to_hub / mine_until_full rather than only repeating unstuck.
+
+2026-03-21 14:00:00 PDT: starting new experiment loop, in this experiment I want to run llm_miner only (no aligner) at increasing step counts (50, 100, 200, 400) to find when reward degrades and debug the LLM planner output. my hypothesis is that miners get stuck in oscillation loops at longer horizons and the LLM planner output will reveal the decision trajectory leading to those failures. Starting with miners first, will move to aligner once miners are solid.
+
+2026-03-21 14:30:00 PDT: I found a critical bug: agents sit on depleted extractors forever because `stationary_on_valid_target` resets the stuck counter even when no cargo is being gained. Fix: added `no_progress_on_target_steps` counter that detects when the agent is on a valid target but making no progress. Also remove depleted extractors from `known_extractors` so agents don't return to them. Results:
+- Before fix (200 steps, miner-only): silicon.deposited=40, Agent 0 had 157 noops
+- After fix (200 steps, miner-only): silicon.deposited=200, germanium.deposited=40
+- After fix (400 steps, miner-only): silicon=300, germanium=160, carbon=100
+- Full team (machina_llm_roles) 200 steps: 0.049/agent, junction.held=287
+- Full team 400 steps: 0.109/agent, junction.held=691
+- Full team 1000 steps: 0.273/agent, junction.held=1730, junction.gained=6, total deposited=1080
+Remaining issues: aligner has 53% move failure rate (wall bumping), miners accidentally pick up scrambler gear. Next experiment should address these.
