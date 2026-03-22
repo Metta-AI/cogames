@@ -206,7 +206,8 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             else:
                 reason = "overrode gear_up to explore because aligner gear is already equipped"
                 skill = "explore"
-        if has_aligner and not has_heart and state.known_hubs and skill == "explore":
+        was_stuck = state.recent_events and "exited as stuck" in state.recent_events[-1]
+        if has_aligner and not has_heart and state.known_hubs and skill == "explore" and not was_stuck:
             reason = f"overrode {skill} to get_heart because aligner gear is equipped and a hub is known"
             skill = "get_heart"
         if has_aligner and not has_heart and skill == "align_neutral":
