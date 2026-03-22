@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import json
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass, field, replace
 from typing import Callable
@@ -30,6 +32,12 @@ class LLMMinerState(MinerSkillState):
     recent_events: list[str] = field(default_factory=list)
 
 
+@dataclass
+class PendingPlannerRequest:
+    prompt: str
+    future: concurrent.futures.Future[str]
+
+
 class LLMMinerPlannerClient:
     def __init__(
         self,
@@ -39,6 +47,7 @@ class LLMMinerPlannerClient:
         site_url: str | None = None,
         app_name: str = "cogames-voyager",
         timeout_s: float = 5.0,
+        decision_deadline_s: float = 2.0,
         responder: Callable[[str], str] | None = None,
     ) -> None:
         self._api_url = api_url
@@ -47,8 +56,16 @@ class LLMMinerPlannerClient:
         self._site_url = site_url
         self._app_name = app_name
         self._timeout_s = timeout_s
+        self._decision_deadline_s = decision_deadline_s
         self._responder = responder
         self._permanent_error: str | None = None
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="cogames-llm")
+        self._lock = threading.Lock()
+        self._pending_requests: dict[str, PendingPlannerRequest] = {}
+
+    @property
+    def decision_deadline_s(self) -> float:
+        return self._decision_deadline_s
 
     def complete(self, prompt: str) -> str:
         if self._responder is not None:
@@ -79,6 +96,29 @@ class LLMMinerPlannerClient:
             else:
                 logger.warning("LLM planner request failed; keeping planner enabled for future retries: %s", error_text)
             return ""
+
+    def complete_with_deadline(self, request_key: str, prompt: str) -> tuple[str | None, str]:
+        with self._lock:
+            pending = self._pending_requests.get(request_key)
+            if pending is not None and pending.prompt != prompt:
+                if pending.future.done():
+                    self._pending_requests.pop(request_key, None)
+                    pending = None
+                else:
+                    return None, "waiting for previous planner request"
+            if pending is None:
+                future = self._executor.submit(self.complete, prompt)
+                pending = PendingPlannerRequest(prompt=prompt, future=future)
+                self._pending_requests[request_key] = pending
+
+        try:
+            text = pending.future.result(timeout=self._decision_deadline_s)
+        except concurrent.futures.TimeoutError:
+            return None, f"planner exceeded {self._decision_deadline_s:.1f}s deadline"
+
+        with self._lock:
+            self._pending_requests.pop(request_key, None)
+        return text, "planner completed"
 
     def _complete_openrouter(self, prompt: str, api_key: str | None) -> str:
         if not api_key:
@@ -262,11 +302,21 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         )
         logger.info("agent=%s llm_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
         started_at = time.perf_counter()
-        text = self._planner.complete(prompt)
+        text, planner_status = self._planner.complete_with_deadline(f"miner:{obs.agent_id}", prompt)
         latency_ms = (time.perf_counter() - started_at) * 1000.0
-        logger.info("agent=%s llm_response_ms=%.1f llm_response=%s", obs.agent_id, latency_ms, text.replace("\n", " "))
-        skill, reason = _parse_skill_choice(text)
-        if skill is None:
+        logger.info(
+            "agent=%s llm_response_ms=%.1f llm_status=%s llm_response=%s",
+            obs.agent_id,
+            latency_ms,
+            planner_status,
+            "" if text is None else text.replace("\n", " "),
+        )
+        if text is None:
+            skill = "unstuck"
+            reason = f"fallback while waiting for planner: {planner_status}"
+        else:
+            skill, reason = _parse_skill_choice(text)
+        if text is not None and skill is None:
             carried_total = self._carried_total(obs)
             if not has_miner:
                 skill = "gear_up"
@@ -369,6 +419,7 @@ class LLMMinerPolicy(MultiAgentPolicy):
         llm_site_url: str | None = None,
         llm_app_name: str = "cogames-voyager",
         llm_timeout_s: float | str = 10.0,
+        llm_decision_deadline_s: float | str = 2.0,
         llm_responder: Callable[[str], str] | None = None,
     ):
         super().__init__(policy_env_info, device=device)
@@ -382,6 +433,7 @@ class LLMMinerPolicy(MultiAgentPolicy):
             site_url=llm_site_url,
             app_name=llm_app_name,
             timeout_s=float(llm_timeout_s),
+            decision_deadline_s=float(llm_decision_deadline_s),
             responder=llm_responder,
         )
         self._agent_policies: dict[int, StatefulAgentPolicy[LLMMinerState]] = {}

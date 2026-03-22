@@ -155,16 +155,21 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         )
         logger.info("agent=%s role=aligner llm_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
         started_at = time.perf_counter()
-        text = self._planner.complete(prompt)
+        text, planner_status = self._planner.complete_with_deadline(f"aligner:{obs.agent_id}", prompt)
         latency_ms = (time.perf_counter() - started_at) * 1000.0
         logger.info(
-            "agent=%s role=aligner llm_response_ms=%.1f llm_response=%s",
+            "agent=%s role=aligner llm_response_ms=%.1f llm_status=%s llm_response=%s",
             obs.agent_id,
             latency_ms,
-            text.replace("\n", " "),
+            planner_status,
+            "" if text is None else text.replace("\n", " "),
         )
-        skill, reason = _parse_role_skill_choice(text, set(ALIGNER_SKILL_DESCRIPTIONS))
-        if skill is None:
+        if text is None:
+            skill = "unstuck"
+            reason = f"fallback while waiting for planner: {planner_status}"
+        else:
+            skill, reason = _parse_role_skill_choice(text, set(ALIGNER_SKILL_DESCRIPTIONS))
+        if text is not None and skill is None:
             if not has_aligner:
                 skill = "gear_up"
             elif not has_heart and state.known_hubs:
@@ -279,6 +284,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         llm_site_url: str | None = None,
         llm_app_name: str = "cogames-voyager",
         llm_timeout_s: float | str = 10.0,
+        llm_decision_deadline_s: float | str = 2.0,
         llm_responder: Callable[[str], str] | None = None,
     ):
         super().__init__(policy_env_info, device=device)
@@ -294,6 +300,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
             site_url=llm_site_url,
             app_name=llm_app_name,
             timeout_s=float(llm_timeout_s),
+            decision_deadline_s=float(llm_decision_deadline_s),
             responder=llm_responder,
         )
         self._return_load = int(return_load)

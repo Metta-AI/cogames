@@ -1,3 +1,5 @@
+import time
+
 from cogames.cli.mission import get_mission
 from cogames.policy.llm_miner_policy import LLMMinerPlannerClient, LLMMinerPolicyImpl, _parse_skill_choice
 from cogames.policy.llm_miner_prompt import build_llm_miner_prompt
@@ -65,3 +67,20 @@ def test_miner_planner_keeps_unstuck_when_gear_is_missing() -> None:
 
     assert state.current_skill == "unstuck"
     assert state.current_reason == "blocked near station"
+
+
+def test_planner_complete_with_deadline_returns_pending_then_completed_result() -> None:
+    client = LLMMinerPlannerClient(
+        decision_deadline_s=0.01,
+        responder=lambda _: (time.sleep(0.05), '{"skill":"explore","reason":"ready later"}')[1],
+    )
+
+    text, status = client.complete_with_deadline("miner:0", "prompt-a")
+    assert text is None
+    assert "deadline" in status
+
+    time.sleep(0.06)
+
+    text, status = client.complete_with_deadline("miner:0", "prompt-a")
+    assert text == '{"skill":"explore","reason":"ready later"}'
+    assert status == "planner completed"
