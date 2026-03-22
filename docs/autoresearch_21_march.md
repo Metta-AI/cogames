@@ -53,6 +53,10 @@ Conclusions: 3 agents is the sweet spot for this map. More agents hit spawn/navi
 
 2026-03-21 23:30:00 PDT: I ran the experiments with get-heart loop fixes and scripted fallback loop fixes. Results are stable at ~2.260 for 3-aligner config. The game is highly deterministic with fixed map layout. Agent 0 always loses aligner gear to an undiscovered miner station early in the run, and agent 2 can't find hearts/junctions due to its spawn position. Only agent 1 successfully aligns junctions (all 7). The ceiling is imposed by: (1) 7 hearts maximum per 1000 steps from the hub, (2) agent 0 gear loss on undiscovered miner station, (3) deterministic map layout.
 
+2026-03-21 23:50:00 PDT: starting new experiment loop: arena map + maximize agents + improve junction alignment (currently only 2/53 junctions aligned, 5 hearts unused). Arena reward scales linearly with num_agents. Max is 8 agents (map has 9 spawn cells but 9 crashes). Key bottleneck: only 2 junctions are aligned despite 5-6 hearts available. If we can improve alignment, reward multiplies.
+
+2026-03-21 23:45:00 PDT: BREAKTHROUGH on arena map! 3 aligners on cogsguard_arena got 7.650 total reward (2.55/agent) vs 2.260 on machina_1. Arena has no competing clips team (clips/aligned.junction.held=0) so reward scales much better. Only 2 junctions aligned but arena reward formula is 3.4x better. Continuing arena experiments.
+
 SESSION SUMMARY:
 - Baseline: 0.819 total reward (dc984a7, 1A2M LLM, 1000 steps)
 - BEST: 2.260 total reward (3 aligners, 1000 steps) = 2.76x improvement
