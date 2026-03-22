@@ -30,6 +30,7 @@ class LLMMinerState(MinerSkillState):
     no_move_steps: int = 0
     no_progress_on_target_steps: int = 0
     last_carried_total: int = 0
+    explore_start_extractors: int = 0
     recent_events: list[str] = field(default_factory=list)
 
 
@@ -248,6 +249,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             no_move_steps=state.no_move_steps,
             no_progress_on_target_steps=state.no_progress_on_target_steps,
             last_carried_total=state.last_carried_total,
+            explore_start_extractors=state.explore_start_extractors,
             recent_events=list(state.recent_events),
         )
 
@@ -385,6 +387,8 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         state.skill_steps = 0
         state.no_move_steps = 0
         state.no_progress_on_target_steps = 0
+        if skill == "explore":
+            state.explore_start_extractors = len(state.known_extractors)
         self._event(state, f"planner selected {skill}: {reason}")
 
     def _maybe_finish_skill(self, obs: AgentObservation, state: LLMMinerState) -> None:
@@ -399,8 +403,8 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         elif state.current_skill == "deposit_to_hub" and carried_total == 0:
             self._event(state, "deposit_to_hub completed after deposit")
             state.current_skill = None
-        elif state.current_skill == "explore" and state.known_extractors:
-            self._event(state, f"explore completed after discovering {len(state.known_extractors)} extractor(s)")
+        elif state.current_skill == "explore" and len(state.known_extractors) > state.explore_start_extractors:
+            self._event(state, f"explore completed after discovering {len(state.known_extractors) - state.explore_start_extractors} new extractor(s)")
             state.current_skill = None
         elif state.current_skill == "unstuck" and state.skill_steps >= self._unstuck_horizon:
             self._event(state, "unstuck finished its bounded horizon")
