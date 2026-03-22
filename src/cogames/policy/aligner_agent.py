@@ -34,6 +34,7 @@ class AlignerState(StarterCogState):
     known_neutral_junctions: set[Coord] = field(default_factory=set)
     known_friendly_junctions: set[Coord] = field(default_factory=set)
     known_enemy_junctions: set[Coord] = field(default_factory=set)
+    known_hazard_stations: set[Coord] = field(default_factory=set)
 
 
 class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
@@ -46,6 +47,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         self._hub_tags = self._starter._resolve_tag_ids(["hub"])
         self._junction_tags = self._starter._resolve_tag_ids(["junction"])
         self._aligner_station_tags = self._starter._resolve_tag_ids(self._gear_station_names(policy_env_info.tags))
+        self._hazard_station_tags = self._resolve_non_aligner_station_tags(policy_env_info)
         self._wall_tags = self._starter._resolve_tag_ids(["wall"])
         self._obs_radius_row = self._starter._center[0]
         self._obs_radius_col = self._starter._center[1]
@@ -62,6 +64,19 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             if object_name == "aligner" or object_name.endswith(":aligner"):
                 names.add(object_name)
         return sorted(names)
+
+    def _resolve_non_aligner_station_tags(self, policy_env_info: PolicyEnvInterface) -> set[int]:
+        other_gear = ("miner", "scrambler", "scout")
+        names: set[str] = set()
+        for gear in other_gear:
+            names.add(f"{gear}_station")
+            for tag_name in policy_env_info.tags:
+                if not tag_name.startswith("type:"):
+                    continue
+                object_name = tag_name.removeprefix("type:")
+                if object_name.endswith(f":{gear}") or object_name == gear:
+                    names.add(object_name)
+        return self._starter._resolve_tag_ids(sorted(names))
 
     def initial_agent_state(self) -> AlignerState:
         starter_state = self._starter.initial_agent_state()
@@ -124,6 +139,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             return self._starter._fallback_action_name
         if goal not in state.known_free_cells:
             return None
+        avoid = state.known_hazard_stations - {goal}
         frontier: deque[Coord] = deque([start])
         parents: dict[Coord, tuple[Coord, str] | None] = {start: None}
         while frontier:
@@ -131,7 +147,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             if cell == goal:
                 break
             for direction, neighbor in self._ordered_neighbors_toward(cell, goal):
-                if neighbor in parents or neighbor not in state.known_free_cells:
+                if neighbor in parents or neighbor not in state.known_free_cells or neighbor in avoid:
                     continue
                 parents[neighbor] = (cell, direction)
                 frontier.append(neighbor)
@@ -196,6 +212,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         blocked_now: set[Coord] = set()
         hubs_now: set[Coord] = set()
         stations_now: set[Coord] = set()
+        hazard_stations_now: set[Coord] = set()
 
         for token in obs.tokens:
             if token.feature.name != "tag" or token.location is None:
@@ -208,6 +225,8 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                 hubs_now.add(abs_cell)
             if token.value in self._aligner_station_tags:
                 stations_now.add(abs_cell)
+            if token.value in self._hazard_station_tags:
+                hazard_stations_now.add(abs_cell)
 
         neutral_now: set[Coord] = set()
         friendly_now: set[Coord] = set()
@@ -230,6 +249,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
 
         self._remember_static_objects(state.known_hubs, hubs_now)
         self._remember_static_objects(state.known_aligner_stations, stations_now)
+        self._remember_static_objects(state.known_hazard_stations, hazard_stations_now)
         self._refresh_dynamic_objects(visible_cells, state.known_neutral_junctions, neutral_now)
         self._refresh_dynamic_objects(visible_cells, state.known_friendly_junctions, friendly_now)
         self._refresh_dynamic_objects(visible_cells, state.known_enemy_junctions, enemy_now)
@@ -266,6 +286,19 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                 cell,
             ),
         )
+        if current_abs == best_frontier:
+            for direction_name, neighbor in sorted(
+                self._neighbors(current_abs),
+                key=lambda item: (
+                    item[1] in state.blocked_cells,
+                    item[1] in state.known_free_cells,
+                    abs(item[1][0] - target_abs[0]) + abs(item[1][1] - target_abs[1]),
+                ),
+            ):
+                if neighbor in state.blocked_cells or neighbor in state.known_free_cells:
+                    continue
+                return self._starter._action(f"move_{direction_name}"), state
+            return self._starter._wander(state)
         return self._move_to(state, current_abs, best_frontier)
 
     def _explore_frontier(

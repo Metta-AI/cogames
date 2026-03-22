@@ -89,6 +89,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             known_neutral_junctions=set(base.known_neutral_junctions),
             known_friendly_junctions=set(base.known_friendly_junctions),
             known_enemy_junctions=set(base.known_enemy_junctions),
+            known_hazard_stations=set(base.known_hazard_stations),
             current_skill=state.current_skill,
             current_reason=state.current_reason,
             skill_steps=state.skill_steps,

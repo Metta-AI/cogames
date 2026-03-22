@@ -18,3 +18,11 @@
 - Full team 400 steps: 0.109/agent, junction.held=691
 - Full team 1000 steps: 0.273/agent, junction.held=1730, junction.gained=6, total deposited=1080
 Remaining issues: aligner has 53% move failure rate (wall bumping), miners accidentally pick up scrambler gear. Next experiment should address these.
+
+2026-03-21 20:00:00 PDT: autoresearch starting (new agent session), my plan is to maximize mission reward by: (1) running with 8 agents (2A6M composition) since March 19 data shows this is optimal, (2) fixing aligner wall-bumping (53% move failure rate), (3) improving miner efficiency. The current branch has depleted-extractor detection and hazard-station avoidance which were not in the March 19 experiments.
+
+2026-03-21 20:00:00 PDT: starting to run baseline with 8 agents (2A6M) at 1000 steps
+
+2026-03-21 20:30:00 PDT: baseline result is 0.80 total reward (0.10/agent) with 8 agents (2A6M) at 1000 steps. Catastrophic failure: cogs aligned 0 junctions, clips held 21040. Aligner 0 never got gear, aligner 1 got 5 hearts but aligned nothing (planner overwhelmed). Multiple miners stuck 127+ steps. The 2s deadline is too tight for 8 concurrent LLM calls causing massive "waiting for previous planner request" fallbacks. Reverting to 3-agent config (best known: 0.819 reward) for experiments, then scaling up once improvements are validated.
+
+2026-03-21 20:30:00 PDT: starting new experiment loop, in this experiment I want to try aligner hazard station avoidance (avoid non-aligner gear stations in BFS pathfinding) and improved aligner frontier stepping (step into unknown territory from frontier cells like miners already do). My hypothesis is that aligners lose gear by stepping on miner/scrambler/scout stations during navigation and get stuck at map boundaries because they don't step into unknown territory, both of which waste cycles and reduce junction alignment rate.
