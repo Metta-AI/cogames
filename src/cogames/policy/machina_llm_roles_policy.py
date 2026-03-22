@@ -10,6 +10,7 @@ from typing import Callable
 from cogames.policy.aligner_agent import AlignerPolicyImpl, AlignerState
 from cogames.policy.llm_aligner_prompt import ALIGNER_SKILL_DESCRIPTIONS, build_llm_aligner_prompt
 from cogames.policy.llm_miner_policy import LLMMinerPlannerClient, LLMMinerPolicyImpl, LLMMinerState
+from cogames.policy.scout_agent import ScoutExplorerPolicyImpl, ScoutState
 from mettagrid.policy.policy import MultiAgentPolicy, StatefulAgentPolicy, StatefulPolicyImpl
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Action
@@ -361,6 +362,8 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         device: str = "cpu",
         num_aligners: int | str = 1,
         aligner_ids: str = "",
+        num_scouts: int | str = 0,
+        scout_ids: str = "",
         return_load: int | str = 40,
         stuck_threshold: int | str = 20,
         unstuck_horizon: int | str = 4,
@@ -376,11 +379,26 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
     ):
         super().__init__(policy_env_info, device=device)
         self._scripted_miners = str(scripted_miners).lower() in ("true", "1", "yes")
-        parsed_aligner_ids = tuple(int(part.strip()) for part in aligner_ids.split(",") if part.strip())
+        n_agents = policy_env_info.num_agents
+
+        # Resolve aligner IDs
+        parsed_aligner_ids = tuple(int(p.strip()) for p in aligner_ids.split(",") if p.strip())
         if parsed_aligner_ids:
             self._aligner_ids = frozenset(parsed_aligner_ids)
         else:
-            self._aligner_ids = frozenset(range(min(int(num_aligners), policy_env_info.num_agents)))
+            self._aligner_ids = frozenset(range(min(int(num_aligners), n_agents)))
+
+        # Resolve scout IDs (come after aligners by default)
+        parsed_scout_ids = tuple(int(p.strip()) for p in scout_ids.split(",") if p.strip())
+        if parsed_scout_ids:
+            self._scout_ids = frozenset(parsed_scout_ids)
+        else:
+            n_scouts = int(num_scouts)
+            aligner_count = len(self._aligner_ids)
+            self._scout_ids = frozenset(
+                range(aligner_count, min(aligner_count + n_scouts, n_agents))
+            )
+
         self._planner = LLMMinerPlannerClient(
             api_url=llm_api_url,
             model=llm_model,
@@ -394,9 +412,9 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         self._return_load = int(return_load)
         self._stuck_threshold = int(stuck_threshold)
         self._unstuck_horizon = int(unstuck_horizon)
-        self._agent_policies: dict[int, StatefulAgentPolicy[LLMAlignerState | LLMMinerState]] = {}
+        self._agent_policies: dict[int, StatefulAgentPolicy[LLMAlignerState | LLMMinerState | ScoutState]] = {}
 
-    def agent_policy(self, agent_id: int) -> StatefulAgentPolicy[LLMAlignerState | LLMMinerState]:
+    def agent_policy(self, agent_id: int) -> StatefulAgentPolicy[LLMAlignerState | LLMMinerState | ScoutState]:
         if agent_id not in self._agent_policies:
             if agent_id in self._aligner_ids:
                 impl = LLMAlignerPolicyImpl(
@@ -405,6 +423,17 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
                     planner=self._planner,
                     stuck_threshold=self._stuck_threshold,
                     unstuck_horizon=self._unstuck_horizon,
+                )
+            elif agent_id in self._scout_ids:
+                # Scouts are offset across the grid so multiple scouts cover
+                # different sections; the last scout in the set gets offset=0.75.
+                sorted_scouts = sorted(self._scout_ids)
+                scout_rank = sorted_scouts.index(agent_id)
+                offset_fraction = scout_rank / max(len(sorted_scouts), 1)
+                impl = ScoutExplorerPolicyImpl(
+                    self._policy_env_info,
+                    agent_id,
+                    grid_offset_fraction=offset_fraction,
                 )
             else:
                 impl = LLMMinerPolicyImpl(

@@ -164,7 +164,7 @@ Aborted after confirming catastrophic failure (~4 friendly junctions vs 24). Roo
 
 ---
 
-## Final Session Summary
+## Final Session Summary (first half)
 
 ### What worked (biggest impact, in order)
 
@@ -198,26 +198,17 @@ Aborted after confirming catastrophic failure (~4 friendly junctions vs 24). Roo
 - 26 `get_heart` timeouts × 100 steps = 2600 wasted aligner steps
 - Out of 3 aligners × 1000 steps = 3000 total aligner steps, ~5000 wasted steps implies many timeouts are cut short by game end or overlap
 
-### Interesting observations
+---
 
-The session started at 0.10 (0 junctions aligned) and reached 0.92 (24 junctions aligned) through 13 experiments in ~1 session day. Each bug fix had outsized impact because the bugs were fundamental navigation failures, not incremental tuning issues.
+## 2026-03-22T(new session): Scout Grid Exploration
 
-The biggest single jump was `greedy-bfs-fallback+forget-stuck-junction` (0.21 → 0.40), which fixed the dead code bug where the greedy fallback was never actually called.
+**Research direction:** Use dedicated Scouts with systematic grid exploration to fix navigation failures. The core insight: if scouts pre-explore the map in a systematic serpentine sweep, they build complete map knowledge enabling clean BFS navigation (no more optimistic BFS hacks). Run at 2000 steps (vs 1000 previously) to see if reward saturates.
 
-The `action_timeout_ms` change (250ms → 3000ms) is a good reminder: infrastructure parameters can silently kill performance when they're miscalibrated for the actual LLM latency.
+**Plan:**
+1. Run 2000-step baseline first (same 3-aligner setup as 0.92)
+2. Implement ScoutExplorerPolicyImpl with systematic grid exploration
+3. Team: 2 aligners + 1 scout (3 agents total)
+4. Scout: serpentine grid sweep, avoid enemy corners, HP retreat
+5. Re-architected navigation: systematic hub-centric exploration for aligners
+6. Experiment: 2A+1S at 2000 steps vs 3A at 2000 steps
 
-### Exploring next
-
-1. **Reduce `align_neutral`/`get_heart` timeout from 100 to 150 steps** — Current timeout is `stuck_threshold * 5 = 20 * 5 = 100`. Many timeouts may fire because a 100-step journey has some oscillation; 150 might let agents succeed instead of retrying.
-
-2. **Diagnose get_heart timeouts**: Are they navigation failures or hub depletion? If hub is depleted (miners deposited but hub hasn't crafted hearts yet), the fix is different — aligners should wait rather than retry. Add a `hub_has_hearts` observable to the state.
-
-3. **Multi-seed validation of 0.92**: Test seeds 42, 43, 44 to check variance. Seed 42 might be favorable. Need at least 3 seeds for a reliable baseline.
-
-4. **Junction pre-exploration**: After aligning a junction, immediately explore adjacent territory to discover new junctions before returning to hub. Would reduce wasted explore cycles.
-
-5. **Increase `stuck_threshold`**: Currently 20 consecutive blocked moves triggers stuck exit. May be too aggressive when navigating through crowded areas (other agents blocking cells). Try 30.
-
-6. **Aligner `_move_toward_target` optimistic BFS**: `_move_toward_target` in `AlignerAgent` only uses standard BFS + frontier navigation. `_align_neutral` has optimistic BFS, `_get_heart` uses `_navigate_to_station`. But if other codepaths use `_move_toward_target` directly, they miss optimistic BFS.
-
-7. **Scripted miners vs LLM miners**: The LLM miner skill selection (gear_up/mine_until_full/deposit_to_hub/explore) overlaps heavily with the scripted fallback logic. Consider testing `scripted_miners=True` — if scripted miners perform equally, we save LLM calls and reduce latency.
