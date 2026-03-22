@@ -373,6 +373,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         state.current_skill = skill
         state.current_reason = reason
         state.skill_steps = 0
+        state.no_move_steps = 0
         state.no_progress_on_target_steps = 0
         self._event(state, f"planner selected {skill}: {reason}")
 
