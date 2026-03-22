@@ -482,11 +482,8 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         visible_target = self._starter._closest_tag_location(obs, self._hub_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
-            direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
-            if direction is not None:
-                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-            # Hub visible but BFS can't find path through known cells - try optimistic BFS
-            direction = self._bfs_optimistic_direction(state, current_abs, target_abs, avoid_hazards=False)
+            # Hub is a blocked object; navigate to adjacent approach cell then step into hub
+            direction = self._navigate_to_station(state, current_abs, target_abs, avoid_hazards=False)
             if direction is not None:
                 return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
             action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
@@ -494,12 +491,8 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         target_abs = self._nearest_known(current_abs, state.known_hubs)
         if target_abs is None:
             return self._explore(obs, state)
-        # Already have aligner gear - no need to avoid other stations
-        direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
-        if direction is not None:
-            return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        # BFS failed: try optimistic BFS through unknown cells
-        direction = self._bfs_optimistic_direction(state, current_abs, target_abs, avoid_hazards=False)
+        # Hub known but not visible - navigate to approach cell via BFS/optimistic-BFS/greedy
+        direction = self._navigate_to_station(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
         action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
