@@ -19,6 +19,7 @@ _DIRECTION_DELTAS: tuple[tuple[str, Coord], ...] = (
     ("south", (1, 0)),
     ("west", (0, -1)),
 )
+_DIRECTION_DELTA_MAP: dict[str, Coord] = {name: delta for name, delta in _DIRECTION_DELTAS}
 _HUB_SEARCH_DISTANCE = 20
 _HUB_ALIGN_DISTANCE = 25
 _JUNCTION_ALIGN_DISTANCE = 15
@@ -35,6 +36,11 @@ class AlignerState(StarterCogState):
     known_friendly_junctions: set[Coord] = field(default_factory=set)
     known_enemy_junctions: set[Coord] = field(default_factory=set)
     known_hazard_stations: set[Coord] = field(default_factory=set)
+    # Track last attempted move to detect impassable objects on move failure
+    last_pos: Coord | None = None
+    last_move_target: Coord | None = None
+    # Cells blocked by move failure (not cleared by observation updates)
+    move_blocked_cells: set[Coord] = field(default_factory=set)
 
 
 class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
@@ -237,6 +243,11 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                 return self._starter._action(f"move_{direction}"), state
         return self._starter._wander(state)
 
+    def _move_target(self, current_abs: Coord, direction: str) -> Coord:
+        """Compute the cell we'll be at if we move in `direction` from `current_abs`."""
+        dr, dc = _DIRECTION_DELTA_MAP.get(direction, (0, 0))
+        return (current_abs[0] + dr, current_abs[1] + dc)
+
     def _greedy_move_toward_abs(self, state: AlignerState, current_abs: Coord, target_abs: Coord) -> tuple[Action, AlignerState]:
         """Move greedily toward a known absolute position without BFS (ignores terrain knowledge)."""
         dr = target_abs[0] - current_abs[0]
@@ -294,6 +305,15 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
 
     def _update_map_memory(self, obs: AgentObservation, state: AlignerState) -> Coord:
         current_abs = self._spawn_offset(obs)
+
+        # If we tried to move last step but didn't move, the target cell blocks movement.
+        # Add to move_blocked_cells (persists across observation updates) so BFS avoids it.
+        if state.last_pos is not None and state.last_move_target is not None:
+            if current_abs == state.last_pos:
+                state.move_blocked_cells.add(state.last_move_target)
+        state.last_pos = current_abs
+        state.last_move_target = None  # reset; set by callers before returning a move action
+
         visible_cells = self._visible_abs_cells(current_abs)
         visible_tag_ids_by_cell: dict[Coord, set[int]] = {}
         blocked_now: set[Coord] = set()
@@ -330,6 +350,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
 
         state.blocked_cells.difference_update(visible_cells)
         state.blocked_cells.update(blocked_now)
+        state.blocked_cells.update(state.move_blocked_cells)  # persist move-failure blocks
         state.known_free_cells.update(visible_cells - blocked_now)
         state.known_free_cells.difference_update(state.blocked_cells)
         state.known_free_cells.add(current_abs)
@@ -528,7 +549,12 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
     def step_with_state(self, obs: AgentObservation, state: AlignerState) -> tuple[Action, AlignerState]:
         current_abs = self._update_map_memory(obs, state)
         if self._current_gear(obs) != "aligner":
-            return self._gear_up(obs, state, current_abs)
-        if self._inventory_count(obs, "heart") <= 0:
-            return self._get_heart(obs, state, current_abs)
-        return self._align_neutral(obs, state, current_abs)
+            action, state = self._gear_up(obs, state, current_abs)
+        elif self._inventory_count(obs, "heart") <= 0:
+            action, state = self._get_heart(obs, state, current_abs)
+        else:
+            action, state = self._align_neutral(obs, state, current_abs)
+        action_name = action.name if hasattr(action, "name") else ""
+        if action_name.startswith("move_"):
+            state.last_move_target = self._move_target(current_abs, action_name[len("move_"):])
+        return action, state

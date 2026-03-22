@@ -88,6 +88,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             last_mode=base.last_mode,
             known_free_cells=set(base.known_free_cells),
             blocked_cells=set(base.blocked_cells),
+            move_blocked_cells=set(base.move_blocked_cells),
             known_hubs=set(base.known_hubs),
             known_aligner_stations=set(base.known_aligner_stations),
             known_neutral_junctions=set(base.known_neutral_junctions),
@@ -350,6 +351,9 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             action, state = self._unstuck(state)
 
         state.skill_steps += 1
+        action_name = action.name if hasattr(action, "name") else ""
+        if action_name.startswith("move_"):
+            state.last_move_target = self._move_target(current_abs, action_name[len("move_"):])
         return action, state
 
 

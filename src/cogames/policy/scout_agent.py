@@ -17,24 +17,27 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field, replace
 
-from cogames.policy.aligner_agent import AlignerPolicyImpl, AlignerState, Coord, _DIRECTION_DELTAS
+from cogames.policy.aligner_agent import AlignerPolicyImpl, AlignerState, Coord, _DIRECTION_DELTAS, _DIRECTION_DELTA_MAP
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Action
 from mettagrid.simulator.interface import AgentObservation
 
 logger = logging.getLogger("cogames.policy.scout_agent")
 
-# Map dimensions for cogsguard_machina_1 (88x88)
-_MAP_WIDTH = 88
-_MAP_HEIGHT = 88
+# The coordinate system is spawn-relative: (0, 0) = agent spawn point (≈ hub center).
+# Map is 88x88; hub at center, so explorable range is ~(-40, -40) to (+40, +40).
+# We use half-extents rather than absolute coords.
+_MAP_HALF_ROW = 40   # rows reachable north/south of spawn
+_MAP_HALF_COL = 40   # cols reachable east/west of spawn
 
 # Grid exploration spacing (cells between visited points).
-# With obs_radius ≈ 5, spacing = 8 gives ~90% coverage with ~100 grid points.
+# With obs_radius ≈ 5, spacing = 8 gives ~10×10 = 100 grid points total.
 _GRID_SPACING = 8
 
-# Fraction of map edge to stay away from (enemy ships in corners).
-# Corner zone = _CORNER_FRACTION * min(map_width, map_height) cells from each corner.
-_CORNER_FRACTION = 0.20  # 20% → ~17 cells
+# Corner danger zone: clips ships are placed at the 4 map corners.
+# In spawn-relative coords, corners are at abs(row) > _MAP_HALF_ROW - _CORNER_MARGIN
+# AND abs(col) > _MAP_HALF_COL - _CORNER_MARGIN.
+_CORNER_MARGIN = 18   # avoid within 18 cells of each corner edge
 
 # HP retreat threshold: retreat to hub when HP < this fraction of observed max HP.
 _HP_RETREAT_THRESHOLD = 0.55
@@ -72,19 +75,19 @@ class ScoutExplorerPolicyImpl(AlignerPolicyImpl):
         policy_env_info: PolicyEnvInterface,
         agent_id: int,
         grid_offset_fraction: float = 0.0,
-        map_width: int = _MAP_WIDTH,
-        map_height: int = _MAP_HEIGHT,
+        map_half_row: int = _MAP_HALF_ROW,
+        map_half_col: int = _MAP_HALF_COL,
         grid_spacing: int = _GRID_SPACING,
+        corner_margin: int = _CORNER_MARGIN,
     ) -> None:
         super().__init__(policy_env_info, agent_id)
-        self._map_width = map_width
-        self._map_height = map_height
+        self._map_half_row = map_half_row
+        self._map_half_col = map_half_col
         self._grid_spacing = grid_spacing
         self._grid_offset_fraction = grid_offset_fraction
+        self._corner_margin = corner_margin
         # Tags for HP-draining enemy structures
         self._enemy_ship_tags = self._starter._resolve_tag_ids(_ENEMY_SHIP_TAG_NAMES)
-        # Also treat clips ships as hazard stations to avoid
-        self._corner_zone = int(min(map_width, map_height) * _CORNER_FRACTION)
 
     # ─────────────────────────────────────────────────────────────────────────
     # State management
@@ -106,6 +109,7 @@ class ScoutExplorerPolicyImpl(AlignerPolicyImpl):
             last_mode=base.last_mode,
             known_free_cells=set(base.known_free_cells),
             blocked_cells=set(base.blocked_cells),
+            move_blocked_cells=set(base.move_blocked_cells),
             known_hubs=set(base.known_hubs),
             known_aligner_stations=set(base.known_aligner_stations),
             known_neutral_junctions=set(base.known_neutral_junctions),
@@ -119,26 +123,28 @@ class ScoutExplorerPolicyImpl(AlignerPolicyImpl):
     # ─────────────────────────────────────────────────────────────────────────
 
     def _build_grid_targets(self) -> list[Coord]:
-        """Build a serpentine grid of (row, col) targets across the map.
+        """Build a serpentine grid of spawn-relative (row, col) targets.
 
-        Starts near the hub area (center) and spirals outward in a boustrophedon
-        (snake) pattern, skipping dangerous corners.
+        Coordinates are relative to spawn point (0, 0) = hub center.
+        Range: -_map_half_row to +_map_half_row (rows), same for cols.
+        Corners are skipped (enemy ship territory).
         """
         spacing = self._grid_spacing
-        margin = spacing
         targets: list[Coord] = []
         direction = 1
-        row = margin
-        while row <= self._map_height - margin:
+
+        # Start just outside hub (hub occupies ~±10 cells around center)
+        row = -self._map_half_row + spacing
+        while row <= self._map_half_row - spacing:
             if direction == 1:
-                col = margin
-                while col <= self._map_width - margin:
+                col = -self._map_half_col + spacing
+                while col <= self._map_half_col - spacing:
                     if not self._is_corner_zone(row, col):
                         targets.append((row, col))
                     col += spacing
             else:
-                col = self._map_width - margin
-                while col >= margin:
+                col = self._map_half_col - spacing
+                while col >= -self._map_half_col + spacing:
                     if not self._is_corner_zone(row, col):
                         targets.append((row, col))
                     col -= spacing
@@ -153,14 +159,18 @@ class ScoutExplorerPolicyImpl(AlignerPolicyImpl):
         return targets
 
     def _is_corner_zone(self, row: int, col: int) -> bool:
-        """Return True if (row, col) is in a dangerous corner zone."""
-        z = self._corner_zone
-        w, h = self._map_width, self._map_height
+        """Return True if spawn-relative (row, col) is in a dangerous corner zone.
+
+        Enemy ships are placed at the 4 map corners, which in spawn-relative
+        coordinates are near (±_map_half_row, ±_map_half_col).
+        """
+        margin = self._corner_margin
+        hr, hc = self._map_half_row, self._map_half_col
         return (
-            (row < z and col < z)
-            or (row < z and col > w - z)
-            or (row > h - z and col < z)
-            or (row > h - z and col > w - z)
+            (row < -hr + margin and col < -hc + margin)
+            or (row < -hr + margin and col > hc - margin)
+            or (row > hr - margin and col < -hc + margin)
+            or (row > hr - margin and col > hc - margin)
         )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -188,12 +198,12 @@ class ScoutExplorerPolicyImpl(AlignerPolicyImpl):
                 state.known_enemy_ships.add(abs_cell)
 
     def _is_dangerous(self, cell: Coord, state: ScoutState) -> bool:
-        """Check whether a cell is in enemy territory."""
+        """Check whether a spawn-relative cell is in enemy territory."""
         # Known enemy ships: stay away from them
         for ship in state.known_enemy_ships:
             if abs(cell[0] - ship[0]) + abs(cell[1] - ship[1]) < 12:
                 return True
-        # Structural: avoid corners even before seeing ships
+        # Structural: avoid corners even before seeing ships (spawn-relative)
         return self._is_corner_zone(cell[0], cell[1])
 
     def _should_retreat(self, obs: AgentObservation, state: ScoutState) -> bool:
@@ -326,9 +336,9 @@ class ScoutExplorerPolicyImpl(AlignerPolicyImpl):
             state.grid_targets = self._build_grid_targets()
             state.phase = "grid_explore"
             logger.info(
-                "agent=%s scout_init grid_points=%d spacing=%d map=%dx%d corner_zone=%d",
+                "agent=%s scout_init grid_points=%d spacing=%d half_row=%d half_col=%d corner_margin=%d",
                 obs.agent_id, len(state.grid_targets), self._grid_spacing,
-                self._map_width, self._map_height, self._corner_zone,
+                self._map_half_row, self._map_half_col, self._corner_margin,
             )
 
         # ── HP-based retreat ───────────────────────────────────────────────
@@ -340,13 +350,22 @@ class ScoutExplorerPolicyImpl(AlignerPolicyImpl):
                 hub = self._nearest_known(current_abs, state.known_hubs)
                 direction = self._navigate_to_station(state, current_abs, hub, avoid_hazards=False)
                 if direction:
-                    return self._starter._action(f"move_{direction}"), state
+                    action = self._starter._action(f"move_{direction}")
+                    state.last_move_target = self._move_target(current_abs, direction)
+                    return action, state
             return self._safe_wander(state, current_abs)
         state.retreating = False
 
         # ── Grid exploration (Phase 1) ─────────────────────────────────────
         if state.phase == "grid_explore":
-            return self._grid_explore_step(obs, state, current_abs)
+            action, state = self._grid_explore_step(obs, state, current_abs)
+        else:
+            # ── Frontier exploration (Phase 2) ────────────────────────────
+            action, state = self._frontier_explore_step(obs, state, current_abs)
 
-        # ── Frontier exploration (Phase 2) ────────────────────────────────
-        return self._frontier_explore_step(obs, state, current_abs)
+        # Track move target for move-failure feedback (blocking non-wall obstacles)
+        action_name = action.name if hasattr(action, "name") else ""
+        if action_name.startswith("move_"):
+            direction = action_name[len("move_"):]
+            state.last_move_target = self._move_target(current_abs, direction)
+        return action, state
