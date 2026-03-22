@@ -50,3 +50,11 @@ Next: try 3 aligners (no miners), try different aligner_ids compositions.
 Conclusions: 3 agents is the sweet spot for this map. More agents hit spawn/navigation issues. The reward is dominated by junction alignment (held over time). Key improvement vectors: (1) align junctions earlier, (2) get more hearts, (3) prevent gear loss on undiscovered stations.
 
 2026-03-21 23:00:00 PDT: starting new experiment loop, trying to improve aligner initial speed by making the scripted fallback override smarter — when aligner has gear + heart but is stuck on explore, override to unstuck then explore again (don't get trapped in get_heart loops).
+
+2026-03-21 23:30:00 PDT: I ran the experiments with get-heart loop fixes and scripted fallback loop fixes. Results are stable at ~2.260 for 3-aligner config. The game is highly deterministic with fixed map layout. Agent 0 always loses aligner gear to an undiscovered miner station early in the run, and agent 2 can't find hearts/junctions due to its spawn position. Only agent 1 successfully aligns junctions (all 7). The ceiling is imposed by: (1) 7 hearts maximum per 1000 steps from the hub, (2) agent 0 gear loss on undiscovered miner station, (3) deterministic map layout.
+
+SESSION SUMMARY:
+- Baseline: 0.819 total reward (dc984a7, 1A2M LLM, 1000 steps)
+- BEST: 2.260 total reward (3 aligners, 1000 steps) = 2.76x improvement
+- Key discoveries: no_move_steps counter bug, explore completion bug, planner contention dominance, 3-agent sweet spot, alignment-focused composition wins
+- Next agent should try: (1) pre-seeding aligner with hub/station positions for faster startup, (2) alternative unstuck patterns that explore more aggressively, (3) investigating if the game has mechanics to increase heart generation rate
