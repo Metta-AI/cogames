@@ -182,20 +182,25 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             text.replace("\n", " "),
         )
         skill, reason = _parse_role_skill_choice(text, set(ALIGNER_SKILL_DESCRIPTIONS))
+        was_stuck = bool(state.recent_events and ("exited as stuck" in state.recent_events[-1] or "exited as stale" in state.recent_events[-1]))
         if skill is None:
-            was_stuck_fb = state.recent_events and "exited as stuck" in state.recent_events[-1]
             if not has_aligner:
-                skill = "explore" if was_stuck_fb else "gear_up"
-            elif not has_heart and state.known_hubs and not was_stuck_fb:
+                skill = "explore" if was_stuck else "gear_up"
+            elif not has_heart and state.known_hubs and not was_stuck:
                 skill = "get_heart"
-            elif known_alignable_junctions and not was_stuck_fb:
+            elif known_alignable_junctions and not was_stuck:
                 skill = "align_neutral"
             else:
                 skill = "explore"
             reason = f"scripted fallback ({reason})"
-        if not has_aligner and skill not in {"gear_up", "unstuck"}:
-            reason = f"overrode {skill} to gear_up because aligner gear is missing"
-            skill = "gear_up"
+        # Allow explore/unstuck after stuck exit even without aligner (find alternate path to station)
+        if not has_aligner and skill not in {"gear_up", "unstuck", "explore"}:
+            if was_stuck:
+                reason = f"overrode {skill} to explore after stuck exit (seeking new path to aligner station)"
+                skill = "explore"
+            else:
+                reason = f"overrode {skill} to gear_up because aligner gear is missing"
+                skill = "gear_up"
         if has_aligner and skill == "gear_up":
             if has_heart and state.known_neutral_junctions:
                 reason = "overrode gear_up to align_neutral because aligner gear is already equipped and a target is known"
@@ -206,7 +211,6 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             else:
                 reason = "overrode gear_up to explore because aligner gear is already equipped"
                 skill = "explore"
-        was_stuck = state.recent_events and "exited as stuck" in state.recent_events[-1]
         if has_aligner and not has_heart and state.known_hubs and skill == "explore" and not was_stuck:
             reason = f"overrode {skill} to get_heart because aligner gear is equipped and a hub is known"
             skill = "get_heart"
@@ -308,7 +312,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         num_aligners: int | str = 1,
         aligner_ids: str = "",
         return_load: int | str = 40,
-        stuck_threshold: int | str = 6,
+        stuck_threshold: int | str = 20,
         unstuck_horizon: int | str = 4,
         llm_api_url: str | None = None,
         llm_model: str | None = "nvidia/llama-3.3-nemotron-super-49b-v1.5",

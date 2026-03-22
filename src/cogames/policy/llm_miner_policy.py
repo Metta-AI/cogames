@@ -311,9 +311,14 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             else:
                 skill = "explore"
             reason = f"fallback after invalid planner response: {reason}"
-        if not has_miner and skill not in {"gear_up", "unstuck"}:
-            reason = f"overrode {skill} to gear_up because miner gear is missing"
-            skill = "gear_up"
+        was_stuck = bool(state.recent_events and ("exited as stuck" in state.recent_events[-1] or "exited as stale" in state.recent_events[-1]))
+        if not has_miner and skill not in {"gear_up", "unstuck", "explore"}:
+            if was_stuck:
+                reason = f"overrode {skill} to explore after stuck exit (seeking new path to miner station)"
+                skill = "explore"
+            else:
+                reason = f"overrode {skill} to gear_up because miner gear is missing"
+                skill = "gear_up"
         if has_miner and skill == "gear_up":
             if self._carried_total(obs) >= self._return_load:
                 reason = "overrode gear_up to deposit_to_hub because miner gear is already equipped and cargo is full"
