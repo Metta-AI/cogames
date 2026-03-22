@@ -415,8 +415,13 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             direction = self._bfs_first_direction(state, current_abs, target_abs)
             if direction is not None:
                 return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-            # BFS blocked even with visible target - skip hazard avoidance (we're already near the station)
-            direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
+            # Regular BFS failed - station visible but direct path blocked (e.g., hub outer wall between agent and station)
+            # Use optimistic BFS to navigate around walls through unknown territory toward the gate/entrance
+            direction = self._bfs_optimistic_direction(state, current_abs, target_abs)
+            if direction is not None:
+                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+            # Optimistic BFS also failed (avoid_hazards=True) - try without hazard avoidance
+            direction = self._bfs_optimistic_direction(state, current_abs, target_abs, avoid_hazards=False)
             if direction is not None:
                 return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
             # Last resort: greedy absolute navigation toward the visible station
