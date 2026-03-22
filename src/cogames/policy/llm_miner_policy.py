@@ -69,24 +69,8 @@ class LLMMinerPlannerClient:
         return self._decision_deadline_s
 
     def complete(self, prompt: str) -> str:
-        if self._responder is not None:
-            return self._responder(prompt)
-        if self._permanent_error is not None:
-            return ""
-        api_key = os.environ.get(self._api_key_env)
         try:
-            if self._model:
-                return self._complete_openrouter(prompt, api_key)
-            if not self._api_url:
-                raise RuntimeError("LLM planner API is not configured")
-            with httpx.Client(timeout=self._timeout_s) as client:
-                response = client.post(self._api_url, json={"prompt": prompt})
-                response.raise_for_status()
-                payload = response.json()
-            text = payload.get("text")
-            if not isinstance(text, str) or not text.strip():
-                raise RuntimeError("LLM planner response missing non-empty 'text'")
-            return text
+            return self.complete_strict(prompt)
         except Exception as exc:
             error_text = f"{type(exc).__name__}: {exc}"
             if isinstance(exc, RuntimeError) and (
@@ -97,6 +81,25 @@ class LLMMinerPlannerClient:
             else:
                 logger.warning("LLM planner request failed; keeping planner enabled for future retries: %s", error_text)
             return ""
+
+    def complete_strict(self, prompt: str) -> str:
+        if self._responder is not None:
+            return self._responder(prompt)
+        if self._permanent_error is not None:
+            return ""
+        api_key = os.environ.get(self._api_key_env)
+        if self._model:
+            return self._complete_openrouter(prompt, api_key)
+        if not self._api_url:
+            raise RuntimeError("LLM planner API is not configured")
+        with httpx.Client(timeout=self._timeout_s) as client:
+            response = client.post(self._api_url, json={"prompt": prompt})
+            response.raise_for_status()
+            payload = response.json()
+        text = payload.get("text")
+        if not isinstance(text, str) or not text.strip():
+            raise RuntimeError("LLM planner response missing non-empty 'text'")
+        return text
 
     def complete_with_deadline(self, request_key: str, prompt: str) -> tuple[str | None, str]:
         with self._lock:
@@ -322,11 +325,11 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             "" if text is None else text.replace("\n", " "),
         )
         if text is None:
-            skill = "unstuck"
+            skill = None
             reason = f"fallback while waiting for planner: {planner_status}"
         else:
             skill, reason = _parse_skill_choice(text)
-        if text is not None and skill is None:
+        if skill is None:
             carried_total = self._carried_total(obs)
             if not has_miner:
                 skill = "gear_up"
@@ -336,7 +339,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
                 skill = "mine_until_full"
             else:
                 skill = "explore"
-            reason = f"fallback after invalid planner response: {reason}"
+            reason = f"scripted fallback ({reason})"
         if not has_miner and skill not in {"gear_up", "unstuck"}:
             reason = f"overrode {skill} to gear_up because miner gear is missing"
             skill = "gear_up"

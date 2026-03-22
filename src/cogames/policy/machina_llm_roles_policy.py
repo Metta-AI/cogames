@@ -179,11 +179,11 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             "" if text is None else text.replace("\n", " "),
         )
         if text is None:
-            skill = "unstuck"
+            skill = None
             reason = f"fallback while waiting for planner: {planner_status}"
         else:
             skill, reason = _parse_role_skill_choice(text, set(ALIGNER_SKILL_DESCRIPTIONS))
-        if text is not None and skill is None:
+        if skill is None:
             if not has_aligner:
                 skill = "gear_up"
             elif not has_heart and state.known_hubs:
@@ -192,7 +192,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
                 skill = "align_neutral"
             else:
                 skill = "explore"
-            reason = f"fallback after invalid planner response: {reason}"
+            reason = f"scripted fallback ({reason})"
         if not has_aligner and skill not in {"gear_up", "unstuck"}:
             reason = f"overrode {skill} to gear_up because aligner gear is missing"
             skill = "gear_up"
