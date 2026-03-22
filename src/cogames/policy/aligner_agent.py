@@ -461,7 +461,13 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         target_abs = self._nearest_known(current_abs, state.known_aligner_stations)
         if target_abs is None:
             if state.known_hubs:
-                return self._explore_near_hub(obs, state)
+                # Station not yet seen: navigate toward expected station position (hub_center+4 rows, -3 cols)
+                # Stations are placed 4 rows below hub center; aligner is leftmost (3 cols west of center).
+                hub_center = self._nearest_known(current_abs, state.known_hubs)
+                expected_station = (hub_center[0] + 4, hub_center[1] - 3)
+                direction = self._navigate_to_station(state, current_abs, expected_station, avoid_hazards=False)
+                if direction is not None:
+                    return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
             return self._explore(obs, state)
         # Station known but not visible - navigate to approach cell
         direction = self._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
