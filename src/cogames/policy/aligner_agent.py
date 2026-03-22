@@ -375,7 +375,11 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         visible_target = self._starter._closest_tag_location(obs, self._aligner_station_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
-            action, next_state = self._move_toward_target(state, current_abs, target_abs)
+            direction = self._bfs_first_direction(state, current_abs, target_abs)
+            if direction is not None:
+                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+            # Station is visible but BFS can't find a path - use greedy egocentric navigation
+            action, next_state = self._starter._move_toward(state, visible_target)
             return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_aligner_stations)
         if target_abs is None:

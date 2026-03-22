@@ -193,6 +193,10 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             else:
                 skill = "explore"
             reason = f"scripted fallback ({reason})"
+        # After stuck exit: force explore to find alternate path (prevent gear_up→stuck→gear_up loop)
+        if not has_aligner and skill == "gear_up" and was_stuck:
+            reason = "overrode gear_up to explore after stuck exit (find alternate path to aligner station)"
+            skill = "explore"
         # Allow explore/unstuck after stuck exit even without aligner (find alternate path to station)
         if not has_aligner and skill not in {"gear_up", "unstuck", "explore"}:
             if was_stuck:
@@ -228,6 +232,10 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             else:
                 reason = "overrode get_heart to explore (heart already held, no target known)"
                 skill = "explore"
+        # Break explore→stuck loop when agent has gear+heart but no known junctions: try unstuck
+        if has_aligner and has_heart and not known_alignable_junctions and skill == "explore" and was_stuck:
+            reason = "overrode explore to unstuck after stuck exit (try escape moves to find junctions)"
+            skill = "unstuck"
         # Break consecutive unstuck loops: after 2+ unstuck in a row, force explore to find new routes
         if skill == "unstuck":
             state.consecutive_unstuck += 1
@@ -285,6 +293,13 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         self._maybe_finish_skill(obs, state)
         if state.current_skill is None:
             self._plan_skill(obs, state)
+
+        # Navigation shake: after 5 consecutive blocked moves, every 3rd step try a random direction
+        # This breaks BFS deadlocks caused by agent-occupied cells
+        if state.current_skill not in {None, "unstuck"} and state.no_move_steps >= 5 and state.no_move_steps % 3 == 0:
+            action, state = self._unstuck(state)
+            state.skill_steps += 1
+            return action, state
 
         if state.current_skill == "gear_up":
             action, base_state = self._gear_up(obs, state, current_abs)
