@@ -134,12 +134,12 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             return None
         return min(candidates, key=lambda coord: (abs(coord[0] - current_abs[0]) + abs(coord[1] - current_abs[1]), coord))
 
-    def _bfs_first_direction(self, state: AlignerState, start: Coord, goal: Coord) -> str | None:
+    def _bfs_first_direction(self, state: AlignerState, start: Coord, goal: Coord, avoid_hazards: bool = True) -> str | None:
         if start == goal:
             return self._starter._fallback_action_name
         if goal not in state.known_free_cells:
             return None
-        avoid = state.known_hazard_stations - {goal}
+        avoid = (state.known_hazard_stations - {goal}) if avoid_hazards else set()
         frontier: deque[Coord] = deque([start])
         parents: dict[Coord, tuple[Coord, str] | None] = {start: None}
         while frontier:
@@ -403,8 +403,8 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         target_abs = self._nearest_known(current_abs, state.known_hubs)
         if target_abs is None:
             return self._explore(obs, state)
-        # Try direct BFS first; fall back to frontier-toward-hub navigation if BFS can't find a path
-        direction = self._bfs_first_direction(state, current_abs, target_abs)
+        # Already have aligner gear - no need to avoid other stations
+        direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
@@ -425,8 +425,8 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         if target_abs is None:
             return self._explore_for_alignment(obs, state)
         self._log_mode(obs, state, "align_neutral")
-        # Try direct BFS; fall back to frontier-toward-junction navigation if BFS can't find a path
-        direction = self._bfs_first_direction(state, current_abs, target_abs)
+        # Already have aligner gear - no need to avoid other stations, can't re-equip
+        direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
         # BFS failed: navigate toward the junction via frontier cells (better than hub-biased exploration)
