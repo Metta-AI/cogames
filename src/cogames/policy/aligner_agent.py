@@ -160,12 +160,23 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             return None
         return parents[step][1]
 
+    def _safe_wander(self, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
+        """Wander but avoid stepping onto known hazard stations."""
+        for _, (name, delta) in zip(range(4), _DIRECTION_DELTAS):
+            idx = (state.wander_direction_index + _) % 4
+            direction, (dr, dc) = _DIRECTION_DELTAS[idx]
+            neighbor = (current_abs[0] + dr, current_abs[1] + dc)
+            if neighbor not in state.known_hazard_stations:
+                state.wander_direction_index = (idx + 1) % 4
+                return self._starter._action(f"move_{direction}"), state
+        return self._starter._wander(state)
+
     def _move_to(self, state: AlignerState, current_abs: Coord, target_abs: Coord | None) -> tuple[Action, AlignerState]:
         if target_abs is None:
-            return self._starter._wander(state)
+            return self._safe_wander(state, current_abs)
         direction = self._bfs_first_direction(state, current_abs, target_abs)
         if direction is None:
-            return self._starter._wander(state)
+            return self._safe_wander(state, current_abs)
         return self._starter._action(f"move_{direction}"), state
 
     def _frontier_cells(self, state: AlignerState) -> set[Coord]:
@@ -269,14 +280,14 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         target_abs: Coord | None,
     ) -> tuple[Action, AlignerState]:
         if target_abs is None:
-            return self._starter._wander(state)
+            return self._safe_wander(state, current_abs)
         direction = self._bfs_first_direction(state, current_abs, target_abs)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), state
 
         frontier_cells = self._frontier_cells(state)
         if not frontier_cells:
-            return self._starter._wander(state)
+            return self._safe_wander(state, current_abs)
 
         best_frontier = min(
             frontier_cells,
@@ -292,13 +303,14 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                 key=lambda item: (
                     item[1] in state.blocked_cells,
                     item[1] in state.known_free_cells,
+                    item[1] in state.known_hazard_stations,
                     abs(item[1][0] - target_abs[0]) + abs(item[1][1] - target_abs[1]),
                 ),
             ):
-                if neighbor in state.blocked_cells or neighbor in state.known_free_cells:
+                if neighbor in state.blocked_cells or neighbor in state.known_free_cells or neighbor in state.known_hazard_stations:
                     continue
                 return self._starter._action(f"move_{direction_name}"), state
-            return self._starter._wander(state)
+            return self._safe_wander(state, current_abs)
         return self._move_to(state, current_abs, best_frontier)
 
     def _explore_frontier(
@@ -311,7 +323,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         current_abs = self._spawn_offset(obs)
         if current_abs in frontier_cells:
             for direction, neighbor in self._neighbors(current_abs):
-                if neighbor in state.blocked_cells or neighbor in state.known_free_cells:
+                if neighbor in state.blocked_cells or neighbor in state.known_free_cells or neighbor in state.known_hazard_stations:
                     continue
                 return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, frontier_cells)
