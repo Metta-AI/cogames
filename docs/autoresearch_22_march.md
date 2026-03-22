@@ -212,3 +212,35 @@ Aborted after confirming catastrophic failure (~4 friendly junctions vs 24). Roo
 5. Re-architected navigation: systematic hub-centric exploration for aligners
 6. Experiment: 2A+1S at 2000 steps vs 3A at 2000 steps
 
+---
+
+### `521deca` — 0.485 — scout-grid-explore-broken-coords (DISCARD)
+
+**Result:** reward=0.485, aligned=7, held=2854
+
+Scout had broken coordinate system (grid targets in absolute coords not spawn-relative). Scout died in 16 moves (stuck 1949/2000 steps). Worse than 0.490 baseline.
+
+**Root cause identified during debugging**: resource extractors (33 silicon + 40 oxygen + 35 germanium + 37 carbon = 145 total on map) block movement but aren't tagged as "wall". BFS routes through them → repeated move failures → agents stuck.
+
+---
+
+### `6f1147a` — **0.612** — move-failure-tracking (3A+0S) (**new 2000-step best**)
+
+**Result:** reward=0.612/agent, aligned=6, held=4117
+
+**+25% over 2000-step baseline 0.490!** Key fix: `move_blocked_cells` mechanism — when a move fails (position unchanged from last step), mark the target cell as blocked. This persists across observation updates (unlike standard `blocked_cells` which gets cleared by `difference_update(visible_cells)`).
+
+- Agent 0: 570 success / 1429 failed moves, 2 junctions
+- Agent 1: 600 success / 1400 failed moves, 3 junctions
+- Agent 2: 571 success / 1429 failed moves, 1 junction
+
+Also tested 2A+1S config with same code: reward=0.581 — scout hurts (replaces aligner). With 3-agent budget, 3A beats 2A+1S. Use 3A as primary config.
+
+**Remaining bottleneck**: still ~70% move failure rate. 145 extractors on map = many obstacles. Move-failure detection is reactive (fail then learn). Could be improved with proactive extractor tag detection.
+
+**Next experiments to try:**
+- 4A (4 agents total) — more aligners
+- Detect extractor/object tags proactively to pre-populate blocked_cells
+- Faster alignment: reduce time in gear_up/get_heart
+- Scout with 4 agents (3A+1S)
+
