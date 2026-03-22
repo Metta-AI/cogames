@@ -359,6 +359,9 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         elif state.current_skill == "unstuck" and state.skill_steps >= self._unstuck_horizon:
             self._event(state, "unstuck finished its bounded horizon")
             state.current_skill = None
+        elif state.current_skill in {"gear_up", "mine_until_full", "deposit_to_hub"} and state.skill_steps >= self._stuck_threshold * 5:
+            self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps without completion")
+            state.current_skill = None
         elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
             self._event(state, f"{state.current_skill} exited as stuck after {state.no_move_steps} blocked steps")
             state.current_skill = None
