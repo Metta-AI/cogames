@@ -287,7 +287,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         elif state.current_skill == "gear_up" and state.skill_steps >= self._stuck_threshold * 10:
             self._event(state, f"gear_up timed out after {state.skill_steps} steps without completion")
             state.current_skill = None
-        elif state.current_skill in {"get_heart", "align_neutral"} and state.skill_steps >= self._stuck_threshold * 5:
+        elif state.current_skill in {"get_heart", "align_neutral"} and state.skill_steps >= self._stuck_threshold * 10:
             if state.current_skill == "align_neutral":
                 state.align_neutral_timeouts += 1
                 # After 2+ timeouts, forget the nearest junction to try a different target
