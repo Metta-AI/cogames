@@ -208,7 +208,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         self,
         policy_env_info: PolicyEnvInterface,
         agent_id: int,
-        planner: LLMMinerPlannerClient,
+        planner: LLMMinerPlannerClient | None,
         return_load: int,
         stuck_threshold: int,
         unstuck_horizon: int,
@@ -298,37 +298,51 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             state.no_move_steps = 0
             state.no_progress_on_target_steps = 0
 
+    def _scripted_skill_choice(self, obs: AgentObservation, state: LLMMinerState) -> tuple[str, str]:
+        has_miner = self._starter._current_gear(self._starter._inventory_items(obs)) == "miner"
+        carried_total = self._carried_total(obs)
+        if not has_miner:
+            return "gear_up", "scripted: no miner gear"
+        if carried_total >= self._return_load:
+            return "deposit_to_hub", "scripted: cargo full"
+        if state.known_extractors:
+            return "mine_until_full", "scripted: known extractors available"
+        return "explore", "scripted: no extractors known"
+
     def _plan_skill(self, obs: AgentObservation, state: LLMMinerState) -> None:
         has_miner = self._starter._current_gear(self._starter._inventory_items(obs)) == "miner"
-        prompt = build_llm_miner_prompt(
-            carried_total=self._carried_total(obs),
-            return_load=self._return_load,
-            has_miner=has_miner,
-            hub_visible=self._hub_visible(obs),
-            remembered_hub=(state.remembered_hub_row_from_spawn, state.remembered_hub_col_from_spawn),
-            known_extractors=len(state.known_extractors),
-            frontier_count=self._frontier_count(state),
-            current_skill=state.current_skill,
-            no_move_steps=state.no_move_steps,
-            no_progress_on_target_steps=state.no_progress_on_target_steps,
-            recent_events=state.recent_events,
-        )
-        logger.info("agent=%s llm_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
-        started_at = time.perf_counter()
-        text, planner_status = self._planner.complete_with_deadline(f"miner:{obs.agent_id}", prompt)
-        latency_ms = (time.perf_counter() - started_at) * 1000.0
-        logger.info(
-            "agent=%s llm_response_ms=%.1f llm_status=%s llm_response=%s",
-            obs.agent_id,
-            latency_ms,
-            planner_status,
-            "" if text is None else text.replace("\n", " "),
-        )
-        if text is None:
-            skill = None
-            reason = f"fallback while waiting for planner: {planner_status}"
+        if self._planner is None:
+            skill, reason = self._scripted_skill_choice(obs, state)
         else:
-            skill, reason = _parse_skill_choice(text)
+            prompt = build_llm_miner_prompt(
+                carried_total=self._carried_total(obs),
+                return_load=self._return_load,
+                has_miner=has_miner,
+                hub_visible=self._hub_visible(obs),
+                remembered_hub=(state.remembered_hub_row_from_spawn, state.remembered_hub_col_from_spawn),
+                known_extractors=len(state.known_extractors),
+                frontier_count=self._frontier_count(state),
+                current_skill=state.current_skill,
+                no_move_steps=state.no_move_steps,
+                no_progress_on_target_steps=state.no_progress_on_target_steps,
+                recent_events=state.recent_events,
+            )
+            logger.info("agent=%s llm_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
+            started_at = time.perf_counter()
+            text, planner_status = self._planner.complete_with_deadline(f"miner:{obs.agent_id}", prompt)
+            latency_ms = (time.perf_counter() - started_at) * 1000.0
+            logger.info(
+                "agent=%s llm_response_ms=%.1f llm_status=%s llm_response=%s",
+                obs.agent_id,
+                latency_ms,
+                planner_status,
+                "" if text is None else text.replace("\n", " "),
+            )
+            if text is None:
+                skill = None
+                reason = f"fallback while waiting for planner: {planner_status}"
+            else:
+                skill, reason = _parse_skill_choice(text)
         if skill is None:
             carried_total = self._carried_total(obs)
             if not has_miner:

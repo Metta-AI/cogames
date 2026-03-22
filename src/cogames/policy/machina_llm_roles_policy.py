@@ -304,8 +304,10 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         llm_timeout_s: float | str = 10.0,
         llm_decision_deadline_s: float | str = 2.0,
         llm_responder: Callable[[str], str] | None = None,
+        scripted_miners: bool | str = False,
     ):
         super().__init__(policy_env_info, device=device)
+        self._scripted_miners = str(scripted_miners).lower() in ("true", "1", "yes")
         parsed_aligner_ids = tuple(int(part.strip()) for part in aligner_ids.split(",") if part.strip())
         if parsed_aligner_ids:
             self._aligner_ids = frozenset(parsed_aligner_ids)
@@ -340,7 +342,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
                 impl = LLMMinerPolicyImpl(
                     self._policy_env_info,
                     agent_id,
-                    planner=self._planner,
+                    planner=None if self._scripted_miners else self._planner,
                     return_load=self._return_load,
                     stuck_threshold=self._stuck_threshold,
                     unstuck_horizon=self._unstuck_horizon,
