@@ -160,7 +160,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             return None
         return parents[step][1]
 
-    def _bfs_optimistic_direction(self, state: AlignerState, start: Coord, goal: Coord, avoid_hazards: bool = True, max_cells: int = 5000) -> str | None:
+    def _bfs_optimistic_direction(self, state: AlignerState, start: Coord, goal: Coord, avoid_hazards: bool = True, max_cells: int = 20000) -> str | None:
         """Optimistic BFS: treat unknown cells as traversable (only avoids known walls/hazards).
         Useful when the path to goal goes through unexplored territory."""
         if start == goal:
