@@ -51,6 +51,7 @@ class LLMAlignerState(AlignerState):
     last_friendly_junctions: int = 0
     consecutive_unstuck: int = 0
     explore_start_junctions: int = 0
+    align_neutral_timeouts: int = 0
     recent_events: list[str] = field(default_factory=list)
 
 
@@ -101,6 +102,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             last_friendly_junctions=state.last_friendly_junctions,
             consecutive_unstuck=state.consecutive_unstuck,
             explore_start_junctions=state.explore_start_junctions,
+            align_neutral_timeouts=state.align_neutral_timeouts,
             recent_events=list(state.recent_events),
         )
 
@@ -274,6 +276,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         elif state.current_skill == "align_neutral" and not has_heart and state.skill_steps > 0:
             self._event(state, "align_neutral completed after spending heart")
             state.current_skill = None
+            state.align_neutral_timeouts = 0
         elif state.current_skill == "explore" and len(state.known_neutral_junctions) > state.explore_start_junctions:
             new_junctions = len(state.known_neutral_junctions) - state.explore_start_junctions
             self._event(state, f"explore completed after discovering {new_junctions} new neutral junction(s)")
@@ -282,6 +285,16 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             self._event(state, "unstuck finished its bounded horizon")
             state.current_skill = None
         elif state.current_skill in {"gear_up", "get_heart", "align_neutral"} and state.skill_steps >= self._stuck_threshold * 5:
+            if state.current_skill == "align_neutral":
+                state.align_neutral_timeouts += 1
+                # After 2+ timeouts, forget the nearest junction to try a different target
+                if state.align_neutral_timeouts >= 2 and state.known_neutral_junctions:
+                    current_abs = self._spawn_offset(obs)
+                    stuck_junction = self._nearest_known(current_abs, state.known_neutral_junctions)
+                    if stuck_junction is not None:
+                        state.known_neutral_junctions.discard(stuck_junction)
+                        self._event(state, f"forgot stuck junction at {stuck_junction} after {state.align_neutral_timeouts} timeouts")
+                        state.align_neutral_timeouts = 0
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps without completion")
             state.current_skill = None
         elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
