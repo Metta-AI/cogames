@@ -33,6 +33,7 @@ class MinerSkillState(StarterCogState):
     known_hubs: set[Coord] = field(default_factory=set)
     known_miner_stations: set[Coord] = field(default_factory=set)
     known_extractors: set[Coord] = field(default_factory=set)
+    known_hazard_stations: set[Coord] = field(default_factory=set)
 
 
 class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
@@ -44,6 +45,7 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         self._hub_tags = self._starter._resolve_tag_ids(["hub"])
         miner_station_names = self._miner_station_names(policy_env_info)
         self._miner_station_tags = self._starter._resolve_tag_ids(miner_station_names)
+        self._hazard_station_tags = self._resolve_non_miner_station_tags(policy_env_info, miner_station_names)
         self._wall_tags = self._starter._resolve_tag_ids(["wall"])
         self._return_load = return_load
         self._obs_radius_row = self._starter._center[0]
@@ -58,6 +60,19 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             if object_name.endswith(":miner") or object_name == "miner":
                 names.add(object_name)
         return sorted(names)
+
+    def _resolve_non_miner_station_tags(self, policy_env_info: PolicyEnvInterface, miner_names: list[str]) -> set[int]:
+        other_gear = ("aligner", "scrambler", "scout")
+        names: set[str] = set()
+        for gear in other_gear:
+            names.add(f"{gear}_station")
+            for tag_name in policy_env_info.tags:
+                if not tag_name.startswith("type:"):
+                    continue
+                object_name = tag_name.removeprefix("type:")
+                if object_name.endswith(f":{gear}") or object_name == gear:
+                    names.add(object_name)
+        return self._starter._resolve_tag_ids(sorted(names))
 
     def initial_agent_state(self) -> MinerSkillState:
         starter_state = self._starter.initial_agent_state()
@@ -132,6 +147,7 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         hubs_now: set[Coord] = set()
         miner_stations_now: set[Coord] = set()
         extractors_now: set[Coord] = set()
+        hazard_stations_now: set[Coord] = set()
 
         for token in obs.tokens:
             if token.feature.name != "tag" or token.location is None:
@@ -145,6 +161,8 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
                 miner_stations_now.add(abs_cell)
             if token.value in self._starter._extractor_tags:
                 extractors_now.add(abs_cell)
+            if token.value in self._hazard_station_tags:
+                hazard_stations_now.add(abs_cell)
 
         state.blocked_cells.difference_update(visible_cells)
         state.blocked_cells.update(blocked_now)
@@ -155,6 +173,7 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         self._remember_static_objects(state.known_hubs, hubs_now)
         self._remember_static_objects(state.known_miner_stations, miner_stations_now)
         self._remember_static_objects(state.known_extractors, extractors_now)
+        self._remember_static_objects(state.known_hazard_stations, hazard_stations_now)
         self._remember_visible_hub(obs, state)
 
     def _neighbors(self, cell: Coord) -> list[tuple[str, Coord]]:
@@ -199,6 +218,7 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             return self._starter._fallback_action_name
         if goal not in state.known_free_cells:
             return None
+        avoid = state.known_hazard_stations - {goal}
         frontier: deque[Coord] = deque([start])
         parents: dict[Coord, tuple[Coord, str] | None] = {start: None}
         while frontier:
@@ -206,7 +226,7 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             if cell == goal:
                 break
             for direction, neighbor in self._neighbors(cell):
-                if neighbor in parents or neighbor not in state.known_free_cells:
+                if neighbor in parents or neighbor not in state.known_free_cells or neighbor in avoid:
                     continue
                 parents[neighbor] = (cell, direction)
                 frontier.append(neighbor)

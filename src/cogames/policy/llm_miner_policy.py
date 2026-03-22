@@ -238,6 +238,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             known_hubs=set(base.known_hubs),
             known_miner_stations=set(base.known_miner_stations),
             known_extractors=set(base.known_extractors),
+            known_hazard_stations=set(base.known_hazard_stations),
             current_skill=state.current_skill,
             current_reason=state.current_reason,
             skill_steps=state.skill_steps,
