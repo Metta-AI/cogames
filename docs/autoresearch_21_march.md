@@ -63,8 +63,27 @@ Conclusions: 3 agents is the sweet spot for this map. More agents hit spawn/navi
 
 2026-03-21 23:45:00 PDT: BREAKTHROUGH on arena map! 3 aligners on cogsguard_arena got 7.650 total reward (2.55/agent) vs 2.260 on machina_1. Arena has no competing clips team (clips/aligned.junction.held=0) so reward scales much better. Only 2 junctions aligned but arena reward formula is 3.4x better. Continuing arena experiments.
 
+2026-03-22 01:00:00 PDT: FINAL SESSION SUMMARY.
+Key findings:
+- Heart economy: FIXED at ~7 hearts per 1000 steps from hub. Mining deposits do NOT increase heart supply in this mission config. This was confirmed empirically.
+- Only agent 1 (one of 3) can actively align junctions. Agents 0 and 2 have spawn positions with poor accessibility (agent 2 in tiny dead-end area, cell.visited=557).
+- 3-aligner composition optimal: no miners needed. Hearts don't depend on deposits.
+- All improvements combined = 2.260 total (deterministic result, same every run).
+
+Bugs fixed this session:
+1. no_move_steps counter not reset when skill changes (critical bug causing permanent stuck loops)
+2. Explore completed immediately when extractors already known (explore_start_extractors fix)
+3. get_heart/align_neutral forced in override loop when was_stuck=True (now allow explore)
+4. Consecutive unstuck loops: after 2+ unstuck, force explore
+5. Hub-biased navigation: get_heart falls back to _explore_near_hub when BFS fails
+
+New features:
+- Aligner hazard station avoidance (BFS, wander, frontier, explore all avoid non-aligner stations)
+- Smart planner fallback (scripted decisions on timeout instead of unstuck)
+- Scripted miners option (kw.scripted_miners=true)
+
 SESSION SUMMARY:
 - Baseline: 0.819 total reward (dc984a7, 1A2M LLM, 1000 steps)
 - BEST: 2.260 total reward (3 aligners, 1000 steps) = 2.76x improvement
-- Key discoveries: no_move_steps counter bug, explore completion bug, planner contention dominance, 3-agent sweet spot, alignment-focused composition wins
-- Next agent should try: (1) pre-seeding aligner with hub/station positions for faster startup, (2) alternative unstuck patterns that explore more aggressively, (3) investigating if the game has mechanics to increase heart generation rate
+- Key discoveries: no_move_steps counter bug, explore completion bug, planner contention dominance, 3-agent sweet spot, alignment-focused composition wins, heart economy is fixed
+- Next agent should try: (1) Try to identify why agent 2 has cell.visited=557 (it's trapped in 557 cells). (2) Try a completely different model (faster LLM = less deadline exceeded = better planning). (3) Consider if game mechanics allow any way to increase heart generation beyond 7/1000steps.
