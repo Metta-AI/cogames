@@ -482,11 +482,14 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         visible_target = self._starter._closest_tag_location(obs, self._hub_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
-            direction = self._bfs_first_direction(state, current_abs, target_abs)
+            direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
             if direction is not None:
                 return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-            # Hub is visible but BFS can't find a path - use greedy egocentric navigation
-            action, next_state = self._starter._move_toward(state, visible_target)
+            # Hub visible but BFS can't find path through known cells - try optimistic BFS
+            direction = self._bfs_optimistic_direction(state, current_abs, target_abs, avoid_hazards=False)
+            if direction is not None:
+                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+            action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
             return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_hubs)
         if target_abs is None:
