@@ -1,5 +1,9 @@
 greeting agent! your task is to improve the reward score on cogames by improving our LLM policies ! 
 
+you should have received two arguments
+- branch name: the name of the branch you will be iterating on
+- experiment direction: the direction of the experiment you need to follow for this session
+
 # Experimentation
 
 We are iterating on a Voyager (Minecraft LLM Agents) like solution to cogames.
@@ -21,7 +25,13 @@ Here is what you can do to improve game reward
 1. add new skills with hardwritten python code
 2. change the prompt of the LLMs
 
-your first run should be a baseline , so you will run the policy as is
+Your first task is to  make in docs/ a file called <branch_name>.md
+That file is your experiment report notebook, add logs
+WRITE TO <branch_name>.md: "<timestamp>: autoresearch starting, my plan is to..."
+
+WRITE TO <branch_name>.md: "<timestamp>: starting to run baseline"
+Your second setup task run should be running baseline , so you will run the policy as is
+WRITE TO <branch_name>.md: "<timestamp>: baseline result is "
 
 # Reward target
 
@@ -62,11 +72,14 @@ That branch must also exist on GitHub so progress is backed up and visible remot
 LOOP FOREVER:
 
 1. Look at the git state: the current branch/commit we're on
-2. Tune skills and LLM policy with experimental idea by directly hacking the code.
-3. git commit
+2. Tune skills and LLM policy with experimental idea by directly hacking the code, brainstorm what you should try, read other experiments in /docs and other previous commit, 
+WRITE TO <branch_name>.md: "<timestamp>: starting new experiment loop, in this experiment I want to try.. my hypothesis is.."
+3. git commit in the form "[EXPERIMENT=...][EXPERIMENT_START] wrote code.." and push to github
 4. Run the experiment
 5. Read out the results
 6. Record the results in the tsv and commit the results
+WRITE TO <branch_name>.md: "<timestamp>: I run my experiment, I found out that.. this is a good/bad result because.. next experiment next agent should probably try.."
+3. git commit in the form "[EXPERIMENT=...][EXPERIMENT_RESULTS] added ... reard to TSV" and push to github
 7. Push the branch to GitHub. If the branch does not exist remotely yet, create it with `git push -u origin <branch_name>`. After that, use `git push` after each kept result so the remote branch stays current.
 8. If reward improved you "advance" the branch, keeping the git commit
 9. If reward is equal or worse, you git reset back to where you started. If you had already pushed a discarded commit, bring the remote branch back in sync too.
