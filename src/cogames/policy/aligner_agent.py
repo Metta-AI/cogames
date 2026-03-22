@@ -403,11 +403,11 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         target_abs = self._nearest_known(current_abs, state.known_hubs)
         if target_abs is None:
             return self._explore(obs, state)
-        # Try direct BFS first; fall back to hub-biased exploration if BFS can't find a path
+        # Try direct BFS first; fall back to frontier-toward-hub navigation if BFS can't find a path
         direction = self._bfs_first_direction(state, current_abs, target_abs)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        action, next_state = self._explore_near_hub(obs, state)
+        action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def _is_alignable(self, junction: Coord, state: AlignerState) -> bool:
@@ -425,11 +425,12 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         if target_abs is None:
             return self._explore_for_alignment(obs, state)
         self._log_mode(obs, state, "align_neutral")
-        # Try direct BFS; fall back to alignment-biased exploration if BFS can't find a path
+        # Try direct BFS; fall back to frontier-toward-junction navigation if BFS can't find a path
         direction = self._bfs_first_direction(state, current_abs, target_abs)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        action, next_state = self._explore_for_alignment(obs, state)
+        # BFS failed: navigate toward the junction via frontier cells (better than hub-biased exploration)
+        action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def step_with_state(self, obs: AgentObservation, state: AlignerState) -> tuple[Action, AlignerState]:
