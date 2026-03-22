@@ -30,3 +30,12 @@ Remaining issues: aligner has 53% move failure rate (wall bumping), miners accid
 2026-03-21 21:00:00 PDT: aligner hazard avoidance alone gave 0.762 (discard). Combined with smart planner fallback (scripted decision on timeout instead of unstuck), got 0.822 (marginal keep). Aligner still has 55.7% move failure rate. Key insight: the LLM planner adds contention for miners that don't benefit much from it (they just cycle gear→mine→deposit). Next experiment: disable LLM for miners (scripted only) to eliminate planner contention and let aligners get reliable planning.
 
 2026-03-21 21:00:00 PDT: starting new experiment loop, in this experiment I want to make miners use purely scripted skill selection (no LLM calls) while keeping LLM planning for aligners. My hypothesis is that miners follow a deterministic loop (gear_up→mine_until_full→deposit_to_hub) that doesn't benefit from LLM planning, and their API calls create contention that hurts aligner planning quality. With scripted miners, I can also scale to 8 agents without planner contention.
+
+2026-03-21 22:00:00 PDT: BREAKTHROUGH! With scripted miners + stuck counter fix, the 1A2M config scored 1.105 (2684 junction.held, 7 gained). Then discovered 8-agent config has spawn-stuck issue (agents physically trapped). The 2A1M config with scripted miner scored 2.184 (6281 junction.held, 7 gained) — 2.67x baseline! Agent 1 aligned all 7 junctions. Key discoveries:
+- The no_move_steps counter was never reset on skill change (bug fix)
+- Explore completion was too aggressive (completed immediately when extractors known)
+- 2 aligners >> 1 aligner for junction.held because junctions are aligned earlier
+- Scripted miners eliminate planner contention allowing reliable aligner LLM planning
+Next: try 3 aligners (no miners), try different aligner_ids compositions.
+
+2026-03-21 22:00:00 PDT: starting new experiment loop, trying 3 aligners 0 miners (all alignment, no mining).
