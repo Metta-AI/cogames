@@ -67,6 +67,7 @@ class LocalLLMInference:
     def _load(self) -> None:
         """Load model and tokenizer into GPU memory (once)."""
         try:
+            import torch
             from transformers import pipeline as hf_pipeline
         except ImportError as exc:
             raise RuntimeError(
@@ -79,7 +80,7 @@ class LocalLLMInference:
             "text-generation",
             model=self._model_path,
             device_map=self._device_map,
-            torch_dtype="auto",
+            torch_dtype=torch.bfloat16,
         )
         logger.info("Local LLM loaded.")
 
