@@ -301,10 +301,20 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
     def _scripted_skill_choice(self, obs: AgentObservation, state: LLMMinerState) -> tuple[str, str]:
         has_miner = self._starter._current_gear(self._starter._inventory_items(obs)) == "miner"
         carried_total = self._carried_total(obs)
+        was_stuck = state.recent_events and "exited as stuck" in state.recent_events[-1]
+        was_stale = state.recent_events and "exited as stale" in state.recent_events[-1]
         if not has_miner:
+            if was_stuck:
+                return "explore", "scripted: gear_up stuck, exploring for station"
             return "gear_up", "scripted: no miner gear"
         if carried_total >= self._return_load:
+            if was_stuck:
+                return "explore", "scripted: deposit stuck, exploring for route"
             return "deposit_to_hub", "scripted: cargo full"
+        if was_stale:
+            return "explore", "scripted: stale target, exploring for new extractor"
+        if was_stuck:
+            return "explore", "scripted: stuck, exploring for new route"
         if state.known_extractors:
             return "mine_until_full", "scripted: known extractors available"
         return "explore", "scripted: no extractors known"
