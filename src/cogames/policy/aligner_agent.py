@@ -186,6 +186,46 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             return None
         return parents[step][1]
 
+    def _best_approach_cell(self, state: AlignerState, current_abs: Coord, blocked_target: Coord) -> Coord | None:
+        """Find the best adjacent cell to a blocked target (e.g., a station object) to navigate toward.
+
+        Returns the adjacent cell closest to current_abs that is not in blocked_cells."""
+        candidates = [
+            (blocked_target[0] + dr, blocked_target[1] + dc)
+            for _, (dr, dc) in _DIRECTION_DELTAS
+            if (blocked_target[0] + dr, blocked_target[1] + dc) not in state.blocked_cells
+        ]
+        if not candidates:
+            return None
+        return min(candidates, key=lambda c: abs(c[0] - current_abs[0]) + abs(c[1] - current_abs[1]))
+
+    def _navigate_to_station(self, state: AlignerState, current_abs: Coord, station_abs: Coord, avoid_hazards: bool = True) -> str | None:
+        """Navigate toward a station object (which is in blocked_cells).
+
+        Targets the best adjacent cell to the station rather than the station itself."""
+        approach = self._best_approach_cell(state, current_abs, station_abs)
+        if approach is None:
+            return None
+        if current_abs == approach:
+            # Already adjacent - try moving into station directly (triggers equip)
+            dr = station_abs[0] - current_abs[0]
+            dc = station_abs[1] - current_abs[1]
+            if abs(dr) >= abs(dc):
+                return "south" if dr > 0 else "north"
+            return "east" if dc > 0 else "west"
+        direction = self._bfs_first_direction(state, current_abs, approach, avoid_hazards=avoid_hazards)
+        if direction is not None:
+            return direction
+        direction = self._bfs_optimistic_direction(state, current_abs, approach, avoid_hazards=avoid_hazards)
+        if direction is not None:
+            return direction
+        # Greedy toward the approach cell
+        dr = approach[0] - current_abs[0]
+        dc = approach[1] - current_abs[1]
+        if abs(dr) >= abs(dc):
+            return "south" if dr > 0 else "north"
+        return "east" if dc > 0 else "west"
+
     def _safe_wander(self, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
         """Wander but avoid stepping onto known hazard stations."""
         for _, (name, delta) in zip(range(4), _DIRECTION_DELTAS):
@@ -411,20 +451,11 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         visible_target = self._starter._closest_tag_location(obs, self._aligner_station_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
-            # Try BFS (avoid hazards so we don't accidentally equip wrong gear)
-            direction = self._bfs_first_direction(state, current_abs, target_abs)
+            # Station is visible - navigate to an adjacent cell (station itself is blocked)
+            direction = self._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
             if direction is not None:
                 return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-            # Regular BFS failed - station visible but direct path blocked (e.g., hub outer wall between agent and station)
-            # Use optimistic BFS to navigate around walls through unknown territory toward the gate/entrance
-            direction = self._bfs_optimistic_direction(state, current_abs, target_abs)
-            if direction is not None:
-                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-            # Optimistic BFS also failed (avoid_hazards=True) - try without hazard avoidance
-            direction = self._bfs_optimistic_direction(state, current_abs, target_abs, avoid_hazards=False)
-            if direction is not None:
-                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-            # Last resort: greedy absolute navigation toward the visible station
+            # All adjacents also blocked - fall back to greedy toward station
             action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
             return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_aligner_stations)
@@ -432,11 +463,11 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             if state.known_hubs:
                 return self._explore_near_hub(obs, state)
             return self._explore(obs, state)
-        # Try optimistic BFS: navigates through unknown territory toward known station
-        direction = self._bfs_optimistic_direction(state, current_abs, target_abs)
+        # Station known but not visible - navigate to approach cell
+        direction = self._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        # Optimistic BFS failed (all paths blocked) - use greedy absolute navigation
+        # All adjacents blocked - greedy toward station
         action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
