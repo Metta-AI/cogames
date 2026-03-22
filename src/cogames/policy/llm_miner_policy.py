@@ -311,7 +311,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             else:
                 skill = "explore"
             reason = f"fallback after invalid planner response: {reason}"
-        was_stuck = bool(state.recent_events and ("exited as stuck" in state.recent_events[-1] or "exited as stale" in state.recent_events[-1]))
+        was_stuck = bool(state.recent_events and ("exited as stuck" in state.recent_events[-1] or "exited as stale" in state.recent_events[-1] or "timed out after" in state.recent_events[-1]))
         if not has_miner and skill not in {"gear_up", "unstuck", "explore"}:
             if was_stuck:
                 reason = f"overrode {skill} to explore after stuck exit (seeking new path to miner station)"

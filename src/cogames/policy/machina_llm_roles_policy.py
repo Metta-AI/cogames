@@ -182,7 +182,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             text.replace("\n", " "),
         )
         skill, reason = _parse_role_skill_choice(text, set(ALIGNER_SKILL_DESCRIPTIONS))
-        was_stuck = bool(state.recent_events and ("exited as stuck" in state.recent_events[-1] or "exited as stale" in state.recent_events[-1]))
+        was_stuck = bool(state.recent_events and ("exited as stuck" in state.recent_events[-1] or "exited as stale" in state.recent_events[-1] or "timed out after" in state.recent_events[-1]))
         if skill is None:
             if not has_aligner:
                 skill = "explore" if was_stuck else "gear_up"
@@ -221,9 +221,13 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         if has_aligner and not has_heart and skill == "align_neutral":
             reason = "overrode align_neutral to get_heart because no heart is held"
             skill = "get_heart"
-        if has_aligner and has_heart and known_alignable_junctions and skill in {"explore", "get_heart"}:
+        if has_aligner and has_heart and known_alignable_junctions and skill in {"explore", "get_heart"} and not was_stuck:
             reason = f"overrode {skill} to align_neutral because an alignable neutral junction is already known"
             skill = "align_neutral"
+        # After stuck/timeout with gear+heart+junction: try unstuck to escape navigation deadlock
+        if has_aligner and has_heart and known_alignable_junctions and skill == "align_neutral" and was_stuck:
+            reason = "overrode align_neutral to unstuck after stuck exit (escape navigation deadlock near junction)"
+            skill = "unstuck"
         # Prevent immediate-completion loops: get_heart already done if has_heart=True
         if has_aligner and has_heart and skill == "get_heart":
             if known_alignable_junctions:
@@ -232,6 +236,10 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             else:
                 reason = "overrode get_heart to explore (heart already held, no target known)"
                 skill = "explore"
+        # After get_heart timeout/stuck with no heart: unstuck first to escape navigation deadlock
+        if has_aligner and not has_heart and skill == "get_heart" and was_stuck and state.known_hubs:
+            reason = "overrode get_heart to unstuck after stuck exit (escape navigation deadlock near hub)"
+            skill = "unstuck"
         # Break explore→stuck loop when agent has gear+heart but no known junctions: try unstuck
         if has_aligner and has_heart and not known_alignable_junctions and skill == "explore" and was_stuck:
             reason = "overrode explore to unstuck after stuck exit (try escape moves to find junctions)"
