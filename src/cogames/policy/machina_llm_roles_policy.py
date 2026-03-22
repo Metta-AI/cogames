@@ -50,6 +50,7 @@ class LLMAlignerState(AlignerState):
     last_has_heart: bool = False
     last_friendly_junctions: int = 0
     consecutive_unstuck: int = 0
+    explore_start_junctions: int = 0
     recent_events: list[str] = field(default_factory=list)
 
 
@@ -99,6 +100,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             last_has_heart=state.last_has_heart,
             last_friendly_junctions=state.last_friendly_junctions,
             consecutive_unstuck=state.consecutive_unstuck,
+            explore_start_junctions=state.explore_start_junctions,
             recent_events=list(state.recent_events),
         )
 
@@ -228,6 +230,8 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             skill = "explore"
             reason = f"overrode unstuck to explore after {state.consecutive_unstuck} consecutive unstuck calls"
             state.consecutive_unstuck = 0
+        if skill == "explore":
+            state.explore_start_junctions = len(state.known_neutral_junctions)
         state.current_skill = skill
         state.current_reason = reason
         state.skill_steps = 0
@@ -247,8 +251,9 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         elif state.current_skill == "align_neutral" and not has_heart:
             self._event(state, "align_neutral completed after spending heart")
             state.current_skill = None
-        elif state.current_skill == "explore" and state.known_neutral_junctions:
-            self._event(state, f"explore completed after discovering {len(state.known_neutral_junctions)} neutral junction(s)")
+        elif state.current_skill == "explore" and len(state.known_neutral_junctions) > state.explore_start_junctions:
+            new_junctions = len(state.known_neutral_junctions) - state.explore_start_junctions
+            self._event(state, f"explore completed after discovering {new_junctions} new neutral junction(s)")
             state.current_skill = None
         elif state.current_skill == "unstuck" and state.skill_steps >= self._unstuck_horizon:
             self._event(state, "unstuck finished its bounded horizon")
