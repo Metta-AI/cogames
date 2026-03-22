@@ -46,8 +46,11 @@ class LLMAlignerState(AlignerState):
     current_reason: str = ""
     skill_steps: int = 0
     no_move_steps: int = 0
+    no_progress_on_target_steps: int = 0
     last_has_heart: bool = False
     last_friendly_junctions: int = 0
+    consecutive_unstuck: int = 0
+    explore_start_junctions: int = 0
     recent_events: list[str] = field(default_factory=list)
 
 
@@ -88,12 +91,16 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             known_neutral_junctions=set(base.known_neutral_junctions),
             known_friendly_junctions=set(base.known_friendly_junctions),
             known_enemy_junctions=set(base.known_enemy_junctions),
+            known_hazard_stations=set(base.known_hazard_stations),
             current_skill=state.current_skill,
             current_reason=state.current_reason,
             skill_steps=state.skill_steps,
             no_move_steps=state.no_move_steps,
+            no_progress_on_target_steps=state.no_progress_on_target_steps,
             last_has_heart=state.last_has_heart,
             last_friendly_junctions=state.last_friendly_junctions,
+            consecutive_unstuck=state.consecutive_unstuck,
+            explore_start_junctions=state.explore_start_junctions,
             recent_events=list(state.recent_events),
         )
 
@@ -110,9 +117,13 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
     def _hub_visible(self, obs: AgentObservation) -> bool:
         return self._starter._closest_tag_location(obs, self._hub_tags) is not None
 
+    def _known_alignable_junctions(self, state: LLMAlignerState) -> set[tuple[int, int]]:
+        return {junction for junction in state.known_neutral_junctions if self._is_alignable(junction, state)}
+
     def _update_progress(self, obs: AgentObservation, state: LLMAlignerState) -> None:
         has_heart = self._inventory_count(obs, "heart") > 0
         friendly_count = len(state.known_friendly_junctions)
+        current_abs = self._spawn_offset(obs)
         if state.current_skill == "get_heart" and has_heart and not state.last_has_heart:
             self._event(state, "acquired a heart")
         if state.current_skill == "align_neutral" and friendly_count > state.last_friendly_junctions:
@@ -121,19 +132,40 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         state.last_friendly_junctions = friendly_count
 
         last_action_move = self._feature_value(obs, "last_action_move")
-        if state.current_skill is not None and last_action_move == 0:
+        made_progress = (
+            (state.current_skill == "get_heart" and has_heart and not state.last_has_heart)
+            or (state.current_skill == "align_neutral" and friendly_count > state.last_friendly_junctions)
+            or (state.current_skill == "gear_up" and self._current_gear(obs) == "aligner")
+        )
+        stationary_on_valid_target = (
+            (state.current_skill == "get_heart" and current_abs in state.known_hubs)
+            or (state.current_skill == "align_neutral" and current_abs in self._known_alignable_junctions(state))
+            or (state.current_skill == "gear_up" and current_abs in state.known_aligner_stations)
+        )
+        if made_progress:
+            state.no_move_steps = 0
+            state.no_progress_on_target_steps = 0
+        elif stationary_on_valid_target and not made_progress:
+            state.no_move_steps = 0
+            state.no_progress_on_target_steps += 1
+        elif state.current_skill is not None and last_action_move == 0:
             state.no_move_steps += 1
+            state.no_progress_on_target_steps = 0
         else:
             state.no_move_steps = 0
+            state.no_progress_on_target_steps = 0
 
     def _plan_skill(self, obs: AgentObservation, state: LLMAlignerState) -> None:
         has_aligner = self._current_gear(obs) == "aligner"
         has_heart = self._inventory_count(obs, "heart") > 0
+        known_alignable_junctions = self._known_alignable_junctions(state)
         prompt = build_llm_aligner_prompt(
             has_aligner=has_aligner,
             has_heart=has_heart,
             hub_visible=self._hub_visible(obs),
+            known_hubs=len(state.known_hubs),
             known_neutral_junctions=len(state.known_neutral_junctions),
+            known_alignable_junctions=len(known_alignable_junctions),
             known_friendly_junctions=len(state.known_friendly_junctions),
             current_skill=state.current_skill,
             no_move_steps=state.no_move_steps,
@@ -151,16 +183,17 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         )
         skill, reason = _parse_role_skill_choice(text, set(ALIGNER_SKILL_DESCRIPTIONS))
         if skill is None:
+            was_stuck_fb = state.recent_events and "exited as stuck" in state.recent_events[-1]
             if not has_aligner:
-                skill = "gear_up"
-            elif not has_heart:
+                skill = "explore" if was_stuck_fb else "gear_up"
+            elif not has_heart and state.known_hubs and not was_stuck_fb:
                 skill = "get_heart"
-            elif state.known_neutral_junctions:
+            elif known_alignable_junctions and not was_stuck_fb:
                 skill = "align_neutral"
             else:
                 skill = "explore"
-            reason = f"fallback after invalid planner response: {reason}"
-        if not has_aligner and skill != "gear_up":
+            reason = f"scripted fallback ({reason})"
+        if not has_aligner and skill not in {"gear_up", "unstuck"}:
             reason = f"overrode {skill} to gear_up because aligner gear is missing"
             skill = "gear_up"
         if has_aligner and skill == "gear_up":
@@ -173,12 +206,32 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             else:
                 reason = "overrode gear_up to explore because aligner gear is already equipped"
                 skill = "explore"
+        was_stuck = state.recent_events and "exited as stuck" in state.recent_events[-1]
+        if has_aligner and not has_heart and state.known_hubs and skill == "explore" and not was_stuck:
+            reason = f"overrode {skill} to get_heart because aligner gear is equipped and a hub is known"
+            skill = "get_heart"
         if has_aligner and not has_heart and skill == "align_neutral":
             reason = "overrode align_neutral to get_heart because no heart is held"
             skill = "get_heart"
+        if has_aligner and has_heart and known_alignable_junctions and skill in {"explore", "get_heart"}:
+            reason = f"overrode {skill} to align_neutral because an alignable neutral junction is already known"
+            skill = "align_neutral"
+        # Break consecutive unstuck loops: after 2+ unstuck in a row, force explore to find new routes
+        if skill == "unstuck":
+            state.consecutive_unstuck += 1
+        else:
+            state.consecutive_unstuck = 0
+        if state.consecutive_unstuck >= 2 and skill == "unstuck":
+            skill = "explore"
+            reason = f"overrode unstuck to explore after {state.consecutive_unstuck} consecutive unstuck calls"
+            state.consecutive_unstuck = 0
+        if skill == "explore":
+            state.explore_start_junctions = len(state.known_neutral_junctions)
         state.current_skill = skill
         state.current_reason = reason
         state.skill_steps = 0
+        state.no_move_steps = 0
+        state.no_progress_on_target_steps = 0
         self._event(state, f"planner selected {skill}: {reason}")
 
     def _maybe_finish_skill(self, obs: AgentObservation, state: LLMAlignerState) -> None:
@@ -193,14 +246,18 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         elif state.current_skill == "align_neutral" and not has_heart:
             self._event(state, "align_neutral completed after spending heart")
             state.current_skill = None
-        elif state.current_skill == "explore" and state.known_neutral_junctions:
-            self._event(state, f"explore completed after discovering {len(state.known_neutral_junctions)} neutral junction(s)")
+        elif state.current_skill == "explore" and len(state.known_neutral_junctions) > state.explore_start_junctions:
+            new_junctions = len(state.known_neutral_junctions) - state.explore_start_junctions
+            self._event(state, f"explore completed after discovering {new_junctions} new neutral junction(s)")
             state.current_skill = None
         elif state.current_skill == "unstuck" and state.skill_steps >= self._unstuck_horizon:
             self._event(state, "unstuck finished its bounded horizon")
             state.current_skill = None
         elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
             self._event(state, f"{state.current_skill} exited as stuck after {state.no_move_steps} blocked steps")
+            state.current_skill = None
+        elif state.current_skill is not None and state.no_progress_on_target_steps >= self._stuck_threshold:
+            self._event(state, f"{state.current_skill} exited as stale on target after {state.no_progress_on_target_steps} steps without progress")
             state.current_skill = None
 
     def _unstuck(self, state: LLMAlignerState) -> tuple[Action, LLMAlignerState]:
@@ -227,7 +284,12 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             action, base_state = self._align_neutral(obs, state, current_abs)
             state = self._copy_with(state, base_state)
         elif state.current_skill == "explore":
-            action, base_state = self._explore(obs, state)
+            if self._inventory_count(obs, "heart") > 0:
+                action, base_state = self._explore_for_alignment(obs, state)
+            elif state.known_hubs:
+                action, base_state = self._explore_near_hub(obs, state)
+            else:
+                action, base_state = self._explore(obs, state)
             state = self._copy_with(state, base_state)
         else:
             action, state = self._unstuck(state)
@@ -243,6 +305,8 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         self,
         policy_env_info: PolicyEnvInterface,
         device: str = "cpu",
+        num_aligners: int | str = 1,
+        aligner_ids: str = "",
         return_load: int | str = 40,
         stuck_threshold: int | str = 6,
         unstuck_horizon: int | str = 4,
@@ -254,8 +318,15 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         llm_timeout_s: float | str = 10.0,
         llm_responder: Callable[[str], str] | None = None,
         llm_local_model_path: str | None = None,
+        scripted_miners: bool | str = False,
     ):
         super().__init__(policy_env_info, device=device)
+        self._scripted_miners = str(scripted_miners).lower() in ("true", "1", "yes")
+        parsed_aligner_ids = tuple(int(part.strip()) for part in aligner_ids.split(",") if part.strip())
+        if parsed_aligner_ids:
+            self._aligner_ids = frozenset(parsed_aligner_ids)
+        else:
+            self._aligner_ids = frozenset(range(min(int(num_aligners), policy_env_info.num_agents)))
         self._planner = LLMMinerPlannerClient(
             api_url=llm_api_url,
             model=llm_model,
@@ -273,7 +344,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
 
     def agent_policy(self, agent_id: int) -> StatefulAgentPolicy[LLMAlignerState | LLMMinerState]:
         if agent_id not in self._agent_policies:
-            if agent_id == 0:
+            if agent_id in self._aligner_ids:
                 impl = LLMAlignerPolicyImpl(
                     self._policy_env_info,
                     agent_id,
@@ -285,7 +356,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
                 impl = LLMMinerPolicyImpl(
                     self._policy_env_info,
                     agent_id,
-                    planner=self._planner,
+                    planner=None if self._scripted_miners else self._planner,
                     return_load=self._return_load,
                     stuck_threshold=self._stuck_threshold,
                     unstuck_horizon=self._unstuck_horizon,
