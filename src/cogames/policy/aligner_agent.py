@@ -399,12 +399,18 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         target_abs = self._nearest_known(current_abs, state.known_hubs)
         if target_abs is None:
             return self._explore(obs, state)
-        # Try direct BFS first; fall back to hub-biased exploration if BFS can't find a path
+        # Try direct BFS first
         direction = self._bfs_first_direction(state, current_abs, target_abs)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        action, next_state = self._explore_near_hub(obs, state)
-        return action, replace(next_state, last_mode=state.last_mode)
+        # BFS failed: move greedily toward hub using row/col deltas (ignores walls)
+        dr = target_abs[0] - current_abs[0]
+        dc = target_abs[1] - current_abs[1]
+        if abs(dr) >= abs(dc):
+            direction = "south" if dr > 0 else "north"
+        else:
+            direction = "east" if dc > 0 else "west"
+        return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
 
     def _is_alignable(self, junction: Coord, state: AlignerState) -> bool:
         for hub in state.known_hubs:
