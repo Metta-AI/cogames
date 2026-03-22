@@ -21,6 +21,7 @@ def build_llm_miner_prompt(
     frontier_count: int,
     current_skill: str | None,
     no_move_steps: int,
+    no_progress_on_target_steps: int = 0,
     recent_events: list[str],
 ) -> str:
     skills = "\n".join(f"- {name}: {description}" for name, description in SKILL_DESCRIPTIONS.items())
@@ -37,6 +38,7 @@ def build_llm_miner_prompt(
         "- If has_miner is false, prefer gear_up.\n"
         "- Do not choose mine_until_full or deposit_to_hub unless has_miner is true.\n"
         "- If carried_total >= return_load, prefer deposit_to_hub.\n"
+        "- If no_progress_on_target_steps > 0, the current extractor/hub/station may be depleted or broken — try explore to find a different one.\n"
         "Respond as JSON like {\"skill\": \"mine_until_full\", \"reason\": \"...\"}.\n\n"
         f"Available skills:\n{skills}\n\n"
         f"State:\n"
@@ -48,6 +50,7 @@ def build_llm_miner_prompt(
         f"- known_extractors: {known_extractors}\n"
         f"- frontier_count: {frontier_count}\n"
         f"- current_skill: {current_skill or 'none'}\n"
-        f"- no_move_steps: {no_move_steps}\n\n"
+        f"- no_move_steps: {no_move_steps}\n"
+        f"- no_progress_on_target_steps: {no_progress_on_target_steps}\n\n"
         f"Recent events:\n{events}\n"
     )

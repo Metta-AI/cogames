@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import json
 import os
 import re
+import threading
 import time
 from dataclasses import dataclass, field, replace
 from typing import Callable
@@ -26,8 +28,16 @@ class LLMMinerState(MinerSkillState):
     current_reason: str = ""
     skill_steps: int = 0
     no_move_steps: int = 0
+    no_progress_on_target_steps: int = 0
     last_carried_total: int = 0
+    explore_start_extractors: int = 0
     recent_events: list[str] = field(default_factory=list)
+
+
+@dataclass
+class PendingPlannerRequest:
+    prompt: str
+    future: concurrent.futures.Future[str]
 
 
 class LLMMinerPlannerClient:
@@ -39,6 +49,7 @@ class LLMMinerPlannerClient:
         site_url: str | None = None,
         app_name: str = "cogames-voyager",
         timeout_s: float = 5.0,
+        decision_deadline_s: float = 2.0,
         responder: Callable[[str], str] | None = None,
     ) -> None:
         self._api_url = api_url
@@ -47,11 +58,36 @@ class LLMMinerPlannerClient:
         self._site_url = site_url
         self._app_name = app_name
         self._timeout_s = timeout_s
+        self._decision_deadline_s = decision_deadline_s
         self._responder = responder
+        self._permanent_error: str | None = None
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="cogames-llm")
+        self._lock = threading.Lock()
+        self._pending_requests: dict[str, PendingPlannerRequest] = {}
+
+    @property
+    def decision_deadline_s(self) -> float:
+        return self._decision_deadline_s
 
     def complete(self, prompt: str) -> str:
+        try:
+            return self.complete_strict(prompt)
+        except Exception as exc:
+            error_text = f"{type(exc).__name__}: {exc}"
+            if isinstance(exc, RuntimeError) and (
+                "Missing API key" in str(exc) or "LLM planner API is not configured" in str(exc)
+            ):
+                self._permanent_error = error_text
+                logger.warning("LLM planner disabled after permanent configuration error: %s", self._permanent_error)
+            else:
+                logger.warning("LLM planner request failed; keeping planner enabled for future retries: %s", error_text)
+            return ""
+
+    def complete_strict(self, prompt: str) -> str:
         if self._responder is not None:
             return self._responder(prompt)
+        if self._permanent_error is not None:
+            return ""
         api_key = os.environ.get(self._api_key_env)
         if self._model:
             return self._complete_openrouter(prompt, api_key)
@@ -65,6 +101,29 @@ class LLMMinerPlannerClient:
         if not isinstance(text, str) or not text.strip():
             raise RuntimeError("LLM planner response missing non-empty 'text'")
         return text
+
+    def complete_with_deadline(self, request_key: str, prompt: str) -> tuple[str | None, str]:
+        with self._lock:
+            pending = self._pending_requests.get(request_key)
+            if pending is not None and pending.prompt != prompt:
+                if pending.future.done():
+                    self._pending_requests.pop(request_key, None)
+                    pending = None
+                else:
+                    return None, "waiting for previous planner request"
+            if pending is None:
+                future = self._executor.submit(self.complete, prompt)
+                pending = PendingPlannerRequest(prompt=prompt, future=future)
+                self._pending_requests[request_key] = pending
+
+        try:
+            text = pending.future.result(timeout=self._decision_deadline_s)
+        except concurrent.futures.TimeoutError:
+            return None, f"planner exceeded {self._decision_deadline_s:.1f}s deadline"
+
+        with self._lock:
+            self._pending_requests.pop(request_key, None)
+        return text, "planner completed"
 
     def _complete_openrouter(self, prompt: str, api_key: str | None) -> str:
         if not api_key:
@@ -150,7 +209,7 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         self,
         policy_env_info: PolicyEnvInterface,
         agent_id: int,
-        planner: LLMMinerPlannerClient,
+        planner: LLMMinerPlannerClient | None,
         return_load: int,
         stuck_threshold: int,
         unstuck_horizon: int,
@@ -183,11 +242,14 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             known_hubs=set(base.known_hubs),
             known_miner_stations=set(base.known_miner_stations),
             known_extractors=set(base.known_extractors),
+            known_hazard_stations=set(base.known_hazard_stations),
             current_skill=state.current_skill,
             current_reason=state.current_reason,
             skill_steps=state.skill_steps,
             no_move_steps=state.no_move_steps,
+            no_progress_on_target_steps=state.no_progress_on_target_steps,
             last_carried_total=state.last_carried_total,
+            explore_start_extractors=state.explore_start_extractors,
             recent_events=list(state.recent_events),
         )
 
@@ -225,33 +287,74 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             or (state.current_skill == "deposit_to_hub" and current_abs in state.known_hubs)
             or (state.current_skill == "gear_up" and current_abs in state.known_miner_stations)
         )
-        if made_progress or stationary_on_valid_target:
+        if made_progress:
             state.no_move_steps = 0
+            state.no_progress_on_target_steps = 0
+        elif stationary_on_valid_target and not made_progress:
+            state.no_move_steps = 0
+            state.no_progress_on_target_steps += 1
         elif state.current_skill is not None and last_action_move == 0:
             state.no_move_steps += 1
+            state.no_progress_on_target_steps = 0
         else:
             state.no_move_steps = 0
+            state.no_progress_on_target_steps = 0
+
+    def _scripted_skill_choice(self, obs: AgentObservation, state: LLMMinerState) -> tuple[str, str]:
+        has_miner = self._starter._current_gear(self._starter._inventory_items(obs)) == "miner"
+        carried_total = self._carried_total(obs)
+        was_stuck = state.recent_events and "exited as stuck" in state.recent_events[-1]
+        was_stale = state.recent_events and "exited as stale" in state.recent_events[-1]
+        if not has_miner:
+            if was_stuck:
+                return "explore", "scripted: gear_up stuck, exploring for station"
+            return "gear_up", "scripted: no miner gear"
+        if carried_total >= self._return_load:
+            if was_stuck:
+                return "explore", "scripted: deposit stuck, exploring for route"
+            return "deposit_to_hub", "scripted: cargo full"
+        if was_stale:
+            return "explore", "scripted: stale target, exploring for new extractor"
+        if was_stuck:
+            return "explore", "scripted: stuck, exploring for new route"
+        if state.known_extractors:
+            return "mine_until_full", "scripted: known extractors available"
+        return "explore", "scripted: no extractors known"
 
     def _plan_skill(self, obs: AgentObservation, state: LLMMinerState) -> None:
         has_miner = self._starter._current_gear(self._starter._inventory_items(obs)) == "miner"
-        prompt = build_llm_miner_prompt(
-            carried_total=self._carried_total(obs),
-            return_load=self._return_load,
-            has_miner=has_miner,
-            hub_visible=self._hub_visible(obs),
-            remembered_hub=(state.remembered_hub_row_from_spawn, state.remembered_hub_col_from_spawn),
-            known_extractors=len(state.known_extractors),
-            frontier_count=self._frontier_count(state),
-            current_skill=state.current_skill,
-            no_move_steps=state.no_move_steps,
-            recent_events=state.recent_events,
-        )
-        logger.info("agent=%s llm_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
-        started_at = time.perf_counter()
-        text = self._planner.complete(prompt)
-        latency_ms = (time.perf_counter() - started_at) * 1000.0
-        logger.info("agent=%s llm_response_ms=%.1f llm_response=%s", obs.agent_id, latency_ms, text.replace("\n", " "))
-        skill, reason = _parse_skill_choice(text)
+        if self._planner is None:
+            skill, reason = self._scripted_skill_choice(obs, state)
+        else:
+            prompt = build_llm_miner_prompt(
+                carried_total=self._carried_total(obs),
+                return_load=self._return_load,
+                has_miner=has_miner,
+                hub_visible=self._hub_visible(obs),
+                remembered_hub=(state.remembered_hub_row_from_spawn, state.remembered_hub_col_from_spawn),
+                known_extractors=len(state.known_extractors),
+                frontier_count=self._frontier_count(state),
+                current_skill=state.current_skill,
+                no_move_steps=state.no_move_steps,
+                no_progress_on_target_steps=state.no_progress_on_target_steps,
+                recent_events=state.recent_events,
+            )
+            logger.info("agent=%s llm_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
+            started_at = time.perf_counter()
+            text, planner_status = self._planner.complete_with_deadline(f"miner:{obs.agent_id}", prompt)
+            latency_ms = (time.perf_counter() - started_at) * 1000.0
+            logger.info(
+                "agent=%s llm_response_ms=%.1f llm_status=%s llm_response=%s",
+                obs.agent_id,
+                latency_ms,
+                planner_status,
+                "" if text is None else text.replace("\n", " "),
+            )
+            if text is None:
+                skill = None
+                reason = f"fallback while waiting for planner: {planner_status}"
+            else:
+                skill, reason = _parse_skill_choice(text)
         if skill is None:
             carried_total = self._carried_total(obs)
             if not has_miner:
@@ -262,8 +365,8 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
                 skill = "mine_until_full"
             else:
                 skill = "explore"
-            reason = f"fallback after invalid planner response: {reason}"
-        if not has_miner and skill != "gear_up":
+            reason = f"scripted fallback ({reason})"
+        if not has_miner and skill not in {"gear_up", "unstuck"}:
             reason = f"overrode {skill} to gear_up because miner gear is missing"
             skill = "gear_up"
         if has_miner and skill == "gear_up":
@@ -282,6 +385,10 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         state.current_skill = skill
         state.current_reason = reason
         state.skill_steps = 0
+        state.no_move_steps = 0
+        state.no_progress_on_target_steps = 0
+        if skill == "explore":
+            state.explore_start_extractors = len(state.known_extractors)
         self._event(state, f"planner selected {skill}: {reason}")
 
     def _maybe_finish_skill(self, obs: AgentObservation, state: LLMMinerState) -> None:
@@ -296,14 +403,21 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         elif state.current_skill == "deposit_to_hub" and carried_total == 0:
             self._event(state, "deposit_to_hub completed after deposit")
             state.current_skill = None
-        elif state.current_skill == "explore" and state.known_extractors:
-            self._event(state, f"explore completed after discovering {len(state.known_extractors)} extractor(s)")
+        elif state.current_skill == "explore" and len(state.known_extractors) > state.explore_start_extractors:
+            self._event(state, f"explore completed after discovering {len(state.known_extractors) - state.explore_start_extractors} new extractor(s)")
             state.current_skill = None
         elif state.current_skill == "unstuck" and state.skill_steps >= self._unstuck_horizon:
             self._event(state, "unstuck finished its bounded horizon")
             state.current_skill = None
         elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
             self._event(state, f"{state.current_skill} exited as stuck after {state.no_move_steps} blocked steps")
+            state.current_skill = None
+        elif state.current_skill is not None and state.no_progress_on_target_steps >= self._stuck_threshold:
+            current_abs = self._current_abs(obs)
+            if state.current_skill == "mine_until_full" and current_abs in state.known_extractors:
+                state.known_extractors.discard(current_abs)
+                self._event(state, f"removed depleted extractor at {current_abs} from memory")
+            self._event(state, f"{state.current_skill} exited as stale on target after {state.no_progress_on_target_steps} steps without progress")
             state.current_skill = None
 
     def _unstuck(self, state: LLMMinerState) -> tuple[Action, LLMMinerState]:
@@ -355,6 +469,7 @@ class LLMMinerPolicy(MultiAgentPolicy):
         llm_site_url: str | None = None,
         llm_app_name: str = "cogames-voyager",
         llm_timeout_s: float | str = 10.0,
+        llm_decision_deadline_s: float | str = 2.0,
         llm_responder: Callable[[str], str] | None = None,
     ):
         super().__init__(policy_env_info, device=device)
@@ -368,6 +483,7 @@ class LLMMinerPolicy(MultiAgentPolicy):
             site_url=llm_site_url,
             app_name=llm_app_name,
             timeout_s=float(llm_timeout_s),
+            decision_deadline_s=float(llm_decision_deadline_s),
             responder=llm_responder,
         )
         self._agent_policies: dict[int, StatefulAgentPolicy[LLMMinerState]] = {}

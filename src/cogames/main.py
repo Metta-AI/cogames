@@ -1737,6 +1737,64 @@ app.command(
 )(diagnose_module.diagnose_cmd)
 
 
+@app.command(
+    name="openrouter-probe",
+    help="Send a minimal prompt through the configured OpenRouter model.",
+    rich_help_panel="Utilities",
+    add_help_option=False,
+)
+def openrouter_probe_cmd(
+    prompt: str = typer.Option(
+        'Return exactly {"skill":"explore","reason":"connectivity test"}',
+        "--prompt",
+        help="Prompt sent as the user message to the planner client.",
+    ),
+    model: str = typer.Option(
+        "openai/gpt-4o-mini",
+        "--model",
+        help="OpenRouter model identifier.",
+    ),
+    api_key_env: str = typer.Option(
+        "OPENROUTER_API_KEY",
+        "--api-key-env",
+        help="Environment variable holding the OpenRouter API key.",
+    ),
+    site_url: str | None = typer.Option(
+        None,
+        "--site-url",
+        help="Optional HTTP-Referer header value for OpenRouter requests.",
+    ),
+    app_name: str = typer.Option(
+        "cogames-voyager",
+        "--app-name",
+        help="X-Title header value for OpenRouter requests.",
+    ),
+    timeout_s: float = typer.Option(
+        20.0,
+        "--timeout-s",
+        min=0.1,
+        help="HTTP timeout in seconds.",
+    ),
+) -> None:
+    from cogames.policy.llm_miner_policy import LLMMinerPlannerClient  # noqa: PLC0415
+
+    client = LLMMinerPlannerClient(
+        model=model,
+        api_key_env=api_key_env,
+        site_url=site_url,
+        app_name=app_name,
+        timeout_s=timeout_s,
+        decision_deadline_s=timeout_s,
+    )
+    try:
+        response_text = client.complete_strict(prompt)
+    except Exception as exc:
+        console.print(f"[red]OpenRouter probe failed:[/red] {type(exc).__name__}: {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print(response_text)
+
+
 def _resolve_season(server: str, season_name: str | None = None, include_hidden: bool = False) -> SeasonInfo:
     try:
         with TournamentServerClient(server_url=server) as client:
