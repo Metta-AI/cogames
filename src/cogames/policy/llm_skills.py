@@ -239,6 +239,30 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             return None
         return parents[step][1]
 
+    def _bfs_optimistic_direction(self, state: MinerSkillState, start: Coord, goal: Coord, max_cells: int = 20000) -> str | None:
+        """Optimistic BFS: treat unknown cells as traversable, only avoid known walls."""
+        if start == goal:
+            return self._starter._fallback_action_name
+        frontier: deque[Coord] = deque([start])
+        parents: dict[Coord, tuple[Coord, str] | None] = {start: None}
+        while frontier and len(parents) < max_cells:
+            cell = frontier.popleft()
+            if cell == goal:
+                break
+            for direction, neighbor in self._neighbors(cell):
+                if neighbor in parents or neighbor in state.blocked_cells:
+                    continue
+                parents[neighbor] = (cell, direction)
+                frontier.append(neighbor)
+        if goal not in parents:
+            return None
+        step = goal
+        while parents[step] is not None and parents[step][0] != start:
+            step = parents[step][0]
+        if parents[step] is None:
+            return None
+        return parents[step][1]
+
     def _move_to(self, state: MinerSkillState, current_abs: Coord, target_abs: Coord | None) -> tuple[Action, MinerSkillState]:
         if target_abs is None:
             return self._starter._wander(state)
@@ -256,6 +280,11 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         if target_abs is None:
             return self._starter._wander(state)
         direction = self._bfs_first_direction(state, current_abs, target_abs)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), state
+
+        # BFS failed (path requires unexplored territory) - try optimistic BFS through unknown cells
+        direction = self._bfs_optimistic_direction(state, current_abs, target_abs)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), state
 

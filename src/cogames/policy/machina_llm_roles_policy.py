@@ -139,8 +139,12 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             or (state.current_skill == "align_neutral" and friendly_count > state.last_friendly_junctions)
             or (state.current_skill == "gear_up" and self._current_gear(obs) == "aligner")
         )
+        near_hub = any(
+            abs(current_abs[0] - h[0]) + abs(current_abs[1] - h[1]) <= 1
+            for h in state.known_hubs
+        )
         stationary_on_valid_target = (
-            (state.current_skill == "get_heart" and current_abs in state.known_hubs)
+            (state.current_skill == "get_heart" and (current_abs in state.known_hubs or near_hub))
             or (state.current_skill == "align_neutral" and current_abs in self._known_alignable_junctions(state))
             or (state.current_skill == "gear_up" and current_abs in state.known_aligner_stations)
         )
