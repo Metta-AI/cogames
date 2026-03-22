@@ -397,10 +397,6 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                 return self._explore_near_hub(obs, state)
             return self._explore(obs, state)
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
-        if action.name != self._starter._fallback_action_name:
-            return action, replace(next_state, last_mode=state.last_mode)
-        # Last resort: greedy absolute navigation toward known station
-        action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def _get_heart(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
@@ -421,10 +417,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        # BFS failed: try frontier-toward-hub, then greedy absolute navigation
-        action, next_state = self._move_toward_target(state, current_abs, target_abs)
-        if action.name != self._starter._fallback_action_name:
-            return action, replace(next_state, last_mode=state.last_mode)
+        # BFS failed: use greedy abs navigation toward hub
         action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
@@ -447,11 +440,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        # BFS failed (path through unexplored territory): try frontier-toward-junction, then greedy
-        action, next_state = self._move_toward_target(state, current_abs, target_abs)
-        if action.name != self._starter._fallback_action_name:
-            return action, replace(next_state, last_mode=state.last_mode)
-        # Last resort: greedy absolute navigation toward known junction position
+        # BFS failed (path through unexplored territory): use greedy abs navigation toward junction
         action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
