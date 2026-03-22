@@ -39,3 +39,14 @@ Remaining issues: aligner has 53% move failure rate (wall bumping), miners accid
 Next: try 3 aligners (no miners), try different aligner_ids compositions.
 
 2026-03-21 22:00:00 PDT: starting new experiment loop, trying 3 aligners 0 miners (all alignment, no mining).
+
+2026-03-21 23:00:00 PDT: composition sweep results:
+- 3 aligners (1000 steps): 2.260 total, 6533 junction.held, 7 gained — BEST at 1000 steps
+- 3 aligners (2000 steps): 3.503 total, 9676 junction.held, 7 gained — diminishing returns
+- 4 aligners: 0.774 total — catastrophic, 2 agents lost gear to miner stations, high failure rates
+- 2A1M LLM: 1.199 total — planner contention hurt aligners despite 8 junctions gained
+- 1 aligner: 0.10 total — agent stuck, couldn't find junctions
+
+Conclusions: 3 agents is the sweet spot for this map. More agents hit spawn/navigation issues. The reward is dominated by junction alignment (held over time). Key improvement vectors: (1) align junctions earlier, (2) get more hearts, (3) prevent gear loss on undiscovered stations.
+
+2026-03-21 23:00:00 PDT: starting new experiment loop, trying to improve aligner initial speed by making the scripted fallback override smarter — when aligner has gear + heart but is stuck on explore, override to unstuck then explore again (don't get trapped in get_heart loops).
