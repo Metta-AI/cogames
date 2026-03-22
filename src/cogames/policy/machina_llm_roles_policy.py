@@ -184,11 +184,12 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         else:
             skill, reason = _parse_role_skill_choice(text, set(ALIGNER_SKILL_DESCRIPTIONS))
         if skill is None:
+            was_stuck_fb = state.recent_events and "exited as stuck" in state.recent_events[-1]
             if not has_aligner:
-                skill = "gear_up"
-            elif not has_heart and state.known_hubs:
+                skill = "explore" if was_stuck_fb else "gear_up"
+            elif not has_heart and state.known_hubs and not was_stuck_fb:
                 skill = "get_heart"
-            elif known_alignable_junctions:
+            elif known_alignable_junctions and not was_stuck_fb:
                 skill = "align_neutral"
             else:
                 skill = "explore"
