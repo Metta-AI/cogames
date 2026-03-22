@@ -411,11 +411,16 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         visible_target = self._starter._closest_tag_location(obs, self._aligner_station_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
+            # Try BFS (avoid hazards so we don't accidentally equip wrong gear)
             direction = self._bfs_first_direction(state, current_abs, target_abs)
             if direction is not None:
                 return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-            # Station is visible but BFS can't find a path - use greedy egocentric navigation
-            action, next_state = self._starter._move_toward(state, visible_target)
+            # BFS blocked even with visible target - skip hazard avoidance (we're already near the station)
+            direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
+            if direction is not None:
+                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+            # Last resort: greedy absolute navigation toward the visible station
+            action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
             return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_aligner_stations)
         if target_abs is None:
@@ -426,7 +431,8 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         direction = self._bfs_optimistic_direction(state, current_abs, target_abs)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        action, next_state = self._move_toward_target(state, current_abs, target_abs)
+        # Optimistic BFS failed (all paths blocked) - use greedy absolute navigation
+        action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def _get_heart(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
