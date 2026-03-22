@@ -49,6 +49,7 @@ class LLMAlignerState(AlignerState):
     no_progress_on_target_steps: int = 0
     last_has_heart: bool = False
     last_friendly_junctions: int = 0
+    consecutive_unstuck: int = 0
     recent_events: list[str] = field(default_factory=list)
 
 
@@ -97,6 +98,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             no_progress_on_target_steps=state.no_progress_on_target_steps,
             last_has_heart=state.last_has_heart,
             last_friendly_junctions=state.last_friendly_junctions,
+            consecutive_unstuck=state.consecutive_unstuck,
             recent_events=list(state.recent_events),
         )
 
@@ -217,6 +219,15 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         if has_aligner and has_heart and known_alignable_junctions and skill in {"explore", "get_heart"}:
             reason = f"overrode {skill} to align_neutral because an alignable neutral junction is already known"
             skill = "align_neutral"
+        # Break consecutive unstuck loops: after 2+ unstuck in a row, force explore to find new routes
+        if skill == "unstuck":
+            state.consecutive_unstuck += 1
+        else:
+            state.consecutive_unstuck = 0
+        if state.consecutive_unstuck >= 2 and skill == "unstuck":
+            skill = "explore"
+            reason = f"overrode unstuck to explore after {state.consecutive_unstuck} consecutive unstuck calls"
+            state.consecutive_unstuck = 0
         state.current_skill = skill
         state.current_reason = reason
         state.skill_steps = 0

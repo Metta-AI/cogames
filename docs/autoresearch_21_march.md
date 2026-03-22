@@ -53,6 +53,8 @@ Conclusions: 3 agents is the sweet spot for this map. More agents hit spawn/navi
 
 2026-03-21 23:30:00 PDT: I ran the experiments with get-heart loop fixes and scripted fallback loop fixes. Results are stable at ~2.260 for 3-aligner config. The game is highly deterministic with fixed map layout. Agent 0 always loses aligner gear to an undiscovered miner station early in the run, and agent 2 can't find hearts/junctions due to its spawn position. Only agent 1 successfully aligns junctions (all 7). The ceiling is imposed by: (1) 7 hearts maximum per 1000 steps from the hub, (2) agent 0 gear loss on undiscovered miner station, (3) deterministic map layout.
 
+2026-03-22 00:10:00 PDT: CRITICAL ANALYSIS: agent 0 in 2A1M gets 977 successes but never gets hearts because it loops unstuck→get_heart→stuck→unstuck×N (LLM chooses unstuck 3+ times in a row instead of explore). With mining and both aligners working, hub should have ~13 hearts (vs 7). Fix: after 2+ consecutive unstuck, force explore to find route to hub. This could double junctions from 7→13 → double junction.held → ~4.5 total reward.
+
 2026-03-22 00:00:00 PDT: USER CORRECTION - revert to machina_1 baseline environment. Arena experiments discarded (different reward structure, no competing team). Key insight from user: aligners need resources from miners to craft hearts. Need balanced composition with actual miners that deposit. Key data points:
 - 3-aligner (no miners): 2.260, 7 junctions, ~7 hearts (base hub supply)
 - 2A1M all-LLM: 1.199, 8 junctions, 13 hearts (miner deposited 504 resources → more hearts)
