@@ -291,7 +291,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             if state.current_skill == "align_neutral":
                 state.align_neutral_timeouts += 1
                 # After 2+ timeouts, forget the nearest junction to try a different target
-                if state.align_neutral_timeouts >= 2 and state.known_neutral_junctions:
+                if state.align_neutral_timeouts >= 1 and state.known_neutral_junctions:
                     current_abs = self._spawn_offset(obs)
                     stuck_junction = self._nearest_known(current_abs, state.known_neutral_junctions)
                     if stuck_junction is not None:
