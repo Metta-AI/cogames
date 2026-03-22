@@ -160,6 +160,32 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             return None
         return parents[step][1]
 
+    def _bfs_optimistic_direction(self, state: AlignerState, start: Coord, goal: Coord, avoid_hazards: bool = True) -> str | None:
+        """Optimistic BFS: treat unknown cells as traversable (only avoids known walls/hazards).
+        Useful when the path to goal goes through unexplored territory."""
+        if start == goal:
+            return self._starter._fallback_action_name
+        avoid = (state.known_hazard_stations - {goal}) if avoid_hazards else set()
+        frontier: deque[Coord] = deque([start])
+        parents: dict[Coord, tuple[Coord, str] | None] = {start: None}
+        while frontier:
+            cell = frontier.popleft()
+            if cell == goal:
+                break
+            for direction, neighbor in self._ordered_neighbors_toward(cell, goal):
+                if neighbor in parents or neighbor in state.blocked_cells or neighbor in avoid:
+                    continue
+                parents[neighbor] = (cell, direction)
+                frontier.append(neighbor)
+        if goal not in parents:
+            return None
+        step = goal
+        while parents[step] is not None and parents[step][0] != start:
+            step = parents[step][0]
+        if parents[step] is None:
+            return None
+        return parents[step][1]
+
     def _safe_wander(self, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
         """Wander but avoid stepping onto known hazard stations."""
         for _, (name, delta) in zip(range(4), _DIRECTION_DELTAS):
@@ -396,6 +422,10 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             if state.known_hubs:
                 return self._explore_near_hub(obs, state)
             return self._explore(obs, state)
+        # Try optimistic BFS: navigates through unknown territory toward known station
+        direction = self._bfs_optimistic_direction(state, current_abs, target_abs)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
@@ -417,7 +447,10 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        # BFS failed: use greedy abs navigation toward hub
+        # BFS failed: try optimistic BFS through unknown cells
+        direction = self._bfs_optimistic_direction(state, current_abs, target_abs, avoid_hazards=False)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
         action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
@@ -440,7 +473,11 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        # BFS failed (path through unexplored territory): use greedy abs navigation toward junction
+        # BFS failed: try optimistic BFS (treat unknown cells as traversable)
+        direction = self._bfs_optimistic_direction(state, current_abs, target_abs, avoid_hazards=False)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+        # Last resort: greedy absolute navigation toward known junction position
         action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
