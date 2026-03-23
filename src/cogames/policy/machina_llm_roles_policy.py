@@ -118,6 +118,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             align_neutral_timeouts=state.align_neutral_timeouts,
             get_heart_timeouts=state.get_heart_timeouts,
             recent_events=list(state.recent_events),
+            blacklisted_junctions=set(state.blacklisted_junctions),
         )
         return result
 
@@ -135,11 +136,11 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         return self._starter._closest_tag_location(obs, self._hub_tags) is not None
 
     def _known_alignable_junctions(self, state: LLMAlignerState) -> set[tuple[int, int]]:
-        neutral = {j for j in state.known_neutral_junctions if self._is_alignable(j, state)}
+        neutral = {j for j in state.known_neutral_junctions if self._is_alignable(j, state) and j not in state.blacklisted_junctions}
         if neutral:
             return neutral
         # Fall back to enemy junctions when no neutral ones available
-        return {j for j in state.known_enemy_junctions if self._is_alignable(j, state)}
+        return {j for j in state.known_enemy_junctions if self._is_alignable(j, state) and j not in state.blacklisted_junctions}
 
     def _update_progress(self, obs: AgentObservation, state: LLMAlignerState) -> None:
         has_heart = self._inventory_count(obs, "heart") > 0
@@ -333,18 +334,22 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
                 # After 1+ timeout, forget the nearest stuck junction to try a different target
                 if state.align_neutral_timeouts >= 1:
                     current_abs = self._spawn_offset(obs)
-                    if state.known_neutral_junctions:
-                        stuck_junction = self._nearest_known(current_abs, state.known_neutral_junctions)
+                    non_blacklisted_neutral = state.known_neutral_junctions - state.blacklisted_junctions
+                    non_blacklisted_enemy = state.known_enemy_junctions - state.blacklisted_junctions
+                    if non_blacklisted_neutral:
+                        stuck_junction = self._nearest_known(current_abs, non_blacklisted_neutral)
                         if stuck_junction is not None:
+                            state.blacklisted_junctions.add(stuck_junction)
                             state.known_neutral_junctions.discard(stuck_junction)
-                            self._event(state, f"forgot stuck neutral junction at {stuck_junction} after {state.align_neutral_timeouts} timeouts")
+                            self._event(state, f"blacklisted stuck neutral junction at {stuck_junction} after {state.align_neutral_timeouts} timeouts")
                             state.align_neutral_timeouts = 0
-                    elif state.known_enemy_junctions:
-                        # Also forget stuck enemy junctions (previously never forgotten = 24x timeout loop)
-                        stuck_junction = self._nearest_known(current_abs, state.known_enemy_junctions)
+                    elif non_blacklisted_enemy:
+                        # Also blacklist stuck enemy junctions
+                        stuck_junction = self._nearest_known(current_abs, non_blacklisted_enemy)
                         if stuck_junction is not None:
+                            state.blacklisted_junctions.add(stuck_junction)
                             state.known_enemy_junctions.discard(stuck_junction)
-                            self._event(state, f"forgot stuck enemy junction at {stuck_junction} after {state.align_neutral_timeouts} timeouts")
+                            self._event(state, f"blacklisted stuck enemy junction at {stuck_junction} after {state.align_neutral_timeouts} timeouts")
                             state.align_neutral_timeouts = 0
             elif state.current_skill == "get_heart":
                 state.get_heart_timeouts += 1

@@ -71,6 +71,8 @@ class AlignerState(StarterCogState):
     last_move_target: Coord | None = None
     # Cells blocked by move failure (not cleared by observation updates)
     move_blocked_cells: set[Coord] = field(default_factory=set)
+    # Junctions permanently skipped after repeated navigation failures
+    blacklisted_junctions: set[Coord] = field(default_factory=set)
 
 
 class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
@@ -598,11 +600,12 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         return False
 
     def _align_neutral(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
-        alignable = {junction for junction in state.known_neutral_junctions if self._is_alignable(junction, state)}
+        bl = state.blacklisted_junctions
+        alignable = {junction for junction in state.known_neutral_junctions if self._is_alignable(junction, state) and junction not in bl}
         target_abs = self._nearest_known(current_abs, alignable)
         if target_abs is None and state.known_enemy_junctions:
             # No neutral targets: try reclaiming enemy junctions (clips-held)
-            enemy_alignable = {j for j in state.known_enemy_junctions if self._is_alignable(j, state)}
+            enemy_alignable = {j for j in state.known_enemy_junctions if self._is_alignable(j, state) and j not in bl}
             target_abs = self._nearest_known(current_abs, enemy_alignable)
         if target_abs is None:
             return self._explore_for_alignment(obs, state)
