@@ -55,6 +55,7 @@ class LLMAlignerState(AlignerState):
     consecutive_unstuck: int = 0
     explore_start_junctions: int = 0
     align_neutral_timeouts: int = 0
+    get_heart_timeouts: int = 0
     recent_events: list[str] = field(default_factory=list)
     # HP monitoring
     max_hp_seen: int = 0
@@ -115,6 +116,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             consecutive_unstuck=state.consecutive_unstuck,
             explore_start_junctions=state.explore_start_junctions,
             align_neutral_timeouts=state.align_neutral_timeouts,
+            get_heart_timeouts=state.get_heart_timeouts,
             recent_events=list(state.recent_events),
         )
         return result
@@ -160,6 +162,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             (state.current_skill == "get_heart" and current_abs in state.known_hubs)
             or (state.current_skill == "align_neutral" and current_abs in self._known_alignable_junctions(state))
             or (state.current_skill == "gear_up" and current_abs in state.known_aligner_stations)
+            or (state.current_skill == "defend" and current_abs in state.known_friendly_junctions)
         )
         if made_progress:
             state.no_move_steps = 0
@@ -259,6 +262,10 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         if has_aligner and not has_heart and skill == "get_heart" and was_stuck and state.known_hubs:
             reason = "overrode get_heart to unstuck after stuck exit (escape navigation deadlock near hub)"
             skill = "unstuck"
+        # Hub likely depleted: after 1+ get_heart timeout, defend friendly junctions instead
+        if has_aligner and not has_heart and skill == "get_heart" and state.get_heart_timeouts >= 1 and state.known_friendly_junctions:
+            reason = f"overrode get_heart to defend after {state.get_heart_timeouts} timeouts (hub likely empty)"
+            skill = "defend"
         # Break explore→stuck loop when agent has gear+heart but no known junctions: try unstuck
         if has_aligner and has_heart and not known_alignable_junctions and skill == "explore" and was_stuck:
             reason = "overrode explore to unstuck after stuck exit (try escape moves to find junctions)"
@@ -289,6 +296,15 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             state.current_skill = None
         elif state.current_skill == "get_heart" and has_heart and state.skill_steps > 0:
             self._event(state, "get_heart completed after acquiring heart")
+            state.get_heart_timeouts = 0
+            state.current_skill = None
+        elif state.current_skill == "defend" and has_heart:
+            self._event(state, "defend ended: acquired heart while defending")
+            state.get_heart_timeouts = 0
+            state.current_skill = None
+        elif state.current_skill == "defend" and state.skill_steps >= self._stuck_threshold * 50:
+            self._event(state, "defend ended: trying get_heart again")
+            state.get_heart_timeouts = 0  # reset to allow another get_heart attempt
             state.current_skill = None
         elif state.current_skill == "align_neutral" and not has_heart and state.skill_steps > 0:
             self._event(state, "align_neutral completed after spending heart")
@@ -315,6 +331,8 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
                         state.known_neutral_junctions.discard(stuck_junction)
                         self._event(state, f"forgot stuck junction at {stuck_junction} after {state.align_neutral_timeouts} timeouts")
                         state.align_neutral_timeouts = 0
+            elif state.current_skill == "get_heart":
+                state.get_heart_timeouts += 1
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps without completion")
             state.current_skill = None
         elif state.current_skill not in {None, "gear_up"} and state.no_move_steps >= self._stuck_threshold:
@@ -394,6 +412,24 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         elif state.current_skill == "align_neutral":
             action, base_state = self._align_neutral(obs, state, current_abs)
             state = self._copy_with(state, base_state)
+        elif state.current_skill == "defend":
+            # Navigate to nearest friendly junction and hold position
+            current_abs = self._spawn_offset(obs)
+            if current_abs in state.known_friendly_junctions:
+                # Already on junction - stand and defend (noop)
+                action = self._starter._action("noop")
+            elif state.known_friendly_junctions:
+                target = self._nearest_known(current_abs, state.known_friendly_junctions)
+                direction = self._navigate_to_station(state, current_abs, target, avoid_hazards=False)
+                if direction:
+                    action = self._starter._action(f"move_{direction}")
+                    state.last_move_target = self._move_target(current_abs, direction)
+                else:
+                    action, base_state = self._explore(obs, state)
+                    state = self._copy_with(state, base_state)
+            else:
+                action, base_state = self._explore(obs, state)
+                state = self._copy_with(state, base_state)
         elif state.current_skill == "explore":
             if self._inventory_count(obs, "heart") > 0:
                 action, base_state = self._explore_for_alignment(obs, state)
