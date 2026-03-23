@@ -86,4 +86,61 @@ SESSION SUMMARY:
 - Baseline: 0.819 total reward (dc984a7, 1A2M LLM, 1000 steps)
 - BEST: 2.260 total reward (3 aligners, 1000 steps) = 2.76x improvement
 - Key discoveries: no_move_steps counter bug, explore completion bug, planner contention dominance, 3-agent sweet spot, alignment-focused composition wins, heart economy is fixed
-- Next agent should try: (1) Try to identify why agent 2 has cell.visited=557 (it's trapped in 557 cells). (2) Try a completely different model (faster LLM = less deadline exceeded = better planning). (3) Consider if game mechanics allow any way to increase heart generation beyond 7/1000steps.
+- Next agent should try: (1) The hub's heart supply (7/1000 steps) is exhausted by agent 1 before agents 0 and 2 can get any - this is the fundamental ceiling. Consider if there's a way to have agents share/coordinate heart collection. (2) Greedy hub navigation (new) helps agent 0 mobility (4.5% failure rate!) but doesn't help since hub is already drained. (3) The aligner explore completion bug (fixed) greatly improved agent 2 exploration (26236 vs 557 cells). (4) The deterministic game result (2.260 every single run) suggests a much longer episode or a different game config is needed to break the ceiling.
+
+---
+
+## FINAL SESSION SUMMARY FOR NEXT AGENT (2026-03-22)
+
+**Branch:** autoresearch_21_march | **Best result:** 2.260 total reward (0.753/agent) with 3 LLM aligners at 1000 steps on cogsguard_machina_1. This is **2.76x** the baseline (0.819, dc984a7).
+
+### Critical Bugs Fixed
+
+1. **`no_move_steps` not reset on skill change** — most impactful bug. Once an agent hit the stuck threshold (6), every subsequent skill immediately re-triggered stuck detection because the counter kept growing forever. Fixed in `_plan_skill` for both miner and aligner.
+
+2. **Aligner/miner `explore` completed immediately** when any junction/extractor was already known. Now tracks `explore_start_junctions` / `explore_start_extractors` and only completes when NEW ones are found. This fixed agent 2's exploration (cell.visited went from 557 to 26236).
+
+3. **`get_heart` / `gear_up` override loop**: when the previous skill exited as stuck, the override logic forced `get_heart` again immediately. Fixed with `was_stuck` check and `consecutive_unstuck` counter.
+
+### What Worked
+
+- **3 aligners, 0 miners** = optimal for machina_1 with 3 agents (2.260 vs 0.819). No miners needed — heart supply is ~7/1000 steps regardless of deposits.
+- **Scripted miners** (`kw.scripted_miners=true`) eliminate planner contention; miners follow gear→mine→deposit without LLM calls.
+- **Aligner hazard station avoidance**: BFS, wander, frontier stepping, and explore all avoid non-aligner gear stations. Prevents gear loss. All 3 agents now keep aligner gear every run.
+- **Consecutive unstuck fix**: after 2+ unstuck in a row, force `explore` instead. Helps agents break navigation deadlocks.
+- **Hub-biased navigation**: `_get_heart` uses greedy direction toward hub (absolute position delta) when BFS fails.
+- **Aligner explore completion fix**: explore runs until genuinely new junctions are found.
+- **Smart planner fallback**: scripted skill selection on LLM timeout instead of unstuck.
+
+### What Didn't Work / Dead Ends
+
+- **8+ agents on machina_1**: spawn positions 2-6 are physically trapped (97-99% stuck). Map topology issue, not code.
+- **Mining increases hearts**: FALSE. Heart supply fixed at ~7/1000 steps regardless of deposits. Tested exhaustively.
+- **Scripted aligners (`machina_roles`)**: agents step on miner station during first-encounter exploration. Gear auto-equip can't be prevented. LLM policy is required.
+- **More agents (4+) on machina_1**: degraded due to gear loss and planner contention.
+- **Larger stuck_threshold (12)**: much worse. Agents waste time in dead-ends.
+- **Larger unstuck_horizon (20)**: much worse.
+- **Faster LLM model (llama-3.1-8b)**: catastrophic. 49B nemotron model required.
+- **Arena map**: higher raw reward but different game mechanics (no competing clips team). User confirmed: use machina_1 only.
+
+### Fundamental Ceiling Analysis
+
+The 2.260 ceiling on 3-agent machina_1:
+1. **Heart supply capped at ~7/1000 steps** from the hub (fixed game mechanic, not affected by mining).
+2. **Only agent 1 can reach the hub in time**. Agents 0 and 2 have longer spawn-to-hub paths. By the time they arrive, all 7 hearts are taken by agent 1.
+3. **Agent 2 spawn is physically constrained** — even with all navigation fixes, limited map coverage.
+
+### To Break the Ceiling
+
+- **2000-step episodes** (~3.5 reward, same 7 junctions but held longer).
+- **Investigate hub heart generation rate** over longer episodes — does it scale with time or junction holding?
+- **Pre-seed aligner with hub/station coordinates** from machina_1 map to skip exploration phase entirely.
+- **Direct greedy navigation from spawn toward hub** before map is built — might let agent 0 reach hub before agent 1 drains it.
+- **Local LLM** (`feature/local-nemotron-llm` branch exists) — eliminates API latency, reduces "waiting for previous planner" fallbacks.
+
+### Best Run Command
+
+```bash
+source .env.openrouter.local && export PATH="$HOME/.nimble/bin:$PATH" && UV_CACHE_DIR=/tmp/uv-cache uv run cogames play -m cogsguard_machina_1 -c 3 -p class=machina_llm_roles,kw.num_aligners=3,kw.llm_timeout_s=20 -s 1000 -r log --autostart
+```
+Expected: 2.260 total, 6533 junction.held, 7 junctions, fully deterministic.
