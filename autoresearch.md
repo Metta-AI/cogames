@@ -53,6 +53,7 @@ Secondary objectives:
 once you have run your training 
 
 When an experiment is done, log it to docs/results_<branch_name>.tsv (tab-separated, NOT comma-separated — commas break in descriptions).
+Log also in docs/<branch>.md , that is your experiment logs! write your findigns and learnings so next researcher can also follow your direction. If you don't will be hard to figure out what you did later
 
 The TSV has a header row and 5 columns:
 
@@ -75,14 +76,14 @@ LOOP FOREVER:
 2. Tune skills and LLM policy with experimental idea by directly hacking the code, brainstorm what you should try, read other experiments in /docs and other previous commit, 
 WRITE TO <branch_name>.md: "<timestamp>: starting new experiment loop, in this experiment I want to try.. my hypothesis is.."
 3. git commit in the form "[EXPERIMENT=...][EXPERIMENT_START] wrote code.." and push to github
-4. Run the experiment
-5. Read out the results
-6. Record the results in the tsv and commit the results
-WRITE TO <branch_name>.md: "<timestamp>: I run my experiment, I found out that.. this is a good/bad result because.. next experiment next agent should probably try.."
-3. git commit in the form "[EXPERIMENT=...][EXPERIMENT_RESULTS] added ... reard to TSV" and push to github
-7. Push the branch to GitHub. If the branch does not exist remotely yet, create it with `git push -u origin <branch_name>`. After that, use `git push` after each kept result so the remote branch stays current.
-8. If reward improved you "advance" the branch, keeping the git commit
-9. If reward is equal or worse, you git reset back to where you started. If you had already pushed a discarded commit, bring the remote branch back in sync too.
+5. Run the experiment
+6. Read out the results
+7. Record the results in the tsv and commit the results
+8. WRITE TO <branch_name>.md: "<timestamp>: I run my experiment, I found out that.. this is a good/bad result because.. next experiment next agent should probably try.."
+9. git commit in the form "[EXPERIMENT=...][EXPERIMENT_RESULTS] added ... reard to TSV" and push to github
+10. Push the branch to GitHub. If the branch does not exist remotely yet, create it with `git push -u origin <branch_name>`. After that, use `git push` after each kept result so the remote branch stays current.
+11. If reward improved you "advance" the branch, keeping the git commit
+12. If reward is equal or worse, you git reset back to where you started. If you had already pushed a discarded commit, bring the remote branch back in sync too.
 
 The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
 

@@ -19,9 +19,40 @@ _DIRECTION_DELTAS: tuple[tuple[str, Coord], ...] = (
     ("south", (1, 0)),
     ("west", (0, -1)),
 )
+_DIRECTION_DELTA_MAP: dict[str, Coord] = {name: delta for name, delta in _DIRECTION_DELTAS}
 _HUB_SEARCH_DISTANCE = 20
 _HUB_ALIGN_DISTANCE = 25
 _JUNCTION_ALIGN_DISTANCE = 15
+
+# HP retreat: retreat to friendly territory when HP drops below this fraction of max
+_HP_RETREAT_THRESHOLD = 0.50
+# Distance from hub/friendly junction to be considered "in friendly territory"
+_FRIENDLY_TERRITORY_DISTANCE = 15
+
+
+class SharedMap:
+    """Shared map knowledge across all agents in the same team.
+
+    A single SharedMap instance is created by the MultiAgentPolicy and passed
+    to every agent.  Each agent's _update_map_memory writes to these sets,
+    so one agent's exploration instantly benefits all others' BFS.
+    """
+
+    def __init__(self) -> None:
+        # Core BFS graph
+        self.known_free_cells: set[Coord] = set()
+        self.blocked_cells: set[Coord] = set()
+        self.move_blocked_cells: set[Coord] = set()
+        # Structures (static — once seen, remembered forever)
+        self.known_hubs: set[Coord] = set()
+        self.known_aligner_stations: set[Coord] = set()
+        self.known_miner_stations: set[Coord] = set()
+        self.known_hazard_stations: set[Coord] = set()
+        self.known_extractors: set[Coord] = set()
+        # Junctions (dynamic — refreshed per visible area)
+        self.known_neutral_junctions: set[Coord] = set()
+        self.known_friendly_junctions: set[Coord] = set()
+        self.known_enemy_junctions: set[Coord] = set()
 
 
 @dataclass
@@ -35,11 +66,19 @@ class AlignerState(StarterCogState):
     known_friendly_junctions: set[Coord] = field(default_factory=set)
     known_enemy_junctions: set[Coord] = field(default_factory=set)
     known_hazard_stations: set[Coord] = field(default_factory=set)
+    # Track last attempted move to detect impassable objects on move failure
+    last_pos: Coord | None = None
+    last_move_target: Coord | None = None
+    # Cells blocked by move failure (not cleared by observation updates)
+    move_blocked_cells: set[Coord] = field(default_factory=set)
+    # Junctions permanently skipped after repeated navigation failures
+    blacklisted_junctions: set[Coord] = field(default_factory=set)
 
 
 class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
-    def __init__(self, policy_env_info: PolicyEnvInterface, agent_id: int):
+    def __init__(self, policy_env_info: PolicyEnvInterface, agent_id: int, shared_map: SharedMap | None = None):
         self._starter = StarterCogPolicyImpl(policy_env_info, agent_id, preferred_gear="aligner")
+        self._shared_map = shared_map
         self._team_tag = self._tag_id("team:cogs")
         self._net_tag = self._tag_id("net:cogs")
         self._enemy_team_tag = self._tag_id("team:clips")
@@ -78,12 +117,29 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                     names.add(object_name)
         return self._starter._resolve_tag_ids(sorted(names))
 
+    def _bind_shared_map(self, state: AlignerState) -> None:
+        """Point state's map fields at the SharedMap sets so all agents share one map."""
+        sm = self._shared_map
+        if sm is None:
+            return
+        state.known_free_cells = sm.known_free_cells
+        state.blocked_cells = sm.blocked_cells
+        state.move_blocked_cells = sm.move_blocked_cells
+        state.known_hubs = sm.known_hubs
+        state.known_aligner_stations = sm.known_aligner_stations
+        state.known_neutral_junctions = sm.known_neutral_junctions
+        state.known_friendly_junctions = sm.known_friendly_junctions
+        state.known_enemy_junctions = sm.known_enemy_junctions
+        state.known_hazard_stations = sm.known_hazard_stations
+
     def initial_agent_state(self) -> AlignerState:
         starter_state = self._starter.initial_agent_state()
-        return AlignerState(
+        state = AlignerState(
             wander_direction_index=starter_state.wander_direction_index,
             wander_steps_remaining=starter_state.wander_steps_remaining,
         )
+        self._bind_shared_map(state)
+        return state
 
     def _spawn_offset(self, obs: AgentObservation) -> Coord:
         row = 0
@@ -134,12 +190,12 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             return None
         return min(candidates, key=lambda coord: (abs(coord[0] - current_abs[0]) + abs(coord[1] - current_abs[1]), coord))
 
-    def _bfs_first_direction(self, state: AlignerState, start: Coord, goal: Coord) -> str | None:
+    def _bfs_first_direction(self, state: AlignerState, start: Coord, goal: Coord, avoid_hazards: bool = True) -> str | None:
         if start == goal:
             return self._starter._fallback_action_name
         if goal not in state.known_free_cells:
             return None
-        avoid = state.known_hazard_stations - {goal}
+        avoid = (state.known_hazard_stations - {goal}) if avoid_hazards else set()
         frontier: deque[Coord] = deque([start])
         parents: dict[Coord, tuple[Coord, str] | None] = {start: None}
         while frontier:
@@ -160,6 +216,72 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             return None
         return parents[step][1]
 
+    def _bfs_optimistic_direction(self, state: AlignerState, start: Coord, goal: Coord, avoid_hazards: bool = True, max_cells: int = 20000) -> str | None:
+        """Optimistic BFS: treat unknown cells as traversable (only avoids known walls/hazards).
+        Useful when the path to goal goes through unexplored territory."""
+        if start == goal:
+            return self._starter._fallback_action_name
+        avoid = (state.known_hazard_stations - {goal}) if avoid_hazards else set()
+        frontier: deque[Coord] = deque([start])
+        parents: dict[Coord, tuple[Coord, str] | None] = {start: None}
+        while frontier and len(parents) < max_cells:
+            cell = frontier.popleft()
+            if cell == goal:
+                break
+            for direction, neighbor in self._ordered_neighbors_toward(cell, goal):
+                if neighbor in parents or neighbor in state.blocked_cells or neighbor in avoid:
+                    continue
+                parents[neighbor] = (cell, direction)
+                frontier.append(neighbor)
+        if goal not in parents:
+            return None
+        step = goal
+        while parents[step] is not None and parents[step][0] != start:
+            step = parents[step][0]
+        if parents[step] is None:
+            return None
+        return parents[step][1]
+
+    def _best_approach_cell(self, state: AlignerState, current_abs: Coord, blocked_target: Coord) -> Coord | None:
+        """Find the best adjacent cell to a blocked target (e.g., a station object) to navigate toward.
+
+        Returns the adjacent cell closest to current_abs that is not in blocked_cells."""
+        candidates = [
+            (blocked_target[0] + dr, blocked_target[1] + dc)
+            for _, (dr, dc) in _DIRECTION_DELTAS
+            if (blocked_target[0] + dr, blocked_target[1] + dc) not in state.blocked_cells
+        ]
+        if not candidates:
+            return None
+        return min(candidates, key=lambda c: abs(c[0] - current_abs[0]) + abs(c[1] - current_abs[1]))
+
+    def _navigate_to_station(self, state: AlignerState, current_abs: Coord, station_abs: Coord, avoid_hazards: bool = True) -> str | None:
+        """Navigate toward a station object (which is in blocked_cells).
+
+        Targets the best adjacent cell to the station rather than the station itself."""
+        approach = self._best_approach_cell(state, current_abs, station_abs)
+        if approach is None:
+            return None
+        if current_abs == approach:
+            # Already adjacent - try moving into station directly (triggers equip)
+            dr = station_abs[0] - current_abs[0]
+            dc = station_abs[1] - current_abs[1]
+            if abs(dr) >= abs(dc):
+                return "south" if dr > 0 else "north"
+            return "east" if dc > 0 else "west"
+        direction = self._bfs_first_direction(state, current_abs, approach, avoid_hazards=avoid_hazards)
+        if direction is not None:
+            return direction
+        direction = self._bfs_optimistic_direction(state, current_abs, approach, avoid_hazards=avoid_hazards)
+        if direction is not None:
+            return direction
+        # Greedy toward the approach cell
+        dr = approach[0] - current_abs[0]
+        dc = approach[1] - current_abs[1]
+        if abs(dr) >= abs(dc):
+            return "south" if dr > 0 else "north"
+        return "east" if dc > 0 else "west"
+
     def _safe_wander(self, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
         """Wander but avoid stepping onto known hazard stations."""
         for _, (name, delta) in zip(range(4), _DIRECTION_DELTAS):
@@ -170,6 +292,21 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                 state.wander_direction_index = (idx + 1) % 4
                 return self._starter._action(f"move_{direction}"), state
         return self._starter._wander(state)
+
+    def _move_target(self, current_abs: Coord, direction: str) -> Coord:
+        """Compute the cell we'll be at if we move in `direction` from `current_abs`."""
+        dr, dc = _DIRECTION_DELTA_MAP.get(direction, (0, 0))
+        return (current_abs[0] + dr, current_abs[1] + dc)
+
+    def _greedy_move_toward_abs(self, state: AlignerState, current_abs: Coord, target_abs: Coord) -> tuple[Action, AlignerState]:
+        """Move greedily toward a known absolute position without BFS (ignores terrain knowledge)."""
+        dr = target_abs[0] - current_abs[0]
+        dc = target_abs[1] - current_abs[1]
+        if abs(dr) >= abs(dc):
+            direction = "south" if dr > 0 else "north"
+        else:
+            direction = "east" if dc > 0 else "west"
+        return self._starter._action(f"move_{direction}"), state
 
     def _move_to(self, state: AlignerState, current_abs: Coord, target_abs: Coord | None) -> tuple[Action, AlignerState]:
         if target_abs is None:
@@ -218,6 +355,15 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
 
     def _update_map_memory(self, obs: AgentObservation, state: AlignerState) -> Coord:
         current_abs = self._spawn_offset(obs)
+
+        # If we tried to move last step but didn't move, the target cell blocks movement.
+        # Add to move_blocked_cells (persists across observation updates) so BFS avoids it.
+        if state.last_pos is not None and state.last_move_target is not None:
+            if current_abs == state.last_pos:
+                state.move_blocked_cells.add(state.last_move_target)
+        state.last_pos = current_abs
+        state.last_move_target = None  # reset; set by callers before returning a move action
+
         visible_cells = self._visible_abs_cells(current_abs)
         visible_tag_ids_by_cell: dict[Coord, set[int]] = {}
         blocked_now: set[Coord] = set()
@@ -254,6 +400,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
 
         state.blocked_cells.difference_update(visible_cells)
         state.blocked_cells.update(blocked_now)
+        state.blocked_cells.update(state.move_blocked_cells)  # persist move-failure blocks
         state.known_free_cells.update(visible_cells - blocked_now)
         state.known_free_cells.difference_update(state.blocked_cells)
         state.known_free_cells.add(current_abs)
@@ -272,6 +419,27 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         if state.last_mode != mode:
             logger.info("agent=%s mode=%s", obs.agent_id, mode)
             state.last_mode = mode
+
+    def _read_hp(self, obs: AgentObservation) -> int | None:
+        """Read current HP from observation tokens."""
+        center = self._starter._center
+        for token in obs.tokens:
+            if token.location != center:
+                continue
+            name = token.feature.name
+            if name in ("hp", "energy", "hp:cogs", "hp:agent", "current_hp"):
+                return int(token.value)
+        return None
+
+    def _in_friendly_territory(self, current_abs: Coord, state: AlignerState) -> bool:
+        """Check if agent is near hub or a friendly junction (safe from HP drain)."""
+        for hub in state.known_hubs:
+            if abs(current_abs[0] - hub[0]) + abs(current_abs[1] - hub[1]) <= _FRIENDLY_TERRITORY_DISTANCE:
+                return True
+        for fj in state.known_friendly_junctions:
+            if abs(current_abs[0] - fj[0]) + abs(current_abs[1] - fj[1]) <= _FRIENDLY_TERRITORY_DISTANCE:
+                return True
+        return False
 
     def _move_toward_target(
         self,
@@ -375,14 +543,30 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         visible_target = self._starter._closest_tag_location(obs, self._aligner_station_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
-            action, next_state = self._move_toward_target(state, current_abs, target_abs)
+            # Station is visible - navigate to an adjacent cell (station itself is blocked)
+            direction = self._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
+            if direction is not None:
+                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+            # All adjacents also blocked - fall back to greedy toward station
+            action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
             return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_aligner_stations)
         if target_abs is None:
             if state.known_hubs:
-                return self._explore_near_hub(obs, state)
+                # Station not yet seen: navigate toward expected station position (hub_center+4 rows, -3 cols)
+                # Stations are placed 4 rows below hub center; aligner is leftmost (3 cols west of center).
+                hub_center = self._nearest_known(current_abs, state.known_hubs)
+                expected_station = (hub_center[0] + 4, hub_center[1] - 3)
+                direction = self._navigate_to_station(state, current_abs, expected_station, avoid_hazards=False)
+                if direction is not None:
+                    return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
             return self._explore(obs, state)
-        action, next_state = self._move_toward_target(state, current_abs, target_abs)
+        # Station known but not visible - navigate to approach cell
+        direction = self._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+        # All adjacents blocked - greedy toward station
+        action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def _get_heart(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
@@ -390,27 +574,21 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         visible_target = self._starter._closest_tag_location(obs, self._hub_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
-            direction = self._bfs_first_direction(state, current_abs, target_abs)
+            # Hub is a blocked object; navigate to adjacent approach cell then step into hub
+            direction = self._navigate_to_station(state, current_abs, target_abs, avoid_hazards=False)
             if direction is not None:
                 return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-            # Hub is visible but BFS can't find a path - use greedy egocentric navigation
-            action, next_state = self._starter._move_toward(state, visible_target)
+            action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
             return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_hubs)
         if target_abs is None:
             return self._explore(obs, state)
-        # Try direct BFS first
-        direction = self._bfs_first_direction(state, current_abs, target_abs)
+        # Hub known but not visible - navigate to approach cell via BFS/optimistic-BFS/greedy
+        direction = self._navigate_to_station(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        # BFS failed: move greedily toward hub using row/col deltas (ignores walls)
-        dr = target_abs[0] - current_abs[0]
-        dc = target_abs[1] - current_abs[1]
-        if abs(dr) >= abs(dc):
-            direction = "south" if dr > 0 else "north"
-        else:
-            direction = "east" if dc > 0 else "west"
-        return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+        action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
+        return action, replace(next_state, last_mode=state.last_mode)
 
     def _is_alignable(self, junction: Coord, state: AlignerState) -> bool:
         for hub in state.known_hubs:
@@ -422,22 +600,37 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
         return False
 
     def _align_neutral(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
-        alignable = {junction for junction in state.known_neutral_junctions if self._is_alignable(junction, state)}
+        bl = state.blacklisted_junctions
+        alignable = {junction for junction in state.known_neutral_junctions if self._is_alignable(junction, state) and junction not in bl}
         target_abs = self._nearest_known(current_abs, alignable)
+        if target_abs is None and state.known_enemy_junctions:
+            # No neutral targets: try reclaiming enemy junctions (clips-held)
+            enemy_alignable = {j for j in state.known_enemy_junctions if self._is_alignable(j, state) and j not in bl}
+            target_abs = self._nearest_known(current_abs, enemy_alignable)
         if target_abs is None:
             return self._explore_for_alignment(obs, state)
         self._log_mode(obs, state, "align_neutral")
-        # Try direct BFS; fall back to alignment-biased exploration if BFS can't find a path
-        direction = self._bfs_first_direction(state, current_abs, target_abs)
+        # Already have aligner gear - no need to avoid other stations, can't re-equip
+        direction = self._bfs_first_direction(state, current_abs, target_abs, avoid_hazards=False)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        action, next_state = self._explore_for_alignment(obs, state)
+        # BFS failed: try optimistic BFS (treat unknown cells as traversable)
+        direction = self._bfs_optimistic_direction(state, current_abs, target_abs, avoid_hazards=False)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
+        # Last resort: greedy absolute navigation toward known junction position
+        action, next_state = self._greedy_move_toward_abs(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
     def step_with_state(self, obs: AgentObservation, state: AlignerState) -> tuple[Action, AlignerState]:
         current_abs = self._update_map_memory(obs, state)
         if self._current_gear(obs) != "aligner":
-            return self._gear_up(obs, state, current_abs)
-        if self._inventory_count(obs, "heart") <= 0:
-            return self._get_heart(obs, state, current_abs)
-        return self._align_neutral(obs, state, current_abs)
+            action, state = self._gear_up(obs, state, current_abs)
+        elif self._inventory_count(obs, "heart") <= 0:
+            action, state = self._get_heart(obs, state, current_abs)
+        else:
+            action, state = self._align_neutral(obs, state, current_abs)
+        action_name = action.name if hasattr(action, "name") else ""
+        if action_name.startswith("move_"):
+            state.last_move_target = self._move_target(current_abs, action_name[len("move_"):])
+        return action, state

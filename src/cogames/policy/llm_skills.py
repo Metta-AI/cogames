@@ -34,13 +34,17 @@ class MinerSkillState(StarterCogState):
     known_miner_stations: set[Coord] = field(default_factory=set)
     known_extractors: set[Coord] = field(default_factory=set)
     known_hazard_stations: set[Coord] = field(default_factory=set)
+    # Move-failure tracking (same mechanism as AlignerState)
+    last_pos: Coord | None = None
+    last_move_target: Coord | None = None
 
 
 class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
     """Bounded miner skills plus navigation primitives shared by scripted and LLM-controlled miners."""
 
-    def __init__(self, policy_env_info: PolicyEnvInterface, agent_id: int, return_load: int):
+    def __init__(self, policy_env_info: PolicyEnvInterface, agent_id: int, return_load: int, shared_map=None):
         self._starter = StarterCogPolicyImpl(policy_env_info, agent_id, preferred_gear="miner")
+        self._shared_map = shared_map
         self._policy_env_info = policy_env_info
         self._hub_tags = self._starter._resolve_tag_ids(["hub"])
         miner_station_names = self._miner_station_names(policy_env_info)
@@ -74,12 +78,26 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
                     names.add(object_name)
         return self._starter._resolve_tag_ids(sorted(names))
 
+    def _bind_shared_map_miner(self, state: MinerSkillState) -> None:
+        """Point miner state's map fields at SharedMap sets."""
+        sm = self._shared_map
+        if sm is None:
+            return
+        state.known_free_cells = sm.known_free_cells
+        state.blocked_cells = sm.blocked_cells
+        state.known_hubs = sm.known_hubs
+        state.known_miner_stations = sm.known_miner_stations
+        state.known_extractors = sm.known_extractors
+        state.known_hazard_stations = sm.known_hazard_stations
+
     def initial_agent_state(self) -> MinerSkillState:
         starter_state = self._starter.initial_agent_state()
-        return MinerSkillState(
+        state = MinerSkillState(
             wander_direction_index=starter_state.wander_direction_index,
             wander_steps_remaining=starter_state.wander_steps_remaining,
         )
+        self._bind_shared_map_miner(state)
+        return state
 
     def _inventory_counts(self, obs: AgentObservation) -> dict[str, int]:
         counts: dict[str, int] = {}
@@ -140,8 +158,22 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         state.remembered_hub_row_from_spawn = hub_row
         state.remembered_hub_col_from_spawn = hub_col
 
+    def _move_target(self, current_abs: Coord, direction: str) -> Coord:
+        delta_map = {name: delta for name, delta in _DIRECTION_DELTAS}
+        dr, dc = delta_map.get(direction, (0, 0))
+        return (current_abs[0] + dr, current_abs[1] + dc)
+
     def _update_map_memory(self, obs: AgentObservation, state: MinerSkillState) -> None:
         current_abs = self._current_abs(obs)
+
+        # Move-failure tracking: if we tried to move but didn't, mark target as blocked
+        if state.last_pos is not None and state.last_move_target is not None:
+            if current_abs == state.last_pos:
+                if self._shared_map is not None:
+                    self._shared_map.move_blocked_cells.add(state.last_move_target)
+        state.last_pos = current_abs
+        state.last_move_target = None
+
         visible_cells = self._visible_abs_cells(current_abs)
         blocked_now: set[Coord] = set()
         hubs_now: set[Coord] = set()
@@ -166,6 +198,9 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
 
         state.blocked_cells.difference_update(visible_cells)
         state.blocked_cells.update(blocked_now)
+        # Re-apply persistent move-blocked cells from shared map
+        if self._shared_map and self._shared_map.move_blocked_cells:
+            state.blocked_cells.update(self._shared_map.move_blocked_cells)
         state.known_free_cells.update(visible_cells - blocked_now)
         state.known_free_cells.difference_update(state.blocked_cells)
         state.known_free_cells.add(current_abs)
@@ -239,6 +274,30 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             return None
         return parents[step][1]
 
+    def _bfs_optimistic_direction(self, state: MinerSkillState, start: Coord, goal: Coord, max_cells: int = 20000) -> str | None:
+        """Optimistic BFS: treat unknown cells as traversable, only avoid known walls."""
+        if start == goal:
+            return self._starter._fallback_action_name
+        frontier: deque[Coord] = deque([start])
+        parents: dict[Coord, tuple[Coord, str] | None] = {start: None}
+        while frontier and len(parents) < max_cells:
+            cell = frontier.popleft()
+            if cell == goal:
+                break
+            for direction, neighbor in self._neighbors(cell):
+                if neighbor in parents or neighbor in state.blocked_cells:
+                    continue
+                parents[neighbor] = (cell, direction)
+                frontier.append(neighbor)
+        if goal not in parents:
+            return None
+        step = goal
+        while parents[step] is not None and parents[step][0] != start:
+            step = parents[step][0]
+        if parents[step] is None:
+            return None
+        return parents[step][1]
+
     def _move_to(self, state: MinerSkillState, current_abs: Coord, target_abs: Coord | None) -> tuple[Action, MinerSkillState]:
         if target_abs is None:
             return self._starter._wander(state)
@@ -256,6 +315,11 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         if target_abs is None:
             return self._starter._wander(state)
         direction = self._bfs_first_direction(state, current_abs, target_abs)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), state
+
+        # BFS failed (path requires unexplored territory) - try optimistic BFS through unknown cells
+        direction = self._bfs_optimistic_direction(state, current_abs, target_abs)
         if direction is not None:
             return self._starter._action(f"move_{direction}"), state
 
