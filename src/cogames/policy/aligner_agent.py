@@ -24,6 +24,36 @@ _HUB_SEARCH_DISTANCE = 20
 _HUB_ALIGN_DISTANCE = 25
 _JUNCTION_ALIGN_DISTANCE = 15
 
+# HP retreat: retreat to friendly territory when HP drops below this fraction of max
+_HP_RETREAT_THRESHOLD = 0.50
+# Distance from hub/friendly junction to be considered "in friendly territory"
+_FRIENDLY_TERRITORY_DISTANCE = 15
+
+
+class SharedMap:
+    """Shared map knowledge across all agents in the same team.
+
+    A single SharedMap instance is created by the MultiAgentPolicy and passed
+    to every agent.  Each agent's _update_map_memory writes to these sets,
+    so one agent's exploration instantly benefits all others' BFS.
+    """
+
+    def __init__(self) -> None:
+        # Core BFS graph
+        self.known_free_cells: set[Coord] = set()
+        self.blocked_cells: set[Coord] = set()
+        self.move_blocked_cells: set[Coord] = set()
+        # Structures (static — once seen, remembered forever)
+        self.known_hubs: set[Coord] = set()
+        self.known_aligner_stations: set[Coord] = set()
+        self.known_miner_stations: set[Coord] = set()
+        self.known_hazard_stations: set[Coord] = set()
+        self.known_extractors: set[Coord] = set()
+        # Junctions (dynamic — refreshed per visible area)
+        self.known_neutral_junctions: set[Coord] = set()
+        self.known_friendly_junctions: set[Coord] = set()
+        self.known_enemy_junctions: set[Coord] = set()
+
 
 @dataclass
 class AlignerState(StarterCogState):
@@ -44,8 +74,9 @@ class AlignerState(StarterCogState):
 
 
 class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
-    def __init__(self, policy_env_info: PolicyEnvInterface, agent_id: int):
+    def __init__(self, policy_env_info: PolicyEnvInterface, agent_id: int, shared_map: SharedMap | None = None):
         self._starter = StarterCogPolicyImpl(policy_env_info, agent_id, preferred_gear="aligner")
+        self._shared_map = shared_map
         self._team_tag = self._tag_id("team:cogs")
         self._net_tag = self._tag_id("net:cogs")
         self._enemy_team_tag = self._tag_id("team:clips")
@@ -84,12 +115,29 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                     names.add(object_name)
         return self._starter._resolve_tag_ids(sorted(names))
 
+    def _bind_shared_map(self, state: AlignerState) -> None:
+        """Point state's map fields at the SharedMap sets so all agents share one map."""
+        sm = self._shared_map
+        if sm is None:
+            return
+        state.known_free_cells = sm.known_free_cells
+        state.blocked_cells = sm.blocked_cells
+        state.move_blocked_cells = sm.move_blocked_cells
+        state.known_hubs = sm.known_hubs
+        state.known_aligner_stations = sm.known_aligner_stations
+        state.known_neutral_junctions = sm.known_neutral_junctions
+        state.known_friendly_junctions = sm.known_friendly_junctions
+        state.known_enemy_junctions = sm.known_enemy_junctions
+        state.known_hazard_stations = sm.known_hazard_stations
+
     def initial_agent_state(self) -> AlignerState:
         starter_state = self._starter.initial_agent_state()
-        return AlignerState(
+        state = AlignerState(
             wander_direction_index=starter_state.wander_direction_index,
             wander_steps_remaining=starter_state.wander_steps_remaining,
         )
+        self._bind_shared_map(state)
+        return state
 
     def _spawn_offset(self, obs: AgentObservation) -> Coord:
         row = 0
@@ -370,6 +418,27 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
             logger.info("agent=%s mode=%s", obs.agent_id, mode)
             state.last_mode = mode
 
+    def _read_hp(self, obs: AgentObservation) -> int | None:
+        """Read current HP from observation tokens."""
+        center = self._starter._center
+        for token in obs.tokens:
+            if token.location != center:
+                continue
+            name = token.feature.name
+            if name in ("hp", "energy", "hp:cogs", "hp:agent", "current_hp"):
+                return int(token.value)
+        return None
+
+    def _in_friendly_territory(self, current_abs: Coord, state: AlignerState) -> bool:
+        """Check if agent is near hub or a friendly junction (safe from HP drain)."""
+        for hub in state.known_hubs:
+            if abs(current_abs[0] - hub[0]) + abs(current_abs[1] - hub[1]) <= _FRIENDLY_TERRITORY_DISTANCE:
+                return True
+        for fj in state.known_friendly_junctions:
+            if abs(current_abs[0] - fj[0]) + abs(current_abs[1] - fj[1]) <= _FRIENDLY_TERRITORY_DISTANCE:
+                return True
+        return False
+
     def _move_toward_target(
         self,
         state: AlignerState,
@@ -531,6 +600,10 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
     def _align_neutral(self, obs: AgentObservation, state: AlignerState, current_abs: Coord) -> tuple[Action, AlignerState]:
         alignable = {junction for junction in state.known_neutral_junctions if self._is_alignable(junction, state)}
         target_abs = self._nearest_known(current_abs, alignable)
+        if target_abs is None and state.known_enemy_junctions:
+            # No neutral targets: try reclaiming enemy junctions (clips-held)
+            enemy_alignable = {j for j in state.known_enemy_junctions if self._is_alignable(j, state)}
+            target_abs = self._nearest_known(current_abs, enemy_alignable)
         if target_abs is None:
             return self._explore_for_alignment(obs, state)
         self._log_mode(obs, state, "align_neutral")

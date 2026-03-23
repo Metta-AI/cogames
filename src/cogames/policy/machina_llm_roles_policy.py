@@ -7,7 +7,9 @@ import time
 from dataclasses import dataclass, field, replace
 from typing import Callable
 
-from cogames.policy.aligner_agent import AlignerPolicyImpl, AlignerState
+from cogames.policy.aligner_agent import (
+    AlignerPolicyImpl, AlignerState, SharedMap, _FRIENDLY_TERRITORY_DISTANCE, _HP_RETREAT_THRESHOLD,
+)
 from cogames.policy.llm_aligner_prompt import ALIGNER_SKILL_DESCRIPTIONS, build_llm_aligner_prompt
 from cogames.policy.llm_miner_policy import LLMMinerPlannerClient, LLMMinerPolicyImpl, LLMMinerState
 from cogames.policy.scout_agent import ScoutExplorerPolicyImpl, ScoutState
@@ -54,6 +56,9 @@ class LLMAlignerState(AlignerState):
     explore_start_junctions: int = 0
     align_neutral_timeouts: int = 0
     recent_events: list[str] = field(default_factory=list)
+    # HP monitoring
+    max_hp_seen: int = 0
+    retreating: bool = False
 
 
 class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState]):
@@ -66,35 +71,40 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         planner: LLMMinerPlannerClient,
         stuck_threshold: int,
         unstuck_horizon: int,
+        shared_map: SharedMap | None = None,
     ) -> None:
-        super().__init__(policy_env_info, agent_id)
+        super().__init__(policy_env_info, agent_id, shared_map=shared_map)
         self._planner = planner
         self._stuck_threshold = stuck_threshold
         self._unstuck_horizon = unstuck_horizon
 
     def initial_agent_state(self) -> LLMAlignerState:
         base = super().initial_agent_state()
-        return LLMAlignerState(
+        state = LLMAlignerState(
             wander_direction_index=base.wander_direction_index,
             wander_steps_remaining=base.wander_steps_remaining,
             last_mode=base.last_mode,
         )
+        self._bind_shared_map(state)
+        return state
 
     def _copy_with(self, state: LLMAlignerState, base: AlignerState) -> LLMAlignerState:
-        return replace(
+        sm = self._shared_map
+        result = replace(
             state,
             wander_direction_index=base.wander_direction_index,
             wander_steps_remaining=base.wander_steps_remaining,
             last_mode=base.last_mode,
-            known_free_cells=set(base.known_free_cells),
-            blocked_cells=set(base.blocked_cells),
-            move_blocked_cells=set(base.move_blocked_cells),
-            known_hubs=set(base.known_hubs),
-            known_aligner_stations=set(base.known_aligner_stations),
-            known_neutral_junctions=set(base.known_neutral_junctions),
-            known_friendly_junctions=set(base.known_friendly_junctions),
-            known_enemy_junctions=set(base.known_enemy_junctions),
-            known_hazard_stations=set(base.known_hazard_stations),
+            # With shared map: preserve shared references; without: copy sets
+            known_free_cells=sm.known_free_cells if sm else set(base.known_free_cells),
+            blocked_cells=sm.blocked_cells if sm else set(base.blocked_cells),
+            move_blocked_cells=sm.move_blocked_cells if sm else set(base.move_blocked_cells),
+            known_hubs=sm.known_hubs if sm else set(base.known_hubs),
+            known_aligner_stations=sm.known_aligner_stations if sm else set(base.known_aligner_stations),
+            known_neutral_junctions=sm.known_neutral_junctions if sm else set(base.known_neutral_junctions),
+            known_friendly_junctions=sm.known_friendly_junctions if sm else set(base.known_friendly_junctions),
+            known_enemy_junctions=sm.known_enemy_junctions if sm else set(base.known_enemy_junctions),
+            known_hazard_stations=sm.known_hazard_stations if sm else set(base.known_hazard_stations),
             current_skill=state.current_skill,
             current_reason=state.current_reason,
             skill_steps=state.skill_steps,
@@ -107,6 +117,7 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             align_neutral_timeouts=state.align_neutral_timeouts,
             recent_events=list(state.recent_events),
         )
+        return result
 
     def _event(self, state: LLMAlignerState, message: str) -> None:
         state.recent_events.append(message)
@@ -122,7 +133,11 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         return self._starter._closest_tag_location(obs, self._hub_tags) is not None
 
     def _known_alignable_junctions(self, state: LLMAlignerState) -> set[tuple[int, int]]:
-        return {junction for junction in state.known_neutral_junctions if self._is_alignable(junction, state)}
+        neutral = {j for j in state.known_neutral_junctions if self._is_alignable(j, state)}
+        if neutral:
+            return neutral
+        # Fall back to enemy junctions when no neutral ones available
+        return {j for j in state.known_enemy_junctions if self._is_alignable(j, state)}
 
     def _update_progress(self, obs: AgentObservation, state: LLMAlignerState) -> None:
         has_heart = self._inventory_count(obs, "heart") > 0
@@ -315,9 +330,49 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         state.wander_direction_index = (state.wander_direction_index + 1) % len(self._UNSTUCK_DIRECTIONS)
         return self._starter._action(f"move_{direction}"), state
 
+    def _check_hp(self, obs: AgentObservation, state: LLMAlignerState, current_abs) -> bool:
+        """Check HP and update retreat state. Returns True if agent should retreat."""
+        hp = self._read_hp(obs)
+        if hp is None:
+            return False
+        if hp > state.max_hp_seen:
+            state.max_hp_seen = hp
+        if state.max_hp_seen <= 0:
+            return False
+        hp_fraction = hp / state.max_hp_seen
+        in_friendly = self._in_friendly_territory(current_abs, state)
+        if hp_fraction < _HP_RETREAT_THRESHOLD and not in_friendly:
+            if not state.retreating:
+                logger.info("agent=%s HP_LOW hp=%d/%d (%.0f%%) retreating to friendly territory",
+                            obs.agent_id, hp, state.max_hp_seen, hp_fraction * 100)
+                self._event(state, f"HP low ({hp}/{state.max_hp_seen}), retreating")
+                state.retreating = True
+            return True
+        if state.retreating and (in_friendly or hp_fraction > 0.7):
+            logger.info("agent=%s HP_OK hp=%d/%d in_friendly=%s resuming",
+                        obs.agent_id, hp, state.max_hp_seen, in_friendly)
+            state.retreating = False
+        return False
+
     def step_with_state(self, obs: AgentObservation, state: LLMAlignerState) -> tuple[Action, LLMAlignerState]:
         current_abs = self._update_map_memory(obs, state)
         self._update_progress(obs, state)
+
+        # ── HP safety: retreat to hub/friendly territory if HP is low ──
+        if self._check_hp(obs, state, current_abs):
+            # Retreat to nearest hub or friendly junction
+            retreat_targets = state.known_hubs | state.known_friendly_junctions
+            if retreat_targets:
+                target = self._nearest_known(current_abs, retreat_targets)
+                direction = self._navigate_to_station(state, current_abs, target, avoid_hazards=False)
+                if direction:
+                    action = self._starter._action(f"move_{direction}")
+                    state.last_move_target = self._move_target(current_abs, direction)
+                    state.skill_steps += 1
+                    return action, state
+            # No known retreat target: wander safely
+            action, state = self._safe_wander(state, current_abs)
+            return action, state
 
         self._maybe_finish_skill(obs, state)
         if state.current_skill is None:
@@ -364,9 +419,9 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         self,
         policy_env_info: PolicyEnvInterface,
         device: str = "cpu",
-        num_aligners: int | str = 4,
+        num_aligners: int | str = 3,
         aligner_ids: str = "",
-        num_scouts: int | str = 0,
+        num_scouts: int | str = 1,
         scout_ids: str = "",
         return_load: int | str = 40,
         stuck_threshold: int | str = 20,
@@ -383,6 +438,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
     ):
         super().__init__(policy_env_info, device=device)
         self._scripted_miners = str(scripted_miners).lower() in ("true", "1", "yes")
+        self._shared_map = SharedMap()  # ONE map, shared by ALL agents
         n_agents = policy_env_info.num_agents
 
         # Resolve aligner IDs
@@ -427,6 +483,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
                     planner=self._planner,
                     stuck_threshold=self._stuck_threshold,
                     unstuck_horizon=self._unstuck_horizon,
+                    shared_map=self._shared_map,
                 )
             elif agent_id in self._scout_ids:
                 # Scouts are offset across the grid so multiple scouts cover
@@ -438,6 +495,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
                     self._policy_env_info,
                     agent_id,
                     grid_offset_fraction=offset_fraction,
+                    shared_map=self._shared_map,
                 )
             else:
                 impl = LLMMinerPolicyImpl(
@@ -447,6 +505,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
                     return_load=self._return_load,
                     stuck_threshold=self._stuck_threshold,
                     unstuck_horizon=self._unstuck_horizon,
+                    shared_map=self._shared_map,
                 )
             self._agent_policies[agent_id] = StatefulAgentPolicy(
                 impl,

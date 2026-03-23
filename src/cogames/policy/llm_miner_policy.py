@@ -168,23 +168,27 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
         return_load: int,
         stuck_threshold: int,
         unstuck_horizon: int,
+        shared_map=None,
     ) -> None:
-        super().__init__(policy_env_info, agent_id, return_load=return_load)
+        super().__init__(policy_env_info, agent_id, return_load=return_load, shared_map=shared_map)
         self._planner = planner
         self._stuck_threshold = stuck_threshold
         self._unstuck_horizon = unstuck_horizon
 
     def initial_agent_state(self) -> LLMMinerState:
         base = super().initial_agent_state()
-        return LLMMinerState(
+        state = LLMMinerState(
             wander_direction_index=base.wander_direction_index,
             wander_steps_remaining=base.wander_steps_remaining,
             last_mode=base.last_mode,
             remembered_hub_row_from_spawn=base.remembered_hub_row_from_spawn,
             remembered_hub_col_from_spawn=base.remembered_hub_col_from_spawn,
         )
+        self._bind_shared_map_miner(state)
+        return state
 
     def _copy_with(self, state: LLMMinerState, base: MinerSkillState) -> LLMMinerState:
+        sm = self._shared_map
         return replace(
             state,
             wander_direction_index=base.wander_direction_index,
@@ -192,12 +196,14 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             last_mode=base.last_mode,
             remembered_hub_row_from_spawn=base.remembered_hub_row_from_spawn,
             remembered_hub_col_from_spawn=base.remembered_hub_col_from_spawn,
-            known_free_cells=set(base.known_free_cells),
-            blocked_cells=set(base.blocked_cells),
-            known_hubs=set(base.known_hubs),
-            known_miner_stations=set(base.known_miner_stations),
-            known_extractors=set(base.known_extractors),
-            known_hazard_stations=set(base.known_hazard_stations),
+            known_free_cells=sm.known_free_cells if sm else set(base.known_free_cells),
+            blocked_cells=sm.blocked_cells if sm else set(base.blocked_cells),
+            known_hubs=sm.known_hubs if sm else set(base.known_hubs),
+            known_miner_stations=sm.known_miner_stations if sm else set(base.known_miner_stations),
+            known_extractors=sm.known_extractors if sm else set(base.known_extractors),
+            known_hazard_stations=sm.known_hazard_stations if sm else set(base.known_hazard_stations),
+            last_pos=base.last_pos,
+            last_move_target=base.last_move_target,
             current_skill=state.current_skill,
             current_reason=state.current_reason,
             skill_steps=state.skill_steps,
@@ -403,6 +409,12 @@ class LLMMinerPolicyImpl(MinerSkillImpl, StatefulPolicyImpl[LLMMinerState]):
             action, state = self._unstuck(state)
 
         state.skill_steps += 1
+        # Track last move target for move-failure feedback
+        action_name = action.name if hasattr(action, "name") else ""
+        if action_name.startswith("move_"):
+            current_abs = self._current_abs(obs)
+            direction = action_name[len("move_"):]
+            state.last_move_target = self._move_target(current_abs, direction)
         return action, state
 
 
