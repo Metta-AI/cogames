@@ -159,10 +159,20 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             or (state.current_skill == "align_neutral" and friendly_count > state.last_friendly_junctions)
             or (state.current_skill == "gear_up" and self._current_gear(obs) == "aligner")
         )
+        # Hub cells are blocked objects — agents stand adjacent, never on the hub cell itself.
+        # Use Manhattan distance ≤ 1 for get_heart so navigation-shake doesn't fire while waiting.
+        near_hub = any(
+            abs(current_abs[0] - h[0]) + abs(current_abs[1] - h[1]) <= 1
+            for h in state.known_hubs
+        )
+        near_aligner_station = any(
+            abs(current_abs[0] - s[0]) + abs(current_abs[1] - s[1]) <= 1
+            for s in state.known_aligner_stations
+        )
         stationary_on_valid_target = (
-            (state.current_skill == "get_heart" and current_abs in state.known_hubs)
+            (state.current_skill == "get_heart" and near_hub)
             or (state.current_skill == "align_neutral" and current_abs in self._known_alignable_junctions(state))
-            or (state.current_skill == "gear_up" and current_abs in state.known_aligner_stations)
+            or (state.current_skill == "gear_up" and near_aligner_station)
             or (state.current_skill == "defend" and current_abs in state.known_friendly_junctions)
         )
         if made_progress:
