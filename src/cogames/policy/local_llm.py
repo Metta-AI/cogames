@@ -14,6 +14,9 @@ import logging
 import os
 from typing import TYPE_CHECKING
 
+# Must be set before any torch import to take effect
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
 if TYPE_CHECKING:
     pass
 
@@ -46,7 +49,7 @@ class LocalLLMInference:
         self,
         model_path: str | None = None,
         *,
-        max_new_tokens: int = 60,
+        max_new_tokens: int = 50,
         device_map: str = "auto",
     ) -> None:
         self._model_path = model_path or os.environ.get("LOCAL_LLM_MODEL_PATH", "")
@@ -76,10 +79,6 @@ class LocalLLMInference:
                 "transformers is required for local LLM inference.\n"
                 "  pip install transformers accelerate"
             ) from exc
-
-        # Enable expandable memory segments to prevent OOM from fragmentation
-        # when model weights leave only ~2-3 GiB free for inference activations.
-        os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")
 
         logger.info("Loading local LLM from %s ...", self._model_path)
         self._pipeline = hf_pipeline(

@@ -17,7 +17,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field, replace
 
-from cogames.policy.aligner_agent import AlignerPolicyImpl, AlignerState, Coord, _DIRECTION_DELTAS, _DIRECTION_DELTA_MAP
+from cogames.policy.aligner_agent import AlignerPolicyImpl, AlignerState, Coord, SharedMap, _DIRECTION_DELTAS, _DIRECTION_DELTA_MAP
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Action
 from mettagrid.simulator.interface import AgentObservation
@@ -79,8 +79,9 @@ class ScoutExplorerPolicyImpl(AlignerPolicyImpl):
         map_half_col: int = _MAP_HALF_COL,
         grid_spacing: int = _GRID_SPACING,
         corner_margin: int = _CORNER_MARGIN,
+        shared_map: SharedMap | None = None,
     ) -> None:
-        super().__init__(policy_env_info, agent_id)
+        super().__init__(policy_env_info, agent_id, shared_map=shared_map)
         self._map_half_row = map_half_row
         self._map_half_col = map_half_col
         self._grid_spacing = grid_spacing
@@ -95,27 +96,30 @@ class ScoutExplorerPolicyImpl(AlignerPolicyImpl):
 
     def initial_agent_state(self) -> ScoutState:
         base = super().initial_agent_state()
-        return ScoutState(
+        state = ScoutState(
             wander_direction_index=base.wander_direction_index,
             wander_steps_remaining=base.wander_steps_remaining,
             last_mode=base.last_mode,
         )
+        self._bind_shared_map(state)
+        return state
 
     def _copy_with_scout(self, state: ScoutState, base: AlignerState) -> ScoutState:
+        sm = self._shared_map
         return replace(
             state,
             wander_direction_index=base.wander_direction_index,
             wander_steps_remaining=base.wander_steps_remaining,
             last_mode=base.last_mode,
-            known_free_cells=set(base.known_free_cells),
-            blocked_cells=set(base.blocked_cells),
-            move_blocked_cells=set(base.move_blocked_cells),
-            known_hubs=set(base.known_hubs),
-            known_aligner_stations=set(base.known_aligner_stations),
-            known_neutral_junctions=set(base.known_neutral_junctions),
-            known_friendly_junctions=set(base.known_friendly_junctions),
-            known_enemy_junctions=set(base.known_enemy_junctions),
-            known_hazard_stations=set(base.known_hazard_stations),
+            known_free_cells=sm.known_free_cells if sm else set(base.known_free_cells),
+            blocked_cells=sm.blocked_cells if sm else set(base.blocked_cells),
+            move_blocked_cells=sm.move_blocked_cells if sm else set(base.move_blocked_cells),
+            known_hubs=sm.known_hubs if sm else set(base.known_hubs),
+            known_aligner_stations=sm.known_aligner_stations if sm else set(base.known_aligner_stations),
+            known_neutral_junctions=sm.known_neutral_junctions if sm else set(base.known_neutral_junctions),
+            known_friendly_junctions=sm.known_friendly_junctions if sm else set(base.known_friendly_junctions),
+            known_enemy_junctions=sm.known_enemy_junctions if sm else set(base.known_enemy_junctions),
+            known_hazard_stations=sm.known_hazard_stations if sm else set(base.known_hazard_stations),
         )
 
     # ─────────────────────────────────────────────────────────────────────────

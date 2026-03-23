@@ -325,3 +325,30 @@ Also fixed: `num_aligners` was accidentally reverted to 3 in the reclaim commit;
 **Key insight:** SharedMap enables fast map sharing, but the bottleneck is heart supply (only 5 hearts from hub, no mining). A scout that improves map coverage doesn't help when the constraint is hearts, not navigation. The 4A+0S SharedMap config at 1.24 remains best.
 
 **True bottleneck:** `get_heart timeout` loop dominates late game — agents repeatedly try to get hearts from depleted hub, timing out after 100 steps each attempt. With 5 hearts and 4 agents, hearts are consumed in the first ~500 steps. The remaining ~1500 steps are wasted on futile `get_heart` attempts.
+
+---
+
+### `ff6913d` — **1.24** — 4A+defend (neutral)
+
+**Result:** reward=1.24, aligned=6, held=10378, heart=1.50/agent
+
+Added "defend" skill: when hub is depleted (get_heart timeouts >= 1), agents navigate to and stand on friendly junctions instead of futile get_heart attempts. Tested both threshold=2 (original) and threshold=1 (linter's more aggressive version).
+
+**No improvement.** Enemies don't recapture our junctions, so physically standing on them has no effect. The 48 defend events replaced futile get_heart timeouts but the held-step count is identical because junctions weren't being lost anyway.
+
+**Real bottleneck confirmed:** 24 align_neutral timeouts — agents know about 7 junctions but can only reach/align 6 of them. The 7th is likely in a region that BFS can't navigate to efficiently (enemy territory, blocked paths, or insufficient map coverage in that corridor).
+
+---
+
+## Summary of SharedMap Research Direction
+
+**SharedMap implementation: SUCCESS** — All agents share one map object by reference. Scout's exploration instantly benefits all aligners' BFS. Verified working with both mock and real LLM.
+
+**SharedMap impact on reward: MARGINAL** — With 4A+0S, SharedMap helps agents discover junctions faster but the binding constraint is heart supply (5 hearts), not map knowledge. By step 500, even without SharedMap, agents have explored enough map to find all 7 junctions.
+
+**Best result: 1.24 reward** (4A+0S, SharedMap, enemy junction reclaim, move-failure tracking)
+
+**Ceiling analysis:**
+- 5 hearts → 6 alignments max → 6 × ~1717 avg held steps = ~10,300 held → reward 1.24
+- Already at 86% of 6-junction theoretical max
+- Breaking through requires either: (a) mining hearts (impossible with 4 agents/GPU limit), or (b) aligning the 7th junction (24 timeouts suggest unreachable)
