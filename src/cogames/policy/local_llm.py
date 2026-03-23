@@ -67,6 +67,8 @@ class LocalLLMInference:
     def _load(self) -> None:
         """Load model and tokenizer into GPU memory (once)."""
         try:
+            import os
+
             import torch
             from transformers import pipeline as hf_pipeline
         except ImportError as exc:
@@ -74,6 +76,10 @@ class LocalLLMInference:
                 "transformers is required for local LLM inference.\n"
                 "  pip install transformers accelerate"
             ) from exc
+
+        # Enable expandable memory segments to prevent OOM from fragmentation
+        # when model weights leave only ~2-3 GiB free for inference activations.
+        os.environ.setdefault("PYTORCH_ALLOC_CONF", "expandable_segments:True")
 
         logger.info("Loading local LLM from %s ...", self._model_path)
         self._pipeline = hf_pipeline(
