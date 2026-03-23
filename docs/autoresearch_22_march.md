@@ -340,15 +340,73 @@ Added "defend" skill: when hub is depleted (get_heart timeouts >= 1), agents nav
 
 ---
 
-## Summary of SharedMap Research Direction
+---
 
-**SharedMap implementation: SUCCESS** — All agents share one map object by reference. Scout's exploration instantly benefits all aligners' BFS. Verified working with both mock and real LLM.
+## Final Session Summary (full session, 2026-03-22 → 2026-03-23)
 
-**SharedMap impact on reward: MARGINAL** — With 4A+0S, SharedMap helps agents discover junctions faster but the binding constraint is heart supply (5 hearts), not map knowledge. By step 500, even without SharedMap, agents have explored enough map to find all 7 junctions.
+### Reward trajectory
 
-**Best result: 1.24 reward** (4A+0S, SharedMap, enemy junction reclaim, move-failure tracking)
+```
+0.10 → 0.20 → 0.21 → 0.40 → 0.63 → 0.69 → 0.71 → 0.90 → 0.92 (1000 steps)
+                                                          0.612 → 1.19 → 1.24 (2000 steps)
+```
 
-**Ceiling analysis:**
-- 5 hearts → 6 alignments max → 6 × ~1717 avg held steps = ~10,300 held → reward 1.24
-- Already at 86% of 6-junction theoretical max
-- Breaking through requires either: (a) mining hearts (impossible with 4 agents/GPU limit), or (b) aligning the 7th junction (24 timeouts suggest unreachable)
+**Best result: 1.24 reward** (4A+0S, 2000 steps, seed=42, `cogsguard_machina_1.basic`)
+
+### What worked (biggest impact)
+
+1. **Fix navigation to blocked-cell objects (+57%, +26%)** — Stations, hubs, and junctions are all in `blocked_cells`. BFS targeting them returns `None` immediately. The universal fix: `_navigate_to_station` navigates to an adjacent free cell first, then steps onto the object. This single pattern fixed gear-up (af41f51, +57%) and get-heart (a07334f, +26%) in one shot. **Lesson: if BFS "just doesn't work" for a destination, check whether the target cell is walkable.**
+
+2. **Greedy BFS fallback + forget stuck junctions (+90%)** — When BFS finds no path (unexplored gap), fall back to greedy navigation toward the nearest frontier cell closest to the target. Combined with forgetting junctions after timeout so agents don't loop on the same unreachable target. Turned 2 aligned junctions into 9.
+
+3. **Optimistic BFS through unknown territory** — On 88×88 map with ~34% explored, standard BFS (known-free only) fails constantly. Optimistic BFS (treat unknown as free, avoid only known walls) is essential. Removing it is catastrophic (e043101).
+
+4. **Move-failure tracking for invisible obstacles (+25% at 2000 steps)** — 145 resource extractors on the map block movement but aren't tagged as walls. Tracking move failures and marking target cells as permanently blocked fixed the ~70% move failure rate. `max_steps_without_motion` dropped from 965 to 11.
+
+5. **4 agents, all aligners** — Going from 3A to 4A at 2000 steps nearly doubled reward (0.612 → 1.19). More aligners = more junctions aligned per heart, more parallel exploration, less wasted time per agent. No miners needed — hearts from hub are sufficient for 6 alignments.
+
+6. **action_timeout_ms calibration** — Default 250ms caused 397/399 LLM calls to timeout (producing noops). Setting to 10000ms (local LLM takes ~4s/call) eliminated this waste entirely.
+
+7. **Enemy junction reclaim** — When no neutral junctions remain, target enemy junctions. Small uplift (+4.2%) but conceptually important: agents don't idle when neutrals run out.
+
+### What didn't work
+
+1. **SharedMap + dedicated scout (3A+1S = 0.88 vs 4A+0S = 1.24)** — SharedMap itself works perfectly (one Python object, all agents share by reference, scout's discoveries instantly available to all aligners). But the scout earns zero reward, diluting the per-agent average by 25%. The map exploration benefit is real (12–13 known junctions vs 8–9) but irrelevant because the bottleneck is heart supply (5 hearts), not map knowledge. **At 2000 steps, even 4 aligners exploring organically discover enough of the map.**
+
+2. **Junction defense / "defend" skill (reward unchanged at 1.24)** — When hub is empty, agents switch from futile `get_heart` to standing on friendly junctions. No impact because enemies on this map don't recapture our junctions. The 48 defend events replaced futile get_heart timeouts but held-step count was identical.
+
+3. **5 agents (OOM)** — A40 has 44.43 GiB. Nemotron 9B in bf16 uses ~27 GiB for weights + inference. 4 agents leaves ~2.7 GiB free (barely enough). 5 agents pushes past the limit. Hardware ceiling at 4 agents confirmed across multiple attempts.
+
+4. **Scripted miners (3A+1M = 0.75)** — Miners can deposit resources, but heart crafting requires 7 of each element (28 total). With 4 elements scattered across the map, no single miner deposits enough of each type. Hearts never get crafted. Also, replacing an aligner with a miner costs more than it gains.
+
+5. **Longer unstuck sequences (unstuck_horizon=16)** — Wasted steps. Keep at 4.
+
+6. **Forget-stuck-junction after 1 timeout (vs 2)** — Faster recovery but fewer total junctions aligned. The tradeoff is a wash at best.
+
+### Key learnings
+
+**The reward function determines the strategy.** Reward is per-agent average of junction held-steps. This means: (a) every agent must contribute to held-steps or they dilute the average, (b) held time matters more than alignment count (holding 6 junctions for 1700 steps each > aligning 9 junctions for 800 steps each), (c) any "support" role (scout, miner) must be justified by proportionally more held-steps from the aligners it supports.
+
+**Identify the binding constraint before optimizing.** We spent significant effort on map exploration (SharedMap, scout, optimistic BFS) when the true ceiling was heart supply. The progression: navigation → map coverage → heart supply → hardware limit. Each fix shifted the bottleneck to the next constraint. Always ask "what prevents the next junction alignment?" before implementing.
+
+**The LLM is mostly a skill selector, not a navigator.** Navigation is deterministic BFS. The LLM picks which skill to execute next (gear_up, get_heart, align_neutral, explore, unstuck). The scripted override logic actually matters more than the LLM's choice — it catches invalid states (aligner choosing align_neutral without a heart), breaks infinite loops (consecutive unstuck), and enforces preconditions. The LLM's value is in novel situations the overrides don't cover.
+
+**GPU memory is the hardest constraint.** Nemotron 9B in bf16 uses ~27 GiB total (weights + KV cache + activations). On a 44 GiB A40, that leaves ~17 GiB for the game simulation + 4 agents. Any 5th agent tips OOM. The correct env var is `PYTORCH_CUDA_ALLOC_CONF` (not `PYTORCH_ALLOC_CONF`). Must be set before any torch import. `torch_dtype=torch.bfloat16` is required (not `dtype=` which silently loads in float32).
+
+**Concurrent GPU experiments are destructive.** The linter (Sonnet) runs its own experiments simultaneously. Two models on one GPU = instant OOM. Both crash, neither gets results. This wasted ~40% of experiment time. Need a GPU lock file or scheduling mechanism.
+
+### What to try next
+
+1. **Faster first alignment (high confidence, low effort)** — Current agents take ~200–300 steps to align their first junction (gear_up → get_heart → find junction → navigate → align). Reducing this by even 100 steps × 6 junctions = 600 more held-steps = ~5% reward gain. Concrete: hardcode initial BFS targets based on known hub layout, skip LLM call for the deterministic first gear_up.
+
+2. **Proactive extractor detection (medium confidence)** — Currently extractors are only detected after a move failure. If we tag-detect them on sight (they're visible in observation tokens), we could pre-populate `move_blocked_cells` and save the failed-move step. With 145 extractors, this could eliminate hundreds of wasted steps.
+
+3. **Smarter heart economy timing (medium confidence)** — With 5 hearts and 4 agents, ideally each agent gets exactly 1 heart and aligns 1 junction, with 1 spare heart for the fastest agent's 2nd alignment. Currently hearts are first-come-first-served with no coordination. A simple "round-robin" or "wait for all agents to align before anyone gets a 2nd heart" could ensure all 4 agents contribute.
+
+4. **Different mission or map (unknown confidence)** — `cogsguard_machina_1.basic` has 7 junctions and 5 hearts. Other missions might have better heart/junction ratios or easier layouts. The current 1.24 might be near-optimal for this specific map but far from optimal on others.
+
+5. **Smaller model for 5+ agents (medium confidence, high effort)** — A 3B-4B model in bf16 might use ~8-10 GiB, leaving room for 5-6 agents. The skill selection task is simple enough (pick from 5 skills given state) that a smaller fine-tuned model could match the 9B. This would break the hardware ceiling.
+
+6. **Quantized model (medium confidence, medium effort)** — GPTQ/AWQ 4-bit quantization of Nemotron 9B would use ~5-6 GiB instead of ~17 GiB for weights, leaving ample room for 5+ agents and larger KV cache. Quality loss on the simple skill-selection task should be minimal.
+
+7. **Multi-seed evaluation (high confidence, medium effort)** — All results are on seed=42. Running seeds 0-9 would reveal variance and whether 1.24 is lucky or stable. Could also identify seeds with better map layouts.
