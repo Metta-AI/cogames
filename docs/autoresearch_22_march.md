@@ -282,3 +282,46 @@ Also fixed: `num_aligners` was accidentally reverted to 3 in the reclaim commit;
 2. **Explore timeout**: when all junctions aligned, agents waste cycles on get_heart; add explicit "sit and defend" mode
 3. **Different seed**: try seed=0 to see if reward varies with map layout
 
+
+
+---
+
+### `11600c3` — **N/A** — 5aligners (-c 5) (**discard, OOM**)
+
+**Result:** OOM — CUDA out of memory (same as 4A+1M)
+
+5 agents (4 LLM aligners + 1 scripted scout) uses slightly more GPU memory than 4 agents, leaving only 2.68 GiB free (vs ~2.71 GiB for 4 agents). LLM inference needs exactly 3 GiB contiguous allocation; expandable_segments can't help when total free VRAM is below 3 GiB.
+
+**Confirmed hardware limit:** Maximum 4 agents on this GPU (A40 44.43 GiB, model 26.27 GiB, ~2.7 GiB free).
+
+**5A as config is dead.** To break past 6 alignments (current ceiling with 4A), need a different approach.
+
+**Revised analysis — achievable headroom with 4A:**
+- Theoretical max held_steps: 7 junctions × 2000 steps = 14,000 held
+- Current: 6 junctions × ~1717 avg held steps ≈ 10,300 held → reward=1.240
+- 86% of 6-junction theoretical maximum already achieved
+- To get 7th junction: need 7th heart (mining impossible with 4A only)
+- To improve with 4A: either (a) align junctions faster for more held time, or (b) prevent enemy recapture
+
+**Next hypothesis options:**
+1. **Junction defense**: When hub empty, agents stand on aligned junctions to prevent enemy recapture
+2. **Proactive enemy reclaim**: Monitor junction status; immediately return to re-align lost junctions
+3. **Faster first-alignment**: Optimize gear_up/navigation path so agents align junctions earlier in game
+
+---
+
+### `HEAD` — **0.88** — 3aligners-1scout (-c 4, SharedMap) (**discard**)
+
+**Result:** reward=0.88, cogs/aligned.junction.gained=6, cogs/aligned.junction.held=6800, heart.gained=1.75/agent, 112 LLM calls
+
+**SharedMap validation:** The scout correctly shares map knowledge with all 3 aligners — `known_neutral_junctions` reaches 12-13 (vs 8-9 without scout), `known_hubs=4` discovered faster. Scout explored systematically while aligners focused on alignment.
+
+**However, 3A+1S is worse than 4A+0S (0.88 vs 1.24):**
+- The 3 aligners actually held junctions longer (6800 > 5517 held steps for 4A+0S baseline)
+- But reward is per-agent average — scout earns 0 reward, diluting by 25%
+- The map exploration benefit (12→13 known junctions vs 8→9) doesn't translate to more alignments because heart supply (5 total) is the bottleneck, not map knowledge
+- At 2000 steps with shared map, even 4A+0S discovers enough of the map through aligner exploration alone
+
+**Key insight:** SharedMap enables fast map sharing, but the bottleneck is heart supply (only 5 hearts from hub, no mining). A scout that improves map coverage doesn't help when the constraint is hearts, not navigation. The 4A+0S SharedMap config at 1.24 remains best.
+
+**True bottleneck:** `get_heart timeout` loop dominates late game — agents repeatedly try to get hearts from depleted hub, timing out after 100 steps each attempt. With 5 hearts and 4 agents, hearts are consumed in the first ~500 steps. The remaining ~1500 steps are wasted on futile `get_heart` attempts.
