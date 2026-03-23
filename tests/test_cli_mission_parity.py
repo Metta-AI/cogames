@@ -1,6 +1,9 @@
 from pathlib import Path
 
 from cogames.cli.mission import get_mission
+from cogames.games.cogs_vs_clips.game.clips import AngryClipsVariant, ClipsVariant
+from cogames.games.cogs_vs_clips.game.clips.clips import JUNCTION_ALIGN_DISTANCE
+from cogames.games.cogs_vs_clips.missions.machina_1 import MachinaOneMission
 from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
 
 
@@ -15,6 +18,49 @@ def test_get_mission_accepts_reward_variants() -> None:
     assert "junction_aligned_by_agent" in rewards
     assert "junction_scrambled_by_agent" in rewards
     assert "gain_diversity" in rewards
+
+
+def test_get_mission_accepts_angry_clips_variant() -> None:
+    _, env_cfg, mission = get_mission(
+        "machina_1",
+        variants_arg=["angry_clips"],
+        cogs=8,
+    )
+
+    assert mission is not None
+    clips_v = mission.required_variant(ClipsVariant)
+    assert clips_v.clips is not None
+    assert clips_v.clips.angry_target_enemy_hub is True
+    assert clips_v.clips.greedy_expand_from_ships is False
+    assert clips_v.clips.scramble_radius == JUNCTION_ALIGN_DISTANCE
+    assert "neutral_to_clips" in env_cfg.game.events
+
+
+def test_parametrized_angry_clips_variant_updates_mission_settings() -> None:
+    mission = MachinaOneMission().with_variants(
+        [
+            AngryClipsVariant(
+                initial_clips_start=25,
+                align_start=50,
+                scramble_start=75,
+                align_interval=10,
+                scramble_interval=15,
+            )
+        ]
+    )
+    env_cfg = mission.make_env()
+
+    clips_v = mission.required_variant(ClipsVariant)
+    assert clips_v.clips is not None
+    assert clips_v.clips.angry_target_enemy_hub is True
+    assert clips_v.clips.greedy_expand_from_ships is False
+    assert clips_v.clips.scramble_radius == JUNCTION_ALIGN_DISTANCE
+    assert clips_v.clips.initial_clips_start == 25
+    assert clips_v.clips.align_start == 50
+    assert clips_v.clips.scramble_start == 75
+    assert clips_v.clips.align_interval == 10
+    assert clips_v.clips.scramble_interval == 15
+    assert "neutral_to_clips" in env_cfg.game.events
 
 
 def test_file_mission_honors_steps_override(tmp_path: Path) -> None:
