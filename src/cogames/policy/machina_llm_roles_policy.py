@@ -256,16 +256,9 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
             if known_alignable_junctions:
                 reason = "overrode get_heart to align_neutral (heart already held)"
                 skill = "align_neutral"
-            elif state.known_friendly_junctions and (state.align_neutral_timeouts >= 1 or state.blacklisted_junctions):
-                reason = f"overrode get_heart to defend: {state.align_neutral_timeouts} align timeout(s), {len(state.blacklisted_junctions)} blacklisted"
-                skill = "defend"
             else:
                 reason = "overrode get_heart to explore (heart already held, no target known)"
                 skill = "explore"
-        # All junctions aligned or out of range: defend instead of fruitless exploration
-        if has_aligner and has_heart and not known_alignable_junctions and state.known_friendly_junctions and (state.align_neutral_timeouts >= 1 or state.blacklisted_junctions) and skill in {"align_neutral", "explore"}:
-            reason = f"overrode {skill} to defend: no alignable junctions (timeouts={state.align_neutral_timeouts}, blacklisted={len(state.blacklisted_junctions)})"
-            skill = "defend"
         # After get_heart timeout/stuck with no heart: unstuck first to escape navigation deadlock
         if has_aligner and not has_heart and skill == "get_heart" and was_stuck and state.known_hubs:
             reason = "overrode get_heart to unstuck after stuck exit (escape navigation deadlock near hub)"
