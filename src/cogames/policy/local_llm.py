@@ -46,7 +46,7 @@ class LocalLLMInference:
         self,
         model_path: str | None = None,
         *,
-        max_new_tokens: int = 200,
+        max_new_tokens: int = 60,
         device_map: str = "auto",
     ) -> None:
         self._model_path = model_path or os.environ.get("LOCAL_LLM_MODEL_PATH", "")
@@ -103,15 +103,25 @@ class LocalLLMInference:
         ]
 
         logger.debug("local_llm_input messages=%s", messages)
-        outputs = self._pipeline(
-            messages,
-            max_new_tokens=self._max_new_tokens,
-            do_sample=False,
-            temperature=None,
-            top_p=None,
-        )
-        # transformers returns a list of dicts when given a list of messages
+        import gc
+
+        import torch
+        # Use inference_mode + empty_cache to minimize GPU memory footprint
+        with torch.inference_mode():
+            outputs = self._pipeline(
+                messages,
+                max_new_tokens=self._max_new_tokens,
+                do_sample=False,
+                temperature=None,
+                top_p=None,
+            )
+        # Extract text before cleaning up to allow full tensor release
         generated = outputs[0]["generated_text"]
+        # Explicit cleanup: delete outputs, collect garbage, then free CUDA cache
+        del outputs
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
         # ``generated_text`` is the full conversation; the last entry is
         # the assistant's new message.
         if isinstance(generated, list):

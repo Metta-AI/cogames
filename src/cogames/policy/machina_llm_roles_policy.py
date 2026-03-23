@@ -419,7 +419,7 @@ class MachinaLLMRolesPolicy(MultiAgentPolicy):
         self,
         policy_env_info: PolicyEnvInterface,
         device: str = "cpu",
-        num_aligners: int | str = 3,
+        num_aligners: int | str = 4,
         aligner_ids: str = "",
         num_scouts: int | str = 1,
         scout_ids: str = "",
