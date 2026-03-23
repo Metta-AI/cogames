@@ -261,3 +261,24 @@ If miners deposit resources, hub crafts hearts, aligners can cycle through more 
 
 ---
 
+
+### `6857db1` — **1.240** — reclaim-enemy-junctions + OOM fix (**new best**)
+
+**Result:** reward=1.240, junction.aligned_by_agent=1.50 (6 total), heart.gained=1.50/agent, max_steps_without_motion=11.25, 1 action timeout
+
+**+4.2% over 1.190 baseline!** Two changes:
+1. `_align_neutral` falls back to enemy junctions when no neutral ones available
+2. Miner move-failure tracking now writes to `shared_map.move_blocked_cells`
+3. **Critical fix:** `PYTORCH_ALLOC_CONF=expandable_segments:True` — model uses ~26 GiB, leaving ~2.7 GiB free; inference needs ~3 GiB; expandable segments allows non-contiguous allocation.
+
+Also fixed: `num_aligners` was accidentally reverted to 3 in the reclaim commit; restored to 4. The gc/delete fix (running gc before empty_cache) was less impactful than the allocator fix.
+
+**Key observation:** `junction.aligned_by_agent=1.50` is the same as before (6 total). Reward improvement may come from more stable navigation (fewer OOM crashes = cleaner episodes) rather than more alignments. Could also be small timing differences in junction alignment order.
+
+**Bottleneck unchanged:** Only 6 hearts available. Need heart replenishment to break past 6 alignments.
+
+**Next hypotheses:**
+1. **5 agents (-c 5, 4 aligners + 1 scripted miner)**: miner replenishes hearts enabling >6 alignments
+2. **Explore timeout**: when all junctions aligned, agents waste cycles on get_heart; add explicit "sit and defend" mode
+3. **Different seed**: try seed=0 to see if reward varies with map layout
+
