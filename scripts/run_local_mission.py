@@ -119,8 +119,8 @@ log.info("Mission loaded: %s agents=%d max_steps=%d", mission.description, env_c
 # PolicySpec takes a class path.  The local model path is threaded through the
 # class kwargs so the policy reads it at construction time.
 policy_spec = PolicySpec(
-    policy_cls_path=f"cogames.policy:{POLICY_NAME}",
-    policy_kwargs={},  # LOCAL_LLM_MODEL_PATH is picked up from env automatically
+    class_path=f"cogames.policy:{POLICY_NAME}",
+    init_kwargs={},  # LOCAL_LLM_MODEL_PATH is picked up from env automatically
 )
 
 log.info("Policy spec: %s", policy_spec)

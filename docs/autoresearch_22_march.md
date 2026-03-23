@@ -239,8 +239,25 @@ Also tested 2A+1S config with same code: reward=0.581 — scout hurts (replaces 
 **Remaining bottleneck**: still ~70% move failure rate. 145 extractors on map = many obstacles. Move-failure detection is reactive (fail then learn). Could be improved with proactive extractor tag detection.
 
 **Next experiments to try:**
-- 4A (4 agents total) — more aligners
 - Detect extractor/object tags proactively to pre-populate blocked_cells
 - Faster alignment: reduce time in gear_up/get_heart
 - Scout with 4 agents (3A+1S)
+
+---
+
+### `cc137e7` — **1.190** — 4-aligners (-c 4) (**confirmed best**)
+
+**Result:** reward=1.190, aligned_by_agent=1.50 (6 junctions total), heart.gained=1.50/agent, max_steps_without_motion=11, 1 LLM timeout
+
+**Confirmed previous 4A result.** Using `cogames run -m cogsguard_machina_1.basic -c 4 -p class=machina_llm_roles -e 1 -s 2000 --action-timeout-ms 10000 --seed 42`. Key insight: `-c 4` gives 4 total agents all aligners. `status.max_steps_without_motion=11` shows the move-failure-tracking is working perfectly (vs 965 before).
+
+**Bottleneck analysis:**
+- Hub starts with 5 hearts, no miners → hearts depleted quickly → only 6 total alignments
+- With all 7 junctions on map: agents aligned 6/7
+- Each heart buys one junction alignment; with no miners, heart supply is finite
+
+**Next hypothesis:** Add 1 scripted miner (-c 5, num_aligners=4, scripted_miners=true) to replenish hub hearts.
+If miners deposit resources, hub crafts hearts, aligners can cycle through more alignments = higher held-steps and reward.
+
+---
 
