@@ -323,14 +323,22 @@ class LLMAlignerPolicyImpl(AlignerPolicyImpl, StatefulPolicyImpl[LLMAlignerState
         elif state.current_skill in {"get_heart", "align_neutral"} and state.skill_steps >= self._stuck_threshold * 5:
             if state.current_skill == "align_neutral":
                 state.align_neutral_timeouts += 1
-                # After 2+ timeouts, forget the nearest junction to try a different target
-                if state.align_neutral_timeouts >= 1 and state.known_neutral_junctions:
+                # After 1+ timeout, forget the nearest stuck junction to try a different target
+                if state.align_neutral_timeouts >= 1:
                     current_abs = self._spawn_offset(obs)
-                    stuck_junction = self._nearest_known(current_abs, state.known_neutral_junctions)
-                    if stuck_junction is not None:
-                        state.known_neutral_junctions.discard(stuck_junction)
-                        self._event(state, f"forgot stuck junction at {stuck_junction} after {state.align_neutral_timeouts} timeouts")
-                        state.align_neutral_timeouts = 0
+                    if state.known_neutral_junctions:
+                        stuck_junction = self._nearest_known(current_abs, state.known_neutral_junctions)
+                        if stuck_junction is not None:
+                            state.known_neutral_junctions.discard(stuck_junction)
+                            self._event(state, f"forgot stuck neutral junction at {stuck_junction} after {state.align_neutral_timeouts} timeouts")
+                            state.align_neutral_timeouts = 0
+                    elif state.known_enemy_junctions:
+                        # Also forget stuck enemy junctions (previously never forgotten = 24x timeout loop)
+                        stuck_junction = self._nearest_known(current_abs, state.known_enemy_junctions)
+                        if stuck_junction is not None:
+                            state.known_enemy_junctions.discard(stuck_junction)
+                            self._event(state, f"forgot stuck enemy junction at {stuck_junction} after {state.align_neutral_timeouts} timeouts")
+                            state.align_neutral_timeouts = 0
             elif state.current_skill == "get_heart":
                 state.get_heart_timeouts += 1
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps without completion")
