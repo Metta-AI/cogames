@@ -33,7 +33,7 @@ ARENA_MAP_BUILDER = MapGen.Config(
 )
 
 
-def make_arena_map_builder(num_agents: int = 10) -> MapGenConfig:
+def make_arena_map_builder(num_agents: int = 8) -> MapGenConfig:
     """Create a CvC arena map builder with configurable agent count."""
     return MapGen.Config(
         width=50,

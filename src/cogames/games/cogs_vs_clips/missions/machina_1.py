@@ -175,12 +175,12 @@ class MachinaOneMission(CvCMission):
     sub_missions: list[str] = Field(default_factory=lambda: list(["solo", "clips", "auto_clips"]))
 
 
-def make_machina1_map_builder(num_agents: int = 10) -> MapGenConfig:
+def make_machina1_map_builder(num_agents: int = 8) -> MapGenConfig:
     """Create a Machina-1 map builder with configurable agent count."""
     return _build_machina1_map_builder(num_agents)
 
 
-def make_machina1_mission(num_agents: int = 10, max_steps: int = 10000) -> CvCMission:
+def make_machina1_mission(num_agents: int = 8, max_steps: int = 10000) -> CvCMission:
     """Create a CvC mission with clips and weather (Machina1 layout)."""
     return MachinaOneMission(
         map_builder=_build_machina1_map_builder(num_agents),

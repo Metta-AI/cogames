@@ -6,8 +6,10 @@ from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
 from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant as JunctionNetVariant
-from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
+from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
+from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_map_builder, make_machina1_mission
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
 from mettagrid.config.game_value import ConstValue, QueryCountValue, SumGameValue
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.query import ClosureQuery, MaterializedQuery
@@ -34,6 +36,19 @@ def test_make_cogs_vs_clips_scenario():
     """Test that make_cogs_vs_clips_scenario creates a valid configuration."""
     config = make_machina1_mission(num_agents=2).make_env()
     assert isinstance(config, MettaGridConfig)
+
+
+def test_cvc_helper_defaults_use_8_agents() -> None:
+    machina1_arena = find_machina_arena(make_machina1_map_builder())
+    arena = find_machina_arena(make_arena_map_builder())
+
+    assert machina1_arena is not None
+    assert machina1_arena.spawn_count == 8
+    assert arena is not None
+    assert arena.spawn_count == 8
+
+    env = make_machina1_mission().make_env()
+    assert env.game.num_agents == 8
 
 
 def test_machina_1_team_station_tags_win_under_dinky_normalization() -> None:
