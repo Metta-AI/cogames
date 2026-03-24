@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -113,10 +114,36 @@ class CoGameMission(Config, ABC):
 
     @classmethod
     def variant_module_prefixes(cls) -> tuple[str, ...]:
+        """Module prefixes for variant resolution. Defaults to the mission's own package."""
+        module = cls.__module__
+        # e.g. "metta.games.territories.game" -> "metta.games.territories."
+        last_dot = module.rfind(".")
+        if last_dot > 0:
+            return (module[: last_dot + 1],)
         return ()
+
+    @classmethod
+    def _ensure_variant_modules_loaded(cls) -> None:
+        """Auto-import variant modules from variant_module_prefixes so variant
+        classes are registered before resolution.  Tries ``{prefix}variants``
+        for each prefix (e.g. ``metta.games.hunger.variants``)."""
+        for prefix in cls.variant_module_prefixes():
+            module_name = prefix.rstrip(".") + ".variants" if not prefix.endswith("variants.") else prefix.rstrip(".")
+            try:
+                importlib.import_module(module_name)
+            except ModuleNotFoundError as e:
+                # Only suppress if the variants module itself doesn't exist.
+                # Re-raise if it exists but has a broken import inside it.
+                if e.name == module_name:
+                    continue
+                raise
 
     def with_variants(self, variants: Sequence[str | CoGameMissionVariant]) -> Self:
         copy = self.model_copy(deep=True)
+        # Import variant modules before resolving string names so the correct
+        # game-specific classes are registered (not same-named variants from
+        # other games that happened to be imported first).
+        copy._ensure_variant_modules_loaded()
         preferred_modules = copy.variant_module_prefixes()
         for v in variants:
             if isinstance(v, CoGameMissionVariant):
