@@ -49,6 +49,11 @@ _MATCH_ID = str(TEST_UUID_4)
 runner = CliRunner()
 
 
+@pytest.fixture(autouse=True)
+def _disable_display_for_cli_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("cogames.main.has_display", lambda: False)
+
+
 def _season_summary(
     name: str = "test-season",
     is_default: bool = True,
@@ -952,7 +957,7 @@ class TestSeasonLookupAuth:
         )
 
         with _mock_from_login(httpserver):
-            runner.invoke(
+            result = runner.invoke(
                 app,
                 [
                     "submit",
@@ -966,6 +971,8 @@ class TestSeasonLookupAuth:
                 ],
             )
 
+        assert result.exit_code == 0
+        assert "Browser launch skipped: no GUI display detected" in result.output
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons/test-season"]
         assert season_reqs, "Expected a request to /tournament/seasons/test-season"
         assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
