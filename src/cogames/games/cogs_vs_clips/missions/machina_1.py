@@ -26,6 +26,7 @@ from cogames.games.cogs_vs_clips.game.roles.scrambler import ScramblerVariant
 from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStationsVariant
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
 from cogames.games.cogs_vs_clips.game.teams.junction import TeamJunctionVariant
+from cogames.games.cogs_vs_clips.game.teams.junction_deposit import JunctionDepositVariant
 from cogames.games.cogs_vs_clips.game.teams.team import TeamVariant
 from cogames.games.cogs_vs_clips.game.territory.damage_strangers import DamageStrangersVariant
 from cogames.games.cogs_vs_clips.game.territory.heal_team import HealTeamVariant
@@ -114,6 +115,7 @@ class CvCMachina1Variant(CoGameMissionVariant):
                 ElementsVariant,
                 HeartVariant,
                 TeamJunctionVariant,
+                JunctionDepositVariant,
                 DamageVariant,
                 EnergyVariant,
                 CargoLimitVariant,

@@ -30,6 +30,7 @@ from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
 from cogames.games.cogs_vs_clips.missions.machina_1 import CvCMachina1Variant
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from mettagrid.config.filter import GameValueFilter, ResourceFilter
+from variants.conftest import StationTestHarness
 
 ELEMENTS = ElementsVariant().elements
 VIBE_NAMES = [v.name for v in VibesVariant().vibes]
@@ -122,6 +123,7 @@ class TestGearVariant:
         for agent in env.game.agents:
             assert "gear" in agent.inventory.limits
             gear = agent.inventory.limits["gear"]
+            assert gear.min == 1
             assert set(gear.resources) == set(GEAR)
 
     def test_adds_gear_stations(self):
@@ -319,9 +321,43 @@ class TestMachina1Variant:
         assert "team_territory" in env.game.territories
         assert len(env.game.agents) > 0
         assert "day" in env.game.events
+        assert {"deposit_cogs", "deposit_clips"} <= set(env.game.objects["junction"].on_use_handlers)
         for agent in env.game.agents:
             assert "hp" in agent.inventory.limits
             assert "energy" in agent.inventory.limits
+            assert agent.inventory.limits["gear"].min == 1
+            assert agent.inventory.limits["heart"].min == 10
+
+    def test_junction_deposit_forwards_resources_to_team_hub(self):
+        mission = CvCMission(
+            name="test",
+            description="test",
+            map_builder=make_arena_map_builder(num_agents=4),
+            min_cogs=4,
+            max_cogs=4,
+            num_cogs=4,
+            num_agents=4,
+            max_steps=100,
+        ).with_variants([CvCMachina1Variant()])
+        env = mission.make_env()
+        junction = env.game.objects["junction"].model_copy(
+            update={"tags": [*env.game.objects["junction"].tags, "team:cogs"]}
+        )
+        harness = StationTestHarness.create(
+            station=junction,
+            agent_inventory={"oxygen": 50},
+            agent_team="cogs",
+            tags=list(env.game.tags),
+            extra_objects=[env.game.objects["c:hub"]],
+        )
+        hub_oxygen_before = harness.object_inventory("hub").get("oxygen", 0)
+
+        harness.move_onto_station()
+
+        assert harness.agent_inventory().get("oxygen", 0) == 0
+        assert harness.object_inventory("hub").get("oxygen", 0) == hub_oxygen_before + 50
+
+        harness.close()
 
     def test_includes_clips(self):
         mission = CvCMission(
