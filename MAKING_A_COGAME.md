@@ -17,7 +17,7 @@ You describe your game entirely in Python config objects. MettaGrid handles the 
 - The **rewards** — what agents get credit for
 - The **events** — things that happen at specific timesteps
 
-**What agents see** is a token-based local window. By default, each agent observes an 11×11 grid around itself as a list of up to 200 tokens (each token has 3 values). Every visible object — agents, walls, resources, buildings — becomes a token describing its type, inventory, and tags. Agents also get a small set of global tokens: episode completion percentage, last action taken, last reward received. The window size and token budget are configurable in `ObsConfig`.
+**What agents see** is a token-based local window. By default, each agent observes an 11×11 grid around itself as a list of up to 300 tokens (each token has 3 values). Every visible object — agents, walls, resources, buildings — becomes a token describing its type, inventory, and tags. Agents also get a small set of global tokens: episode completion percentage, last action taken, last reward received. The window size and token budget are configurable in `ObsConfig`.
 
 ---
 
