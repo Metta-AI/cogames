@@ -14,7 +14,7 @@ from mettagrid.config.mettagrid_config import MettaGridConfig
 if TYPE_CHECKING:
     from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 
-DAMAGE_RATE = -10
+DAMAGE_RATE = -1
 
 
 class DamageStrangersVariant(CoGameMissionVariant):
