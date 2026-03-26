@@ -5,7 +5,14 @@ import sys
 import typer
 from rich.panel import Panel
 
-from cogames.auth import DEFAULT_COGAMES_SERVER, build_browser_login_url, has_saved_token, load_token, save_token
+from cogames.auth import (
+    DEFAULT_COGAMES_SERVER,
+    build_browser_login_url,
+    delete_token,
+    has_saved_token,
+    load_token,
+    save_token,
+)
 from cogames.cli.base import console
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
@@ -100,6 +107,22 @@ def login_cmd(
         raise typer.Exit(1) from e
 
     console.print("Authentication successful.", style="green")
+
+
+@auth_app.command(name="logout")
+def logout_cmd(
+    login_server: str = typer.Option(
+        DEFAULT_COGAMES_SERVER,
+        "--login-server",
+        metavar="URL",
+        help="Authentication server URL",
+    ),
+) -> None:
+    """Remove saved authentication token."""
+    if delete_token(token_kind=TokenKind.COGAMES, server=login_server):
+        console.print("Logged out.", style="green")
+    else:
+        console.print("No token found — already logged out.", style="yellow")
 
 
 @auth_app.command(name="get-login-url")
