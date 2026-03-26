@@ -10,11 +10,13 @@ from cogames.auth import has_saved_token, load_token
 from cogames.cli._model_base import CLIModel
 from cogames.cli.base import console
 from cogames.cli.generated_models import (
+    AssayRunResponse,
     EpisodeQueryResponse,
     EpisodeResponse,
     LeaderboardEntry,
     MatchResponse,
     MembershipHistoryEntry,
+    MissionSpec,
     PoliciesResponse,
     PolicySummary,
     PolicyVersionResponse,
@@ -421,6 +423,40 @@ class TournamentServerClient:
         if offset is not None:
             body["offset"] = offset
         return self._post("/stats/episodes/query", EpisodeQueryResponse, json=body)
+
+    # ---------------------------------------------------------------------------
+    # Assay endpoints
+    # ---------------------------------------------------------------------------
+
+    def create_assay_run(
+        self,
+        *,
+        policy_version_id: uuid.UUID,
+        missions: list[MissionSpec],
+        name: str | None = None,
+        compat_version: str | None = None,
+    ) -> AssayRunResponse:
+        body: dict = {
+            "policy_version_id": str(policy_version_id),
+            "missions": [m.model_dump() for m in missions],
+        }
+        if name is not None:
+            body["name"] = name
+        if compat_version is not None:
+            body["compat_version"] = compat_version
+        return self._post("/assay/runs", AssayRunResponse, json=body)
+
+    def get_assay_run(self, run_id: uuid.UUID) -> AssayRunResponse:
+        return self._get(f"/assay/runs/{run_id}", AssayRunResponse)
+
+    def list_assay_runs(self, policy_version_id: uuid.UUID | None = None) -> list[AssayRunResponse]:
+        params: dict[str, str] = {}
+        if policy_version_id is not None:
+            params["policy_version_id"] = str(policy_version_id)
+        return self._get("/assay/runs", list[AssayRunResponse], params=params if params else None)
+
+    def finalize_assay_run(self, run_id: uuid.UUID) -> AssayRunResponse:
+        return self._post(f"/assay/runs/{run_id}/finalize", AssayRunResponse)
 
     def browse_policies(
         self,
