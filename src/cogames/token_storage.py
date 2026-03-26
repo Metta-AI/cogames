@@ -70,3 +70,27 @@ def save_token(*, token_kind: TokenKind, server: str, token: str) -> None:
     with open(token_file, "w") as f:
         yaml.safe_dump(data, f, default_flow_style=False)
     os.chmod(token_file, 0o600)
+
+
+def delete_token(*, token_kind: TokenKind, server: str) -> bool:
+    token_file_name = _token_file_name(token_kind=token_kind)
+    token_storage_key = _token_storage_key(token_kind=token_kind)
+    data = _load_token_data(token_file_name=token_file_name)
+    assert isinstance(data, dict)
+
+    if token_storage_key:
+        tokens = data.get(token_storage_key, {})
+        assert isinstance(tokens, dict)
+        if server not in tokens:
+            return False
+        del tokens[server]
+    else:
+        if server not in data:
+            return False
+        del data[server]
+
+    token_file = _token_file_path(token_file_name=token_file_name)
+    with open(token_file, "w") as f:
+        yaml.safe_dump(data, f, default_flow_style=False)
+    os.chmod(token_file, 0o600)
+    return True
