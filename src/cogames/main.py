@@ -40,6 +40,7 @@ from cogames import play as play_module
 from cogames import train as train_module
 from cogames import verbose
 from cogames.auth import DEFAULT_COGAMES_SERVER, load_token
+from cogames.cli.assay import assay_app
 from cogames.cli.auth import auth_app
 from cogames.cli.base import console, emit_json
 from cogames.cli.client import SeasonDetail, TournamentServerClient
@@ -262,6 +263,7 @@ app.add_typer(tutorial_app, name="tutorial", rich_help_panel="Tutorials")
 app.add_typer(auth_app, name="auth", rich_help_panel="Tournament")
 app.add_typer(season_app, name="season", rich_help_panel="Tournament")
 app.add_typer(episode_app, name="episode", rich_help_panel="Tournament")
+app.add_typer(assay_app, name="assay", rich_help_panel="Tournament")
 
 
 def _help_callback(ctx: typer.Context, value: bool) -> None:
