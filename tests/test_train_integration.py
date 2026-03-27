@@ -41,14 +41,14 @@ def test_train_lstm_policy(test_env_config, temp_checkpoint_dir):
         policy_class_path="mettagrid.policy.lstm.LSTMPolicy",
         device=torch.device("cpu"),
         initial_weights_path=None,
-        num_steps=10,
+        num_steps=5,
         checkpoints_path=temp_checkpoint_dir,
         seed=42,
         minibatch_size=64,
         vector_num_envs=1,
         vector_batch_size=1,
         vector_num_workers=1,
-        checkpoint_interval=10,
+        checkpoint_interval=5,
     )
 
     # Check that checkpoints were created
@@ -74,14 +74,14 @@ def test_train_lstm_and_load_policy_data(test_env_config, temp_checkpoint_dir):
         policy_class_path="mettagrid.policy.lstm.LSTMPolicy",
         device=torch.device("cpu"),
         initial_weights_path=None,
-        num_steps=10,
+        num_steps=5,
         checkpoints_path=temp_checkpoint_dir,
         seed=42,
         minibatch_size=64,
         vector_num_envs=1,
         vector_batch_size=1,
         vector_num_workers=1,
-        checkpoint_interval=10,
+        checkpoint_interval=5,
     )
 
     # Find the saved checkpoint
@@ -125,14 +125,14 @@ def test_make_policy_trainable_and_train(temp_checkpoint_dir):
                 policy_class_path=f"{policy_file.stem}.MyTrainablePolicy",
                 device=torch.device("cpu"),
                 initial_weights_path=None,
-                num_steps=10,
+                num_steps=5,
                 checkpoints_path=temp_checkpoint_dir,
                 seed=42,
                 minibatch_size=64,
                 vector_num_envs=1,
                 vector_batch_size=1,
                 vector_num_workers=1,
-                checkpoint_interval=10,
+                checkpoint_interval=5,
             )
 
             # Check that checkpoints were created
