@@ -1,8 +1,13 @@
-greeting agent! your task is to improve the reward score on cogames by improving our LLM policies ! 
+greeting agent! you will be given a GitHub issue number. your task is to improve the reward score on cogames by improving our LLM policies, following the direction in that issue.
 
-you should have received two arguments
-- branch name: the name of the branch you will be iterating on
-- experiment direction: the direction of the experiment you need to follow for this session
+# Setup
+
+You will be invoked with an issue number, e.g. `autoresearch.md 10`.
+
+1. Fetch the issue: `gh issue view <N> --repo SolbiatiAlessandro/cogames`
+2. Read the issue title and body — that is your research direction for this session
+3. Create and checkout a branch named after the issue: `git checkout -b autoresearch/issue-<N>-<slug>` where slug is a short kebab-case summary of the issue title
+4. All experiment results and discussion go as **comments on the issue** via `gh issue comment <N> --repo SolbiatiAlessandro/cogames --body "..."` — do NOT write a separate discussion doc
 
 # Experimentation
 
@@ -50,7 +55,7 @@ Secondary objectives:
 
 # Output and logging
 
-once you have run your training 
+once you have run your training
 
 When an experiment is done, log it to docs/results_<branch_name>.tsv (tab-separated, NOT comma-separated — commas break in descriptions).
 Log also in docs/<branch>.md , that is your experiment logs! write your findigns and learnings so next researcher can also follow your direction. If you don't will be hard to figure out what you did later
@@ -67,23 +72,24 @@ short text description of what this experiment tried
 
 
 # The experiment loop
-The experiment runs on a dedicated branch (e.g. cogames/mar5 or cogames/mar5-gpu0).
+The experiment runs on the branch created in Setup above.
 That branch must also exist on GitHub so progress is backed up and visible remotely.
 
 LOOP FOREVER:
 
 1. Look at the git state: the current branch/commit we're on
-2. Tune skills and LLM policy with experimental idea by directly hacking the code, brainstorm what you should try, read other experiments in /docs and other previous commit, 
+2. Tune skills and LLM policy with experimental idea by directly hacking the code, brainstorm what you should try, read other experiments in /docs and other previous commit,
 WRITE TO <branch_name>.md: "<timestamp>: starting new experiment loop, in this experiment I want to try.. my hypothesis is.."
 3. git commit in the form "[EXPERIMENT=...][EXPERIMENT_START] wrote code.." and push to github
 5. Run the experiment
 6. Read out the results
 7. Record the results in the tsv and commit the results
 8. WRITE TO <branch_name>.md: "<timestamp>: I run my experiment, I found out that.. this is a good/bad result because.. next experiment next agent should probably try.."
-9. git commit in the form "[EXPERIMENT=...][EXPERIMENT_RESULTS] added ... reard to TSV" and push to github
-10. Push the branch to GitHub. If the branch does not exist remotely yet, create it with `git push -u origin <branch_name>`. After that, use `git push` after each kept result so the remote branch stays current.
-11. If reward improved you "advance" the branch, keeping the git commit
-12. If reward is equal or worse, you git reset back to where you started. If you had already pushed a discarded commit, bring the remote branch back in sync too.
+9. Post a comment on the issue with the results and interpretation: `gh issue comment <N> --repo SolbiatiAlessandro/cogames --body "..."`
+10. git commit in the form "[EXPERIMENT=...][EXPERIMENT_RESULTS] added ... reard to TSV" and push to github
+11. Push the branch to GitHub. If the branch does not exist remotely yet, create it with `git push -u origin <branch_name>`. After that, use `git push` after each kept result so the remote branch stays current.
+12. If reward improved you "advance" the branch, keeping the git commit
+13. If reward is equal or worse, you git reset back to where you started. If you had already pushed a discarded commit, bring the remote branch back in sync too.
 
 The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
 
