@@ -714,6 +714,56 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 expanded.add((hs[0] + dr, hs[1] + dc))
         return replace(state, known_hazard_stations=expanded)
 
+    def _navigate_to_station_safe(self, state: CrossRoleState, current_abs: Coord, target_abs: Coord) -> str | None:
+        """Navigate to target station: try BFS with hazards first, then BFS without hazards.
+
+        v6 fix: when hazard-aware BFS fails (path blocked by scout/scrambler stations),
+        fall back to BFS without hazard avoidance. The agent may cross intermediate stations
+        en route, but the final station overrides any intermediate gear changes.
+        """
+        direction = self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
+        if direction is not None:
+            return direction
+        # Hazard-aware BFS failed (path blocked by scout/scrambler); try without hazard avoidance.
+        # Crossing other stations en route is acceptable since the target station will override gear.
+        return self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=False)
+
+    def _gear_up_aligner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
+        """Gear up to aligner using BFS-with-hazards → BFS-without-hazards → greedy cascade.
+
+        v6 fix: when BFS-with-hazards fails (path blocked by scout/scrambler), try
+        BFS-without-hazards. Crossing other stations en route is acceptable since the
+        aligner station will override any intermediate gear changes.
+        """
+        visible_target = self._aligner._starter._closest_tag_location(obs, self._aligner._aligner_station_tags)
+        if visible_target is not None:
+            target_abs = self._aligner._visible_abs_cell(current_abs, visible_target)
+            direction = self._navigate_to_station_safe(state, current_abs, target_abs)
+            if direction is not None:
+                return self._aligner._starter._action(f"move_{direction}"), state
+            action, next_state = self._aligner._greedy_move_toward_abs(state, current_abs, target_abs)
+            return action, state
+        target_abs = self._aligner._nearest_known(current_abs, state.known_aligner_stations)
+        if target_abs is None:
+            if state.known_hubs:
+                action, base_state = self._aligner._explore_near_hub(obs, state)
+                return action, self._copy_with_shared(replace(state,
+                    wander_direction_index=base_state.wander_direction_index,
+                    wander_steps_remaining=base_state.wander_steps_remaining,
+                    last_mode=base_state.last_mode,
+                ))
+            action, base_state = self._aligner._explore(obs, state)
+            return action, self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+            ))
+        direction = self._navigate_to_station_safe(state, current_abs, target_abs)
+        if direction is not None:
+            return self._aligner._starter._action(f"move_{direction}"), state
+        action, next_state = self._aligner._greedy_move_toward_abs(state, current_abs, target_abs)
+        return action, state
+
     def _gear_up_miner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
         """Gear up to miner using hazard-aware navigation (avoids other gear stations + buffer).
 
@@ -722,11 +772,12 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         agents to route through scout/scrambler/aligner stations, accidentally equipping
         wrong gear. This version uses the aligner's _navigate_to_station with avoid_hazards=True
         and an expanded 1-cell buffer zone around hazard stations.
+        v6 fix: adds BFS-without-hazards as fallback before greedy navigation.
         """
         visible_target = self._miner._closest_visible_location(obs, self._miner._miner_station_tags)
         if visible_target is not None:
             target_abs = self._miner._visible_abs_cell(current_abs, visible_target)
-            direction = self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
+            direction = self._navigate_to_station_safe(state, current_abs, target_abs)
             if direction is not None:
                 return self._aligner._starter._action(f"move_{direction}"), state
             action, next_state = self._aligner._greedy_move_toward_abs(state, current_abs, target_abs)
@@ -746,7 +797,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 wander_steps_remaining=base_state.wander_steps_remaining,
                 last_mode=base_state.last_mode,
             ))
-        direction = self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
+        direction = self._navigate_to_station_safe(state, current_abs, target_abs)
         if direction is not None:
             return self._aligner._starter._action(f"move_{direction}"), state
         action, next_state = self._aligner._greedy_move_toward_abs(state, current_abs, target_abs)
@@ -806,13 +857,13 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 nav_state = replace(state, known_hazard_stations=state.known_hazard_stations - state.known_miner_stations)
             else:
                 nav_state = state
-            action, base_state = self._aligner._gear_up(obs, nav_state, current_abs)
+            action, base_state = self._gear_up_aligner_safe(obs, nav_state, current_abs)
             state = self._copy_with_shared(replace(state,
                 wander_direction_index=base_state.wander_direction_index,
                 wander_steps_remaining=base_state.wander_steps_remaining,
                 last_mode=base_state.last_mode,
-                last_pos=base_state.last_pos,
-                last_move_target=base_state.last_move_target,
+                last_pos=getattr(base_state, 'last_pos', state.last_pos),
+                last_move_target=getattr(base_state, 'last_move_target', state.last_move_target),
             ))
 
         elif skill == "gear_up_miner":
