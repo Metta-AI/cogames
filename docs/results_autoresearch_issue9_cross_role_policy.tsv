@@ -6,3 +6,6 @@ fccab42	0.43	aligned=8/held=3334/hearts=5/oxygen=41	1000	discard	cross-role v3: 
 013d5e7	0.10	aligned=0/held=0/hearts=2/silicon=50	1000	discard	cross-role v4: gear_up retry (5x); retry wasted entire episode + agents got scout gear accidentally; 0 junctions aligned
 a701f3b	0.10	aligned=0/held=0/hearts=2	1000	discard	cross-role v5: fallback gear (1 preferred+1 fallback); same scout gear bug; 0 aligners; 5 miners; 0 junctions
 86c7b98	0.39	aligned=5/held=2924/hearts=5/oxygen=40	1000	discard	cross-role v6: gear_up_completed guard; fallback works (agent0→miner); 2 aligners+5 miners; BUT 4/5 miners lose gear to scout during aligner-style explore
+dc28117	0.44	aligned=8/held=3428/hearts=7/oxygen=59	1000	keep	cross-role v7: miner-specific explore; miners use miner._explore_near_hub not aligner's; scout 3→1; 8 aligned (=baseline); best cross-role so far
+7df4d41	0.39	aligned=5/held=2921/hearts=5/oxygen=40/silicon=40	1000	discard	cross-role v8: re-acquire aligner gear after loss; no improvement; 1 aligner still loses gear
+e0784ae	0.55	aligned=12/held=4500/hearts=8	1000	keep	cross-role v9: 400-step timeout for worker skills; 93% reduction in deposit timeouts; 12 junctions aligned (>baseline!); best cross-role so far

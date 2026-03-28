@@ -241,3 +241,42 @@ Reason: re-acquire logic didn't help; same fundamental timeout issue.
 - Give worker skills a much larger timeout: `stuck_threshold * 20 = 400 steps` (separate check)
 - Keep `get_heart` and `align_neutral` at their existing timeouts
 - Expected: miners complete more mine/deposit cycles → more resources → more hearts → better holding
+
+## 2026-03-28: cross-role v9 result — 0.55 reward (BEST SO FAR, KEEP)
+
+**Result (commit e0784ae): 0.55 reward** — huge improvement from v7 (0.44).
+
+**What happened:**
+1. Worker skill timeouts extended: mine_until_full timed out 3 (vs 25), deposit_to_hub timed out 2 (vs 27) — 90%+ reduction ✓
+2. Miners now cycling properly: 23 mine_until_full completions, 10 deposit_to_hub completions (vs 7) ✓
+3. 12 junctions aligned (vs 8 in baseline!) ✓ — 2 aligners outperforming 3 in baseline due to better heart supply
+4. 8 hearts used (vs 6 baseline) ✓
+5. held=4500 (vs 5633 baseline) — still 20% below baseline
+6. BUT: miner.lost=0.50 per agent × 8 = 4 miners lost gear (death=0.88×8=7 total deaths)
+7. Agent 3: failed gear_up_miner AND gear_up_aligner both (200-step timeout each) → useless explorer entire episode
+
+**Remaining gaps:**
+1. Agent 3 wasted (no gear, just explores) — 400 steps of bootstrap + 600 steps of useless exploring
+2. 4 miners losing gear mid-episode (likely combat deaths) → respawn without gear → explore forever
+3. held=4500 vs 5633 — need more sustained aligning
+
+**Next: v10 - add miner re_acquire + agent 3 rescue retry**
+
+---
+
+## 2026-03-28: starting new experiment loop (cross-role v10: miner re_acquire + 3rd bootstrap attempt)
+
+**Hypothesis:**
+1. Dead miners can re_acquire gear after losing it (combat death → respawn → gear gone)
+2. Agent 3 (and similar) can retry gear acquisition after exploring (discovers stations via map exploration)
+
+**Root cause analysis for remaining gap:**
+- Agent 3: 400 steps wasted on bootstrap failures + 600 steps exploring uselessly
+- 4/5 miners lose gear during episode (7 deaths) → 4 miners become useless explorers
+- If miner re_acquire works: +4 miners back active → more resources → more hearts → better holding
+
+**Changes (v10):**
+- Add miner re_acquire: when gear="none", gear_up_completed=True, preferred="miner", re_acquire_attempts < 2 → gear_up_miner
+- Add "rescue retry" for agents that failed ALL bootstrap attempts: after exploring 50 steps post-failure, try gear_up one more time
+  - Track with new state field `gear_up_rescue_done: bool = False`
+  - Only fire when `gear_up_failures >= 2 and not gear_up_completed and not gear_up_rescue_done and state.known_miner_stations`
