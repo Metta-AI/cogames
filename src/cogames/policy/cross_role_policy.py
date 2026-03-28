@@ -734,41 +734,16 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         return replace(state, known_hazard_stations=expanded)
 
     def _navigate_to_station_safe(self, state: CrossRoleState, current_abs: Coord, target_abs: Coord) -> str | None:
-        """Navigate to target station: BFS-with-hazards → BFS-without-hazards → None (caller uses greedy).
+        """Navigate to target station using hazard-aware navigation.
 
-        v6/v7 fix: when hazard-aware BFS fails (path blocked by scout/scrambler stations),
-        try BFS without hazard avoidance. Crossing other stations en route is acceptable since
-        the target station overrides any intermediate gear changes.
+        Delegates to _navigate_to_station (BFS-strict → BFS-optimistic → greedy).
+        Returns None only when no approach cell exists (all adjacent cells blocked).
 
-        Returns None if all BFS variants fail (caller should use greedy fallback).
-        NOTE: does NOT call _navigate_to_station (which always returns a direction via greedy)
-        to allow the caller to distinguish "BFS found path" from "only greedy available".
+        v10: removed BFS-without-hazards — it caused contamination by routing through
+        scout/scrambler stations when those were the only known paths. The original
+        hazard-aware cascade (BFS+greedy) avoids contamination and is used here.
         """
-        approach = self._aligner._best_approach_cell(state, current_abs, target_abs)
-        if approach is None:
-            return None
-        if current_abs == approach:
-            # Already adjacent to station - bump into it
-            dr = target_abs[0] - current_abs[0]
-            dc = target_abs[1] - current_abs[1]
-            if abs(dr) >= abs(dc):
-                return "south" if dr > 0 else "north"
-            return "east" if dc > 0 else "west"
-        # Cascade: BFS with hazards (preferred clean path)
-        direction = self._aligner._bfs_first_direction(state, current_abs, approach, avoid_hazards=True)
-        if direction is not None:
-            return direction
-        direction = self._aligner._bfs_optimistic_direction(state, current_abs, approach, avoid_hazards=True)
-        if direction is not None:
-            return direction
-        # BFS without hazards (strict, known-cells only): routes through known free cells
-        # while ignoring hazard stations. Agent may cross contaminating stations en route,
-        # but the target station will override any intermediate gear.
-        # NOTE: we do NOT use _bfs_optimistic_direction(avoid_hazards=False) because
-        # optimistic-without-hazards routes through unknown cells that may be walls,
-        # causing the agent to get stuck for 20+ steps at each attempt.
-        direction = self._aligner._bfs_first_direction(state, current_abs, approach, avoid_hazards=False)
-        return direction  # None if all BFS variants fail
+        return self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
 
     def _gear_up_aligner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
         """Gear up to aligner using BFS-with-hazards → BFS-without-hazards → greedy cascade.
