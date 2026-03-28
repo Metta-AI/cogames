@@ -13,3 +13,4 @@ cd52915	0.48	aligned=7/held=?/hearts=9	1000	discard	cross-role v10: miner re_acq
 35a0d69	0.30	aligned=3/held=1979/hearts=5	1000	discard	cross-role v10-new: num_aligners=5; aligner station congestion; only 4 miners; resource shortage → only 3 aligned; BUT: agent3 SUCCEEDED at aligner gear when preferred=aligner (key finding)
 9a16479	0.32	aligned=4/held=2217/hearts=5	1000	discard	cross-role v11: num_aligners=4; 3 aligners succeed but hub depletes from 3× demand with 4 miners; agent3 stuck in get_heart stale loop; 2:5 aligner:miner is optimal
 d0d4290	0.45	aligned=9/held=?/hearts=7	1000	discard	cross-role v12: gear_up timeout 200→300 steps; agent3 STILL fails (truly isolated from stations); 200 more wasted steps → worse than v9
+e83bb57	0.41	aligned=5/held=?/hearts=5	1000	discard	cross-role v13: scripted skill selection (bypass LLM for obvious actions); caused infinite retry loops; status.max_steps_without_motion=195.5 vs 12 in v9; LLM diversity is essential

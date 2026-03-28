@@ -389,30 +389,6 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         gears = sm.agent_gears.values()
         return sum(1 for g in gears if g == "aligner"), sum(1 for g in gears if g == "miner")
 
-    def _scripted_skill(
-        self, obs: AgentObservation, state: CrossRoleState,
-        gear: str, has_heart: bool, carried: int,
-    ) -> tuple[str, str]:
-        """Return (skill, reason) when state unambiguously dictates action, else ('', '').
-
-        Skips LLM for trivially predictable decisions to save ~15 action timeouts/episode.
-        Only returns a skill when preconditions are definitely met and the choice is clear.
-        """
-        known_alignable = self._known_alignable_junctions(state)
-
-        if gear == "aligner":
-            if has_heart and known_alignable:
-                return "align_neutral", "scripted: aligner has heart + alignable junction known"
-            if not has_heart and state.known_hubs and state.get_heart_timeouts < 3:
-                return "get_heart", "scripted: aligner needs heart and hub known"
-        elif gear == "miner":
-            if carried >= self._return_load and state.known_hubs:
-                return "deposit_to_hub", "scripted: miner cargo full + hub known"
-            if carried < self._return_load and state.known_extractors:
-                return "mine_until_full", "scripted: miner needs to mine + extractor known"
-
-        return "", ""
-
     def _plan_skill(self, obs: AgentObservation, state: CrossRoleState) -> None:
         gear = self._current_gear(obs)
         has_heart = self._inventory_count(obs, "heart") > 0
@@ -450,19 +426,6 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                     state.no_progress_on_target_steps = 0
                     self._event(state, f"planner selected {skill}: {reason}")
                     return
-
-        # v13: Scripted skill selection — skip LLM when state clearly dictates action.
-        # Most LLM calls are trivially predictable; scripting them saves ~15 action timeouts/ep.
-        scripted_skill, scripted_reason = self._scripted_skill(obs, state, gear, has_heart, carried)
-        if scripted_skill:
-            logger.info("agent=%s scripted_skill=%s reason=%s", obs.agent_id, scripted_skill, scripted_reason)
-            state.current_skill = scripted_skill
-            state.current_reason = scripted_reason
-            state.skill_steps = 0
-            state.no_move_steps = 0
-            state.no_progress_on_target_steps = 0
-            self._event(state, f"planner selected {scripted_skill}: {scripted_reason}")
-            return
 
         team_aligners, team_miners = self._team_gear_counts()
         team_size = max(1, len(self._shared_map.agent_gears) if self._shared_map and hasattr(self._shared_map, "agent_gears") else 8)
