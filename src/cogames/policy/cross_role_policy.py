@@ -82,6 +82,9 @@ def build_cross_role_prompt(
     current_skill: str | None,
     no_move_steps: int,
     recent_events: list[str],
+    team_aligners: int = 0,
+    team_miners: int = 0,
+    team_size: int = 8,
 ) -> str:
     skills_text = "\n".join(f"- {name}: {desc}" for name, desc in CROSS_ROLE_SKILLS.items())
     events_text = "\n".join(f"- {e}" for e in recent_events[-6:]) or "- none"
@@ -89,10 +92,14 @@ def build_cross_role_prompt(
     # Build team analysis hint
     has_aligner_gear = current_gear == "aligner"
     has_miner_gear = current_gear == "miner"
-    has_no_gear = current_gear == "none"
 
     team_hint = ""
-    if known_neutral_junctions > 0 and not has_aligner_gear:
+    team_balance = team_aligners / max(1, team_aligners + team_miners)
+    if known_neutral_junctions > 0 and team_balance < 0.3:
+        team_hint = f"Hint: team has only {team_aligners} aligners/{team_size} agents — junctions available, consider aligner role."
+    elif known_extractors > 0 and team_balance > 0.7 and not has_miner_gear:
+        team_hint = f"Hint: team has {team_aligners} aligners already — consider miner role to supply hearts."
+    elif known_neutral_junctions > 0 and not has_aligner_gear:
         team_hint = "Hint: there are alignable junctions available — consider getting aligner gear."
     elif known_neutral_junctions == 0 and known_enemy_junctions > 0 and has_aligner_gear:
         team_hint = "Hint: no neutral junctions left, but enemy junctions can be reclaimed."
@@ -112,6 +119,10 @@ def build_cross_role_prompt(
         "- deposit_to_hub: requires current_gear == 'miner' AND carried_resources > 0\n"
         "Respond as JSON: {\"skill\": \"align_neutral\", \"reason\": \"...\"}\n\n"
         f"Available skills:\n{skills_text}\n\n"
+        f"Team state:\n"
+        f"- team_aligners: {team_aligners} (agents with aligner gear)\n"
+        f"- team_miners: {team_miners} (agents with miner gear)\n"
+        f"- team_size: {team_size}\n\n"
         f"Agent state:\n"
         f"- current_gear: {current_gear}\n"
         f"- has_heart: {has_heart}\n"
@@ -205,6 +216,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         unstuck_horizon: int,
         return_load: int,
         shared_map: SharedMap | None = None,
+        preferred_initial_gear: str = "",
     ) -> None:
         # Aligner impl handles aligner-specific skills (gear_up aligner station, get_heart, align_neutral)
         self._aligner = AlignerPolicyImpl(policy_env_info, agent_id, shared_map=shared_map)
@@ -215,6 +227,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         self._unstuck_horizon = unstuck_horizon
         self._return_load = return_load
         self._shared_map = shared_map
+        self._preferred_initial_gear = preferred_initial_gear
         # Store hub_tags for hub visibility check
         self._hub_tags = self._aligner._starter._resolve_tag_ids(["hub"])
 
@@ -364,11 +377,40 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             state.no_move_steps = 0
             state.no_progress_on_target_steps = 0
 
+    def _team_gear_counts(self) -> tuple[int, int]:
+        """Return (num_aligners, num_miners) across the team from shared map."""
+        sm = self._shared_map
+        if sm is None or not hasattr(sm, "agent_gears"):
+            return 0, 0
+        gears = sm.agent_gears.values()
+        return sum(1 for g in gears if g == "aligner"), sum(1 for g in gears if g == "miner")
+
     def _plan_skill(self, obs: AgentObservation, state: CrossRoleState) -> None:
         gear = self._current_gear(obs)
         has_heart = self._inventory_count(obs, "heart") > 0
         carried = self._carried_total(obs)
         known_alignable = self._known_alignable_junctions(state)
+
+        # Update shared gear tracking
+        if self._shared_map is not None and hasattr(self._shared_map, "agent_gears"):
+            self._shared_map.agent_gears[obs.agent_id] = gear
+
+        # Bootstrap: first plan with no gear uses preferred initial role (skips LLM)
+        if gear == "none" and not state.recent_events and self._preferred_initial_gear:
+            skill = f"gear_up_{self._preferred_initial_gear}"
+            reason = f"initial role: {self._preferred_initial_gear} (bootstrap)"
+            logger.info("agent=%s bootstrap_skill=%s", obs.agent_id, skill)
+            if skill in CROSS_ROLE_SKILLS:
+                state.current_skill = skill
+                state.current_reason = reason
+                state.skill_steps = 0
+                state.no_move_steps = 0
+                state.no_progress_on_target_steps = 0
+                self._event(state, f"planner selected {skill}: {reason}")
+                return
+
+        team_aligners, team_miners = self._team_gear_counts()
+        team_size = max(1, len(self._shared_map.agent_gears) if self._shared_map and hasattr(self._shared_map, "agent_gears") else 8)
 
         prompt = build_cross_role_prompt(
             current_gear=gear,
@@ -384,6 +426,9 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             current_skill=state.current_skill,
             no_move_steps=state.no_move_steps,
             recent_events=state.recent_events,
+            team_aligners=team_aligners,
+            team_miners=team_miners,
+            team_size=team_size,
         )
         logger.info("agent=%s cross_role_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
         started_at = time.perf_counter()
@@ -688,6 +733,7 @@ class CrossRolePolicy(MultiAgentPolicy):
         self,
         policy_env_info: PolicyEnvInterface,
         device: str = "cpu",
+        num_aligners: int | str = 3,
         return_load: int | str = 40,
         stuck_threshold: int | str = 20,
         unstuck_horizon: int | str = 4,
@@ -712,6 +758,7 @@ class CrossRolePolicy(MultiAgentPolicy):
             responder=llm_responder,
             local_model_path=llm_local_model_path,
         )
+        self._num_aligners = int(num_aligners)
         self._return_load = int(return_load)
         self._stuck_threshold = int(stuck_threshold)
         self._unstuck_horizon = int(unstuck_horizon)
@@ -719,6 +766,7 @@ class CrossRolePolicy(MultiAgentPolicy):
 
     def agent_policy(self, agent_id: int) -> StatefulAgentPolicy[CrossRoleState]:
         if agent_id not in self._agent_policies:
+            preferred = "aligner" if agent_id < self._num_aligners else "miner"
             impl = CrossRolePolicyImpl(
                 self._policy_env_info,
                 agent_id,
@@ -727,6 +775,7 @@ class CrossRolePolicy(MultiAgentPolicy):
                 unstuck_horizon=self._unstuck_horizon,
                 return_load=self._return_load,
                 shared_map=self._shared_map,
+                preferred_initial_gear=preferred,
             )
             self._agent_policies[agent_id] = StatefulAgentPolicy(
                 impl,

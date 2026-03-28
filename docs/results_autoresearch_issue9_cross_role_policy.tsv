@@ -1,2 +1,3 @@
 commit	mission_reward	secondary_rewards	steps	status	description
 baseline	0.66	aligned=8/held=5633/hearts=6	1000	keep	baseline 8A (3 aligners+5 miners) cloud LLM; hub oxygen deficit; EPISODE_RUNNER_USE_ISOLATED_VENVS=0 required
+15f24c4	0.49	aligned=6/held=3891/hearts=6/silicon=34/germanium=20	1000	discard	cross-role v1: all-LLM role selection; all 8 agents start as miners then switch; 2 accidental scramblers; team-state not in prompt
