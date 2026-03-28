@@ -67,6 +67,10 @@ def _parse_cross_role_skill(text: str) -> tuple[str | None, str]:
     return (skill if skill in CROSS_ROLE_SKILLS else None, str(reason))
 
 
+_ALIGNER_SKILLS = {k: v for k, v in CROSS_ROLE_SKILLS.items() if k in {"get_heart", "align_neutral", "explore", "unstuck"}}
+_MINER_SKILLS = {k: v for k, v in CROSS_ROLE_SKILLS.items() if k in {"mine_until_full", "deposit_to_hub", "explore", "unstuck"}}
+
+
 def build_cross_role_prompt(
     *,
     current_gear: str,
@@ -86,42 +90,39 @@ def build_cross_role_prompt(
     team_miners: int = 0,
     team_size: int = 8,
 ) -> str:
-    skills_text = "\n".join(f"- {name}: {desc}" for name, desc in CROSS_ROLE_SKILLS.items())
+    # Select skills relevant to current gear (no gear switching via LLM)
+    if current_gear == "aligner":
+        skill_set = _ALIGNER_SKILLS
+        role_hint = "You are in ALIGNER mode. Your job: get hearts, then align junctions."
+        preconditions = (
+            "- get_heart: requires current_gear == 'aligner' AND hub accessible\n"
+            "- align_neutral: requires current_gear == 'aligner' AND has_heart == true AND known_alignable_junctions > 0\n"
+        )
+    elif current_gear == "miner":
+        skill_set = _MINER_SKILLS
+        role_hint = "You are in MINER mode. Your job: mine resources, then deposit to hub."
+        preconditions = (
+            "- mine_until_full: requires current_gear == 'miner' AND known_extractors > 0\n"
+            "- deposit_to_hub: requires current_gear == 'miner' AND carried_resources > 0\n"
+        )
+    else:
+        # No gear yet — shouldn't reach LLM in normal flow (bootstrap handles it)
+        skill_set = {"explore": CROSS_ROLE_SKILLS["explore"], "unstuck": CROSS_ROLE_SKILLS["unstuck"]}
+        role_hint = "You have no gear yet — explore to discover stations."
+        preconditions = ""
+
+    skills_text = "\n".join(f"- {name}: {desc}" for name, desc in skill_set.items())
     events_text = "\n".join(f"- {e}" for e in recent_events[-6:]) or "- none"
 
-    # Build team analysis hint
-    has_aligner_gear = current_gear == "aligner"
-    has_miner_gear = current_gear == "miner"
-
-    team_hint = ""
-    team_balance = team_aligners / max(1, team_aligners + team_miners)
-    if known_neutral_junctions > 0 and team_balance < 0.3:
-        team_hint = f"Hint: team has only {team_aligners} aligners/{team_size} agents — junctions available, consider aligner role."
-    elif known_extractors > 0 and team_balance > 0.7 and not has_miner_gear:
-        team_hint = f"Hint: team has {team_aligners} aligners already — consider miner role to supply hearts."
-    elif known_neutral_junctions > 0 and not has_aligner_gear:
-        team_hint = "Hint: there are alignable junctions available — consider getting aligner gear."
-    elif known_neutral_junctions == 0 and known_enemy_junctions > 0 and has_aligner_gear:
-        team_hint = "Hint: no neutral junctions left, but enemy junctions can be reclaimed."
-    elif known_extractors > 0 and not has_miner_gear and carried_resources == 0:
-        team_hint = "Hint: extractors are available for mining — consider getting miner gear."
-
     return (
-        "You are a flexible cog agent in CoGames. Your team wins by aligning and holding junctions.\n"
-        "You can be an aligner (align junctions for reward) OR a miner (deposit resources so hearts can be crafted).\n"
-        "Choose the skill that maximizes team reward RIGHT NOW based on what the team needs most.\n\n"
-        "Preconditions:\n"
-        "- gear_up_aligner: only if current_gear != 'aligner'\n"
-        "- gear_up_miner: only if current_gear != 'miner'\n"
-        "- get_heart: requires current_gear == 'aligner'\n"
-        "- align_neutral: requires current_gear == 'aligner' AND has_heart == true AND known_alignable_junctions > 0\n"
-        "- mine_until_full: requires current_gear == 'miner'\n"
-        "- deposit_to_hub: requires current_gear == 'miner' AND carried_resources > 0\n"
-        "Respond as JSON: {\"skill\": \"align_neutral\", \"reason\": \"...\"}\n\n"
+        f"You are a cog agent in CoGames. {role_hint}\n"
+        "Your team wins by aligning and holding junctions.\n\n"
+        f"Preconditions:\n{preconditions}"
+        "Respond as JSON: {\"skill\": \"<skill_name>\", \"reason\": \"...\"}\n\n"
         f"Available skills:\n{skills_text}\n\n"
         f"Team state:\n"
-        f"- team_aligners: {team_aligners} (agents with aligner gear)\n"
-        f"- team_miners: {team_miners} (agents with miner gear)\n"
+        f"- team_aligners: {team_aligners}\n"
+        f"- team_miners: {team_miners}\n"
         f"- team_size: {team_size}\n\n"
         f"Agent state:\n"
         f"- current_gear: {current_gear}\n"
@@ -137,7 +138,6 @@ def build_cross_role_prompt(
         f"- known_alignable_junctions: {known_neutral_junctions + known_enemy_junctions}\n"
         f"- current_skill: {current_skill or 'none'}\n"
         f"- no_move_steps: {no_move_steps}\n"
-        f"{team_hint + chr(10) if team_hint else ''}"
         f"\nRecent events:\n{events_text}\n"
     )
 
@@ -432,7 +432,16 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         )
         logger.info("agent=%s cross_role_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
         started_at = time.perf_counter()
-        text = self._planner.complete(prompt)
+        text = ""
+        for attempt in range(3):
+            try:
+                text = self._planner.complete(prompt)
+                break
+            except Exception as exc:
+                wait_s = 3.0 * (attempt + 1)
+                logger.warning("agent=%s LLM attempt %d failed (%s), retrying in %.0fs", obs.agent_id, attempt + 1, exc, wait_s)
+                if attempt < 2:
+                    time.sleep(wait_s)
         latency_ms = (time.perf_counter() - started_at) * 1000.0
         logger.info(
             "agent=%s cross_role_response_ms=%.1f response=%s",
