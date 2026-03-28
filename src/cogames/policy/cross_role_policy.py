@@ -755,11 +755,12 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         return direction
 
     def _gear_up_aligner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
-        """Gear up to aligner using BFS-with-hazards → BFS-without-hazards → greedy cascade.
+        """Gear up to aligner using BFS-with-hazards → explore-near-hub fallback.
 
-        v6 fix: when BFS-with-hazards fails (path blocked by scout/scrambler), try
-        BFS-without-hazards. Crossing other stations en route is acceptable since the
-        aligner station will override any intermediate gear changes.
+        v12 fix: when _navigate_to_station_safe returns None (all safe paths blocked),
+        use explore_near_hub instead of _greedy_move_toward_abs. The greedy fallback has
+        no hazard avoidance and would step through contaminating stations. Exploring near
+        the hub allows the agent to discover alternative paths around hazards.
         """
         visible_target = self._aligner._starter._closest_tag_location(obs, self._aligner._aligner_station_tags)
         if visible_target is not None:
@@ -767,8 +768,20 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             direction = self._navigate_to_station_safe(state, current_abs, target_abs)
             if direction is not None:
                 return self._aligner._starter._action(f"move_{direction}"), state
-            action, next_state = self._aligner._greedy_move_toward_abs(state, current_abs, target_abs)
-            return action, state
+            # v12: safe paths blocked; explore to discover alternative routes (not greedy — unsafe)
+            if state.known_hubs:
+                action, base_state = self._aligner._explore_near_hub(obs, state)
+                return action, self._copy_with_shared(replace(state,
+                    wander_direction_index=base_state.wander_direction_index,
+                    wander_steps_remaining=base_state.wander_steps_remaining,
+                    last_mode=base_state.last_mode,
+                ))
+            action, base_state = self._aligner._explore(obs, state)
+            return action, self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+            ))
         target_abs = self._aligner._nearest_known(current_abs, state.known_aligner_stations)
         if target_abs is None:
             if state.known_hubs:
@@ -787,8 +800,20 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         direction = self._navigate_to_station_safe(state, current_abs, target_abs)
         if direction is not None:
             return self._aligner._starter._action(f"move_{direction}"), state
-        action, next_state = self._aligner._greedy_move_toward_abs(state, current_abs, target_abs)
-        return action, state
+        # v12: safe paths blocked; explore to discover alternative routes (not greedy — unsafe)
+        if state.known_hubs:
+            action, base_state = self._aligner._explore_near_hub(obs, state)
+            return action, self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+            ))
+        action, base_state = self._aligner._explore(obs, state)
+        return action, self._copy_with_shared(replace(state,
+            wander_direction_index=base_state.wander_direction_index,
+            wander_steps_remaining=base_state.wander_steps_remaining,
+            last_mode=base_state.last_mode,
+        ))
 
     def _gear_up_miner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
         """Gear up to miner using hazard-aware navigation (avoids other gear stations + buffer).
@@ -806,8 +831,20 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             direction = self._navigate_to_station_safe(state, current_abs, target_abs)
             if direction is not None:
                 return self._aligner._starter._action(f"move_{direction}"), state
-            action, next_state = self._aligner._greedy_move_toward_abs(state, current_abs, target_abs)
-            return action, state
+            # v12: safe paths blocked; explore to discover alternative routes (not greedy — unsafe)
+            if state.known_hubs:
+                action, base_state = self._aligner._explore_near_hub(obs, state)
+                return action, self._copy_with_shared(replace(state,
+                    wander_direction_index=base_state.wander_direction_index,
+                    wander_steps_remaining=base_state.wander_steps_remaining,
+                    last_mode=base_state.last_mode,
+                ))
+            action, base_state = self._aligner._explore(obs, state)
+            return action, self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+            ))
         target_abs = self._aligner._nearest_known(current_abs, state.known_miner_stations)
         if target_abs is None:
             if state.known_hubs:
@@ -826,8 +863,20 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         direction = self._navigate_to_station_safe(state, current_abs, target_abs)
         if direction is not None:
             return self._aligner._starter._action(f"move_{direction}"), state
-        action, next_state = self._aligner._greedy_move_toward_abs(state, current_abs, target_abs)
-        return action, state
+        # v12: safe paths blocked; explore to discover alternative routes (not greedy — unsafe)
+        if state.known_hubs:
+            action, base_state = self._aligner._explore_near_hub(obs, state)
+            return action, self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+            ))
+        action, base_state = self._aligner._explore(obs, state)
+        return action, self._copy_with_shared(replace(state,
+            wander_direction_index=base_state.wander_direction_index,
+            wander_steps_remaining=base_state.wander_steps_remaining,
+            last_mode=base_state.last_mode,
+        ))
 
     def _handle_phase_switch(self, obs: AgentObservation, state: CrossRoleState) -> None:
         """At phase switch step, flip preferred gear and reset gear acquisition state."""
