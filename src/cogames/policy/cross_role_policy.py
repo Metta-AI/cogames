@@ -458,8 +458,14 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             elif failures == 1:
                 bootstrap_gear = "miner" if effective_preferred == "aligner" else "aligner"
                 reason = f"phase{state.phase} fallback gear: {bootstrap_gear} (preferred {effective_preferred} failed)"
+            elif state.phase == 2:
+                # v7: in phase 2, keep retrying the preferred gear after 2+ failures
+                # (fallback to the other gear is a no-op when agent already has that gear;
+                #  LLM would just pick mining/aligning which is wrong — keep trying the switch)
+                bootstrap_gear = effective_preferred
+                reason = f"phase2 persistent retry: {bootstrap_gear} (attempt {failures + 1}, failures={failures})"
             else:
-                bootstrap_gear = ""  # 2+ failures: let LLM choose
+                bootstrap_gear = ""  # Phase 1 with 2+ failures: let LLM choose
 
             if bootstrap_gear:
                 skill = f"gear_up_{bootstrap_gear}"
@@ -614,13 +620,17 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         carried = self._carried_total(obs)
         friendly_count = len(state.known_friendly_junctions)
 
+        effective_preferred = state.phase_preferred_gear or self._preferred_initial_gear
         if state.current_skill == "gear_up_aligner" and gear == "aligner" and state.skill_steps > 0:
             self._event(state, "gear_up_aligner completed")
-            state.gear_up_completed = True
+            # v7: only mark gear_up as fully done if the acquired gear is the effective preferred gear.
+            # If aligner is the preferred gear, this is a true completion. If not (e.g., fallback during
+            # a phase where miner is preferred), keep gear_up_completed=False so retries can continue.
+            state.gear_up_completed = (effective_preferred == "aligner")
             state.current_skill = None
         elif state.current_skill == "gear_up_miner" and gear == "miner" and state.skill_steps > 0:
             self._event(state, "gear_up_miner completed")
-            state.gear_up_completed = True
+            state.gear_up_completed = (effective_preferred == "miner")
             state.current_skill = None
         elif state.current_skill == "get_heart" and has_heart and state.skill_steps > 0:
             self._event(state, "get_heart completed: acquired heart")
@@ -715,18 +725,40 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         return replace(state, known_hazard_stations=expanded)
 
     def _navigate_to_station_safe(self, state: CrossRoleState, current_abs: Coord, target_abs: Coord) -> str | None:
-        """Navigate to target station: try BFS with hazards first, then BFS without hazards.
+        """Navigate to target station: BFS-with-hazards → BFS-without-hazards → None (caller uses greedy).
 
-        v6 fix: when hazard-aware BFS fails (path blocked by scout/scrambler stations),
-        fall back to BFS without hazard avoidance. The agent may cross intermediate stations
-        en route, but the final station overrides any intermediate gear changes.
+        v6/v7 fix: when hazard-aware BFS fails (path blocked by scout/scrambler stations),
+        try BFS without hazard avoidance. Crossing other stations en route is acceptable since
+        the target station overrides any intermediate gear changes.
+
+        Returns None if all BFS variants fail (caller should use greedy fallback).
+        NOTE: does NOT call _navigate_to_station (which always returns a direction via greedy)
+        to allow the caller to distinguish "BFS found path" from "only greedy available".
         """
-        direction = self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
+        approach = self._aligner._best_approach_cell(state, current_abs, target_abs)
+        if approach is None:
+            return None
+        if current_abs == approach:
+            # Already adjacent to station - bump into it
+            dr = target_abs[0] - current_abs[0]
+            dc = target_abs[1] - current_abs[1]
+            if abs(dr) >= abs(dc):
+                return "south" if dr > 0 else "north"
+            return "east" if dc > 0 else "west"
+        # Cascade: BFS with hazards (preferred clean path)
+        direction = self._aligner._bfs_first_direction(state, current_abs, approach, avoid_hazards=True)
         if direction is not None:
             return direction
-        # Hazard-aware BFS failed (path blocked by scout/scrambler); try without hazard avoidance.
-        # Crossing other stations en route is acceptable since the target station will override gear.
-        return self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=False)
+        direction = self._aligner._bfs_optimistic_direction(state, current_abs, approach, avoid_hazards=True)
+        if direction is not None:
+            return direction
+        # BFS without hazards: agent may cross contaminating stations en route,
+        # but the final target station will override any intermediate gear.
+        direction = self._aligner._bfs_first_direction(state, current_abs, approach, avoid_hazards=False)
+        if direction is not None:
+            return direction
+        direction = self._aligner._bfs_optimistic_direction(state, current_abs, approach, avoid_hazards=False)
+        return direction  # None if all BFS variants fail
 
     def _gear_up_aligner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
         """Gear up to aligner using BFS-with-hazards → BFS-without-hazards → greedy cascade.
