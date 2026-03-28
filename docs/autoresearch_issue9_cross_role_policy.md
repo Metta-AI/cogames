@@ -92,4 +92,57 @@ Running: `EPISODE_RUNNER_USE_ISOLATED_VENVS=0 cogames run -m cogsguard_machina_1
 - Hint logic: if team has too few aligners and junctions available, suggest aligner role
 - `kw.num_aligners=3,kw.llm_timeout_s=60,kw.stuck_threshold=30` for stability
 
+## 2026-03-28: cross-role v3 result — 0.43 reward
+
+**Result (commit fccab42): 0.43 reward** — better than v2 (0.20) but still below baseline 0.66.
+
+**What happened:**
+1. Role-stable prompt worked: aligners saw only get_heart/align_neutral; miners saw only mine/deposit
+2. Bootstrap fired once correctly (num_aligners=3): agents 0,1,2 → gear_up_aligner; agents 3-7 → gear_up_miner
+3. BUT: 5 of 8 agents failed to acquire gear; only 2 aligners + 1 miner active most of the episode
+4. Despite only 3 active agents: aligned 8 junctions (same as baseline!) but held 3334 vs 5633 baseline
+5. Bootstrap fires only ONCE (`not state.recent_events`); after first failure, agent stuck exploring forever
+
+**Root cause:** bootstrap fires once only. If gear_up fails, agent permanently explores.
+
+---
+
+## 2026-03-28: cross-role v4 result — 0.10 reward (CRASH)
+
+**Result (commit 013d5e7, DISCARDED): 0.10 reward** — catastrophically worse.
+
+**What happened:**
+1. Fixed bootstrap to retry up to 5 times (`gear_up_failures < 5`)
+2. Agents 4,5,6,7 got miner gear on first try ✓; agents 1 got aligner gear ✓
+3. Agent 0: failed gear_up_aligner 5 times × 200 steps = 1000 steps = ENTIRE EPISODE wasted
+4. Agent 1: got aligner gear, tried align_neutral, navigation passed scout station → got scout gear accidentally
+5. With scout gear, `_current_gear()` returns "none" → bootstrap retried 5× = wasted more episode
+6. 0 junctions aligned; miners ran fine (silicon=50 deposited!) but no aligners working
+
+**Root causes:**
+1. 5 retries × 200 steps = 1000 steps wasted (consumed entire episode for failed agents)
+2. Accidental gear acquisition: during `align_neutral` navigation, agent passed scout station and got equipped automatically → treated as "no gear" → triggered more retries
+3. The retry mechanism amplified the gear acquisition bug
+
+---
+
+## 2026-03-28: starting new experiment loop (cross-role v5: gear fallback + fewer retries)
+
+**Hypothesis:** Limited retries + fallback to alternative gear avoids both the "explore forever" bug AND the "retry forever" bug.
+
+**Plan:**
+- Max 2 retries for preferred gear (not 5)
+- After 2 failures: fall back to opposite gear (aligner→miner, miner→aligner)
+- This ensures every agent eventually becomes productive (either aligner or miner)
+- Also: prevent spurious "no gear" from wrong-gear detection (add `gear_up_attempts` that only fires after actual gear station interaction, not on stale from wrong gear)
+
+**Changes (v5):**
+- Add `gear_up_failures: int = 0` and `fallback_gear: str = ""` to `CrossRoleState`
+- Track gear_up failures in `_maybe_finish_skill`
+- Bootstrap logic:
+  1. If failures < 2: retry preferred gear
+  2. If failures >= 2: use fallback gear (aligner→miner, miner→aligner)
+  3. If fallback also fails (failures >= 4): give up, let LLM explore
+- This prevents >4 × 200 = 800 steps wasted maximum per agent
+
 

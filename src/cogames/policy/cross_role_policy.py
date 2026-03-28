@@ -201,6 +201,9 @@ class CrossRoleState:
     last_carried_total: int = 0
     explore_start_extractors: int = 0
 
+    # Gear acquisition tracking (for retry + fallback logic)
+    gear_up_failures: int = 0
+
 
 class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
     """Agent that can dynamically choose aligner or miner skills based on team needs."""
@@ -395,19 +398,33 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         if self._shared_map is not None and hasattr(self._shared_map, "agent_gears"):
             self._shared_map.agent_gears[obs.agent_id] = gear
 
-        # Bootstrap: first plan with no gear uses preferred initial role (skips LLM)
-        if gear == "none" and not state.recent_events and self._preferred_initial_gear:
-            skill = f"gear_up_{self._preferred_initial_gear}"
-            reason = f"initial role: {self._preferred_initial_gear} (bootstrap)"
-            logger.info("agent=%s bootstrap_skill=%s", obs.agent_id, skill)
-            if skill in CROSS_ROLE_SKILLS:
-                state.current_skill = skill
-                state.current_reason = reason
-                state.skill_steps = 0
-                state.no_move_steps = 0
-                state.no_progress_on_target_steps = 0
-                self._event(state, f"planner selected {skill}: {reason}")
-                return
+        # Bootstrap: if no gear and preferred role set, try preferred gear up to 2x then fall back to opposite
+        _MAX_PREFERRED_RETRIES = 2  # try preferred gear up to 2 times
+        _MAX_FALLBACK_RETRIES = 2   # try fallback gear up to 2 times (total max 4 attempts = 800 steps)
+        if gear == "none" and self._preferred_initial_gear:
+            failures = state.gear_up_failures
+            if failures < _MAX_PREFERRED_RETRIES:
+                # Still trying preferred gear
+                bootstrap_gear = self._preferred_initial_gear
+                reason = f"initial role: {bootstrap_gear} (attempt {failures + 1}/{_MAX_PREFERRED_RETRIES})"
+            elif failures < _MAX_PREFERRED_RETRIES + _MAX_FALLBACK_RETRIES:
+                # Preferred failed, try opposite gear as fallback
+                bootstrap_gear = "miner" if self._preferred_initial_gear == "aligner" else "aligner"
+                reason = f"fallback role: {bootstrap_gear} (preferred {self._preferred_initial_gear} failed, attempt {failures - _MAX_PREFERRED_RETRIES + 1}/{_MAX_FALLBACK_RETRIES})"
+            else:
+                bootstrap_gear = ""  # Give up, let LLM handle it
+
+            if bootstrap_gear:
+                skill = f"gear_up_{bootstrap_gear}"
+                logger.info("agent=%s bootstrap_skill=%s failures=%d", obs.agent_id, skill, failures)
+                if skill in CROSS_ROLE_SKILLS:
+                    state.current_skill = skill
+                    state.current_reason = reason
+                    state.skill_steps = 0
+                    state.no_move_steps = 0
+                    state.no_progress_on_target_steps = 0
+                    self._event(state, f"planner selected {skill}: {reason}")
+                    return
 
         team_aligners, team_miners = self._team_gear_counts()
         team_size = max(1, len(self._shared_map.agent_gears) if self._shared_map and hasattr(self._shared_map, "agent_gears") else 8)
@@ -581,7 +598,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             self._event(state, "unstuck finished horizon")
             state.current_skill = None
         elif state.current_skill in {"gear_up_aligner", "gear_up_miner"} and state.skill_steps >= self._stuck_threshold * 10:
-            self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps")
+            state.gear_up_failures += 1
+            self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps (failure #{state.gear_up_failures})")
             state.current_skill = None
         elif state.current_skill in {"get_heart", "align_neutral", "mine_until_full", "deposit_to_hub"} and state.skill_steps >= self._stuck_threshold * 5:
             if state.current_skill == "align_neutral":
@@ -603,6 +621,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps")
             state.current_skill = None
         elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
+            if state.current_skill in {"gear_up_aligner", "gear_up_miner"}:
+                state.gear_up_failures += 1
             self._event(state, f"{state.current_skill} exited as stuck after {state.no_move_steps} blocked steps")
             state.current_skill = None
         elif state.current_skill is not None and state.no_progress_on_target_steps >= self._stuck_threshold:
@@ -612,6 +632,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 if current_abs in state.known_extractors:
                     state.known_extractors.discard(current_abs)
                     self._event(state, f"removed depleted extractor at {current_abs}")
+            if state.current_skill in {"gear_up_aligner", "gear_up_miner"}:
+                state.gear_up_failures += 1
             self._event(state, f"{state.current_skill} exited as stale after {state.no_progress_on_target_steps} steps")
             state.current_skill = None
 
