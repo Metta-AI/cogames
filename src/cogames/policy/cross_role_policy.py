@@ -734,16 +734,25 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         return replace(state, known_hazard_stations=expanded)
 
     def _navigate_to_station_safe(self, state: CrossRoleState, current_abs: Coord, target_abs: Coord) -> str | None:
-        """Navigate to target station using hazard-aware navigation.
+        """Navigate to target station, returning None if next step would enter a hazard station.
 
-        Delegates to _navigate_to_station (BFS-strict → BFS-optimistic → greedy).
-        Returns None only when no approach cell exists (all adjacent cells blocked).
-
-        v10: removed BFS-without-hazards — it caused contamination by routing through
-        scout/scrambler stations when those were the only known paths. The original
-        hazard-aware cascade (BFS+greedy) avoids contamination and is used here.
+        v10: delegates to _navigate_to_station (BFS → greedy fallback).
+        v11 fix: _navigate_to_station's greedy fallback can step into hazard stations
+        (e.g. when BFS fails and the greedy direction points toward scout/scrambler).
+        After getting a direction, check if the immediate next cell is a known hazard station.
+        If so, return None so the caller can explore safely instead of contaminating.
         """
-        return self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
+        direction = self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
+        if direction is None:
+            return None
+        # Verify the immediate next step doesn't land on a known hazard station
+        _DIR_DELTA = {"north": (-1, 0), "south": (1, 0), "east": (0, 1), "west": (0, -1)}
+        if direction in _DIR_DELTA:
+            dr, dc = _DIR_DELTA[direction]
+            next_cell = (current_abs[0] + dr, current_abs[1] + dc)
+            if next_cell in state.known_hazard_stations:
+                return None  # Would contaminate; caller should explore instead
+        return direction
 
     def _gear_up_aligner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
         """Gear up to aligner using BFS-with-hazards → BFS-without-hazards → greedy cascade.

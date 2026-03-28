@@ -99,3 +99,38 @@ The bootstrap logic only fires when `gear == "none"`. After the phase switch at 
 - In `_plan_skill`: add phase 2 bootstrap that fires when `gear != effective_preferred`
 - Rename "gear=none" bootstrap condition more precisely
 
+---
+
+## 2026-03-28T22:00:00Z: experiments v2-v11 summary
+
+**v2 (32788d6):** discard — hazard adjacency buffer caused contamination
+**v3-v4:** discard — reverted to 200-step timeout
+
+**v5-v8: Navigation improvements**
+- Key insight: `_navigate_to_station` always returns a direction via greedy fallback
+- Greedy fallback can route through hazard stations → contamination
+- v5: remove own-gear station from hazards (helps some miner→aligner switches)
+- v6: BFS-without-hazards fallback (never fires due to navigate_to_station always returning direction — bug)
+- v7: proper BFS cascade, gear_up_completed fix, phase2 persistent retry → p1=7/8 FIRST TIME!
+- v8: remove optimistic-without-hazards (same results, confirming it was strict that caused contamination)
+- v9: fix infinite loop (wrong-gear completion increments failures)
+
+**v10: Multi-seed testing reveals**
+- 3-seed average p1=0.71, p2=0.25
+- BFS-without-hazards entirely removed (v10)
+- Contamination still happens from greedy fallback in `_navigate_to_station`
+
+**v11: Hazard-safe greedy**
+- `_navigate_to_station_safe` checks if next step lands in hazard station
+- If yes, returns None (caller explores instead of contaminating)
+- Hypothesis: this should eliminate contamination while maintaining navigation quality
+
+**Key findings:**
+1. p1=7/8 is achievable (v7/v8/v9/v10 on seed 42)
+2. p2 target (6/8) was met on seed 43 v9 but it was "lucky" (agents with no gear navigating to aligner)
+3. Miner→aligner switch is hard due to map topology (scout/scrambler in path)
+4. Aligner→miner switch should work in theory but gets blocked by navigation/time issues
+5. LLM timing variability is large (3-seed variance is huge)
+6. Bootstrap infinite loops must be prevented (v9 fix)
+7. Greedy fallback contamination must be prevented (v11 fix)
+
