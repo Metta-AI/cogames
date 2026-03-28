@@ -335,3 +335,28 @@ Reason: re-acquire logic didn't help; same fundamental timeout issue.
 **Hypothesis:** With `num_aligners=4`, we get 3 effective aligners + 5 effective miners — matching baseline composition but with v9's 90% better skill success rates. Expected result: >= 0.66 (beating baseline).
 
 **Changes:** Only kw parameter change: `num_aligners=4` (no code changes needed)
+
+## 2026-03-28: cross-role v11 result — 0.32 reward (DISCARD)
+
+**Result (kw.num_aligners=4): 0.32 reward** — worse than v9 (0.55).
+
+**What happened:**
+1. Agent 3 got aligner gear ✓ → 3 aligners active
+2. BUT: 3 aligners competed for hearts with only 4 miners → hub depleted
+3. Agent 3 stuck in `get_heart exited as stale after 20 steps` loop (hub empty = no hearts)
+4. Only 4 junctions aligned (vs 12 in v9)
+5. Conclusion: 2:5 aligner:miner ratio is optimal; 3:4 breaks resource balance
+
+**Key insight:** The resource supply chain limits the aligner count. With 5 miners and 2 aligners (v9), the balance works perfectly. 3 aligners + 4 miners depletes the hub.
+
+---
+
+## 2026-03-28: starting new experiment loop (cross-role v12: longer gear_up timeout)
+
+**Hypothesis:** Agent 3 (seed=42) fails gear acquisition because it's physically far from the miner station — 200 steps is just not enough. With 300 steps (stuck_threshold*15), it might reach the station.
+
+**Expected outcome:** Agent 3 becomes a productive 6th agent (miner) → more resources → more hearts → better alignment. Keep num_aligners=3 to preserve the 2:5 aligner:miner ratio.
+
+**Changes:**
+- Increase gear_up timeout from `stuck_threshold * 10 = 200` to `stuck_threshold * 15 = 300` steps
+- No other changes

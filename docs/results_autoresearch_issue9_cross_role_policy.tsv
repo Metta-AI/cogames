@@ -11,3 +11,4 @@ dc28117	0.44	aligned=8/held=3428/hearts=7/oxygen=59	1000	keep	cross-role v7: min
 e0784ae	0.55	aligned=12/held=4500/hearts=8	1000	keep	cross-role v9: 400-step timeout for worker skills; 93% reduction in deposit timeouts; 12 junctions aligned (>baseline!); best cross-role so far
 cd52915	0.48	aligned=7/held=?/hearts=9	1000	discard	cross-role v10: miner re_acquire + rescue retry; ALL 5 miners lost gear; re_acquire sent miners through scrambler station (800 wasted steps per agent)
 35a0d69	0.30	aligned=3/held=1979/hearts=5	1000	discard	cross-role v10-new: num_aligners=5; aligner station congestion; only 4 miners; resource shortage → only 3 aligned; BUT: agent3 SUCCEEDED at aligner gear when preferred=aligner (key finding)
+9a16479	0.32	aligned=4/held=2217/hearts=5	1000	discard	cross-role v11: num_aligners=4; 3 aligners succeed but hub depletes from 3× demand with 4 miners; agent3 stuck in get_heart stale loop; 2:5 aligner:miner is optimal
