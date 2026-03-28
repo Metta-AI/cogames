@@ -394,3 +394,66 @@ Only use LLM for uncertain situations (no known targets, need to explore, etc.).
 - Call `_scripted_skill()` BEFORE LLM in `_plan_skill()`
 - Scripted rules: aligner→get_heart, aligner→align_neutral, miner→deposit, miner→mine
 - Only LLM when scripted returns None (ambiguous state)
+
+## 2026-03-28: cross-role v13 result — 0.41 reward (DISCARD)
+
+**Result: 0.41 reward** — significantly worse than v9 (0.55).
+
+**What happened:**
+- `status.max_steps_without_motion = 195.5` vs 12 in v9 — agents stuck for massive amounts of time
+- Scripted selection creates infinite retry loops: mine_until_full fires whenever extractors known, even when the skill timed out due to stuck state
+- LLM diversity is ESSENTIAL: LLM picks `explore` or `unstuck` after skill failures, breaking stuck loops
+- Scripted selection lacks this — just fires the same skill again on next step
+- Only 5 aligned junctions (vs 12 in v9) — stuck agents are totally unproductive
+
+**Conclusion:** The LLM is NOT just for trivially predictable decisions. Its real value is RECOVERY diversity — picking different skills after failures. Scripting kills this.
+
+**Key insight:** LLM calls that seem "obvious" (mine when extractors known) are actually recovery decisions too. When `mine_until_full` fails, the LLM might pick `explore` to find a different route. Scripted selection can't do this.
+
+---
+
+## 2026-03-28: starting new experiment loop (cross-role v14: enemy junction routing)
+
+**Hypothesis:** V9 aligns 12 junctions but holds them for avg 375 steps each, while baseline aligns 8 but holds for 704 steps each. Root cause: aligners ONLY re-align enemy junctions after ALL neutral junctions are exhausted (neutral-first routing in `_align_neutral`). This means:
+1. Enemies recapture aligned junctions
+2. Aligners ignore recaptured ones (still have neutral junctions to find)
+3. Keep exploring for new neutral junctions
+4. Short hold times → lower reward despite more total alignments
+
+**Fix:** Merge neutral + enemy junctions into a single routing pool. Route to nearest(neutral ∪ enemy) instead of neutral-first-then-enemy-as-fallback. This makes aligners immediately defend recaptured junctions.
+
+**Implementation:**
+- In `_known_alignable_junctions`: return `(neutral | enemy) - blacklisted` (not neutral-first fallback)
+- In `align_neutral` dispatch: pass `align_state = replace(state, known_neutral_junctions = neutral | enemy)` to `_aligner._align_neutral()` so routing uses combined pool
+
+**Expected outcome:** Aligners re-align enemy junctions sooner → longer average hold times → higher held count → better reward (target: beat v9's 0.55, approach baseline 0.66).
+
+## 2026-03-28: cross-role v14 result — 0.23 reward (DISCARD)
+
+**Result: run1=0.23, run2=0.10** — MUCH worse than v9 (0.55). Average ~0.165.
+
+**Root cause analysis:**
+- Run 1: 2 aligners got gear but BOTH stuck in `get_heart exited as stale` loops; 2 agents got scout gear → only 3 effective miners → hub resource shortage → can't supply hearts
+- Run 2: 4 agents ended with `current_gear: none` — ZERO aligners! `team_aligners=0` for entire episode
+- Bootstrap gives up after 2 gear failures: preferred → fallback → give up. LLM timing variability causes gear station congestion, making all 2 attempts fail
+- The v14 routing change (neutral|enemy pool) is NOT the cause — the failure is entirely in gear acquisition
+
+**Key finding:** Bootstrap is FRAGILE. LLM response time variability (2-3s per call) changes agent positions slightly between runs with same seed=42. This causes different collision patterns at gear stations → some runs succeed, others fail catastrophically.
+
+**Why v9 worked:** v9 was a "lucky" run where gear acquisition succeeded. The routing change itself didn't cause v14's poor results.
+
+**Next step (v15):** Fix bootstrap reliability by retrying indefinitely instead of giving up after 2 failures.
+
+---
+
+## 2026-03-28: starting new experiment loop (cross-role v15: persistent bootstrap retry)
+
+**Hypothesis:** The catastrophic v14 runs (0 aligners) happen because bootstrap gives up after 2 gear failures, leaving agents permanently gear-less. These failures are caused by LLM timing variability (non-determinism) causing agent congestion at gear stations even with seed=42. The fix: cycle preferred/fallback gear attempts indefinitely instead of giving up. Agents blocked by congestion will eventually succeed when the station clears.
+
+**Expected outcome:** More reliable gear acquisition → fewer "0 aligner" catastrophes → more consistent results → reward closer to/above v9's 0.55.
+
+**Changes (v15):**
+- Bootstrap: replace `else: bootstrap_gear = ""` (give up) with `failures % 2 == 0 → preferred, else → fallback` (cycle indefinitely)
+- Keep v14 routing change (neutral|enemy pool for align_neutral)
+
+

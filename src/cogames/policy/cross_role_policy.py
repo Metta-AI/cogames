@@ -403,16 +403,15 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         # do NOT retry — let the agent continue with LLM guidance.
         if gear == "none" and self._preferred_initial_gear and not state.gear_up_completed:
             failures = state.gear_up_failures
-            if failures == 0:
-                # First attempt: try preferred gear
+            # v15: cycle preferred/fallback indefinitely instead of giving up after 2 failures.
+            # Agents blocked by congestion will eventually succeed when the station clears.
+            # Truly isolated agents (unreachable station) will keep trying but episode ends naturally.
+            if failures % 2 == 0:
                 bootstrap_gear = self._preferred_initial_gear
-                reason = f"initial role: {bootstrap_gear} (first attempt)"
-            elif failures == 1:
-                # Second attempt: try fallback gear (opposite)
-                bootstrap_gear = "miner" if self._preferred_initial_gear == "aligner" else "aligner"
-                reason = f"fallback role: {bootstrap_gear} (preferred {self._preferred_initial_gear} failed once)"
+                reason = f"gear_up attempt {failures + 1}: {bootstrap_gear} (preferred)"
             else:
-                bootstrap_gear = ""  # 2 failures = give up, let LLM explore
+                bootstrap_gear = "miner" if self._preferred_initial_gear == "aligner" else "aligner"
+                reason = f"gear_up attempt {failures + 1}: {bootstrap_gear} (fallback)"
 
             if bootstrap_gear:
                 skill = f"gear_up_{bootstrap_gear}"
