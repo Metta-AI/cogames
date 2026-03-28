@@ -935,6 +935,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 last_mode=base_state.last_mode,
                 last_pos=getattr(base_state, 'last_pos', state.last_pos),
                 last_move_target=getattr(base_state, 'last_move_target', state.last_move_target),
+                phase2_hub_cleared=base_state.phase2_hub_cleared,  # v13: persist hub waypoint state
             ))
 
         elif skill == "gear_up_miner":
@@ -952,6 +953,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 last_mode=base_state.last_mode,
                 last_pos=base_state.last_pos,
                 last_move_target=getattr(base_state, 'last_move_target', state.last_move_target),
+                phase2_hub_cleared=base_state.phase2_hub_cleared,  # v13: persist hub waypoint state
             ))
 
         elif skill == "get_heart":
