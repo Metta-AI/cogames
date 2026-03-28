@@ -15,3 +15,4 @@ cd52915	0.48	aligned=7/held=?/hearts=9	1000	discard	cross-role v10: miner re_acq
 d0d4290	0.45	aligned=9/held=?/hearts=7	1000	discard	cross-role v12: gear_up timeout 200→300 steps; agent3 STILL fails (truly isolated from stations); 200 more wasted steps → worse than v9
 e83bb57	0.41	aligned=5/held=?/hearts=5	1000	discard	cross-role v13: scripted skill selection (bypass LLM for obvious actions); caused infinite retry loops; status.max_steps_without_motion=195.5 vs 12 in v9; LLM diversity is essential
 4e5d2fa	0.23	aligned=2/held=?/hearts=5	1000	discard	cross-role v14: enemy junction routing (neutral|enemy pool); run1=0.23 run2=0.10; bootstrap give-up after 2 failures causes 0-aligner catastrophes from LLM timing variability
+f2163f7	0.27	aligned=?/held=?	1000	discard	cross-role v15: infinite bootstrap retry (cycle preferred/fallback); 1 aligner vs 0; still bad due to scrambler contamination blocking bootstrap (gear!=none so condition misses)

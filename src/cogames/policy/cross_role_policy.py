@@ -398,10 +398,14 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         if self._shared_map is not None and hasattr(self._shared_map, "agent_gears"):
             self._shared_map.agent_gears[obs.agent_id] = gear
 
-        # Bootstrap: try to acquire gear if agent has none and gear_up never succeeded.
-        # If gear_up already completed once (agent had gear, then accidentally lost it to scout/etc),
+        # Bootstrap: try to acquire gear if agent has no VALID gear and gear_up never succeeded.
+        # "none", "scrambler", "scout" are all treated as invalid: scrambler/scout contamination
+        # happens during gear_up navigation fallback paths; continuing to retry eventually reaches
+        # the correct gear station and swaps to the right gear.
+        # If gear_up already completed once (agent had aligner/miner gear, then accidentally lost it),
         # do NOT retry — let the agent continue with LLM guidance.
-        if gear == "none" and self._preferred_initial_gear and not state.gear_up_completed:
+        _INVALID_GEAR = {"none", "scrambler", "scout"}
+        if gear in _INVALID_GEAR and self._preferred_initial_gear and not state.gear_up_completed:
             failures = state.gear_up_failures
             # v15: cycle preferred/fallback indefinitely instead of giving up after 2 failures.
             # Agents blocked by congestion will eventually succeed when the station clears.
