@@ -752,12 +752,13 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         direction = self._aligner._bfs_optimistic_direction(state, current_abs, approach, avoid_hazards=True)
         if direction is not None:
             return direction
-        # BFS without hazards: agent may cross contaminating stations en route,
-        # but the final target station will override any intermediate gear.
+        # BFS without hazards (strict, known-cells only): routes through known free cells
+        # while ignoring hazard stations. Agent may cross contaminating stations en route,
+        # but the target station will override any intermediate gear.
+        # NOTE: we do NOT use _bfs_optimistic_direction(avoid_hazards=False) because
+        # optimistic-without-hazards routes through unknown cells that may be walls,
+        # causing the agent to get stuck for 20+ steps at each attempt.
         direction = self._aligner._bfs_first_direction(state, current_abs, approach, avoid_hazards=False)
-        if direction is not None:
-            return direction
-        direction = self._aligner._bfs_optimistic_direction(state, current_abs, approach, avoid_hazards=False)
         return direction  # None if all BFS variants fail
 
     def _gear_up_aligner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
