@@ -733,17 +733,47 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             has_heart = self._inventory_count(obs, "heart") > 0
             if gear == "aligner" and has_heart:
                 action, base_state = self._aligner._explore_for_alignment(obs, state)
+                state = self._copy_with_shared(replace(state,
+                    wander_direction_index=base_state.wander_direction_index,
+                    wander_steps_remaining=base_state.wander_steps_remaining,
+                    last_mode=base_state.last_mode,
+                    last_pos=getattr(base_state, 'last_pos', state.last_pos),
+                    last_move_target=getattr(base_state, 'last_move_target', state.last_move_target),
+                ))
+            elif gear == "miner":
+                # Use miner-specific explore to stay near hub/extractor areas (avoids junction/scout areas)
+                if state.known_hubs:
+                    action, base_state = self._miner._explore_near_hub(obs, state)
+                else:
+                    action, base_state = self._miner._explore(obs, state)
+                state = self._copy_with_shared(replace(state,
+                    wander_direction_index=base_state.wander_direction_index,
+                    wander_steps_remaining=base_state.wander_steps_remaining,
+                    last_mode=base_state.last_mode,
+                    remembered_hub_row_from_spawn=base_state.remembered_hub_row_from_spawn,
+                    remembered_hub_col_from_spawn=base_state.remembered_hub_col_from_spawn,
+                    last_pos=base_state.last_pos,
+                    last_move_target=base_state.last_move_target,
+                ))
             elif state.known_hubs:
                 action, base_state = self._aligner._explore_near_hub(obs, state)
+                state = self._copy_with_shared(replace(state,
+                    wander_direction_index=base_state.wander_direction_index,
+                    wander_steps_remaining=base_state.wander_steps_remaining,
+                    last_mode=base_state.last_mode,
+                    last_pos=getattr(base_state, 'last_pos', state.last_pos),
+                    last_move_target=getattr(base_state, 'last_move_target', state.last_move_target),
+                ))
             else:
                 action, base_state = self._aligner._explore(obs, state)
-            state = self._copy_with_shared(replace(state,
-                wander_direction_index=base_state.wander_direction_index,
-                wander_steps_remaining=base_state.wander_steps_remaining,
-                last_mode=base_state.last_mode,
-                last_pos=getattr(base_state, 'last_pos', state.last_pos),
-                last_move_target=getattr(base_state, 'last_move_target', state.last_move_target),
-            ))
+                state = self._copy_with_shared(replace(state,
+                    wander_direction_index=base_state.wander_direction_index,
+                    wander_steps_remaining=base_state.wander_steps_remaining,
+                    last_mode=base_state.last_mode,
+                    last_pos=getattr(base_state, 'last_pos', state.last_pos),
+                    last_move_target=getattr(base_state, 'last_move_target', state.last_move_target),
+                ))
+            # Note: state already updated in each branch above — don't double-update below
 
         else:
             action, state = self._unstuck_move(state)

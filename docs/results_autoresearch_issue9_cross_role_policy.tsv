@@ -5,3 +5,4 @@ baseline	0.66	aligned=8/held=5633/hearts=6	1000	keep	baseline 8A (3 aligners+5 m
 fccab42	0.43	aligned=8/held=3334/hearts=5/oxygen=41	1000	discard	cross-role v3: role-stable (LLM only picks within-role skills); bootstrap fires once only; 5/8 agents fail gear_up → explore forever; only 2 aligners + 1 miner active
 013d5e7	0.10	aligned=0/held=0/hearts=2/silicon=50	1000	discard	cross-role v4: gear_up retry (5x); retry wasted entire episode + agents got scout gear accidentally; 0 junctions aligned
 a701f3b	0.10	aligned=0/held=0/hearts=2	1000	discard	cross-role v5: fallback gear (1 preferred+1 fallback); same scout gear bug; 0 aligners; 5 miners; 0 junctions
+86c7b98	0.39	aligned=5/held=2924/hearts=5/oxygen=40	1000	discard	cross-role v6: gear_up_completed guard; fallback works (agent0→miner); 2 aligners+5 miners; BUT 4/5 miners lose gear to scout during aligner-style explore

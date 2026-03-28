@@ -175,3 +175,28 @@ Running: `EPISODE_RUNNER_USE_ISOLATED_VENVS=0 cogames run -m cogsguard_machina_1
   - failures>=2 OR gear_up_completed: let LLM guide
 - Expected: agent 0 (fails aligner) → fallback to miner; agents 1,2 succeed aligner; no retry after scout gear
 - Expected team: 2 aligners + 5 miners (=baseline composition)
+
+## 2026-03-28: cross-role v6 result — 0.39 reward
+
+**Result (commit 86c7b98, DISCARDED): 0.39 reward** — slightly worse than v3 (0.43).
+
+**What happened:**
+1. gear_up_completed guard worked: aligners 1,2 no longer retry after accidental gear loss ✓
+2. Fallback worked: agent 0 got miner gear (preferred aligner failed → fallback miner) ✓ 
+3. Initial team: 2 aligners + 5 miners (=baseline composition!) ✓
+4. BUT: `miner.lost=4` — 4 of 5 miners LOST their miner gear during the episode!
+5. Root cause: miners use aligner's `_explore_near_hub` when exploring → navigates toward junction areas → junction areas have scout station → miners accidentally use scout station via `use` action → get scout gear
+6. Only 1 miner active at end → limited hearts → fewer junctions held
+
+**Root cause identified:** `CrossRolePolicyImpl.step_with_state` explore branch uses `self._aligner._explore_near_hub` for ALL agents including miners. Miners should use `self._miner._explore_near_hub` which stays near hub/extractor areas.
+
+---
+
+## 2026-03-28: starting new experiment loop (cross-role v7: miner-specific explore)
+
+**Hypothesis:** Using miner's own explore method for miners prevents them from navigating into scout station areas (junction zones).
+
+**Changes (v7):**
+- In explore branch: when `gear == "miner"`, use `self._miner._explore_near_hub` / `self._miner._explore` instead of aligner's explore
+- Aligners continue using aligner explore methods (correct behavior)
+- Expected: miners keep their gear throughout episode → more resources → more hearts → better holding
