@@ -799,7 +799,14 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         skill = state.current_skill
 
         if skill == "gear_up_aligner":
-            action, base_state = self._aligner._gear_up(obs, state, current_abs)
+            # v5: when agent has miner gear, miner station is safe to pass through
+            # (re-equips same gear → no net change; removes it as a navigation blocker)
+            gear = self._current_gear(obs)
+            if gear == "miner" and state.known_miner_stations:
+                nav_state = replace(state, known_hazard_stations=state.known_hazard_stations - state.known_miner_stations)
+            else:
+                nav_state = state
+            action, base_state = self._aligner._gear_up(obs, nav_state, current_abs)
             state = self._copy_with_shared(replace(state,
                 wander_direction_index=base_state.wander_direction_index,
                 wander_steps_remaining=base_state.wander_steps_remaining,
@@ -810,7 +817,13 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
 
         elif skill == "gear_up_miner":
             # Use safe version: hazard-aware navigation (avoids other gear stations)
-            action, base_state = self._gear_up_miner_safe(obs, state, current_abs)
+            # v5: when agent has aligner gear, aligner station is safe to pass through
+            gear = self._current_gear(obs)
+            if gear == "aligner" and state.known_aligner_stations:
+                aligner_nav_state = replace(state, known_hazard_stations=state.known_hazard_stations - state.known_aligner_stations)
+            else:
+                aligner_nav_state = state
+            action, base_state = self._gear_up_miner_safe(obs, aligner_nav_state, current_abs)
             state = self._copy_with_shared(replace(state,
                 wander_direction_index=base_state.wander_direction_index,
                 wander_steps_remaining=base_state.wander_steps_remaining,
