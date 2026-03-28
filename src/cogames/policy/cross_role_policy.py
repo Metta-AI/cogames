@@ -604,7 +604,13 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             state.gear_up_failures += 1
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps (failure #{state.gear_up_failures})")
             state.current_skill = None
-        elif state.current_skill in {"get_heart", "align_neutral", "mine_until_full", "deposit_to_hub"} and state.skill_steps >= self._stuck_threshold * 5:
+        elif state.current_skill in {"mine_until_full", "deposit_to_hub"} and state.skill_steps >= self._stuck_threshold * 20:
+            # Worker skills get a much longer timeout (400 steps with default threshold=20).
+            # The baseline miner has NO timeout at all — skills run until completion.
+            # Short timeouts waste 65% of step capacity in failed navigation to far hub/extractors.
+            self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps (long-timeout)")
+            state.current_skill = None
+        elif state.current_skill in {"get_heart", "align_neutral"} and state.skill_steps >= self._stuck_threshold * 5:
             if state.current_skill == "align_neutral":
                 state.align_neutral_timeouts += 1
                 if state.align_neutral_timeouts >= 1:

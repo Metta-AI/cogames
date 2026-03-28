@@ -200,3 +200,44 @@ Running: `EPISODE_RUNNER_USE_ISOLATED_VENVS=0 cogames run -m cogsguard_machina_1
 - In explore branch: when `gear == "miner"`, use `self._miner._explore_near_hub` / `self._miner._explore` instead of aligner's explore
 - Aligners continue using aligner explore methods (correct behavior)
 - Expected: miners keep their gear throughout episode → more resources → more hearts → better holding
+
+## 2026-03-28: cross-role v7 result — 0.44 reward (BEST SO FAR, KEEP)
+
+**Result (commit dc28117): 0.44 reward** — better than v6 (0.39).
+
+**What happened:**
+1. Miner-specific explore worked: scout.gained dropped from 3 → 1 ✓
+2. All 8 junctions aligned (same as baseline!) ✓
+3. 7 hearts used (vs 6 baseline) ✓
+4. BUT: held=3428 vs 5633 baseline — only 61% of baseline holding
+5. deposit_to_hub failures: 27 timeouts / 7 successes — 79% failure rate!
+6. mine_until_full failures: 25 timeouts / 30 successes — 45% failure rate
+7. Root cause: 100-step timeout (`stuck_threshold * 5`) too short for hub/extractor navigation
+
+**Key finding:** The skill timeouts (100 steps) are the new bottleneck. In the baseline miner policy, there's NO timeout — skills run until completion. The cross-role policy times out mine_until_full and deposit_to_hub prematurely, wasting ~5200 steps (52% of total capacity!) on failed navigation attempts.
+
+---
+
+## 2026-03-28: cross-role v8 result — 0.39 reward (DISCARD)
+
+**Result (commit 7df4d41): 0.39 reward** — worse than v7, no improvement.
+Reason: re-acquire logic didn't help; same fundamental timeout issue.
+
+---
+
+## 2026-03-28: starting new experiment loop (cross-role v9: longer worker skill timeouts)
+
+**Hypothesis:** Removing the fixed 100-step timeout for mine_until_full and deposit_to_hub (making them behave like the baseline miner — run until completion) will drastically reduce wasted steps and improve resource delivery.
+
+**Root cause analysis:**
+- `mine_until_full` timed out 25/55 times (45% failure) = 2500 wasted steps
+- `deposit_to_hub` timed out 27/42 times (64% failure) = 2700 wasted steps
+- Total wasted: ~5200 of 8000 total agent-steps (65%!)
+- The 100-step timeout fires when navigation to extractor/hub takes >100 steps
+- Baseline miner: no timeout, runs until completion regardless of distance
+
+**Changes (v9):**
+- Remove `mine_until_full` and `deposit_to_hub` from the `stuck_threshold * 5` timeout check
+- Give worker skills a much larger timeout: `stuck_threshold * 20 = 400 steps` (separate check)
+- Keep `get_heart` and `align_neutral` at their existing timeouts
+- Expected: miners complete more mine/deposit cycles → more resources → more hearts → better holding
