@@ -89,6 +89,7 @@ def build_cross_role_prompt(
     team_aligners: int = 0,
     team_miners: int = 0,
     team_size: int = 8,
+    preferred_role: str = "",
 ) -> str:
     # Select skills relevant to current gear (no gear switching via LLM)
     if current_gear == "aligner":
@@ -116,12 +117,26 @@ def build_cross_role_prompt(
             "unstuck": CROSS_ROLE_SKILLS["unstuck"],
         }
         if current_gear in ("scrambler", "scout"):
-            role_hint = (
-                f"You have {current_gear} gear (wrong gear — contamination). "
-                "Navigate to the aligner or miner station to acquire the correct gear."
-            )
+            if preferred_role:
+                role_hint = (
+                    f"You have {current_gear} gear (wrong gear — contamination). "
+                    f"Your PREFERRED ROLE is {preferred_role.upper()}. "
+                    f"You MUST use gear_up_{preferred_role} to restore your role. "
+                    f"Do NOT switch roles."
+                )
+            else:
+                role_hint = (
+                    f"You have {current_gear} gear (wrong gear — contamination). "
+                    "Navigate to the aligner or miner station to acquire the correct gear."
+                )
         else:
-            role_hint = "You have no gear yet — explore to find a gear station, then gear up."
+            if preferred_role:
+                role_hint = (
+                    f"You have no gear yet. Your PREFERRED ROLE is {preferred_role.upper()}. "
+                    f"Use gear_up_{preferred_role} to acquire your role gear."
+                )
+            else:
+                role_hint = "You have no gear yet — explore to find a gear station, then gear up."
         preconditions = ""
 
     skills_text = "\n".join(f"- {name}: {desc}" for name, desc in skill_set.items())
@@ -461,6 +476,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             team_aligners=team_aligners,
             team_miners=team_miners,
             team_size=team_size,
+            preferred_role=self._preferred_initial_gear,
         )
         logger.info("agent=%s cross_role_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
         started_at = time.perf_counter()
