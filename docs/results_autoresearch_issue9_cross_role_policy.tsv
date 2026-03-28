@@ -1,0 +1,2 @@
+commit	mission_reward	secondary_rewards	steps	status	description
+baseline	0.66	aligned=8/held=5633/hearts=6	1000	keep	baseline 8A (3 aligners+5 miners) cloud LLM; hub oxygen deficit; EPISODE_RUNNER_USE_ISOLATED_VENVS=0 required
