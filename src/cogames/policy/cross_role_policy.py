@@ -106,9 +106,22 @@ def build_cross_role_prompt(
             "- deposit_to_hub: requires current_gear == 'miner' AND carried_resources > 0\n"
         )
     else:
-        # No gear yet — shouldn't reach LLM in normal flow (bootstrap handles it)
-        skill_set = {"explore": CROSS_ROLE_SKILLS["explore"], "unstuck": CROSS_ROLE_SKILLS["unstuck"]}
-        role_hint = "You have no gear yet — explore to discover stations."
+        # No valid gear (none, scrambler, scout) — include gear_up skills so LLM can recover.
+        # Scrambler/scout gear is contamination from wrong station; agent needs to navigate to
+        # a gear station to acquire the correct gear.
+        skill_set = {
+            "gear_up_aligner": CROSS_ROLE_SKILLS["gear_up_aligner"],
+            "gear_up_miner": CROSS_ROLE_SKILLS["gear_up_miner"],
+            "explore": CROSS_ROLE_SKILLS["explore"],
+            "unstuck": CROSS_ROLE_SKILLS["unstuck"],
+        }
+        if current_gear in ("scrambler", "scout"):
+            role_hint = (
+                f"You have {current_gear} gear (wrong gear — contamination). "
+                "Navigate to the aligner or miner station to acquire the correct gear."
+            )
+        else:
+            role_hint = "You have no gear yet — explore to find a gear station, then gear up."
         preconditions = ""
 
     skills_text = "\n".join(f"- {name}: {desc}" for name, desc in skill_set.items())
@@ -398,24 +411,23 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         if self._shared_map is not None and hasattr(self._shared_map, "agent_gears"):
             self._shared_map.agent_gears[obs.agent_id] = gear
 
-        # Bootstrap: try to acquire gear if agent has no VALID gear and gear_up never succeeded.
-        # "none", "scrambler", "scout" are all treated as invalid: scrambler/scout contamination
-        # happens during gear_up navigation fallback paths; continuing to retry eventually reaches
-        # the correct gear station and swaps to the right gear.
-        # If gear_up already completed once (agent had aligner/miner gear, then accidentally lost it),
-        # do NOT retry — let the agent continue with LLM guidance.
-        _INVALID_GEAR = {"none", "scrambler", "scout"}
-        if gear in _INVALID_GEAR and self._preferred_initial_gear and not state.gear_up_completed:
+        # Bootstrap: try to acquire gear if agent has none and gear_up never succeeded.
+        # If gear_up already completed once (agent had gear, then accidentally lost it to scrambler/scout),
+        # do NOT retry — let the agent continue with LLM guidance (LLM has gear_up skills available).
+        # v17: LLM prompt now includes gear_up_aligner/miner for scrambler/scout gear so agents can
+        # self-correct without relying solely on bootstrap.
+        if gear == "none" and self._preferred_initial_gear and not state.gear_up_completed:
             failures = state.gear_up_failures
-            # v15: cycle preferred/fallback indefinitely instead of giving up after 2 failures.
-            # Agents blocked by congestion will eventually succeed when the station clears.
-            # Truly isolated agents (unreachable station) will keep trying but episode ends naturally.
-            if failures % 2 == 0:
+            if failures == 0:
+                # First attempt: try preferred gear
                 bootstrap_gear = self._preferred_initial_gear
-                reason = f"gear_up attempt {failures + 1}: {bootstrap_gear} (preferred)"
-            else:
+                reason = f"initial role: {bootstrap_gear} (first attempt)"
+            elif failures == 1:
+                # Second attempt: try fallback gear (opposite)
                 bootstrap_gear = "miner" if self._preferred_initial_gear == "aligner" else "aligner"
-                reason = f"gear_up attempt {failures + 1}: {bootstrap_gear} (fallback)"
+                reason = f"fallback role: {bootstrap_gear} (preferred {self._preferred_initial_gear} failed once)"
+            else:
+                bootstrap_gear = ""  # 2 failures = give up, let LLM choose gear_up
 
             if bootstrap_gear:
                 skill = f"gear_up_{bootstrap_gear}"
