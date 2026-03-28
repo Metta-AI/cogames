@@ -1,0 +1,736 @@
+"""Cross-role policy: agents dynamically choose aligner or miner role based on team needs.
+
+Instead of fixed role assignment, each agent asks "what does the team need now?"
+and picks skills from both aligner and miner skill sets accordingly.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import re
+import time
+from dataclasses import dataclass, field, replace
+from typing import Callable
+
+from cogames.policy.aligner_agent import (
+    AlignerPolicyImpl,
+    SharedMap,
+    _FRIENDLY_TERRITORY_DISTANCE,
+    _HP_RETREAT_THRESHOLD,
+)
+from cogames.policy.llm_miner_policy import LLMMinerPlannerClient, LLMMinerPolicyImpl, LLMMinerState
+from cogames.policy.llm_skills import MinerSkillImpl, MinerSkillState
+from mettagrid.policy.policy import MultiAgentPolicy, StatefulAgentPolicy, StatefulPolicyImpl
+from mettagrid.policy.policy_env_interface import PolicyEnvInterface
+from mettagrid.simulator import Action
+from mettagrid.simulator.interface import AgentObservation
+
+logger = logging.getLogger("cogames.policy.cross_role")
+
+Coord = tuple[int, int]
+
+CROSS_ROLE_SKILLS = {
+    "gear_up_aligner": "Route to the aligner station and acquire aligner gear.",
+    "gear_up_miner": "Route to the miner station and acquire miner gear.",
+    "get_heart": "Route to the hub and obtain a heart (requires aligner gear).",
+    "align_neutral": "Route to a neutral or enemy junction and align it (requires aligner gear + heart).",
+    "mine_until_full": "Route to extractors and mine until cargo full (requires miner gear).",
+    "deposit_to_hub": "Route to hub and deposit carried resources (requires miner gear + carried resources).",
+    "explore": "Explore the map to discover new junctions, extractors, and routes.",
+    "unstuck": "Execute a short escape pattern to break navigation deadlocks.",
+}
+
+_SKILL_ALIASES = {"unstick": "unstuck"}
+
+
+def _parse_cross_role_skill(text: str) -> tuple[str | None, str]:
+    text = text.strip()
+    if not text:
+        return None, "empty response"
+    fence_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1).strip()
+    try:
+        payload = json.loads(text)
+    except json.JSONDecodeError:
+        skill = text.splitlines()[0].strip()
+        skill = _SKILL_ALIASES.get(skill, skill)
+        return (skill if skill in CROSS_ROLE_SKILLS else None, "non-json response")
+    if not isinstance(payload, dict):
+        return None, "response was not a JSON object"
+    skill = payload.get("skill")
+    reason = payload.get("reason", "")
+    if not isinstance(skill, str):
+        return None, "missing skill field"
+    skill = _SKILL_ALIASES.get(skill, skill)
+    return (skill if skill in CROSS_ROLE_SKILLS else None, str(reason))
+
+
+def build_cross_role_prompt(
+    *,
+    current_gear: str,
+    has_heart: bool,
+    carried_resources: int,
+    return_load: int,
+    hub_visible: bool,
+    known_hubs: int,
+    known_neutral_junctions: int,
+    known_friendly_junctions: int,
+    known_enemy_junctions: int,
+    known_extractors: int,
+    current_skill: str | None,
+    no_move_steps: int,
+    recent_events: list[str],
+) -> str:
+    skills_text = "\n".join(f"- {name}: {desc}" for name, desc in CROSS_ROLE_SKILLS.items())
+    events_text = "\n".join(f"- {e}" for e in recent_events[-6:]) or "- none"
+
+    # Build team analysis hint
+    has_aligner_gear = current_gear == "aligner"
+    has_miner_gear = current_gear == "miner"
+    has_no_gear = current_gear == "none"
+
+    team_hint = ""
+    if known_neutral_junctions > 0 and not has_aligner_gear:
+        team_hint = "Hint: there are alignable junctions available — consider getting aligner gear."
+    elif known_neutral_junctions == 0 and known_enemy_junctions > 0 and has_aligner_gear:
+        team_hint = "Hint: no neutral junctions left, but enemy junctions can be reclaimed."
+    elif known_extractors > 0 and not has_miner_gear and carried_resources == 0:
+        team_hint = "Hint: extractors are available for mining — consider getting miner gear."
+
+    return (
+        "You are a flexible cog agent in CoGames. Your team wins by aligning and holding junctions.\n"
+        "You can be an aligner (align junctions for reward) OR a miner (deposit resources so hearts can be crafted).\n"
+        "Choose the skill that maximizes team reward RIGHT NOW based on what the team needs most.\n\n"
+        "Preconditions:\n"
+        "- gear_up_aligner: only if current_gear != 'aligner'\n"
+        "- gear_up_miner: only if current_gear != 'miner'\n"
+        "- get_heart: requires current_gear == 'aligner'\n"
+        "- align_neutral: requires current_gear == 'aligner' AND has_heart == true AND known_alignable_junctions > 0\n"
+        "- mine_until_full: requires current_gear == 'miner'\n"
+        "- deposit_to_hub: requires current_gear == 'miner' AND carried_resources > 0\n"
+        "Respond as JSON: {\"skill\": \"align_neutral\", \"reason\": \"...\"}\n\n"
+        f"Available skills:\n{skills_text}\n\n"
+        f"Agent state:\n"
+        f"- current_gear: {current_gear}\n"
+        f"- has_heart: {has_heart}\n"
+        f"- carried_resources: {carried_resources}\n"
+        f"- return_load: {return_load}\n"
+        f"- hub_visible: {hub_visible}\n"
+        f"- known_hubs: {known_hubs}\n"
+        f"- known_neutral_junctions: {known_neutral_junctions}\n"
+        f"- known_friendly_junctions: {known_friendly_junctions}\n"
+        f"- known_enemy_junctions: {known_enemy_junctions}\n"
+        f"- known_extractors: {known_extractors}\n"
+        f"- known_alignable_junctions: {known_neutral_junctions + known_enemy_junctions}\n"
+        f"- current_skill: {current_skill or 'none'}\n"
+        f"- no_move_steps: {no_move_steps}\n"
+        f"{team_hint + chr(10) if team_hint else ''}"
+        f"\nRecent events:\n{events_text}\n"
+    )
+
+
+@dataclass
+class CrossRoleState:
+    """Combined state for agents that can play both aligner and miner roles.
+
+    Has all fields required by AlignerPolicyImpl AND MinerSkillImpl methods
+    (duck typing approach — both can operate on this state).
+    """
+
+    # StarterCogState base fields
+    wander_direction_index: int = 0
+    wander_steps_remaining: int = 0
+    last_mode: str = "bootstrap"
+
+    # Map memory (shared via SharedMap)
+    known_free_cells: set[Coord] = field(default_factory=set)
+    blocked_cells: set[Coord] = field(default_factory=set)
+    move_blocked_cells: set[Coord] = field(default_factory=set)
+    known_hubs: set[Coord] = field(default_factory=set)
+
+    # Aligner-specific structures
+    known_aligner_stations: set[Coord] = field(default_factory=set)
+    known_neutral_junctions: set[Coord] = field(default_factory=set)
+    known_friendly_junctions: set[Coord] = field(default_factory=set)
+    known_enemy_junctions: set[Coord] = field(default_factory=set)
+    known_hazard_stations: set[Coord] = field(default_factory=set)
+    blacklisted_junctions: set[Coord] = field(default_factory=set)
+
+    # Miner-specific structures
+    known_miner_stations: set[Coord] = field(default_factory=set)
+    known_extractors: set[Coord] = field(default_factory=set)
+    remembered_hub_row_from_spawn: int | None = None
+    remembered_hub_col_from_spawn: int | None = None
+
+    # Move-failure tracking
+    last_pos: Coord | None = None
+    last_move_target: Coord | None = None
+
+    # LLM planning state
+    current_skill: str | None = None
+    current_reason: str = ""
+    skill_steps: int = 0
+    no_move_steps: int = 0
+    no_progress_on_target_steps: int = 0
+    recent_events: list[str] = field(default_factory=list)
+
+    # Aligner LLM tracking
+    last_has_heart: bool = False
+    last_friendly_junctions: int = 0
+    consecutive_unstuck: int = 0
+    explore_start_junctions: int = 0
+    align_neutral_timeouts: int = 0
+    get_heart_timeouts: int = 0
+    max_hp_seen: int = 0
+    retreating: bool = False
+
+    # Miner LLM tracking
+    last_carried_total: int = 0
+    explore_start_extractors: int = 0
+
+
+class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
+    """Agent that can dynamically choose aligner or miner skills based on team needs."""
+
+    _UNSTUCK_DIRECTIONS = ("north", "east", "south", "west")
+
+    def __init__(
+        self,
+        policy_env_info: PolicyEnvInterface,
+        agent_id: int,
+        planner: LLMMinerPlannerClient,
+        stuck_threshold: int,
+        unstuck_horizon: int,
+        return_load: int,
+        shared_map: SharedMap | None = None,
+    ) -> None:
+        # Aligner impl handles aligner-specific skills (gear_up aligner station, get_heart, align_neutral)
+        self._aligner = AlignerPolicyImpl(policy_env_info, agent_id, shared_map=shared_map)
+        # Miner impl handles miner-specific skills (gear_up miner station, mine_until_full, deposit_to_hub)
+        self._miner = MinerSkillImpl(policy_env_info, agent_id, return_load=return_load, shared_map=shared_map)
+        self._planner = planner
+        self._stuck_threshold = stuck_threshold
+        self._unstuck_horizon = unstuck_horizon
+        self._return_load = return_load
+        self._shared_map = shared_map
+        # Store hub_tags for hub visibility check
+        self._hub_tags = self._aligner._starter._resolve_tag_ids(["hub"])
+
+    def initial_agent_state(self) -> CrossRoleState:
+        state = CrossRoleState()
+        self._bind_shared_map(state)
+        return state
+
+    def _bind_shared_map(self, state: CrossRoleState) -> None:
+        sm = self._shared_map
+        if sm is None:
+            return
+        state.known_free_cells = sm.known_free_cells
+        state.blocked_cells = sm.blocked_cells
+        state.move_blocked_cells = sm.move_blocked_cells
+        state.known_hubs = sm.known_hubs
+        state.known_aligner_stations = sm.known_aligner_stations
+        state.known_miner_stations = sm.known_miner_stations
+        state.known_hazard_stations = sm.known_hazard_stations
+        state.known_extractors = sm.known_extractors
+        state.known_neutral_junctions = sm.known_neutral_junctions
+        state.known_friendly_junctions = sm.known_friendly_junctions
+        state.known_enemy_junctions = sm.known_enemy_junctions
+
+    def _copy_with_shared(self, state: CrossRoleState) -> CrossRoleState:
+        """Return state with shared map fields re-bound (after delegate calls may have returned new state)."""
+        sm = self._shared_map
+        if sm is None:
+            return state
+        return replace(
+            state,
+            known_free_cells=sm.known_free_cells,
+            blocked_cells=sm.blocked_cells,
+            move_blocked_cells=sm.move_blocked_cells,
+            known_hubs=sm.known_hubs,
+            known_aligner_stations=sm.known_aligner_stations,
+            known_miner_stations=sm.known_miner_stations,
+            known_hazard_stations=sm.known_hazard_stations,
+            known_extractors=sm.known_extractors,
+            known_neutral_junctions=sm.known_neutral_junctions,
+            known_friendly_junctions=sm.known_friendly_junctions,
+            known_enemy_junctions=sm.known_enemy_junctions,
+        )
+
+    def _event(self, state: CrossRoleState, message: str) -> None:
+        state.recent_events.append(message)
+        del state.recent_events[:-10]
+
+    def _current_gear(self, obs: AgentObservation) -> str:
+        gear = self._aligner._current_gear(obs)
+        return gear if gear else "none"
+
+    def _inventory_count(self, obs: AgentObservation, item: str) -> int:
+        return self._aligner._inventory_count(obs, item)
+
+    def _carried_total(self, obs: AgentObservation) -> int:
+        return self._miner._carried_total(obs)
+
+    def _feature_value(self, obs: AgentObservation, feature_name: str) -> int | None:
+        for token in obs.tokens:
+            if token.feature.name == feature_name:
+                return int(token.value)
+        return None
+
+    def _hub_visible(self, obs: AgentObservation) -> bool:
+        return self._aligner._starter._closest_tag_location(obs, self._hub_tags) is not None
+
+    def _current_abs(self, obs: AgentObservation) -> Coord:
+        return self._aligner._spawn_offset(obs)
+
+    def _known_alignable_junctions(self, state: CrossRoleState) -> set[Coord]:
+        neutral = {j for j in state.known_neutral_junctions if j not in state.blacklisted_junctions}
+        if neutral:
+            return neutral
+        return {j for j in state.known_enemy_junctions if j not in state.blacklisted_junctions}
+
+    def _update_map_memory(self, obs: AgentObservation, state: CrossRoleState) -> Coord:
+        """Update map from both aligner and miner perspectives."""
+        # Use aligner map memory (handles junctions, aligner stations, hazards)
+        current_abs = self._aligner._update_map_memory(obs, state)
+        # Additionally update miner-specific structures (extractors, miner stations)
+        # We reuse the miner's _update_map_memory but pass our CrossRoleState (duck typing)
+        self._miner._update_map_memory(obs, state)
+        return current_abs
+
+    def _update_progress(self, obs: AgentObservation, state: CrossRoleState) -> None:
+        has_heart = self._inventory_count(obs, "heart") > 0
+        friendly_count = len(state.known_friendly_junctions)
+        carried_total = self._carried_total(obs)
+        current_abs = self._current_abs(obs)
+
+        if state.current_skill == "get_heart" and has_heart and not state.last_has_heart:
+            self._event(state, "acquired a heart")
+        if state.current_skill == "align_neutral" and friendly_count > state.last_friendly_junctions:
+            self._event(state, f"friendly junction count increased {state.last_friendly_junctions}→{friendly_count}")
+        if state.current_skill == "deposit_to_hub" and carried_total < state.last_carried_total:
+            self._event(state, f"deposited cargo {state.last_carried_total}→{carried_total}")
+        if state.current_skill == "mine_until_full" and carried_total > state.last_carried_total:
+            self._event(state, f"cargo increased {state.last_carried_total}→{carried_total}")
+
+        state.last_has_heart = has_heart
+        state.last_friendly_junctions = friendly_count
+        state.last_carried_total = carried_total
+
+        last_action_move = self._feature_value(obs, "last_action_move")
+        gear = self._current_gear(obs)
+
+        near_hub = any(
+            abs(current_abs[0] - h[0]) + abs(current_abs[1] - h[1]) <= 1
+            for h in state.known_hubs
+        )
+        near_aligner_station = any(
+            abs(current_abs[0] - s[0]) + abs(current_abs[1] - s[1]) <= 1
+            for s in state.known_aligner_stations
+        )
+        near_miner_station = any(
+            abs(current_abs[0] - s[0]) + abs(current_abs[1] - s[1]) <= 1
+            for s in state.known_miner_stations
+        )
+
+        made_progress = (
+            (state.current_skill == "get_heart" and has_heart and not state.last_has_heart)
+            or (state.current_skill == "align_neutral" and friendly_count > state.last_friendly_junctions)
+            or (state.current_skill == "gear_up_aligner" and gear == "aligner")
+            or (state.current_skill == "gear_up_miner" and gear == "miner")
+            or (state.current_skill == "deposit_to_hub" and carried_total < state.last_carried_total)
+            or (state.current_skill == "mine_until_full" and carried_total > state.last_carried_total)
+        )
+        stationary_on_valid_target = (
+            (state.current_skill == "get_heart" and near_hub)
+            or (state.current_skill == "align_neutral" and current_abs in self._known_alignable_junctions(state))
+            or (state.current_skill == "gear_up_aligner" and near_aligner_station)
+            or (state.current_skill == "gear_up_miner" and near_miner_station)
+            or (state.current_skill in {"mine_until_full", "deposit_to_hub"} and near_hub)
+        )
+
+        if made_progress:
+            state.no_move_steps = 0
+            state.no_progress_on_target_steps = 0
+        elif stationary_on_valid_target and not made_progress:
+            state.no_move_steps = 0
+            state.no_progress_on_target_steps += 1
+        elif state.current_skill is not None and last_action_move == 0:
+            state.no_move_steps += 1
+            state.no_progress_on_target_steps = 0
+        else:
+            state.no_move_steps = 0
+            state.no_progress_on_target_steps = 0
+
+    def _plan_skill(self, obs: AgentObservation, state: CrossRoleState) -> None:
+        gear = self._current_gear(obs)
+        has_heart = self._inventory_count(obs, "heart") > 0
+        carried = self._carried_total(obs)
+        known_alignable = self._known_alignable_junctions(state)
+
+        prompt = build_cross_role_prompt(
+            current_gear=gear,
+            has_heart=has_heart,
+            carried_resources=carried,
+            return_load=self._return_load,
+            hub_visible=self._hub_visible(obs),
+            known_hubs=len(state.known_hubs),
+            known_neutral_junctions=len(state.known_neutral_junctions),
+            known_friendly_junctions=len(state.known_friendly_junctions),
+            known_enemy_junctions=len(state.known_enemy_junctions),
+            known_extractors=len(state.known_extractors),
+            current_skill=state.current_skill,
+            no_move_steps=state.no_move_steps,
+            recent_events=state.recent_events,
+        )
+        logger.info("agent=%s cross_role_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
+        started_at = time.perf_counter()
+        text = self._planner.complete(prompt)
+        latency_ms = (time.perf_counter() - started_at) * 1000.0
+        logger.info(
+            "agent=%s cross_role_response_ms=%.1f response=%s",
+            obs.agent_id, latency_ms, text.replace("\n", " "),
+        )
+        skill, reason = _parse_cross_role_skill(text)
+        was_stuck = bool(
+            state.recent_events and (
+                "exited as stuck" in state.recent_events[-1]
+                or "exited as stale" in state.recent_events[-1]
+                or "timed out after" in state.recent_events[-1]
+            )
+        )
+
+        # Scripted fallback if LLM returns invalid skill
+        if skill is None:
+            if gear == "none":
+                skill = "gear_up_aligner" if len(known_alignable) >= len(state.known_extractors) else "gear_up_miner"
+            elif gear == "aligner":
+                if not has_heart and state.known_hubs:
+                    skill = "get_heart"
+                elif has_heart and known_alignable:
+                    skill = "align_neutral"
+                else:
+                    skill = "explore"
+            elif gear == "miner":
+                if carried >= self._return_load:
+                    skill = "deposit_to_hub"
+                elif state.known_extractors:
+                    skill = "mine_until_full"
+                else:
+                    skill = "explore"
+            else:
+                skill = "explore"
+            reason = f"scripted fallback ({reason})"
+
+        # Precondition enforcement
+        # Must have correct gear for role-specific skills
+        if skill == "get_heart" and gear != "aligner":
+            skill = "gear_up_aligner"
+            reason = f"overrode to gear_up_aligner: need aligner gear for get_heart (current={gear})"
+        if skill == "align_neutral" and gear != "aligner":
+            skill = "gear_up_aligner"
+            reason = f"overrode to gear_up_aligner: need aligner gear for align_neutral"
+        if skill == "align_neutral" and gear == "aligner" and not has_heart:
+            skill = "get_heart"
+            reason = "overrode to get_heart: need heart for align_neutral"
+        if skill == "align_neutral" and gear == "aligner" and has_heart and not known_alignable:
+            skill = "explore"
+            reason = "overrode to explore: no alignable junctions known"
+        if skill == "mine_until_full" and gear != "miner":
+            skill = "gear_up_miner"
+            reason = f"overrode to gear_up_miner: need miner gear for mining (current={gear})"
+        if skill == "deposit_to_hub" and gear != "miner":
+            skill = "gear_up_miner"
+            reason = f"overrode to gear_up_miner: need miner gear for deposit (current={gear})"
+        if skill == "deposit_to_hub" and gear == "miner" and carried == 0:
+            skill = "mine_until_full" if state.known_extractors else "explore"
+            reason = "overrode to mine: no cargo to deposit"
+        if skill == "gear_up_aligner" and gear == "aligner":
+            if has_heart and known_alignable:
+                skill = "align_neutral"
+                reason = "overrode: already have aligner gear, have heart and target"
+            elif not has_heart and state.known_hubs:
+                skill = "get_heart"
+                reason = "overrode: already have aligner gear, need heart"
+            else:
+                skill = "explore"
+                reason = "overrode: already have aligner gear"
+        if skill == "gear_up_miner" and gear == "miner":
+            if carried >= self._return_load:
+                skill = "deposit_to_hub"
+                reason = "overrode: already have miner gear, cargo full"
+            elif state.known_extractors:
+                skill = "mine_until_full"
+                reason = "overrode: already have miner gear"
+            else:
+                skill = "explore"
+                reason = "overrode: already have miner gear, no extractors"
+
+        # Prevent consecutive unstuck loops
+        if skill == "unstuck":
+            state.consecutive_unstuck += 1
+        else:
+            state.consecutive_unstuck = 0
+        if state.consecutive_unstuck >= 2 and skill == "unstuck":
+            skill = "explore"
+            reason = f"overrode unstuck to explore after {state.consecutive_unstuck} consecutive unstuck"
+            state.consecutive_unstuck = 0
+
+        if skill in {"explore", "gear_up_aligner", "gear_up_miner"}:
+            state.explore_start_junctions = len(state.known_neutral_junctions)
+            state.explore_start_extractors = len(state.known_extractors)
+
+        state.current_skill = skill
+        state.current_reason = reason
+        state.skill_steps = 0
+        state.no_move_steps = 0
+        state.no_progress_on_target_steps = 0
+        self._event(state, f"planner selected {skill}: {reason}")
+
+    def _maybe_finish_skill(self, obs: AgentObservation, state: CrossRoleState) -> None:
+        gear = self._current_gear(obs)
+        has_heart = self._inventory_count(obs, "heart") > 0
+        carried = self._carried_total(obs)
+        friendly_count = len(state.known_friendly_junctions)
+
+        if state.current_skill == "gear_up_aligner" and gear == "aligner" and state.skill_steps > 0:
+            self._event(state, "gear_up_aligner completed")
+            state.current_skill = None
+        elif state.current_skill == "gear_up_miner" and gear == "miner" and state.skill_steps > 0:
+            self._event(state, "gear_up_miner completed")
+            state.current_skill = None
+        elif state.current_skill == "get_heart" and has_heart and state.skill_steps > 0:
+            self._event(state, "get_heart completed: acquired heart")
+            state.get_heart_timeouts = 0
+            state.current_skill = None
+        elif state.current_skill == "align_neutral" and not has_heart and state.skill_steps > 0:
+            self._event(state, "align_neutral completed: heart spent")
+            state.align_neutral_timeouts = 0
+            state.current_skill = None
+        elif state.current_skill == "mine_until_full" and carried >= self._return_load:
+            self._event(state, f"mine_until_full completed: cargo={carried}")
+            state.current_skill = None
+        elif state.current_skill == "deposit_to_hub" and carried == 0:
+            self._event(state, "deposit_to_hub completed")
+            state.current_skill = None
+        elif state.current_skill == "explore" and (
+            len(state.known_neutral_junctions) > state.explore_start_junctions
+            or len(state.known_extractors) > state.explore_start_extractors
+        ):
+            new_junctions = len(state.known_neutral_junctions) - state.explore_start_junctions
+            new_extractors = len(state.known_extractors) - state.explore_start_extractors
+            self._event(state, f"explore completed: +{new_junctions} junctions, +{new_extractors} extractors")
+            state.current_skill = None
+        elif state.current_skill == "unstuck" and state.skill_steps >= self._unstuck_horizon:
+            self._event(state, "unstuck finished horizon")
+            state.current_skill = None
+        elif state.current_skill in {"gear_up_aligner", "gear_up_miner"} and state.skill_steps >= self._stuck_threshold * 10:
+            self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps")
+            state.current_skill = None
+        elif state.current_skill in {"get_heart", "align_neutral", "mine_until_full", "deposit_to_hub"} and state.skill_steps >= self._stuck_threshold * 5:
+            if state.current_skill == "align_neutral":
+                state.align_neutral_timeouts += 1
+                if state.align_neutral_timeouts >= 1:
+                    current_abs = self._current_abs(obs)
+                    non_bl_neutral = state.known_neutral_junctions - state.blacklisted_junctions
+                    non_bl_enemy = state.known_enemy_junctions - state.blacklisted_junctions
+                    targets = non_bl_neutral or non_bl_enemy
+                    if targets:
+                        stuck = self._aligner._nearest_known(current_abs, targets)
+                        if stuck:
+                            state.blacklisted_junctions.add(stuck)
+                            state.known_neutral_junctions.discard(stuck)
+                            state.known_enemy_junctions.discard(stuck)
+                            state.align_neutral_timeouts = 0
+            elif state.current_skill == "get_heart":
+                state.get_heart_timeouts += 1
+            self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps")
+            state.current_skill = None
+        elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
+            self._event(state, f"{state.current_skill} exited as stuck after {state.no_move_steps} blocked steps")
+            state.current_skill = None
+        elif state.current_skill is not None and state.no_progress_on_target_steps >= self._stuck_threshold:
+            # Remove depleted extractors
+            if state.current_skill == "mine_until_full":
+                current_abs = self._current_abs(obs)
+                if current_abs in state.known_extractors:
+                    state.known_extractors.discard(current_abs)
+                    self._event(state, f"removed depleted extractor at {current_abs}")
+            self._event(state, f"{state.current_skill} exited as stale after {state.no_progress_on_target_steps} steps")
+            state.current_skill = None
+
+    def _unstuck_move(self, state: CrossRoleState) -> tuple[Action, CrossRoleState]:
+        state.last_mode = "unstuck"
+        direction = self._UNSTUCK_DIRECTIONS[state.wander_direction_index % len(self._UNSTUCK_DIRECTIONS)]
+        state.wander_direction_index = (state.wander_direction_index + 1) % len(self._UNSTUCK_DIRECTIONS)
+        return self._aligner._starter._action(f"move_{direction}"), state
+
+    def step_with_state(self, obs: AgentObservation, state: CrossRoleState) -> tuple[Action, CrossRoleState]:
+        current_abs = self._update_map_memory(obs, state)
+        self._update_progress(obs, state)
+        self._maybe_finish_skill(obs, state)
+
+        if state.current_skill is None:
+            self._plan_skill(obs, state)
+
+        # Navigation shake to break stuck loops
+        if state.current_skill not in {None, "unstuck"} and state.no_move_steps >= 5 and state.no_move_steps % 3 == 0:
+            action, state = self._unstuck_move(state)
+            state.skill_steps += 1
+            return action, state
+
+        skill = state.current_skill
+
+        if skill == "gear_up_aligner":
+            action, base_state = self._aligner._gear_up(obs, state, current_abs)
+            state = self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+                last_pos=base_state.last_pos,
+                last_move_target=base_state.last_move_target,
+            ))
+
+        elif skill == "gear_up_miner":
+            action, base_state = self._miner._gear_up(obs, state)
+            state = self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+                remembered_hub_row_from_spawn=base_state.remembered_hub_row_from_spawn,
+                remembered_hub_col_from_spawn=base_state.remembered_hub_col_from_spawn,
+                last_pos=base_state.last_pos,
+                last_move_target=base_state.last_move_target,
+            ))
+
+        elif skill == "get_heart":
+            action, base_state = self._aligner._get_heart(obs, state, current_abs)
+            state = self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+                last_pos=base_state.last_pos,
+                last_move_target=base_state.last_move_target,
+            ))
+
+        elif skill == "align_neutral":
+            action, base_state = self._aligner._align_neutral(obs, state, current_abs)
+            state = self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+                last_pos=base_state.last_pos,
+                last_move_target=base_state.last_move_target,
+            ))
+
+        elif skill == "mine_until_full":
+            action, base_state = self._miner._mine_until_full(obs, state)
+            state = self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+                remembered_hub_row_from_spawn=base_state.remembered_hub_row_from_spawn,
+                remembered_hub_col_from_spawn=base_state.remembered_hub_col_from_spawn,
+                last_pos=base_state.last_pos,
+                last_move_target=base_state.last_move_target,
+            ))
+
+        elif skill == "deposit_to_hub":
+            action, base_state = self._miner._deposit_to_hub(obs, state)
+            state = self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+                remembered_hub_row_from_spawn=base_state.remembered_hub_row_from_spawn,
+                remembered_hub_col_from_spawn=base_state.remembered_hub_col_from_spawn,
+                last_pos=base_state.last_pos,
+                last_move_target=base_state.last_move_target,
+            ))
+
+        elif skill == "explore":
+            gear = self._current_gear(obs)
+            has_heart = self._inventory_count(obs, "heart") > 0
+            if gear == "aligner" and has_heart:
+                action, base_state = self._aligner._explore_for_alignment(obs, state)
+            elif state.known_hubs:
+                action, base_state = self._aligner._explore_near_hub(obs, state)
+            else:
+                action, base_state = self._aligner._explore(obs, state)
+            state = self._copy_with_shared(replace(state,
+                wander_direction_index=base_state.wander_direction_index,
+                wander_steps_remaining=base_state.wander_steps_remaining,
+                last_mode=base_state.last_mode,
+                last_pos=getattr(base_state, 'last_pos', state.last_pos),
+                last_move_target=getattr(base_state, 'last_move_target', state.last_move_target),
+            ))
+
+        else:
+            action, state = self._unstuck_move(state)
+
+        state.skill_steps += 1
+        action_name = action.name if hasattr(action, "name") else ""
+        if action_name.startswith("move_"):
+            direction = action_name[len("move_"):]
+            delta_map = {"north": (-1, 0), "east": (0, 1), "south": (1, 0), "west": (0, -1)}
+            dr, dc = delta_map.get(direction, (0, 0))
+            state.last_move_target = (current_abs[0] + dr, current_abs[1] + dc)
+        return action, state
+
+
+class CrossRolePolicy(MultiAgentPolicy):
+    """Policy where all agents can dynamically choose aligner or miner role."""
+
+    short_names = ["cross_role", "machina_cross_role"]
+
+    def __init__(
+        self,
+        policy_env_info: PolicyEnvInterface,
+        device: str = "cpu",
+        return_load: int | str = 40,
+        stuck_threshold: int | str = 20,
+        unstuck_horizon: int | str = 4,
+        llm_api_url: str | None = None,
+        llm_model: str | None = "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+        llm_api_key_env: str = "OPENROUTER_API_KEY",
+        llm_site_url: str | None = None,
+        llm_app_name: str = "cogames-cross-role",
+        llm_timeout_s: float | str = 10.0,
+        llm_responder: Callable[[str], str] | None = None,
+        llm_local_model_path: str | None = None,
+    ):
+        super().__init__(policy_env_info, device=device)
+        self._shared_map = SharedMap()
+        self._planner = LLMMinerPlannerClient(
+            api_url=llm_api_url,
+            model=llm_model,
+            api_key_env=llm_api_key_env,
+            site_url=llm_site_url,
+            app_name=llm_app_name,
+            timeout_s=float(llm_timeout_s),
+            responder=llm_responder,
+            local_model_path=llm_local_model_path,
+        )
+        self._return_load = int(return_load)
+        self._stuck_threshold = int(stuck_threshold)
+        self._unstuck_horizon = int(unstuck_horizon)
+        self._agent_policies: dict[int, StatefulAgentPolicy[CrossRoleState]] = {}
+
+    def agent_policy(self, agent_id: int) -> StatefulAgentPolicy[CrossRoleState]:
+        if agent_id not in self._agent_policies:
+            impl = CrossRolePolicyImpl(
+                self._policy_env_info,
+                agent_id,
+                planner=self._planner,
+                stuck_threshold=self._stuck_threshold,
+                unstuck_horizon=self._unstuck_horizon,
+                return_load=self._return_load,
+                shared_map=self._shared_map,
+            )
+            self._agent_policies[agent_id] = StatefulAgentPolicy(
+                impl,
+                self._policy_env_info,
+                agent_id=agent_id,
+            )
+        return self._agent_policies[agent_id]
