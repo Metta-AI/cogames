@@ -441,15 +441,25 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         # Phase 2: fire when gear!=effective_preferred and gear_up_completed==False (gear switch)
         # v17: LLM prompt includes gear_up_aligner/miner for scrambler/scout so agents can
         # self-correct without bootstrap (but bootstrap is faster and more reliable).
-        needs_gear_up = (
-            effective_preferred
-            and not state.gear_up_completed
-            and (
-                gear == "none"
-                or gear in ("scrambler", "scout")  # contamination: always re-gear to preferred
-                or (state.phase == 2 and gear != effective_preferred and gear in ("aligner", "miner"))
+        # v12 fix: scout/scrambler contamination always triggers re-gear, even after gear_up_completed.
+        # Bug: agent 3 (seed 44) completed gear_up_miner successfully, then contaminated during
+        # mine_until_full (walked through scout station). gear_up_completed=True blocked re-bootstrap.
+        contaminated = gear in ("scrambler", "scout")
+        needs_gear_up = effective_preferred and (
+            contaminated  # always re-gear on contamination, even if gear_up previously completed
+            or (
+                not state.gear_up_completed
+                and (
+                    gear == "none"
+                    or (state.phase == 2 and gear != effective_preferred and gear in ("aligner", "miner"))
+                )
             )
         )
+        if contaminated and state.gear_up_completed:
+            # Reset so bootstrap retries from scratch; contamination invalidates completed status
+            state.gear_up_completed = False
+            state.gear_up_failures = 0
+            self._event(state, f"contamination detected ({gear}): resetting gear_up state for re-acquisition")
         if needs_gear_up:
             failures = state.gear_up_failures
             if failures == 0:
