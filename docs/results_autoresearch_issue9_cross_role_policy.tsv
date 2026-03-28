@@ -9,3 +9,4 @@ a701f3b	0.10	aligned=0/held=0/hearts=2	1000	discard	cross-role v5: fallback gear
 dc28117	0.44	aligned=8/held=3428/hearts=7/oxygen=59	1000	keep	cross-role v7: miner-specific explore; miners use miner._explore_near_hub not aligner's; scout 3→1; 8 aligned (=baseline); best cross-role so far
 7df4d41	0.39	aligned=5/held=2921/hearts=5/oxygen=40/silicon=40	1000	discard	cross-role v8: re-acquire aligner gear after loss; no improvement; 1 aligner still loses gear
 e0784ae	0.55	aligned=12/held=4500/hearts=8	1000	keep	cross-role v9: 400-step timeout for worker skills; 93% reduction in deposit timeouts; 12 junctions aligned (>baseline!); best cross-role so far
+cd52915	0.48	aligned=7/held=?/hearts=9	1000	discard	cross-role v10: miner re_acquire + rescue retry; ALL 5 miners lost gear; re_acquire sent miners through scrambler station (800 wasted steps per agent)
