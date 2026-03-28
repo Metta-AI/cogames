@@ -303,10 +303,9 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         return self._aligner._spawn_offset(obs)
 
     def _known_alignable_junctions(self, state: CrossRoleState) -> set[Coord]:
-        neutral = {j for j in state.known_neutral_junctions if j not in state.blacklisted_junctions}
-        if neutral:
-            return neutral
-        return {j for j in state.known_enemy_junctions if j not in state.blacklisted_junctions}
+        # v14: include both neutral AND enemy junctions so aligners re-align captured ones
+        # without waiting until all neutral junctions are exhausted.
+        return (state.known_neutral_junctions | state.known_enemy_junctions) - state.blacklisted_junctions
 
     def _update_map_memory(self, obs: AgentObservation, state: CrossRoleState) -> Coord:
         """Update map from both aligner and miner perspectives."""
@@ -701,7 +700,13 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             ))
 
         elif skill == "align_neutral":
-            action, base_state = self._aligner._align_neutral(obs, state, current_abs)
+            # v14: merge enemy junctions into neutral pool so aligner routes to nearest
+            # of (neutral ∪ enemy) instead of neutral-first-then-enemy-as-fallback.
+            # This makes aligners defend recaptured junctions immediately rather than
+            # continuing to chase new neutral ones, increasing average hold time.
+            merged_neutral = state.known_neutral_junctions | state.known_enemy_junctions
+            align_state = replace(state, known_neutral_junctions=merged_neutral)
+            action, base_state = self._aligner._align_neutral(obs, align_state, current_abs)
             state = self._copy_with_shared(replace(state,
                 wander_direction_index=base_state.wander_direction_index,
                 wander_steps_remaining=base_state.wander_steps_remaining,
