@@ -146,3 +146,32 @@ Running: `EPISODE_RUNNER_USE_ISOLATED_VENVS=0 cogames run -m cogsguard_machina_1
 - This prevents >4 × 200 = 800 steps wasted maximum per agent
 
 
+
+## 2026-03-28: cross-role v5 result — 0.10 reward (same as v4, DISCARD)
+
+**Result (commit a701f3b, DISCARDED): 0.10 reward** — same catastrophic failure.
+
+**What happened:**
+1. Miners (agents 4-7): got miner gear on first try; 5 miners total active ✓
+2. Aligners (agents 1,2): got aligner gear BUT then lost it to scout gear during get_heart/align_neutral navigation
+3. Scout gear bug: `_current_gear()` returns "none" for scout → bootstrap retried gear_up
+4. Fallback to miner: agents 1,2 became miners (useful!) but no aligners
+5. 0 aligned junctions; miners deposited resources well (silicon=50) but no one to align
+
+**Root cause confirmed:** Once gear is lost to scout, bootstrap retries aggressively (counted as "first attempt"). Need to stop retrying when gear was already successfully acquired.
+
+---
+
+## 2026-03-28: starting new experiment loop (cross-role v6: gear_up_completed guard)
+
+**Hypothesis:** Track `gear_up_completed` boolean. Once gear acquired, NEVER retry from bootstrap. Single fallback for agents that genuinely fail preferred gear.
+
+**Changes (v6):**
+- Add `gear_up_completed: bool = False` to `CrossRoleState`  
+- Set `True` when gear_up succeeds in `_maybe_finish_skill`
+- Bootstrap: fires only when `not state.gear_up_completed AND failures < 2`
+  - failures=0: try preferred gear
+  - failures=1: try fallback (opposite gear)  
+  - failures>=2 OR gear_up_completed: let LLM guide
+- Expected: agent 0 (fails aligner) → fallback to miner; agents 1,2 succeed aligner; no retry after scout gear
+- Expected team: 2 aligners + 5 miners (=baseline composition)

@@ -203,6 +203,7 @@ class CrossRoleState:
 
     # Gear acquisition tracking (for retry + fallback logic)
     gear_up_failures: int = 0
+    gear_up_completed: bool = False  # True once any gear_up succeeds; prevents retry after accidental gear change
 
 
 class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
@@ -398,21 +399,21 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         if self._shared_map is not None and hasattr(self._shared_map, "agent_gears"):
             self._shared_map.agent_gears[obs.agent_id] = gear
 
-        # Bootstrap: if no gear and preferred role set, try preferred gear up to 2x then fall back to opposite
-        _MAX_PREFERRED_RETRIES = 2  # try preferred gear up to 2 times
-        _MAX_FALLBACK_RETRIES = 2   # try fallback gear up to 2 times (total max 4 attempts = 800 steps)
-        if gear == "none" and self._preferred_initial_gear:
+        # Bootstrap: try to acquire gear if agent has none and gear_up never succeeded.
+        # If gear_up already completed once (agent had gear, then accidentally lost it to scout/etc),
+        # do NOT retry — let the agent continue with LLM guidance.
+        if gear == "none" and self._preferred_initial_gear and not state.gear_up_completed:
             failures = state.gear_up_failures
-            if failures < _MAX_PREFERRED_RETRIES:
-                # Still trying preferred gear
+            if failures == 0:
+                # First attempt: try preferred gear
                 bootstrap_gear = self._preferred_initial_gear
-                reason = f"initial role: {bootstrap_gear} (attempt {failures + 1}/{_MAX_PREFERRED_RETRIES})"
-            elif failures < _MAX_PREFERRED_RETRIES + _MAX_FALLBACK_RETRIES:
-                # Preferred failed, try opposite gear as fallback
+                reason = f"initial role: {bootstrap_gear} (first attempt)"
+            elif failures == 1:
+                # Second attempt: try fallback gear (opposite)
                 bootstrap_gear = "miner" if self._preferred_initial_gear == "aligner" else "aligner"
-                reason = f"fallback role: {bootstrap_gear} (preferred {self._preferred_initial_gear} failed, attempt {failures - _MAX_PREFERRED_RETRIES + 1}/{_MAX_FALLBACK_RETRIES})"
+                reason = f"fallback role: {bootstrap_gear} (preferred {self._preferred_initial_gear} failed once)"
             else:
-                bootstrap_gear = ""  # Give up, let LLM handle it
+                bootstrap_gear = ""  # 2 failures = give up, let LLM explore
 
             if bootstrap_gear:
                 skill = f"gear_up_{bootstrap_gear}"
@@ -568,9 +569,11 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
 
         if state.current_skill == "gear_up_aligner" and gear == "aligner" and state.skill_steps > 0:
             self._event(state, "gear_up_aligner completed")
+            state.gear_up_completed = True
             state.current_skill = None
         elif state.current_skill == "gear_up_miner" and gear == "miner" and state.skill_steps > 0:
             self._event(state, "gear_up_miner completed")
+            state.gear_up_completed = True
             state.current_skill = None
         elif state.current_skill == "get_heart" and has_heart and state.skill_steps > 0:
             self._event(state, "get_heart completed: acquired heart")
