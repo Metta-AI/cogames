@@ -6,6 +6,7 @@ import pytest
 
 from cogames.core import CoGameMissionVariant, Deps
 from cogames.variants import ResolvedDeps, VariantRegistry
+from metta.games.games import GAMES, make_game, register
 
 # --- Test variant subclasses (not ABC, so we can instantiate them) ---
 
@@ -150,6 +151,12 @@ class TestConfigure:
         reg.run_configure(["gamma"])
         assert gamma._alpha is None
 
+    def test_configured_accessors_follow_topological_order(self):
+        reg = VariantRegistry([AlphaVariant(), BetaVariant()])
+        reg.run_configure(["alpha", "beta"])
+        assert reg.configured_names() == ["beta", "alpha"]
+        assert [variant.name for variant in reg.configured()] == ["beta", "alpha"]
+
 
 # --- ResolvedDeps enforcement ---
 
@@ -216,7 +223,7 @@ class TestTopologicalOrder:
         """Beta (dep) should appear before Alpha (dependent) in configure order."""
         reg = VariantRegistry([AlphaVariant(), BetaVariant()])
         reg.run_configure(["alpha", "beta"])
-        order = reg._configure_order
+        order = reg.configured_names()
         assert order.index("beta") < order.index("alpha")
 
     def test_circular_dependency_detected(self):
@@ -239,3 +246,39 @@ class TestTopologicalOrder:
         reg = VariantRegistry([CycleA(), CycleB()])
         with pytest.raises(AssertionError, match="Circular dependency"):
             reg.run_configure(["cycle_a", "cycle_b"])
+
+
+class _FakeMission:
+    model_fields = {"max_steps": type("_Field", (), {"default": 17})()}
+
+    def __init__(self, variants: list[str] | None = None) -> None:
+        self._variants = list(variants or [])
+
+    @classmethod
+    def create(cls, num_agents: int, max_steps: int) -> "_FakeMission":
+        assert num_agents == 3
+        assert max_steps == 17
+        return cls()
+
+    def with_variants(self, variants: list[str]) -> "_FakeMission":
+        return type(self)(variants)
+
+    def make_env(self):
+        return type(
+            "_Env",
+            (),
+            {
+                "label": "fake",
+                "game": type("_Game", (), {"max_steps": 17})(),
+            },
+        )()
+
+
+class TestMakeGameVariantValidation:
+    def test_make_game_rejects_non_string_variant_entries(self) -> None:
+        register("variant_validation_test", _FakeMission)
+        try:
+            with pytest.raises(TypeError, match="Game variants must be strings, got int"):
+                make_game("variant_validation_test", num_agents=3, variants=[1])  # type: ignore[list-item]
+        finally:
+            GAMES.pop("variant_validation_test", None)

@@ -73,6 +73,14 @@ class VariantRegistry:
     def all(self) -> list[CoGameMissionVariant]:
         return list(self._variants.values())
 
+    def configured(self) -> list[CoGameMissionVariant]:
+        """Return variants in configure order after run_configure()."""
+        return [self._variants[name] for name in self._configure_order]
+
+    def configured_names(self) -> list[str]:
+        """Return variant names in configure order after run_configure()."""
+        return list(self._configure_order)
+
     def required(self, variant_type: type[T]) -> T:
         """Get a variant by type. Asserts it exists."""
         for v in self._variants.values():
