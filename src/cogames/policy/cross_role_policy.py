@@ -622,15 +622,24 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
 
         effective_preferred = state.phase_preferred_gear or self._preferred_initial_gear
         if state.current_skill == "gear_up_aligner" and gear == "aligner" and state.skill_steps > 0:
-            self._event(state, "gear_up_aligner completed")
-            # v7: only mark gear_up as fully done if the acquired gear is the effective preferred gear.
-            # If aligner is the preferred gear, this is a true completion. If not (e.g., fallback during
-            # a phase where miner is preferred), keep gear_up_completed=False so retries can continue.
-            state.gear_up_completed = (effective_preferred == "aligner")
+            if effective_preferred == "aligner":
+                self._event(state, "gear_up_aligner completed")
+                state.gear_up_completed = True
+            else:
+                # v7/v9: completed with wrong gear (agent already had aligner, effective_preferred=miner).
+                # Don't mark gear_up_completed=True (that would stop bootstrap retries).
+                # Increment failures to avoid infinite loop at this fallback gear.
+                state.gear_up_failures += 1
+                self._event(state, f"gear_up_aligner wrong-gear completion (preferred={effective_preferred}), failures={state.gear_up_failures}")
             state.current_skill = None
         elif state.current_skill == "gear_up_miner" and gear == "miner" and state.skill_steps > 0:
-            self._event(state, "gear_up_miner completed")
-            state.gear_up_completed = (effective_preferred == "miner")
+            if effective_preferred == "miner":
+                self._event(state, "gear_up_miner completed")
+                state.gear_up_completed = True
+            else:
+                # v7/v9: completed with wrong gear (agent already had miner, effective_preferred=aligner).
+                state.gear_up_failures += 1
+                self._event(state, f"gear_up_miner wrong-gear completion (preferred={effective_preferred}), failures={state.gear_up_failures}")
             state.current_skill = None
         elif state.current_skill == "get_heart" and has_heart and state.skill_steps > 0:
             self._event(state, "get_heart completed: acquired heart")
