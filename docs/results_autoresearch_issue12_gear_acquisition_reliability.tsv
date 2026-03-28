@@ -1,1 +1,2 @@
 commit	mission_reward	secondary_rewards	steps	status	description
+3cdf29c	0.04	p1_gear_success=0.75/p2_gear_change=0.00/contamination=0.00	400	keep	baseline: hazard-aware miner gear_up + gear test harness; p1=6/8 agents correct; p2=0/8 (bootstrap only fires for gear==none, not for gear switch)

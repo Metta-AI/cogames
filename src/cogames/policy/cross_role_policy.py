@@ -433,29 +433,33 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         if self._shared_map is not None and hasattr(self._shared_map, "agent_gears"):
             self._shared_map.agent_gears[obs.agent_id] = gear
 
-        # Bootstrap: try to acquire gear if agent has none and gear_up never succeeded.
-        # If gear_up already completed once (agent had gear, then accidentally lost it to scrambler/scout),
-        # do NOT retry — let the agent continue with LLM guidance (LLM has gear_up skills available).
-        # v17: LLM prompt now includes gear_up_aligner/miner for scrambler/scout gear so agents can
-        # self-correct without relying solely on bootstrap.
         # Effective preferred gear: phase_preferred_gear (set at phase switch) or original preference
         effective_preferred = state.phase_preferred_gear or self._preferred_initial_gear
-        if gear == "none" and effective_preferred and not state.gear_up_completed:
+
+        # Bootstrap: acquire preferred gear.
+        # Phase 1: fire when gear=="none" and gear_up_completed==False (initial acquisition)
+        # Phase 2: fire when gear!=effective_preferred and gear_up_completed==False (gear switch)
+        # v17: LLM prompt includes gear_up_aligner/miner for scrambler/scout so agents can
+        # self-correct without bootstrap (but bootstrap is faster and more reliable).
+        needs_gear_up = (
+            effective_preferred
+            and not state.gear_up_completed
+            and (gear == "none" or (state.phase == 2 and gear != effective_preferred and gear in ("aligner", "miner")))
+        )
+        if needs_gear_up:
             failures = state.gear_up_failures
             if failures == 0:
-                # First attempt: try preferred gear
                 bootstrap_gear = effective_preferred
-                reason = f"initial role: {bootstrap_gear} (first attempt)"
+                reason = f"phase{state.phase} gear target: {bootstrap_gear} (attempt 1)"
             elif failures == 1:
-                # Second attempt: try fallback gear (opposite)
                 bootstrap_gear = "miner" if effective_preferred == "aligner" else "aligner"
-                reason = f"fallback role: {bootstrap_gear} (preferred {effective_preferred} failed once)"
+                reason = f"phase{state.phase} fallback gear: {bootstrap_gear} (preferred {effective_preferred} failed)"
             else:
-                bootstrap_gear = ""  # 2 failures = give up, let LLM choose gear_up
+                bootstrap_gear = ""  # 2+ failures: let LLM choose
 
             if bootstrap_gear:
                 skill = f"gear_up_{bootstrap_gear}"
-                logger.info("agent=%s bootstrap_skill=%s failures=%d", obs.agent_id, skill, failures)
+                logger.info("agent=%s bootstrap_skill=%s failures=%d phase=%d", obs.agent_id, skill, failures, state.phase)
                 if skill in CROSS_ROLE_SKILLS:
                     state.current_skill = skill
                     state.current_reason = reason

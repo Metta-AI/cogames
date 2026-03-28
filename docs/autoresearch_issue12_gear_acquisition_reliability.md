@@ -50,3 +50,52 @@ Looking at current gear acquisition:
 
 Run: `EPISODE_RUNNER_USE_ISOLATED_VENVS=0 cogames run -m cogsguard_machina_1 -c 8 -p "class=gear_test,kw.num_aligners=3,kw.llm_timeout_s=30" -e 1 -s 400 --action-timeout-ms 3000 --seed 42`
 
+## 2026-03-28T19:30:00Z: baseline result
+
+**Baseline result: 0.04 mission reward (400 steps)**
+
+**Phase 1 gear states at step 200 (from PHASE_SWITCH logs):**
+- Agent 0: old_preferred=aligner, gear=none → FAIL
+- Agent 1: old_preferred=aligner, gear=aligner → SUCCESS
+- Agent 2: old_preferred=aligner, gear=aligner → SUCCESS
+- Agent 3: old_preferred=miner, gear=miner → SUCCESS
+- Agent 4: old_preferred=miner, gear=miner → SUCCESS
+- Agent 5: old_preferred=miner, gear=miner → SUCCESS
+- Agent 6: old_preferred=miner, gear=miner → SUCCESS
+- Agent 7: old_preferred=miner, gear=none → FAIL
+
+`initial_gear_success_rate` = **6/8 = 0.75** (vs ~0.25 from issue-9 baseline!)
+→ Hazard-aware miner gear_up is already a big improvement
+
+**Phase 2 gear states at step 400:**
+- Agents 1,2: still have aligner gear (phase 2 intended=miner) → FAIL
+- Agents 3,4,5: still have miner gear (phase 2 intended=aligner) → FAIL
+- Agents 0,6,7: gear=none → FAIL
+
+`gear_change_success_rate` = **0/8 = 0.00**
+`gear_contamination_rate` = 0/8 = 0.00 (no scout/scrambler contamination!)
+
+**Root cause of phase 2 failure:**
+The bootstrap logic only fires when `gear == "none"`. After the phase switch at step 200, agents still have their OLD gear (aligner or miner). The bootstrap doesn't recognize they need to switch gear:
+- Agents 1,2 have aligner gear → prompt shows aligner skills only → LLM can't pick gear_up_miner
+- Agents 3-7 have miner gear → prompt shows miner skills only → LLM can't pick gear_up_aligner
+
+**Fix needed:** Bootstrap must also fire when `gear != effective_preferred` (wrong gear for current phase).
+
+**Key finding:** The hazard-aware miner gear_up (_gear_up_miner_safe) WORKED:
+- 5/5 miners (agents 3-7) acquired miner gear in phase 1 (except agent 7 who failed)
+- 2/3 aligners (agents 1,2) acquired aligner gear in phase 1
+- 0 contamination events (no scout/scrambler gear) in phase 1!
+
+---
+
+## 2026-03-28T19:30:00Z: starting new experiment loop (gear_switch_v1: phase 2 bootstrap fix)
+
+**Hypothesis:** Phase 2 fails because bootstrap only checks `gear=="none"`. Need to add:
+- If phase==2 and gear != effective_preferred and not gear_up_completed: bootstrap gear_up_{effective_preferred}
+- This lets agents 1,2 navigate to miner station; agents 3-7 navigate to aligner station
+
+**Changes (gear_switch_v1):**
+- In `_plan_skill`: add phase 2 bootstrap that fires when `gear != effective_preferred`
+- Rename "gear=none" bootstrap condition more precisely
+
