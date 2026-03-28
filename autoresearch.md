@@ -40,7 +40,10 @@ WRITE TO <branch_name>.md: "<timestamp>: baseline result is "
 
 # Reward target
 
-Primary objective:
+**Issue-specific override (check first):**
+Before defaulting to mission reward, read the issue body. If the issue defines its own success criteria or custom metrics (e.g. `initial_gear_success_rate`, `gear_change_success_rate`, or any explicit numeric thresholds), use those as your primary optimization target instead of mission reward. Log the issue-defined metrics in the TSV `secondary_rewards` column and track them as your main signal.
+
+Primary objective (default — use when issue defines no custom metrics):
 
 - maximize the mission reward reported by the game
 

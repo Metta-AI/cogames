@@ -53,6 +53,8 @@ class SharedMap:
         self.known_neutral_junctions: set[Coord] = set()
         self.known_friendly_junctions: set[Coord] = set()
         self.known_enemy_junctions: set[Coord] = set()
+        # Agent gear tracking for team coordination
+        self.agent_gears: dict[int, str] = {}
 
 
 @dataclass
