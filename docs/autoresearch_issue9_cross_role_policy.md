@@ -360,3 +360,37 @@ Reason: re-acquire logic didn't help; same fundamental timeout issue.
 **Changes:**
 - Increase gear_up timeout from `stuck_threshold * 10 = 200` to `stuck_threshold * 15 = 300` steps
 - No other changes
+
+## 2026-03-28: cross-role v12 result — 0.45 reward (DISCARD)
+
+**Result: 0.45 reward** — worse than v9 (0.55).
+
+**What happened:**
+- Agent 3 STILL failed with 300-step timeouts: `gear_up_miner timed out after 300 steps, gear_up_aligner timed out after 300 steps`
+- Agent 3 is TRULY isolated from all gear stations in seed=42 — no timeout increase will fix this
+- 300-step timeout means 600 steps wasted (vs 400 in v9) → 200 more steps of nothing
+- 9 aligned (vs 12 in v9), 7 hearts (vs 8), 0.45 vs 0.55
+
+**Conclusion:** Agent 3 in seed=42 is fundamentally unreachable from gear stations. Cannot fix with timeout. This is a map topology limitation.
+
+---
+
+## 2026-03-28: starting new experiment loop (cross-role v13: scripted skill selection)
+
+**Hypothesis:** Most LLM calls in v9 are trivially predictable:
+- Aligner + no heart + hub known → get_heart (always)
+- Aligner + heart + alignable junction → align_neutral (always)
+- Miner + full cargo → deposit_to_hub (always)
+- Miner + empty cargo + known extractors → mine_until_full (always)
+
+Using LLM for these is wasteful (~240 LLM calls per episode × ~2s each = ~480s overhead, ~15 action timeouts × 3s = 45s). Scripting these decisions saves time and allows more productive steps.
+
+Only use LLM for uncertain situations (no known targets, need to explore, etc.).
+
+**Expected outcome:** Faster episode execution → more productive steps → better alignment and resource cycles → higher reward than v9 (0.55).
+
+**Changes (v13):**
+- Add `_scripted_skill()` method: returns skill+reason if state clearly dictates it
+- Call `_scripted_skill()` BEFORE LLM in `_plan_skill()`
+- Scripted rules: aligner→get_heart, aligner→align_neutral, miner→deposit, miner→mine
+- Only LLM when scripted returns None (ambiguous state)
