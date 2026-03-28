@@ -53,6 +53,8 @@ class SharedMap:
         self.known_neutral_junctions: set[Coord] = set()
         self.known_friendly_junctions: set[Coord] = set()
         self.known_enemy_junctions: set[Coord] = set()
+        # Agent gear tracking for team coordination
+        self.agent_gears: dict[int, str] = {}
 
 
 @dataclass
@@ -557,7 +559,7 @@ class AlignerPolicyImpl(StatefulPolicyImpl[AlignerState]):
                 # Stations are placed 4 rows below hub center; aligner is leftmost (3 cols west of center).
                 hub_center = self._nearest_known(current_abs, state.known_hubs)
                 expected_station = (hub_center[0] + 4, hub_center[1] - 3)
-                direction = self._navigate_to_station(state, current_abs, expected_station, avoid_hazards=False)
+                direction = self._navigate_to_station(state, current_abs, expected_station, avoid_hazards=True)
                 if direction is not None:
                     return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
             return self._explore(obs, state)
