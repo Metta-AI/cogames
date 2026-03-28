@@ -643,7 +643,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         elif state.current_skill == "unstuck" and state.skill_steps >= self._unstuck_horizon:
             self._event(state, "unstuck finished horizon")
             state.current_skill = None
-        elif state.current_skill in {"gear_up_aligner", "gear_up_miner"} and state.skill_steps >= self._stuck_threshold * 10:
+        elif state.current_skill in {"gear_up_aligner", "gear_up_miner"} and state.skill_steps >= self._stuck_threshold * 5:
             state.gear_up_failures += 1
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps (failure #{state.gear_up_failures})")
             state.current_skill = None
@@ -695,18 +695,36 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         state.wander_direction_index = (state.wander_direction_index + 1) % len(self._UNSTUCK_DIRECTIONS)
         return self._aligner._starter._action(f"move_{direction}"), state
 
+    def _expand_hazard_zone(self, state: CrossRoleState) -> CrossRoleState:
+        """Return a state with hazard zone expanded by 1-cell adjacency buffer.
+
+        Auto-equip in CoGames triggers when walking NEAR (adjacent to) a gear station.
+        Expanding the avoid set prevents routes that pass adjacent to contaminating stations.
+        Only used for gear_up navigation, not general movement.
+        """
+        if not state.known_hazard_stations:
+            return state
+        expanded = set(state.known_hazard_stations)
+        for hs in state.known_hazard_stations:
+            for dr, dc in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                expanded.add((hs[0] + dr, hs[1] + dc))
+        return replace(state, known_hazard_stations=expanded)
+
     def _gear_up_miner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
-        """Gear up to miner using hazard-aware navigation (avoids other gear stations).
+        """Gear up to miner using hazard-aware navigation (avoids other gear stations + buffer).
 
         Issue-12 fix: the original miner._gear_up uses _move_toward_target which falls back
         to optimistic BFS without hazard avoidance when the primary BFS fails. This causes
         agents to route through scout/scrambler/aligner stations, accidentally equipping
-        wrong gear. This version uses the aligner's _navigate_to_station with avoid_hazards=True.
+        wrong gear. This version uses the aligner's _navigate_to_station with avoid_hazards=True
+        and an expanded 1-cell buffer zone around hazard stations.
         """
+        # Use expanded hazard zone for gear_up to prevent adjacency-triggered contamination
+        nav_state = self._expand_hazard_zone(state)
         visible_target = self._miner._closest_visible_location(obs, self._miner._miner_station_tags)
         if visible_target is not None:
             target_abs = self._miner._visible_abs_cell(current_abs, visible_target)
-            direction = self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
+            direction = self._aligner._navigate_to_station(nav_state, current_abs, target_abs, avoid_hazards=True)
             if direction is not None:
                 return self._aligner._starter._action(f"move_{direction}"), state
             action, next_state = self._aligner._greedy_move_toward_abs(state, current_abs, target_abs)
@@ -726,7 +744,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 wander_steps_remaining=base_state.wander_steps_remaining,
                 last_mode=base_state.last_mode,
             ))
-        direction = self._aligner._navigate_to_station(state, current_abs, target_abs, avoid_hazards=True)
+        direction = self._aligner._navigate_to_station(nav_state, current_abs, target_abs, avoid_hazards=True)
         if direction is not None:
             return self._aligner._starter._action(f"move_{direction}"), state
         action, next_state = self._aligner._greedy_move_toward_abs(state, current_abs, target_abs)
@@ -779,7 +797,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         skill = state.current_skill
 
         if skill == "gear_up_aligner":
-            action, base_state = self._aligner._gear_up(obs, state, current_abs)
+            # Use expanded hazard zone to prevent adjacency-triggered contamination
+            action, base_state = self._aligner._gear_up(obs, self._expand_hazard_zone(state), current_abs)
             state = self._copy_with_shared(replace(state,
                 wander_direction_index=base_state.wander_direction_index,
                 wander_steps_remaining=base_state.wander_steps_remaining,
