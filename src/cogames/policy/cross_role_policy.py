@@ -237,6 +237,7 @@ class CrossRoleState:
     episode_step: int = 0  # incremented once per game step
     phase: int = 1  # 1 = initial gear acquisition, 2 = switched gear acquisition
     phase_preferred_gear: str = ""  # overrides preferred_initial_gear in phase 2
+    phase2_hub_cleared: bool = False  # True after agent passes through hub in phase 2 (hub-first waypoint)
 
 
 class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
@@ -764,13 +765,42 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 return None  # Would contaminate; caller should explore instead
         return direction
 
+    def _gear_up_via_hub_step(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState] | None:
+        """v13: In phase 2, navigate to hub first before targeting gear station.
+
+        Rationale: After phase switch, agents are near their phase-1 gear station. The
+        phase-2 target station may be on the other side of the map, with hazards between them.
+        The hub is central and well-connected; navigating via hub ensures agents are in a good
+        position to find the new gear station without contamination.
+
+        Returns None when hub has been reached (caller should proceed to gear station).
+        """
+        if state.phase != 2 or state.phase2_hub_cleared or not state.known_hubs:
+            return None
+        hub_abs = self._aligner._nearest_known(current_abs, state.known_hubs)
+        if hub_abs is None:
+            return None
+        hub_dist = abs(current_abs[0] - hub_abs[0]) + abs(current_abs[1] - hub_abs[1])
+        if hub_dist <= 3:
+            state.phase2_hub_cleared = True
+            self._event(state, "phase2 hub waypoint cleared; proceeding to gear station")
+            return None
+        direction = self._aligner._navigate_to_station(state, current_abs, hub_abs, avoid_hazards=True)
+        if direction:
+            return self._aligner._starter._action(f"move_{direction}"), state
+        return None
+
     def _gear_up_aligner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
-        """Gear up to aligner using BFS-with-hazards → BFS-without-hazards → greedy cascade.
+        """Gear up to aligner using hub-first waypoint (phase 2) then BFS-with-hazards → greedy.
 
         v6 fix: when BFS-with-hazards fails (path blocked by scout/scrambler), try
         BFS-without-hazards. Crossing other stations en route is acceptable since the
         aligner station will override any intermediate gear changes.
+        v13 fix: in phase 2, navigate to hub first to reposition before targeting aligner station.
         """
+        hub_step = self._gear_up_via_hub_step(obs, state, current_abs)
+        if hub_step is not None:
+            return hub_step
         visible_target = self._aligner._starter._closest_tag_location(obs, self._aligner._aligner_station_tags)
         if visible_target is not None:
             target_abs = self._aligner._visible_abs_cell(current_abs, visible_target)
@@ -801,7 +831,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         return action, state
 
     def _gear_up_miner_safe(self, obs: AgentObservation, state: CrossRoleState, current_abs: Coord) -> tuple[Action, CrossRoleState]:
-        """Gear up to miner using hazard-aware navigation (avoids other gear stations + buffer).
+        """Gear up to miner using hub-first waypoint (phase 2) then BFS-with-hazards → greedy.
 
         Issue-12 fix: the original miner._gear_up uses _move_toward_target which falls back
         to optimistic BFS without hazard avoidance when the primary BFS fails. This causes
@@ -809,7 +839,11 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         wrong gear. This version uses the aligner's _navigate_to_station with avoid_hazards=True
         and an expanded 1-cell buffer zone around hazard stations.
         v6 fix: adds BFS-without-hazards as fallback before greedy navigation.
+        v13 fix: in phase 2, navigate to hub first to reposition before targeting miner station.
         """
+        hub_step = self._gear_up_via_hub_step(obs, state, current_abs)
+        if hub_step is not None:
+            return hub_step
         visible_target = self._miner._closest_visible_location(obs, self._miner._miner_station_tags)
         if visible_target is not None:
             target_abs = self._miner._visible_abs_cell(current_abs, visible_target)
@@ -853,6 +887,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         state.gear_up_completed = False
         state.gear_up_failures = 0
         state.current_skill = None
+        state.phase2_hub_cleared = False  # v13: reset hub waypoint for hub-first navigation
 
     def step_with_state(self, obs: AgentObservation, state: CrossRoleState) -> tuple[Action, CrossRoleState]:
         state.episode_step += 1
