@@ -307,3 +307,31 @@ Reason: re-acquire logic didn't help; same fundamental timeout issue.
 **Hypothesis:** With 5 preferred aligners, even if 2 agents fail (seed=42 pattern: agents 0 and 3), we get 3 reliable aligners (agents 1,2,4). This should improve junction holding while keeping 3+ miners active.
 
 **Changes:** Only kw parameter change: `num_aligners=5` (was 3)
+
+## 2026-03-28: cross-role v10-new result — 0.30 reward (DISCARD)
+
+**Result: 0.30 reward** — much worse than v9 (0.55).
+
+**What happened:**
+1. Agent 3 SUCCEEDED at aligner gear on first try when preferred=aligner! KEY FINDING ✓
+2. 3 aligners active (vs 2 in v9)
+3. BUT: only 4 miners (vs 5 in v9) → resource shortage
+4. Fewer resources → fewer hearts (5 vs 8 in v9) → aligners couldn't align many junctions
+5. Only 7 align_neutral completions (vs 12+ implied in v9)
+
+**KEY INSIGHT:** Agent 3 is physically close to the ALIGNER station but far from the MINER station (seed=42 map topology). When preferred=aligner, agent 3 succeeds. When preferred=miner, agent 3 fails.
+
+**Optimal configuration:** `num_aligners=4`
+- Agents 0,1,2,3 → preferred aligner
+- Agents 4,5,6,7 → preferred miner
+- Agent 0: fails aligner (stale 20 steps) → miner (fallback) ✓
+- Agent 3: SUCCEEDS at aligner ✓ (proven in v10-new)
+- Result: 3 aligners (1,2,3) + 5 miners (0,4,5,6,7) = BASELINE composition + v9's better timeouts!
+
+---
+
+## 2026-03-28: starting new experiment loop (cross-role v11: num_aligners=4)
+
+**Hypothesis:** With `num_aligners=4`, we get 3 effective aligners + 5 effective miners — matching baseline composition but with v9's 90% better skill success rates. Expected result: >= 0.66 (beating baseline).
+
+**Changes:** Only kw parameter change: `num_aligners=4` (no code changes needed)
