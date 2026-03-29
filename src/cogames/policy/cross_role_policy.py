@@ -125,10 +125,15 @@ def build_cross_role_prompt(
             )
     elif current_gear == "miner":
         skill_set = _MINER_SKILLS
-        role_hint = "You are in MINER mode. Your job: mine resources, then deposit to hub."
+        role_hint = (
+            "You are in MINER mode. Your job: mine resources, then deposit to hub. "
+            "After depositing, explore briefly to find new extractor types before mining again. "
+            "The hub needs ALL four resource types (carbon, oxygen, germanium, silicon) to create hearts."
+        )
         preconditions = (
             "- mine_until_full: requires current_gear == 'miner' AND known_extractors > 0\n"
             "- deposit_to_hub: requires current_gear == 'miner' AND carried_resources > 0\n"
+            "- explore: use after depositing to discover different extractor types\n"
         )
     else:
         # No valid gear (none, scrambler, scout) — include gear_up skills so LLM can recover.
