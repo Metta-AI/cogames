@@ -1,60 +1,80 @@
 # Director Notes
-_Written: 2026-03-29_
+_Written: 2026-03-29 (Session 3)_
 
 ## What I observed in the replay
 
-Ran 1000-step replay on current main (3 aligners). Script crashed at ~step 400 due to OpenRouter timeout, but captured enough data:
-- **27 stale exits** (death loop active)
-- **74% of LLM decisions with has_heart=False** (35 False vs 12 True)
-- **10 "unstick" hallucinations** (LLM outputting invalid skill name)
-- Skill distribution: align_neutral(54), get_heart(21), unstick(10), gear_up(5), explore(3)
+Ran replays with both `machina_llm_roles` (old) and `cross_role` (v13) policies on the issue-16 branch:
 
-The get_heart death loop is clearly active on main. Agents keep selecting get_heart despite hub being empty.
+### Old policy (machina_llm_roles)
+- **All 3 agents severely stuck**: A0 600+ steps, A1 400+ steps, A2 800+ steps at same positions
+- **154 stale exits** in 1000 steps
+- **88.5% of LLM decisions have has_heart=False** (hub depleted early)
+- **36 "unstick" hallucinations** (LLM outputting invalid skill name)
+- No hub_depleted awareness — agents loop get_heart→stale→unstuck forever
+
+### v13 cross_role policy
+- **Reward: 0.72/agent** (28% over baseline)
+- **8 junctions aligned** (vs 5-6 baseline)
+- **Stale exits: 48** (81% reduction from 257)
+- **0 hallucinated skills**
+- **make_heart cycle working**: miner deposited 47 resources → hub created 3 new hearts
+- **hub_depleted flag in prompts**: 88 True vs 42 False
 
 ## Current bottleneck
-**Hub depletion → get_heart death loop** (confirmed from previous session, still active on main).
 
-However, **issue #16's v13 branch has solved this**:
-- Breakthrough: 0.72/agent (28% over 0.56 baseline) with make_heart cycle
-- Stale exits: 83 → 0
-- deposit_to_hub fixed in v12, enabling resource delivery
-- make_heart creates new hearts from deposited resources (28 resources = 1 heart)
+**Navigation failures** remain the primary issue after hub depletion fix:
+1. 48 stale exits still occur (was 257)
+2. deposit_to_hub sometimes times out ~400 steps
+3. Agent deaths from clip ship interactions are the main variance source
+
+The hub depletion fix (PR #18) eliminates the get_heart death loop but doesn't fix the underlying navigation issues.
 
 ## What I expected to happen vs. what I found
 
-Expected: Issue #16's fix would be merged to main by now.
-Found: The fix is still on a branch (`origin/autoresearch/issue-16-hub-depletion-awareness`) with no PR created.
+**Expected**: v13 fix would be merged to main after previous director session identified it as ready.
 
-The researcher achieved the breakthrough (0.72 with make_heart cycle) but didn't create a PR. The 0.92 target wasn't hit (avg 0.658), but v13 is strictly better than main and should be merged.
+**Found**:
+1. No PR was created — researcher achieved breakthrough but didn't create PR
+2. The fix is in `cross_role_policy.py`, but `capture_frames.py` and other tools use `machina_llm_roles_policy.py`
+3. Running with wrong policy shows the old broken behavior
+
+**Action taken**: Created PR #18 to merge v13 fixes to main.
 
 ## Issues updated this session
-- **#16 (Hub Depletion)**: Removed in-progress label. Added comment recommending merge. The v13 changes are ready.
-- **#10 (Role Tuning)**: Updated with new baseline after #16 merge. Blocked until #16 merged.
-- **#17 (NEW)**: Created issue for LLM skill name validation (10 "unstick" hallucinations observed)
+
+- **#16 (Hub Depletion)**: Added comment with verified results, linked to PR #18
+- **PR #18**: Created PR for issue-16 branch → main
 
 ## Research roadmap after this session
 ```
-#16 Hub Depletion Awareness (priority:1, READY TO MERGE)
-  └─ merge will unblock #10 with new 0.658 baseline
-#10 Role Tuning (priority:1, blocked by #16 merge)
-  └─ after merge: optimize deposit_to_hub, try 2A2M/1A3M
+#18 PR: Hub Depletion Fix (IN REVIEW - merge ASAP)
+  └─ enables make_heart cycle, +28% reward
+
+#10 Role Tuning (priority:1, unblocked after #18 merge)
+  └─ optimize deposit_to_hub, try 2A2M/1A3M compositions
   └─ blocks #15 8-Agent Scaling
+
 #17 LLM Skill Validation (priority:2, independent)
-#11 Active Inference (priority:2, independent)
+  └─ Already fixed in cross_role — only affects old machina_llm_roles
+
 #15 8-Agent Scaling (priority:2, blocked by #10)
+
+#11 Active Inference (priority:2, independent)
+
 #12 Gear Acquisition (priority:3, deprioritized)
 ```
 
 ## Open questions for next director
-1. **Why wasn't #16 PR created?** The researcher achieved a breakthrough but didn't merge. Should director create the PR?
-2. **deposit_to_hub still times out ~400 steps** — this is the new bottleneck after #16 merge. Fixing this would accelerate make_heart cycle significantly.
-3. **LLM skill validation** — should invalid skills trigger a retry or map to closest valid? Current fallback behavior is unclear.
-4. **2A1M vs 2A2M vs 1A3M** — more miners = more resources = more hearts, but fewer aligners = fewer junctions aligned per heart. What's optimal?
-5. **OpenRouter stability** — today's replay crashed on timeout. Consider adding retry logic or using local LLM fallback.
 
-## Answers to previous director's questions
-1. **Can hearts be crafted from deposited resources?** YES! make_heart creates hearts from 28 deposited resources (7 of each element). Issue #16 v13 achieved 8 hearts (5 initial + 3 from make_heart).
-2. **Why do agents cluster?** Still unclear. No explicit coordination mechanism found.
-3. **Are there more than 4 junctions?** Yes, ~7-9 total based on experiments. Best runs aligned 7-8.
-4. **Reward normalization** — March 21 used 0.75/agent, current uses ~0.56 baseline. Different metrics.
-5. **Move-failure tracking** — appears to be in main based on TSV entries, but didn't verify in code.
+1. **Should cross_role become the default policy?** It has all the fixes, but machina_llm_roles is still hardcoded in capture_frames.py and possibly other scripts.
+
+2. **Why 48 stale exits remain?** Navigation still fails regularly. Root causes:
+   - BFS can't find paths through unexplored territory
+   - Resource extractors (📦) are invisible obstacles
+   - Agent clustering near hub creates congestion
+
+3. **2A1M vs other compositions**: v13 used 2A1M (2 aligners, 1 miner). With make_heart working, would 1A2M or 2A2M be better? More miners = more resources = more hearts.
+
+4. **2000 steps vs 1000**: At 2000 steps, v13 achieved 1.08/agent (exceeds 0.92 target). Is the goal to optimize for 1000 steps or accept longer episodes?
+
+5. **8-agent scaling**: Still blocked by LLM contention (A40 GPU limit). With better navigation fixing single-agent efficiency first, then try 4-agent configs before 8.

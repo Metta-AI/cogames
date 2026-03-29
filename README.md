@@ -24,20 +24,20 @@
 
 <!-- LEADERBOARD_START -->
 ## Research Leaderboard
-_Updated by Director: 2026-03-29_
+_Updated by Director: 2026-03-29 (Session 3)_
 
 | Rank | Reward | Commit | Config | Steps | Notes |
 |------|--------|--------|--------|-------|-------|
-| 1 | 0.92 | `7321afc` | 3A+miner, LLM | 1000 | action_timeout 3000ms, baseline |
-| 2 | 0.90 | `a07334f` | 3A, LLM | 1000 | get_heart navigate-to-approach-cell fix |
-| 3 | **0.72** | `3d2b232` | 2A1M, LLM | 1000 | **#16 breakthrough**: make_heart cycle, +28% (branch only) |
+| 1 | **1.08** | `3d2b232` | 2A1M, cross_role | 2000 | **#16 breakthrough**: make_heart creates 3+ hearts |
+| 2 | 0.92 | `7321afc` | 3A+miner, LLM | 1000 | action_timeout 3000ms, old baseline |
+| 3 | **0.72** | `3d2b232` | 2A1M, cross_role | 1000 | #16: stale exits 257→48, hallucinations 39→0 |
 | 4 | 0.71 | `802fcdd` | 3A, LLM | 1000 | forget-stuck-junction after 1 timeout |
 | 5 | 0.69 | `0f7a64a` | 3A, LLM | 1000 | optimistic BFS + max_cells 20k |
 
 _Note: March 21 results (2.260 best) used different reward normalization and are not directly comparable._
 
-**Current bottleneck**: Hub depletion → get_heart death loop (74% of LLM decisions have has_heart=False). Issue #16 v13 eliminates this (83→0 stale exits) but is not yet merged.
-**Next up**: Merge #16 to main, then #10 — optimize deposit_to_hub navigation for make_heart cycle
+**Current bottleneck**: Navigation failures (48 stale exits remain) and deposit_to_hub timeouts (~400 steps)
+**Next up**: PR #18 (hub depletion fix) in review → merge to unblock #10
 <!-- LEADERBOARD_END -->
 
 The [Alignment League Benchmark (ALB)](https://www.softmax.com/alignmentleague) is a suite of multi-agent games, designed to measure how well AI agents align, coordinate, and collaborate with others (both AIs and humans).
