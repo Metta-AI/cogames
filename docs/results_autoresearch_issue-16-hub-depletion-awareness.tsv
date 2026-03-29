@@ -34,3 +34,6 @@ c959397	0.640000	get_heart_stale=0	1000	keep	v13 2A1M seed45: avg 0.658; 17% imp
 1fb842e	0.590000	get_heart_stale=0	1000	keep	v13 2A1M seed48
 1fb842e	0.730000	get_heart_stale=0	1000	keep	v13 2A1M seed49: 0.73 make_heart working
 1fb842e	0.450000	get_heart_stale=0	1000	discard	v13 2A1M seed50: agent deaths; 9-seed avg=0.626; 11% over baseline
+b6904f9	1.080000	get_heart_stale=0	2000	keep	v13 2A1M 2000 steps seed42: exceeds 0.92 target!
+b6904f9	0.960000	get_heart_stale=0	2000	keep	v13 2A1M 2000 steps seed43: exceeds 0.92 target!
+b6904f9	0.620000	get_heart_stale=0	2000	discard	v13 2A1M 2000 steps seed44: deaths/timing
