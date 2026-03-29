@@ -521,15 +521,15 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         team_size = max(1, len(self._shared_map.agent_gears) if self._shared_map and hasattr(self._shared_map, "agent_gears") else 8)
 
         # Issue-16: hub depletion awareness
-        # Decrement cooldown each time we plan
+        # Only use cooldown-based blocking (no hard block). After cooldown expires,
+        # agents retry get_heart. If make_heart created new hearts from deposited
+        # resources, the retry succeeds. If not, failure sets a new cooldown.
         if state.get_heart_cooldown_steps > 0:
             state.get_heart_cooldown_steps -= 1
         hub_hearts_used = self._shared_map.hub_hearts_withdrawn if self._shared_map else 0
-        # Hard block: all initial hearts withdrawn (confirmed depleted)
-        # Soft block: on cooldown after recent failures (temporary, allows retry)
-        hub_hard_depleted = hub_hearts_used >= 5
+        hub_hard_depleted = False  # v13: removed hard block to allow make_heart retries
         hub_on_cooldown = state.get_heart_cooldown_steps > 0
-        hub_depleted = hub_hard_depleted or hub_on_cooldown
+        hub_depleted = hub_on_cooldown
 
         prompt = build_cross_role_prompt(
             current_gear=gear,
