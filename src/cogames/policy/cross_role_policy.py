@@ -93,6 +93,7 @@ def build_cross_role_prompt(
     team_size: int = 8,
     preferred_role: str = "",
     hub_depleted: bool = False,
+    hub_hard_depleted: bool = False,
 ) -> str:
     # Select skills relevant to current gear (no gear switching via LLM)
     if current_gear == "aligner":
@@ -569,6 +570,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             team_size=team_size,
             preferred_role=state.phase_preferred_gear or self._preferred_initial_gear,
             hub_depleted=hub_depleted,
+            hub_hard_depleted=hub_hard_depleted,
         )
         logger.info("agent=%s cross_role_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
         started_at = time.perf_counter()
