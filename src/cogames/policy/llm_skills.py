@@ -433,6 +433,42 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
+    def _navigate_to_blocked_target(
+        self, state: MinerSkillState, current_abs: Coord, blocked_target: Coord
+    ) -> tuple[Action, MinerSkillState] | None:
+        """Navigate toward a blocked object (hub/station) via its best adjacent approach cell.
+
+        Issue-16 fix: hubs are blocked objects. BFS to them fails because they're
+        not in known_free_cells. Navigate to the nearest adjacent free cell instead,
+        then step into the blocked cell to trigger the interaction handler.
+        """
+        # Find adjacent cells that aren't blocked
+        approach_candidates = []
+        for _, (dr, dc) in (("north", (-1, 0)), ("south", (1, 0)), ("east", (0, 1)), ("west", (0, -1))):
+            neighbor = (blocked_target[0] + dr, blocked_target[1] + dc)
+            if neighbor not in state.blocked_cells:
+                approach_candidates.append(neighbor)
+        if not approach_candidates:
+            return None
+        approach = min(approach_candidates, key=lambda c: abs(c[0] - current_abs[0]) + abs(c[1] - current_abs[1]))
+        if current_abs == approach:
+            # Already adjacent — step into the blocked target
+            dr = blocked_target[0] - current_abs[0]
+            dc = blocked_target[1] - current_abs[1]
+            if abs(dr) >= abs(dc):
+                direction = "south" if dr > 0 else "north"
+            else:
+                direction = "east" if dc > 0 else "west"
+            return self._starter._action(f"move_{direction}"), state
+        # Navigate to approach cell
+        direction = self._bfs_first_direction(state, current_abs, approach)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), state
+        direction = self._bfs_optimistic_direction(state, current_abs, approach)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), state
+        return None
+
     def _deposit_to_hub(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
         if state.last_mode != "deposit_to_hub":
             logger.info("agent=%s mode=deposit_to_hub load=%s", obs.agent_id, self._carried_total(obs))
@@ -441,6 +477,11 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         visible_target = self._closest_visible_location(obs, self._hub_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
+            # Issue-16: hub is a blocked object — use approach-cell navigation
+            result = self._navigate_to_blocked_target(state, current_abs, target_abs)
+            if result is not None:
+                action, next_state = result
+                return action, replace(next_state, last_mode=state.last_mode)
             action, next_state = self._move_toward_target(state, current_abs, target_abs)
             return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_hubs)
@@ -449,6 +490,11 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             state.known_free_cells.add(target_abs)
         if target_abs is None:
             return self._explore(obs, state)
+        # Issue-16: hub is a blocked object — use approach-cell navigation
+        result = self._navigate_to_blocked_target(state, current_abs, target_abs)
+        if result is not None:
+            action, next_state = result
+            return action, replace(next_state, last_mode=state.last_mode)
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
