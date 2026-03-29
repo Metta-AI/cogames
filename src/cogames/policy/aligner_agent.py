@@ -55,6 +55,8 @@ class SharedMap:
         self.known_enemy_junctions: set[Coord] = set()
         # Agent gear tracking for team coordination
         self.agent_gears: dict[int, str] = {}
+        # Hub depletion tracking (issue-16): count total hearts withdrawn across team
+        self.hub_hearts_withdrawn: int = 0
 
 
 @dataclass

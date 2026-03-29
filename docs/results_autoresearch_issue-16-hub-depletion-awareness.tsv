@@ -1,1 +1,2 @@
 commit	mission_reward	secondary_rewards	steps	status	description
+eede8b0	0.570901	junction.held=4709;junction.gained=6;heart.withdrawn=5;get_heart_stale=83	1000	keep	Baseline: 3-agent cross_role 3 aligners; 0.57/agent; 83 get_heart stale exits confirm issue

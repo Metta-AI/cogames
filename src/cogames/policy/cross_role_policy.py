@@ -90,15 +90,29 @@ def build_cross_role_prompt(
     team_miners: int = 0,
     team_size: int = 8,
     preferred_role: str = "",
+    hub_depleted: bool = False,
 ) -> str:
     # Select skills relevant to current gear (no gear switching via LLM)
     if current_gear == "aligner":
-        skill_set = _ALIGNER_SKILLS
-        role_hint = "You are in ALIGNER mode. Your job: get hearts, then align junctions."
-        preconditions = (
-            "- get_heart: requires current_gear == 'aligner' AND hub accessible\n"
-            "- align_neutral: requires current_gear == 'aligner' AND has_heart == true AND known_alignable_junctions > 0\n"
-        )
+        if hub_depleted and not has_heart:
+            # Issue-16: hub is depleted and agent has no heart — remove get_heart, focus on defense/explore
+            skill_set = {k: v for k, v in _ALIGNER_SKILLS.items() if k != "get_heart"}
+            role_hint = (
+                "You are in ALIGNER mode. The hub is DEPLETED (no hearts remaining). "
+                "You cannot get more hearts. Focus on exploring to discover new junctions "
+                "or defending territory your team already holds."
+            )
+            preconditions = (
+                "- align_neutral: requires has_heart == true (you have NO heart and CANNOT get one)\n"
+                "- IMPORTANT: The hub has no hearts left. Do NOT attempt get_heart.\n"
+            )
+        else:
+            skill_set = _ALIGNER_SKILLS
+            role_hint = "You are in ALIGNER mode. Your job: get hearts, then align junctions."
+            preconditions = (
+                "- get_heart: requires current_gear == 'aligner' AND hub accessible\n"
+                "- align_neutral: requires current_gear == 'aligner' AND has_heart == true AND known_alignable_junctions > 0\n"
+            )
     elif current_gear == "miner":
         skill_set = _MINER_SKILLS
         role_hint = "You are in MINER mode. Your job: mine resources, then deposit to hub."
@@ -164,6 +178,7 @@ def build_cross_role_prompt(
         f"- known_enemy_junctions: {known_enemy_junctions}\n"
         f"- known_extractors: {known_extractors}\n"
         f"- known_alignable_junctions: {known_neutral_junctions + known_enemy_junctions}\n"
+        f"- hub_depleted: {hub_depleted}\n"
         f"- current_skill: {current_skill or 'none'}\n"
         f"- no_move_steps: {no_move_steps}\n"
         f"\nRecent events:\n{events_text}\n"
@@ -493,6 +508,12 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         team_aligners, team_miners = self._team_gear_counts()
         team_size = max(1, len(self._shared_map.agent_gears) if self._shared_map and hasattr(self._shared_map, "agent_gears") else 8)
 
+        # Issue-16: detect hub depletion (hub has 5 hearts; once all withdrawn, no more available)
+        hub_depleted = (
+            self._shared_map is not None
+            and self._shared_map.hub_hearts_withdrawn >= 5
+        )
+
         prompt = build_cross_role_prompt(
             current_gear=gear,
             has_heart=has_heart,
@@ -511,6 +532,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             team_miners=team_miners,
             team_size=team_size,
             preferred_role=state.phase_preferred_gear or self._preferred_initial_gear,
+            hub_depleted=hub_depleted,
         )
         logger.info("agent=%s cross_role_prompt=%s", obs.agent_id, prompt.replace("\n", " | "))
         started_at = time.perf_counter()
@@ -543,7 +565,10 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             if gear == "none":
                 skill = "gear_up_aligner" if len(known_alignable) >= len(state.known_extractors) else "gear_up_miner"
             elif gear == "aligner":
-                if not has_heart and state.known_hubs:
+                if hub_depleted and not has_heart:
+                    # Issue-16: hub depleted, can't get hearts — explore for new junctions
+                    skill = "explore"
+                elif not has_heart and state.known_hubs:
                     skill = "get_heart"
                 elif has_heart and known_alignable:
                     skill = "align_neutral"
@@ -561,6 +586,10 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             reason = f"scripted fallback ({reason})"
 
         # Precondition enforcement
+        # Issue-16: prevent get_heart when hub is depleted
+        if skill == "get_heart" and hub_depleted and not has_heart:
+            skill = "explore"
+            reason = "overrode get_heart to explore: hub depleted (all hearts withdrawn)"
         # Must have correct gear for role-specific skills
         if skill == "get_heart" and gear != "aligner":
             skill = "gear_up_aligner"
@@ -569,8 +598,12 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             skill = "gear_up_aligner"
             reason = f"overrode to gear_up_aligner: need aligner gear for align_neutral"
         if skill == "align_neutral" and gear == "aligner" and not has_heart:
-            skill = "get_heart"
-            reason = "overrode to get_heart: need heart for align_neutral"
+            if hub_depleted:
+                skill = "explore"
+                reason = "overrode align_neutral to explore: no heart and hub depleted"
+            else:
+                skill = "get_heart"
+                reason = "overrode to get_heart: need heart for align_neutral"
         if skill == "align_neutral" and gear == "aligner" and has_heart and not known_alignable:
             skill = "explore"
             reason = "overrode to explore: no alignable junctions known"
@@ -587,7 +620,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             if has_heart and known_alignable:
                 skill = "align_neutral"
                 reason = "overrode: already have aligner gear, have heart and target"
-            elif not has_heart and state.known_hubs:
+            elif not has_heart and state.known_hubs and not hub_depleted:
                 skill = "get_heart"
                 reason = "overrode: already have aligner gear, need heart"
             else:
@@ -655,6 +688,10 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         elif state.current_skill == "get_heart" and has_heart and state.skill_steps > 0:
             self._event(state, "get_heart completed: acquired heart")
             state.get_heart_timeouts = 0
+            # Issue-16: track hub heart withdrawals for depletion awareness
+            if self._shared_map is not None:
+                self._shared_map.hub_hearts_withdrawn += 1
+                logger.info("agent=%s hub_hearts_withdrawn=%d", obs.agent_id, self._shared_map.hub_hearts_withdrawn)
             state.current_skill = None
         elif state.current_skill == "align_neutral" and not has_heart and state.skill_steps > 0:
             self._event(state, "align_neutral completed: heart spent")

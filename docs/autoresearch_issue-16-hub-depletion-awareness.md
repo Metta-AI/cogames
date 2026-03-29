@@ -31,3 +31,25 @@ The root cause is that agents have no way to know the hub is out of hearts. They
 ---
 
 ## 2026-03-29T00:00:00Z: starting to run baseline
+
+**Command:** `source .env.openrouter.local && UV_CACHE_DIR=/tmp/uv-cache uv run cogames play -m cogsguard_machina_1 -c 3 -p class=cross_role,kw.num_aligners=3,kw.llm_timeout_s=20 -s 1000 -r log --autostart`
+
+**Baseline results:**
+- mission_reward: 0.5709 (per-agent: 0.57)
+- cogs/heart.withdrawn: 5 (all 5 hearts consumed)
+- cogs/aligned.junction.held: 4709
+- cogs/aligned.junction.gained: 6
+- get_heart selected: 95 times
+- get_heart completed: 16 times (17% success rate)
+- get_heart stale/timeout exits: 83 (confirms issue: agents waste most steps on failed get_heart)
+- has_heart=False in 96 of LLM decisions
+- Agent 0: 446 move failures (44.6%), heart.gained=2
+- Agent 1: 415 move failures (41.5%), heart.gained=2
+- Agent 2: lost aligner gear, got miner gear, heart.gained=3 but 1 unused
+- Total stale/stuck/timeout exits across all skills: 122
+
+**Analysis:** Confirms issue exactly. After ~5 hearts withdrawn, agents enter get_heart->stale->explore->get_heart loop. 83 stale get_heart exits waste ~83*20=1660 agent-steps. With 3 agents * 1000 steps = 3000 total agent-steps, that's 55% wasted on failed get_heart alone.
+
+---
+
+## 2026-03-29T00:01:00Z: starting experiment v1 - hub depletion tracking
