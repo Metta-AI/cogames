@@ -8,3 +8,6 @@ f1e62bc	0.410000	junction.held=3099;junction.gained=4;noop=2816	1000	discard	v4:
 0038266	0.510000	junction.held=4072;junction.gained=5;get_heart_stale=0	1000	keep	v5 seed42: mining switch; agents switched to mining after hub depleted
 0038266	0.640000	junction.held=5430;junction.gained=6;get_heart_stale=0	1000	keep	v5 seed43: best result! mining switch + good seed; 0 stale exits
 0038266	0.440000	junction.held=3409;junction.gained=5;get_heart_stale=0	1000	discard	v5 seed44: mining switch; deaths present
+273761f	0.510000	junction.held=4070;junction.gained=5;get_heart_stale=0	1000	keep	v6 seed42: cooldown approach; 0 stale; all get_heart attempts succeeded
+273761f	0.620000	junction.held=?;get_heart_stale=0	1000	keep	v6 seed43: cooldown; matches baseline
+273761f	0.500000	junction.held=?;get_heart_stale=0	1000	keep	v6 seed44: cooldown; matches baseline

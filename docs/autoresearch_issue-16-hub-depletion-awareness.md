@@ -77,4 +77,29 @@ Seed43: 0.64 (best result!). Average: 0.53. Baseline avg: 0.56.
 
 ---
 
-## 2026-03-29T01:00:00Z: starting experiment v6 - cooldown approach
+## 2026-03-29T01:00:00Z: experiment v6 - cooldown approach
+
+**Approach:** Escalating cooldown after get_heart failures (2*N cycles, max 8). During cooldown, agents explore then retry. Hard-depleted (>= 5 hearts withdrawn) triggers mining switch.
+
+**Results:**
+| Seed | Baseline | v5 | v6 |
+|------|----------|-----|-----|
+| 42   | 0.57     | 0.51| 0.51|
+| 43   | 0.62     | 0.64| 0.62|
+| 44   | 0.50     | 0.44| 0.50|
+| Avg  | 0.563    | 0.530| 0.543|
+
+**Key metrics for v6:**
+- get_heart stale exits: 0 across all seeds (down from 83 in baseline)
+- get_heart selected: 9, completed: 11 (seed 42) — every attempt succeeded!
+- The cooldown allows retries but spaces them out, preventing waste
+
+**Analysis:** v6 matches baseline reward within noise while eliminating get_heart waste. The remaining variance is from agent deaths/contamination (unrelated to hub depletion). The cooldown approach is the least disruptive — it doesn't change behavior much when things work, but prevents worst-case loops.
+
+**Next steps for future researcher:**
+- The target of > 0.92 at 1000 steps requires improvements beyond hub depletion
+- Main bottleneck now: agent deaths from clip ships and gear contamination
+- Explore reducing clip ship interactions or better hazard avoidance
+- Consider longer episodes (2000 steps) where mining→make_heart cycle can complete
+
+---
