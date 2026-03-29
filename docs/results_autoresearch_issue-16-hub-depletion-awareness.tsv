@@ -26,3 +26,6 @@ c959397	0.720000	junction.held=6244;junction.gained=8;heart.withdrawn=8;deposite
 c959397	0.620000	get_heart_stale=0	1000	keep	v13 2A1M seed43
 c959397	0.650000	get_heart_stale=0	1000	keep	v13 2A1M seed44
 c959397	0.640000	get_heart_stale=0	1000	keep	v13 2A1M seed45: avg 0.658; 17% improvement over baseline
+3d2b232	0.560000	get_heart_stale=0	1000	discard	v13 3A seed42: 3 aligners; no miner to fund make_heart
+3d2b232	0.170000	get_heart_stale=0	1000	discard	v13 2A2M c=4: too many agents; LLM bottleneck
+3d2b232	0.530000	get_heart_stale=0	1000	discard	v13 2A1M return_load=20: more frequent deposits worse; navigation overhead
