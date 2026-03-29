@@ -428,7 +428,7 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             return None
         min_count = min(counts.get(e, 0) for e in ELEMENTS)
         max_count = max(counts.get(e, 0) for e in ELEMENTS)
-        if max_count - min_count < 3:
+        if max_count - min_count < 5:
             return None
         for e in ELEMENTS:
             if counts.get(e, 0) == min_count:
