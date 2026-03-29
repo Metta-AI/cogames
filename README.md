@@ -24,20 +24,20 @@
 
 <!-- LEADERBOARD_START -->
 ## Research Leaderboard
-_Updated by Director: 2026-03-28_
+_Updated by Director: 2026-03-29_
 
 | Rank | Reward | Commit | Config | Steps | Notes |
 |------|--------|--------|--------|-------|-------|
-| 1 | 0.92 | `7321afc` | 3 agents, 4A+optimistic BFS miner | 1000 | action_timeout 3000ms, LLM timeouts 399→2 |
-| 2 | 0.90 | `a07334f` | 3 agents, 4A | 1000 | get_heart navigate-to-approach-cell fix |
-| 3 | 0.71 | `802fcdd` | 3 agents, 4A | 1000 | forget-stuck-junction after 1 timeout |
-| 4 | 0.69 | `0f7a64a` | 3 agents, 4A | 1000 | optimistic BFS + max_cells 20k |
-| 5 | 0.63 | `af41f51` | 3 agents, 3A | 1000 | gear-up fix all aligners |
+| 1 | 0.92 | `7321afc` | 3A+miner, LLM | 1000 | action_timeout 3000ms, baseline |
+| 2 | 0.90 | `a07334f` | 3A, LLM | 1000 | get_heart navigate-to-approach-cell fix |
+| 3 | **0.72** | `3d2b232` | 2A1M, LLM | 1000 | **#16 breakthrough**: make_heart cycle, +28% (branch only) |
+| 4 | 0.71 | `802fcdd` | 3A, LLM | 1000 | forget-stuck-junction after 1 timeout |
+| 5 | 0.69 | `0f7a64a` | 3A, LLM | 1000 | optimistic BFS + max_cells 20k |
 
 _Note: March 21 results (2.260 best) used different reward normalization and are not directly comparable._
 
-**Current bottleneck**: 24 align_neutral + 26 get_heart timeouts waste ~2500 agent-steps (31% of capacity); hub has exactly 5 hearts (mining does not increase hearts)
-**Next up**: issue #10 — Tuning fixed-role baseline with skill timeout optimization and heart economy fixes
+**Current bottleneck**: Hub depletion → get_heart death loop (74% of LLM decisions have has_heart=False). Issue #16 v13 eliminates this (83→0 stale exits) but is not yet merged.
+**Next up**: Merge #16 to main, then #10 — optimize deposit_to_hub navigation for make_heart cycle
 <!-- LEADERBOARD_END -->
 
 The [Alignment League Benchmark (ALB)](https://www.softmax.com/alignmentleague) is a suite of multi-agent games, designed to measure how well AI agents align, coordinate, and collaborate with others (both AIs and humans).

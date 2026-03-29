@@ -1,57 +1,60 @@
 # Director Notes
-_Written: 2026-03-28 (updated with replay observations)_
+_Written: 2026-03-29_
 
 ## What I observed in the replay
 
-Ran 3 configurations on current main:
-- 3 aligners, 1000 steps → 0.563/agent (1.689 total)
-- 3 aligners, 400 steps → 0.259/agent
-- 1 aligner, 500 steps → 0.294/agent
-- 8 agents → CRASHED (LLM ReadTimeout)
+Ran 1000-step replay on current main (3 aligners). Script crashed at ~step 400 due to OpenRouter timeout, but captured enough data:
+- **27 stale exits** (death loop active)
+- **74% of LLM decisions with has_heart=False** (35 False vs 12 True)
+- **10 "unstick" hallucinations** (LLM outputting invalid skill name)
+- Skill distribution: align_neutral(54), get_heart(21), unstick(10), gear_up(5), explore(3)
 
-### Agent behavior timeline (3A, 1000 steps)
-- **Steps 0-100**: All 3 agents gear up and start exploring. A0 heads south, A1/A2 head north-west.
-- **Steps 100-200**: Agents return to hub area, start get_heart/align_neutral cycles. First junctions aligned.
-- **Steps 200-300**: A1 reaches row 45, col 48 and gets stuck. A2 returns to hub.
-- **Steps 300-400**: A2 settles on gear station row (row 52-53). Both A1 and A2 now stuck.
-- **Steps 400-1000**: Only A0 moves. A1 at EXACT same position for 700 steps. A2 on gear station row for 600 steps. Reward growth decays from 0.08→0.03 per 100 steps.
-
-### The get_heart death loop
-55 stale exits total. has_heart=False for 81% (51/63) of LLM decisions. Once hub's 5 hearts are consumed (~step 200-300), agents loop: get_heart → stale after 20 steps → unstuck → explore → get_heart → forever.
-
-### Corner junctions unreachable
-4 junctions at map corners (rows 6-7, 91-92). Agents spawn at rows 49-52. In 1000 steps, NO agent gets within 30 rows of any corner junction. The policy explores only ~20 cells from center.
-
-### LLM decision pattern
-- Skill selections: explore(37), get_heart(27), align_neutral(24), gear_up(4)
-- LLM hallucinated "unstick" instead of "unstuck" once (mapped to explore by fallback)
+The get_heart death loop is clearly active on main. Agents keep selecting get_heart despite hub being empty.
 
 ## Current bottleneck
-**Hub depletion → get_heart death loop.** This is MORE specific than my initial assessment of "skill timeout waste." The hub has 5 hearts and they're consumed by step 200-300. After that, 2 of 3 agents become permanently stuck because the LLM keeps choosing get_heart (which always fails) instead of exploring or defending.
+**Hub depletion → get_heart death loop** (confirmed from previous session, still active on main).
+
+However, **issue #16's v13 branch has solved this**:
+- Breakthrough: 0.72/agent (28% over 0.56 baseline) with make_heart cycle
+- Stale exits: 83 → 0
+- deposit_to_hub fixed in v12, enabling resource delivery
+- make_heart creates new hearts from deposited resources (28 resources = 1 heart)
 
 ## What I expected to happen vs. what I found
-Initial analysis (from TSV) suggested the bottleneck was skill timeouts (24+26 = 50 timeouts wasting 2500 steps). The replay CONFIRMED this but revealed the ROOT CAUSE: hub depletion. The timeouts aren't random — they're ALL from get_heart failing because the hub is empty. Fixing get_heart without fixing hub awareness will just change the timeout count, not the outcome.
+
+Expected: Issue #16's fix would be merged to main by now.
+Found: The fix is still on a branch (`origin/autoresearch/issue-16-hub-depletion-awareness`) with no PR created.
+
+The researcher achieved the breakthrough (0.72 with make_heart cycle) but didn't create a PR. The 0.92 target wasn't hit (avg 0.658), but v13 is strictly better than main and should be merged.
 
 ## Issues updated this session
-- **#9 (Cross-Role Policy):** CLOSED. 18 variants, best 0.55 vs baseline 0.66.
-- **#12 (Gear Acquisition):** Deprioritized. PR reverted.
-- **#10 (Role Tuning):** Reprioritized to top. Added 4 experiments + detailed replay observations.
-- **#15 (8-Agent Scaling):** NEW. Blocked by #10.
-- **#16 (Hub Depletion Awareness):** NEW. Highest-leverage fix from replay observation. Can be worked on independently or as part of #10.
+- **#16 (Hub Depletion)**: Removed in-progress label. Added comment recommending merge. The v13 changes are ready.
+- **#10 (Role Tuning)**: Updated with new baseline after #16 merge. Blocked until #16 merged.
+- **#17 (NEW)**: Created issue for LLM skill name validation (10 "unstick" hallucinations observed)
 
 ## Research roadmap after this session
 ```
-#16 Hub Depletion Awareness (priority:1, HIGHEST LEVERAGE)
-#10 Role Tuning (priority:1, umbrella for #16 + other fixes)
+#16 Hub Depletion Awareness (priority:1, READY TO MERGE)
+  └─ merge will unblock #10 with new 0.658 baseline
+#10 Role Tuning (priority:1, blocked by #16 merge)
+  └─ after merge: optimize deposit_to_hub, try 2A2M/1A3M
   └─ blocks #15 8-Agent Scaling
-#11 Active Inference (independent, priority:2)
-#12 Gear Acquisition (deprioritized)
-#9  Cross-Role Policy (CLOSED)
+#17 LLM Skill Validation (priority:2, independent)
+#11 Active Inference (priority:2, independent)
+#15 8-Agent Scaling (priority:2, blocked by #10)
+#12 Gear Acquisition (priority:3, deprioritized)
 ```
 
 ## Open questions for next director
-1. **Can hearts be crafted from deposited resources?** If yes, a miner could create more hearts beyond the initial 5. This would break the hard ceiling.
-2. **Why do agents cluster?** All 3 agents stay within 20 cells of each other. Is there a coordination mechanism to spread them across different map quadrants?
-3. **Are there more than 4 junctions?** Only 4 visible at map corners. Best runs aligned 7+, suggesting junctions are discovered during exploration. How many total junctions exist?
-4. **Reward normalization question still open** — March 21 vs March 22 use different normalization.
-5. **Move-failure tracking** from March 22 session — is it in main or does it need cherry-picking?
+1. **Why wasn't #16 PR created?** The researcher achieved a breakthrough but didn't merge. Should director create the PR?
+2. **deposit_to_hub still times out ~400 steps** — this is the new bottleneck after #16 merge. Fixing this would accelerate make_heart cycle significantly.
+3. **LLM skill validation** — should invalid skills trigger a retry or map to closest valid? Current fallback behavior is unclear.
+4. **2A1M vs 2A2M vs 1A3M** — more miners = more resources = more hearts, but fewer aligners = fewer junctions aligned per heart. What's optimal?
+5. **OpenRouter stability** — today's replay crashed on timeout. Consider adding retry logic or using local LLM fallback.
+
+## Answers to previous director's questions
+1. **Can hearts be crafted from deposited resources?** YES! make_heart creates hearts from 28 deposited resources (7 of each element). Issue #16 v13 achieved 8 hearts (5 initial + 3 from make_heart).
+2. **Why do agents cluster?** Still unclear. No explicit coordination mechanism found.
+3. **Are there more than 4 junctions?** Yes, ~7-9 total based on experiments. Best runs aligned 7-8.
+4. **Reward normalization** — March 21 used 0.75/agent, current uses ~0.56 baseline. Different metrics.
+5. **Move-failure tracking** — appears to be in main based on TSV entries, but didn't verify in code.
