@@ -21,7 +21,6 @@ _DIRECTION_DELTAS: tuple[tuple[str, Coord], ...] = (
     ("south", (1, 0)),
     ("west", (0, -1)),
 )
-_DIRECTION_DELTA_MAP: dict[str, Coord] = dict(_DIRECTION_DELTAS)
 
 
 @dataclass
@@ -299,45 +298,6 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             return None
         return parents[step][1]
 
-    def _best_approach_cell(self, state: MinerSkillState, current_abs: Coord, blocked_target: Coord) -> Coord | None:
-        """Return the closest non-blocked cell adjacent to a blocked station object."""
-        candidates = [
-            (blocked_target[0] + dr, blocked_target[1] + dc)
-            for _, (dr, dc) in _DIRECTION_DELTAS
-            if (blocked_target[0] + dr, blocked_target[1] + dc) not in state.blocked_cells
-        ]
-        if not candidates:
-            return None
-        return min(candidates, key=lambda cell: abs(cell[0] - current_abs[0]) + abs(cell[1] - current_abs[1]))
-
-    def _navigate_to_station(self, state: MinerSkillState, current_abs: Coord, station_abs: Coord) -> str | None:
-        """Navigate to a blocked station via an adjacent approach cell while avoiding hazard stations."""
-        approach = self._best_approach_cell(state, current_abs, station_abs)
-        if approach is None:
-            return None
-        if current_abs == approach:
-            dr = station_abs[0] - current_abs[0]
-            dc = station_abs[1] - current_abs[1]
-            return "south" if abs(dr) >= abs(dc) and dr > 0 else (
-                "north" if abs(dr) >= abs(dc) else ("east" if dc > 0 else "west")
-            )
-
-        direction = self._bfs_first_direction(state, current_abs, approach)
-        if direction is None:
-            direction = self._bfs_optimistic_direction(state, current_abs, approach)
-        if direction is None:
-            dr = approach[0] - current_abs[0]
-            dc = approach[1] - current_abs[1]
-            direction = "south" if abs(dr) >= abs(dc) and dr > 0 else (
-                "north" if abs(dr) >= abs(dc) else ("east" if dc > 0 else "west")
-            )
-
-        step_dr, step_dc = _DIRECTION_DELTA_MAP.get(direction, (0, 0))
-        next_cell = (current_abs[0] + step_dr, current_abs[1] + step_dc)
-        if next_cell in state.known_hazard_stations and next_cell != station_abs:
-            return None
-        return direction
-
     def _move_to(self, state: MinerSkillState, current_abs: Coord, target_abs: Coord | None) -> tuple[Action, MinerSkillState]:
         if target_abs is None:
             return self._starter._wander(state)
@@ -440,23 +400,15 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         visible_target = self._closest_visible_location(obs, self._miner_station_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
-            direction = self._navigate_to_station(state, current_abs, target_abs)
-            if direction is not None:
-                return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-            if state.known_hubs:
-                return self._explore_near_hub(obs, state)
-            return self._explore(obs, state)
+            action, next_state = self._move_toward_target(state, current_abs, target_abs)
+            return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_miner_stations)
         if target_abs is None:
             if state.known_hubs:
                 return self._explore_near_hub(obs, state)
             return self._explore(obs, state)
-        direction = self._navigate_to_station(state, current_abs, target_abs)
-        if direction is not None:
-            return self._starter._action(f"move_{direction}"), replace(state, last_mode=state.last_mode)
-        if state.known_hubs:
-            return self._explore_near_hub(obs, state)
-        return self._explore(obs, state)
+        action, next_state = self._move_toward_target(state, current_abs, target_abs)
+        return action, replace(next_state, last_mode=state.last_mode)
 
     def _mine_until_full(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
         if state.last_mode != "mine_until_full":
