@@ -48,10 +48,14 @@ class FrameCaptureRenderer(Renderer):
     @override
     def on_episode_start(self) -> None:
         symbol_map = DEFAULT_SYMBOL_MAP.copy()
+        # Extend with game-specific render symbols if the config exposes them
         for obj in self._sim.config.game.objects.values():
-            symbol_map[obj.render_name or obj.name] = obj.render_symbol
-            if obj.render_name and obj.render_name != obj.name:
-                symbol_map[obj.name] = obj.render_symbol
+            render_symbol = getattr(obj, "render_symbol", None)
+            if render_symbol:
+                key = getattr(obj, "render_name", None) or obj.name
+                symbol_map[key] = render_symbol
+                if getattr(obj, "render_name", None) and obj.render_name != obj.name:
+                    symbol_map[obj.name] = render_symbol
         self._map_buffer = MapBuffer(
             symbol_map=symbol_map,
             initial_height=self._sim.map_height,
@@ -98,8 +102,8 @@ class FrameCaptureRenderer(Renderer):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--mission", default="cogsguard_machina_1.basic",
-                        help="Mission name (default: cogsguard_machina_1.basic)")
+    parser.add_argument("--mission", default="machina_1",
+                        help="Mission name (default: machina_1)")
     parser.add_argument("--policy", default="class=cogames.policy.starter_agent.StarterPolicy",
                         help="Policy spec (default: starter policy, no LLM required)")
     parser.add_argument("--agents", type=int, default=4,
