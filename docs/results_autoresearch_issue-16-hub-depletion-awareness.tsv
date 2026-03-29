@@ -11,3 +11,6 @@ f1e62bc	0.410000	junction.held=3099;junction.gained=4;noop=2816	1000	discard	v4:
 273761f	0.510000	junction.held=4070;junction.gained=5;get_heart_stale=0	1000	keep	v6 seed42: cooldown approach; 0 stale; all get_heart attempts succeeded
 273761f	0.620000	junction.held=?;get_heart_stale=0	1000	keep	v6 seed43: cooldown; matches baseline
 273761f	0.500000	junction.held=?;get_heart_stale=0	1000	keep	v6 seed44: cooldown; matches baseline
+07a73d2	0.490000	junction.held=?;get_heart_stale=0	1000	keep	v7 seed42: explore-only (no mining switch); slightly worse than v6
+07a73d2	0.620000	junction.held=?;get_heart_stale=0	1000	keep	v7 seed43: explore-only; matches baseline
+07a73d2	0.500000	junction.held=?;get_heart_stale=0	1000	keep	v7 seed44: explore-only; matches baseline

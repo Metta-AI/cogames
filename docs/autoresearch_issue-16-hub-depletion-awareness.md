@@ -103,3 +103,22 @@ Seed43: 0.64 (best result!). Average: 0.53. Baseline avg: 0.56.
 - Consider longer episodes (2000 steps) where mining→make_heart cycle can complete
 
 ---
+
+## 2026-03-29T02:00:00Z: experiment v7 - explore-only (no mining switch)
+
+Removed mining switch. When hub depleted, agents just explore. deposit_to_hub has navigation issues that waste 400 steps per failed attempt.
+
+v7 results: seed42=0.49, seed43=0.62, seed44=0.50 (avg 0.537). Slightly worse than v6 (0.543). All versions achieve 0 get_heart stale exits.
+
+## Final Summary
+
+**Best approach: v7 (explore-only with cooldown)** — simplest, eliminates 83 get_heart stale exits while maintaining baseline-comparable reward.
+
+Key changes in v7:
+1. `SharedMap.hub_hearts_withdrawn` counter (incremented on get_heart completion)
+2. `CrossRoleState.consecutive_get_heart_failures` + `get_heart_cooldown_steps`
+3. Escalating cooldown after failures (2×N cycles, max 8)
+4. `hub_depleted` flag in LLM prompt removes get_heart from available skills
+5. Precondition enforcement prevents get_heart during cooldown/depletion
+
+Target >0.92 needs fixes beyond hub depletion (navigation, deaths, clip avoidance).
