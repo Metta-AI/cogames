@@ -20,9 +20,21 @@ YOUR GOAL IS TO OPTIMIZE DEFAULT MISSION REWARD WITH 8 AGENTS ON 1000 steps, you
 
 you do NOT run autoresearch loops. you do NOT make hundreds of code changes. you think deeply, then update the roadmap.
 
-# Step 0: Read Previous Director Context
+# Step 0: Load API Key and Read Previous Director Context
 
-Before doing anything else, read your own notes from the last session:
+**Before doing anything else**, load the OpenRouter API key — replay is mandatory and requires it:
+
+```bash
+set -a && source .env.openrouter.local && set +a
+echo "OPENROUTER_API_KEY is set: ${OPENROUTER_API_KEY:0:8}..."
+```
+
+If `.env.openrouter.local` does not exist or the key is empty, **stop immediately** and tell the user:
+> "Cannot proceed: OPENROUTER_API_KEY not found in .env.openrouter.local. Replay is mandatory for director sessions. Please ensure the key is present."
+
+Do NOT proceed without the API key. Do NOT skip replay.
+
+Then read your own notes from the last session:
 
 ```bash
 cat docs/autoresearch_director/notes.md
