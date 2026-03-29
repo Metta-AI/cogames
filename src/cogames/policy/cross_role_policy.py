@@ -625,6 +625,10 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         if skill == "align_neutral" and gear == "aligner" and has_heart and not known_alignable:
             skill = "explore"
             reason = "overrode to explore: no alignable junctions known"
+        # Issue-16: prioritize alignment when agent has heart and targets exist
+        if gear == "aligner" and has_heart and known_alignable and skill in {"explore", "get_heart"}:
+            skill = "align_neutral"
+            reason = f"overrode {skill} to align_neutral: have heart and {len(known_alignable)} alignable targets"
         if skill == "mine_until_full" and gear != "miner":
             skill = "gear_up_miner"
             reason = f"overrode to gear_up_miner: need miner gear for mining (current={gear})"
