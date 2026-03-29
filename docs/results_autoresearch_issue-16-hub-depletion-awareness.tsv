@@ -42,3 +42,5 @@ b6904f9	0.620000	get_heart_stale=0	2000	discard	v13 2A1M 2000 steps seed44: deat
 97886dd	0.770000	junction.gained=11;heart.withdrawn=12;deposited=163	1000	keep	v15 seed46: NEW BEST! 12 hearts (7 from make_heart); 11 junctions aligned!
 6ece281	0.652000	get_heart_stale=0	1000	keep	v16 avg (6 seeds): element-aware mining; best avg yet (+2.6% over v13)
 11008eb	0.700000	get_heart_stale=0	1000	keep	v16+gemma-3-12b avg (5 seeds): faster LLM = more decisions = more make_heart; NEW BEST AVG!
+db9a07a	0.370000	get_heart_stale=0	1000	discard	gemma-3-4b: too small model; can't plan well
+db9a07a	0.570000	get_heart_stale=0	1000	discard	qwen3-8b: decent but slower/less capable than gemma-12b
