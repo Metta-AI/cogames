@@ -230,6 +230,8 @@ class CrossRoleState:
     # Miner-specific structures
     known_miner_stations: set[Coord] = field(default_factory=set)
     known_extractors: set[Coord] = field(default_factory=set)
+    # Issue-16: per-element extractor locations for diverse mining
+    extractors_by_element: dict[str, set[Coord]] = field(default_factory=lambda: {e: set() for e in ("carbon", "oxygen", "germanium", "silicon")})
     remembered_hub_row_from_spawn: int | None = None
     remembered_hub_col_from_spawn: int | None = None
 
