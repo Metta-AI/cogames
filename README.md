@@ -36,8 +36,15 @@ _Updated by Director: 2026-03-29 (Session 3)_
 
 _Note: March 21 results (2.260 best) used different reward normalization and are not directly comparable._
 
-**Current bottleneck**: Navigation failures (48 stale exits remain) and deposit_to_hub timeouts (~400 steps)
-**Next up**: PR #18 (hub depletion fix) in review → merge to unblock #10
+**Current bottleneck**: Multi-agent scaling (55% move failures at 3 agents vs 0.2% at 1 agent) and unbalanced mining deposits
+**Next up**: PR #18 (hub depletion) → #24 (balanced mining) → #20 (coordinated exploration)
+
+**Research tree:**
+```
+Immediate: #18 PR → #24 Balanced Mining (priority:1) → #10 Role Tuning (priority:1)
+Near-term: #20 Coordinated Exploration (priority:2) | #19 LLM Code Generation (priority:2) | #21 Intrinsic Motivation (priority:2)
+Longer-term: #22 Social Influence (priority:3) | #23 Meta-Learning (priority:3) | #15 8-Agent Scaling (blocked)
+```
 <!-- LEADERBOARD_END -->
 
 The [Alignment League Benchmark (ALB)](https://www.softmax.com/alignmentleague) is a suite of multi-agent games, designed to measure how well AI agents align, coordinate, and collaborate with others (both AIs and humans).

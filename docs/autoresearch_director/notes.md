@@ -47,34 +47,44 @@ The hub depletion fix (PR #18) eliminates the get_heart death loop but doesn't f
 
 ## Research roadmap after this session
 ```
+## IMMEDIATE (merge + optimize existing cycle)
 #18 PR: Hub Depletion Fix (IN REVIEW - merge ASAP)
   └─ enables make_heart cycle, +28% reward
+#24 Balanced Mining (priority:1) — deposits are 30:1 skewed, make_heart needs 1:1
+  └─ fixing this alone could double make_heart output
+#10 Role Tuning (priority:1, unblocked after #18)
+  └─ optimize deposit_to_hub, try 2A2M/1A3M
 
-#10 Role Tuning (priority:1, unblocked after #18 merge)
-  └─ optimize deposit_to_hub, try 2A2M/1A3M compositions
-  └─ blocks #15 8-Agent Scaling
+## NEAR-TERM (research directions to unlock next ceiling)
+#20 Coordinated Exploration (priority:2) — agents block each other (55% move fail vs 0.2% solo)
+#19 LLM Code Generation (priority:2) — runtime skill composition, not fixed menus
+#21 Intrinsic Motivation (priority:2) — empowerment-driven exploration for junction discovery
+#17 LLM Skill Validation (priority:2) — fixed in cross_role, low priority
 
-#17 LLM Skill Validation (priority:2, independent)
-  └─ Already fixed in cross_role — only affects old machina_llm_roles
-
-#15 8-Agent Scaling (priority:2, blocked by #10)
-
+## LONGER-TERM (paradigm shifts)
+#22 Social Influence & Role Specialization (priority:3) — emergent roles from interaction
+#23 Meta-Learning: In-Context Adaptation (priority:3) — agents learn across episodes
+#15 8-Agent Scaling (priority:2, blocked by #10) — LLM contention
 #11 Active Inference (priority:2, independent)
-
 #12 Gear Acquisition (priority:3, deprioritized)
 ```
 
+## New issues created this session
+- **#19**: LLM Dynamic Code Generation — runtime skill composition (priority:2)
+- **#20**: Coordinated Multi-Agent Exploration — spatial partitioning (priority:2)
+- **#21**: Intrinsic Motivation & Empowerment — exploration drives (priority:2)
+- **#22**: Social Influence & Role Specialization — emergent coordination (priority:3)
+- **#23**: Meta-Learning: In-Context Adaptation — cross-episode learning (priority:3)
+- **#24**: Balanced Mining Strategy — element diversity for make_heart (priority:1)
+
+## Key replay insight driving these issues
+Single-agent efficiency is 100x better than multi-agent: 0.2% vs 55% move failures, 43k vs 12k cells visited. The multi-agent degradation is the fundamental research challenge. Issues #20, #21, #22 all attack this from different angles.
+
 ## Open questions for next director
 
-1. **Should cross_role become the default policy?** It has all the fixes, but machina_llm_roles is still hardcoded in capture_frames.py and possibly other scripts.
-
-2. **Why 48 stale exits remain?** Navigation still fails regularly. Root causes:
-   - BFS can't find paths through unexplored territory
-   - Resource extractors (📦) are invisible obstacles
-   - Agent clustering near hub creates congestion
-
-3. **2A1M vs other compositions**: v13 used 2A1M (2 aligners, 1 miner). With make_heart working, would 1A2M or 2A2M be better? More miners = more resources = more hearts.
-
-4. **2000 steps vs 1000**: At 2000 steps, v13 achieved 1.08/agent (exceeds 0.92 target). Is the goal to optimize for 1000 steps or accept longer episodes?
+1. **Should cross_role become the default policy?** machina_llm_roles is still hardcoded in capture_frames.py.
+2. **What's the optimal agent count?** 1 agent is most efficient per-step but 3-4 give more total reward. Is there a sweet spot?
+3. **LLM model choice**: Could a more capable model (Claude/GPT-4) via #19 beat a faster model (Nemotron 49B) that makes more decisions per episode?
+4. **2000 steps vs 1000**: v13 hits 1.08 at 2000 steps. Should we optimize for the longer horizon?
 
 5. **8-agent scaling**: Still blocked by LLM contention (A40 GPU limit). With better navigation fixing single-agent efficiency first, then try 4-agent configs before 8.
