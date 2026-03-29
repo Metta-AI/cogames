@@ -20,3 +20,5 @@ ca0dc0c	0.500000	get_heart_stale=0	1000	discard	v8 seed44: minimal cooldown; sam
 b848dd1	0.560000	get_heart_stale=0	1000	discard	2A1M seed42: 2 aligners 1 miner; comparable to 3A
 b848dd1	0.530000	get_heart_stale=0	1000	discard	2A1M seed43: 2A1M worse than 3A on this seed
 b848dd1	0.450000	get_heart_stale=0	1000	discard	2A1M seed44: 2A1M worse; 3A remains best composition
+f61b0c6	0.500000	get_heart_stale=0	1000	discard	v10 avg 0.50: shorter timeout hurts align_neutral; reverted
+d91a275	0.537000	get_heart_stale=0	1000	keep	v11 avg: force align_neutral when heart+targets; same as v7; FINAL kept version
