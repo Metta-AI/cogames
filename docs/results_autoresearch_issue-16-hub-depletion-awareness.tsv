@@ -21,4 +21,8 @@ b848dd1	0.560000	get_heart_stale=0	1000	discard	2A1M seed42: 2 aligners 1 miner;
 b848dd1	0.530000	get_heart_stale=0	1000	discard	2A1M seed43: 2A1M worse than 3A on this seed
 b848dd1	0.450000	get_heart_stale=0	1000	discard	2A1M seed44: 2A1M worse; 3A remains best composition
 f61b0c6	0.500000	get_heart_stale=0	1000	discard	v10 avg 0.50: shorter timeout hurts align_neutral; reverted
-d91a275	0.537000	get_heart_stale=0	1000	keep	v11 avg: force align_neutral when heart+targets; same as v7; FINAL kept version
+d91a275	0.537000	get_heart_stale=0	1000	keep	v11 avg: force align_neutral when heart+targets; same as v7
+c959397	0.720000	junction.held=6244;junction.gained=8;heart.withdrawn=8;deposited=46	1000	keep	v13 2A1M seed42: BEST! make_heart created 3 extra hearts; 8 junctions!
+c959397	0.620000	get_heart_stale=0	1000	keep	v13 2A1M seed43
+c959397	0.650000	get_heart_stale=0	1000	keep	v13 2A1M seed44
+c959397	0.640000	get_heart_stale=0	1000	keep	v13 2A1M seed45: avg 0.658; 17% improvement over baseline
