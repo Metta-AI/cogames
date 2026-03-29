@@ -29,3 +29,8 @@ c959397	0.640000	get_heart_stale=0	1000	keep	v13 2A1M seed45: avg 0.658; 17% imp
 3d2b232	0.560000	get_heart_stale=0	1000	discard	v13 3A seed42: 3 aligners; no miner to fund make_heart
 3d2b232	0.170000	get_heart_stale=0	1000	discard	v13 2A2M c=4: too many agents; LLM bottleneck
 3d2b232	0.530000	get_heart_stale=0	1000	discard	v13 2A1M return_load=20: more frequent deposits worse; navigation overhead
+1fb842e	0.740000	get_heart_stale=0	1000	keep	v13 2A1M seed46: BEST 0.74; make_heart working well
+1fb842e	0.490000	get_heart_stale=0	1000	discard	v13 2A1M seed47: bad LLM timing
+1fb842e	0.590000	get_heart_stale=0	1000	keep	v13 2A1M seed48
+1fb842e	0.730000	get_heart_stale=0	1000	keep	v13 2A1M seed49: 0.73 make_heart working
+1fb842e	0.450000	get_heart_stale=0	1000	discard	v13 2A1M seed50: agent deaths; 9-seed avg=0.626; 11% over baseline
