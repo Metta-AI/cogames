@@ -773,8 +773,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             elif state.current_skill == "get_heart":
                 state.get_heart_timeouts += 1
                 state.consecutive_get_heart_failures += 1
-                # Issue-16: brief cooldown — explore once between retries
-                state.get_heart_cooldown_steps = 1
+                # Issue-16: escalating cooldown — explore between retries
+                state.get_heart_cooldown_steps = min(state.consecutive_get_heart_failures * 2, 8)
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps")
             state.current_skill = None
         elif state.current_skill is not None and state.current_skill != "defend" and state.no_move_steps >= self._stuck_threshold:

@@ -17,3 +17,6 @@ f1e62bc	0.410000	junction.held=3099;junction.gained=4;noop=2816	1000	discard	v4:
 ca0dc0c	0.490000	get_heart_stale=0	1000	discard	v8 seed42: minimal cooldown (1 cycle); same as v7
 ca0dc0c	0.620000	get_heart_stale=0	1000	discard	v8 seed43: minimal cooldown; same as v7
 ca0dc0c	0.500000	get_heart_stale=0	1000	discard	v8 seed44: minimal cooldown; same as v7; cooldown duration doesn't matter
+b848dd1	0.560000	get_heart_stale=0	1000	discard	2A1M seed42: 2 aligners 1 miner; comparable to 3A
+b848dd1	0.530000	get_heart_stale=0	1000	discard	2A1M seed43: 2A1M worse than 3A on this seed
+b848dd1	0.450000	get_heart_stale=0	1000	discard	2A1M seed44: 2A1M worse; 3A remains best composition
