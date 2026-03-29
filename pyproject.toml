@@ -23,6 +23,8 @@ dependencies = [
   "fastapi>=0.115.0",
   "uvicorn>=0.34.0",
   "httpx>=0.28.1",
+  "anthropic[bedrock]>=0.64.0",
+  "openai>=1.0.0",
   # For `cogames docsync` command
   "nbstripout>=0.8.0",
   "nbconvert>=7.16.0",

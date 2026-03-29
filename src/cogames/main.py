@@ -1965,6 +1965,12 @@ def upload_cmd(
         help="Secret environment variable for policy execution (can be repeated). Stored in AWS Secrets Manager.",
         rich_help_panel="Secrets",
     ),
+    use_bedrock: bool = typer.Option(
+        False,
+        "--use-bedrock",
+        help="Enable AWS Bedrock access for this policy. Sets USE_BEDROCK=true in policy environment.",
+        rich_help_panel="Secrets",
+    ),
     # --- Tournament ---
     season: Optional[str] = typer.Option(
         None,
@@ -2041,6 +2047,8 @@ def upload_cmd(
 
     submitting = not no_submit
     parsed_secret_env: dict[str, str] = {}
+    if use_bedrock:
+        parsed_secret_env["USE_BEDROCK"] = "true"
     if secret_env:
         for kv in secret_env:
             key, val = _parse_secret_env(kv)
