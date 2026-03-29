@@ -168,3 +168,28 @@ Previous versions permanently blocked get_heart after 5 withdrawals. But make_he
 - 3A: 0.537 — no miner, no make_heart
 - 2A2M (4 agents): 0.17/agent — LLM bottleneck
 - 1A2M: 0.28 — not enough aligners
+
+## 2026-03-29T05:00:00Z: experiments v14-v17 - element diversity
+
+**v14:** Scarce element targeting via visible extractors only. Avg 0.572 (worse, reverted).
+**v15:** Prompt hint for miner diversity. Avg 0.625 (no effect, LLM ignores hint). Best single: 0.77.
+**v16:** Full element-aware mining with extractors_by_element map memory. **Avg 0.652 (best!)**.
+**v17:** Lower imbalance threshold (3 vs 5). Same 0.652. Performance converged.
+
+## FINAL BRANCH STATE: v16
+
+**Recommended command:**
+```
+cogames play -m cogsguard_machina_1 -c 3 -p class=cross_role,kw.num_aligners=2,kw.llm_timeout_s=20 -s 1000 -r log --autostart
+```
+
+**All improvements:**
+1. Hub depletion cooldown (escalating, replaces infinite get_heart retry)
+2. deposit_to_hub approach-cell navigation fix
+3. Cooldown-only blocking (no hard block) for make_heart retry
+4. Element-aware mining via extractors_by_element map memory
+5. Force align_neutral when heart + targets available
+6. Miner diversity prompt hint
+
+**Results:** avg 0.652 (+16%), best 0.77 (+37%), 0 get_heart stale exits (was 83)
+**Target 0.92:** achievable at 2000 steps (1.08 best). At 1000 steps, needs HP retreat + better navigation.
