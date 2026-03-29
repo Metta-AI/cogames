@@ -42,6 +42,8 @@ CROSS_ROLE_SKILLS = {
 }
 
 _SKILL_ALIASES = {"unstick": "unstuck"}
+# Issue-16: "defend" is a virtual skill for heartless aligners when hub is depleted
+_ALL_VALID_SKILLS = set(CROSS_ROLE_SKILLS.keys()) | {"defend"}
 
 
 def _parse_cross_role_skill(text: str) -> tuple[str | None, str]:
@@ -56,7 +58,7 @@ def _parse_cross_role_skill(text: str) -> tuple[str | None, str]:
     except json.JSONDecodeError:
         skill = text.splitlines()[0].strip()
         skill = _SKILL_ALIASES.get(skill, skill)
-        return (skill if skill in CROSS_ROLE_SKILLS else None, "non-json response")
+        return (skill if skill in _ALL_VALID_SKILLS else None, "non-json response")
     if not isinstance(payload, dict):
         return None, "response was not a JSON object"
     skill = payload.get("skill")
@@ -64,7 +66,7 @@ def _parse_cross_role_skill(text: str) -> tuple[str | None, str]:
     if not isinstance(skill, str):
         return None, "missing skill field"
     skill = _SKILL_ALIASES.get(skill, skill)
-    return (skill if skill in CROSS_ROLE_SKILLS else None, str(reason))
+    return (skill if skill in _ALL_VALID_SKILLS else None, str(reason))
 
 
 _ALIGNER_SKILLS = {k: v for k, v in CROSS_ROLE_SKILLS.items() if k in {"get_heart", "align_neutral", "explore", "unstuck"}}
@@ -95,16 +97,22 @@ def build_cross_role_prompt(
     # Select skills relevant to current gear (no gear switching via LLM)
     if current_gear == "aligner":
         if hub_depleted and not has_heart:
-            # Issue-16: hub is depleted and agent has no heart — remove get_heart, focus on defense/explore
-            skill_set = {k: v for k, v in _ALIGNER_SKILLS.items() if k != "get_heart"}
+            # Issue-16: hub is depleted and agent has no heart — remove get_heart, focus on defense
+            # Add "defend" as a virtual skill that keeps agents near friendly junctions
+            skill_set = {
+                "defend": "Stay near friendly junctions to maintain territory control. Navigate toward the nearest friendly junction and hold position.",
+                "explore": CROSS_ROLE_SKILLS["explore"],
+                "unstuck": CROSS_ROLE_SKILLS["unstuck"],
+            }
             role_hint = (
                 "You are in ALIGNER mode. The hub is DEPLETED (no hearts remaining). "
-                "You cannot get more hearts. Focus on exploring to discover new junctions "
-                "or defending territory your team already holds."
+                "You cannot get more hearts. DEFEND your team's aligned junctions by staying nearby. "
+                "Only explore if there are no friendly junctions to defend."
             )
             preconditions = (
-                "- align_neutral: requires has_heart == true (you have NO heart and CANNOT get one)\n"
-                "- IMPORTANT: The hub has no hearts left. Do NOT attempt get_heart.\n"
+                "- defend: PREFERRED — move toward and stay near friendly junctions to hold territory\n"
+                "- explore: only use if known_friendly_junctions == 0\n"
+                "- IMPORTANT: The hub has no hearts left. Do NOT attempt get_heart or align_neutral.\n"
             )
         else:
             skill_set = _ALIGNER_SKILLS
@@ -567,8 +575,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 skill = "gear_up_aligner" if len(known_alignable) >= len(state.known_extractors) else "gear_up_miner"
             elif gear == "aligner":
                 if hub_depleted and not has_heart:
-                    # Issue-16: hub depleted, can't get hearts — explore for new junctions
-                    skill = "explore"
+                    # Issue-16: hub depleted, can't get hearts — defend friendly junctions
+                    skill = "defend" if state.known_friendly_junctions else "explore"
                 elif not has_heart and state.known_hubs:
                     skill = "get_heart"
                 elif has_heart and known_alignable:
@@ -587,11 +595,11 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             reason = f"scripted fallback ({reason})"
 
         # Precondition enforcement
-        # Issue-16: prevent get_heart when hub is depleted
+        # Issue-16: prevent get_heart when hub is depleted — defend instead
         if skill == "get_heart" and hub_depleted and not has_heart:
-            skill = "explore"
-            reason = f"overrode get_heart to explore: hub depleted (hearts_used={hub_hearts_used}, timeouts={state.get_heart_timeouts})"
-            logger.info("agent=%s hub_depletion_override: skill=explore hearts_used=%d timeouts=%d", obs.agent_id, hub_hearts_used, state.get_heart_timeouts)
+            skill = "defend" if state.known_friendly_junctions else "explore"
+            reason = f"overrode get_heart to {skill}: hub depleted (hearts_used={hub_hearts_used}, failures={state.consecutive_get_heart_failures})"
+            logger.info("agent=%s hub_depletion_override: skill=%s hearts_used=%d failures=%d", obs.agent_id, skill, hub_hearts_used, state.consecutive_get_heart_failures)
         # Must have correct gear for role-specific skills
         if skill == "get_heart" and gear != "aligner":
             skill = "gear_up_aligner"
@@ -601,8 +609,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             reason = f"overrode to gear_up_aligner: need aligner gear for align_neutral"
         if skill == "align_neutral" and gear == "aligner" and not has_heart:
             if hub_depleted:
-                skill = "explore"
-                reason = "overrode align_neutral to explore: no heart and hub depleted"
+                skill = "defend" if state.known_friendly_junctions else "explore"
+                reason = f"overrode align_neutral to {skill}: no heart and hub depleted"
             else:
                 skill = "get_heart"
                 reason = "overrode to get_heart: need heart for align_neutral"
@@ -622,7 +630,10 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             if has_heart and known_alignable:
                 skill = "align_neutral"
                 reason = "overrode: already have aligner gear, have heart and target"
-            elif not has_heart and state.known_hubs and not hub_depleted:
+            elif not has_heart and hub_depleted:
+                skill = "defend" if state.known_friendly_junctions else "explore"
+                reason = f"overrode: already have aligner gear, hub depleted → {skill}"
+            elif not has_heart and state.known_hubs:
                 skill = "get_heart"
                 reason = "overrode: already have aligner gear, need heart"
             else:
@@ -714,6 +725,15 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             new_extractors = len(state.known_extractors) - state.explore_start_extractors
             self._event(state, f"explore completed: +{new_junctions} junctions, +{new_extractors} extractors")
             state.current_skill = None
+        elif state.current_skill == "defend" and has_heart:
+            # Issue-16: agent got a heart while defending — switch to aligning
+            self._event(state, "defend completed: acquired heart, switching to align")
+            state.consecutive_get_heart_failures = 0
+            state.current_skill = None
+        elif state.current_skill == "defend" and state.skill_steps >= self._stuck_threshold * 20:
+            # Issue-16: long defend timeout — replan in case situation changed
+            self._event(state, f"defend recheck after {state.skill_steps} steps")
+            state.current_skill = None
         elif state.current_skill == "unstuck" and state.skill_steps >= self._unstuck_horizon:
             self._event(state, "unstuck finished horizon")
             state.current_skill = None
@@ -747,14 +767,14 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 state.consecutive_get_heart_failures += 1  # Issue-16
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps")
             state.current_skill = None
-        elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
+        elif state.current_skill is not None and state.current_skill != "defend" and state.no_move_steps >= self._stuck_threshold:
             if state.current_skill in {"gear_up_aligner", "gear_up_miner"}:
                 state.gear_up_failures += 1
             if state.current_skill == "get_heart":
                 state.consecutive_get_heart_failures += 1  # Issue-16
             self._event(state, f"{state.current_skill} exited as stuck after {state.no_move_steps} blocked steps")
             state.current_skill = None
-        elif state.current_skill is not None and state.no_progress_on_target_steps >= self._stuck_threshold:
+        elif state.current_skill is not None and state.current_skill != "defend" and state.no_progress_on_target_steps >= self._stuck_threshold:
             # Remove depleted extractors
             if state.current_skill == "mine_until_full":
                 current_abs = self._current_abs(obs)
@@ -958,7 +978,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             self._plan_skill(obs, state)
 
         # Navigation shake to break stuck loops
-        if state.current_skill not in {None, "unstuck"} and state.no_move_steps >= 5 and state.no_move_steps % 3 == 0:
+        if state.current_skill not in {None, "unstuck", "defend"} and state.no_move_steps >= 5 and state.no_move_steps % 3 == 0:
             action, state = self._unstuck_move(state)
             state.skill_steps += 1
             return action, state
@@ -1050,6 +1070,42 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 last_pos=base_state.last_pos,
                 last_move_target=base_state.last_move_target,
             ))
+
+        elif skill == "defend":
+            # Issue-16: navigate toward nearest friendly junction and hold position
+            target = self._aligner._nearest_known(current_abs, state.known_friendly_junctions)
+            if target is not None:
+                dist = abs(current_abs[0] - target[0]) + abs(current_abs[1] - target[1])
+                if dist <= 2:
+                    # Already near friendly junction — hold position (noop)
+                    action = self._aligner._starter._action("noop")
+                else:
+                    # Navigate toward friendly junction
+                    direction = self._aligner._navigate_to_station(state, current_abs, target, avoid_hazards=True)
+                    if direction:
+                        action = self._aligner._starter._action(f"move_{direction}")
+                    else:
+                        action, base_state = self._aligner._greedy_move_toward_abs(state, current_abs, target)
+                        state = self._copy_with_shared(replace(state,
+                            wander_direction_index=base_state.wander_direction_index,
+                            wander_steps_remaining=base_state.wander_steps_remaining,
+                            last_mode=base_state.last_mode,
+                            last_pos=getattr(base_state, 'last_pos', state.last_pos),
+                            last_move_target=getattr(base_state, 'last_move_target', state.last_move_target),
+                        ))
+            else:
+                # No friendly junctions known — explore near hub to stay safe
+                if state.known_hubs:
+                    action, base_state = self._aligner._explore_near_hub(obs, state)
+                else:
+                    action, base_state = self._aligner._explore(obs, state)
+                state = self._copy_with_shared(replace(state,
+                    wander_direction_index=base_state.wander_direction_index,
+                    wander_steps_remaining=base_state.wander_steps_remaining,
+                    last_mode=base_state.last_mode,
+                    last_pos=getattr(base_state, 'last_pos', state.last_pos),
+                    last_move_target=getattr(base_state, 'last_move_target', state.last_move_target),
+                ))
 
         elif skill == "explore":
             gear = self._current_gear(obs)
