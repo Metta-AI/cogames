@@ -97,22 +97,25 @@ def build_cross_role_prompt(
     # Select skills relevant to current gear (no gear switching via LLM)
     if current_gear == "aligner":
         if hub_depleted and not has_heart:
-            # Issue-16: hub is depleted and agent has no heart — remove get_heart, focus on defense
-            # Add "defend" as a virtual skill that keeps agents near friendly junctions
+            # Issue-16: hub depleted, no heart — switch to mining to fund heart production
+            # Mining deposits resources to hub → make_heart creates hearts → agents can align again
             skill_set = {
-                "defend": "Stay near friendly junctions to maintain territory control. Navigate toward the nearest friendly junction and hold position.",
+                "gear_up_miner": CROSS_ROLE_SKILLS["gear_up_miner"],
+                "mine_until_full": CROSS_ROLE_SKILLS["mine_until_full"],
+                "deposit_to_hub": CROSS_ROLE_SKILLS["deposit_to_hub"],
                 "explore": CROSS_ROLE_SKILLS["explore"],
                 "unstuck": CROSS_ROLE_SKILLS["unstuck"],
             }
             role_hint = (
-                "You are in ALIGNER mode. The hub is DEPLETED (no hearts remaining). "
-                "You cannot get more hearts. DEFEND your team's aligned junctions by staying nearby. "
-                "Only explore if there are no friendly junctions to defend."
+                "You are in ALIGNER mode but the hub has NO hearts remaining. "
+                "Switch to MINING: get miner gear, mine resources, and deposit to hub. "
+                "Depositing resources to the hub creates new hearts, letting you align again later."
             )
             preconditions = (
-                "- defend: PREFERRED — move toward and stay near friendly junctions to hold territory\n"
-                "- explore: only use if known_friendly_junctions == 0\n"
-                "- IMPORTANT: The hub has no hearts left. Do NOT attempt get_heart or align_neutral.\n"
+                "- gear_up_miner: PREFERRED if you still have aligner gear — switch to mining\n"
+                "- mine_until_full: mine resources after getting miner gear\n"
+                "- deposit_to_hub: deposit resources to fund heart creation\n"
+                "- IMPORTANT: Hub has no hearts. Mine and deposit to create new ones.\n"
             )
         else:
             skill_set = _ALIGNER_SKILLS
@@ -470,7 +473,15 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         # Bug: agent 3 (seed 44) completed gear_up_miner successfully, then contaminated during
         # mine_until_full (walked through scout station). gear_up_completed=True blocked re-bootstrap.
         contaminated = gear in ("scrambler", "scout")
-        needs_gear_up = effective_preferred and (
+        # Issue-16: when hub is depleted, aligners switch to mining intentionally — don't fight it
+        hub_hearts_used_bootstrap = self._shared_map.hub_hearts_withdrawn if self._shared_map else 0
+        intentionally_mining = (
+            effective_preferred == "aligner"
+            and gear == "miner"
+            and not has_heart
+            and (hub_hearts_used_bootstrap >= 5 or state.consecutive_get_heart_failures >= 3)
+        )
+        needs_gear_up = effective_preferred and not intentionally_mining and (
             contaminated  # always re-gear on contamination, even if gear_up previously completed
             or (
                 not state.gear_up_completed
@@ -518,10 +529,10 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         team_size = max(1, len(self._shared_map.agent_gears) if self._shared_map and hasattr(self._shared_map, "agent_gears") else 8)
 
         # Issue-16: detect hub depletion via multiple signals
-        # 1. Global: hub_hearts_withdrawn >= 4 (hub starts with 5, needs >= 2 to withdraw)
-        # 2. Per-agent: consecutive_get_heart_failures >= 2 (fast per-agent detection)
+        # Hub starts with 5 hearts; get_last_heart allows all 5 to be withdrawn.
+        # Per-agent: consecutive failures are a faster signal (detects depletion before global count).
         hub_hearts_used = self._shared_map.hub_hearts_withdrawn if self._shared_map else 0
-        hub_depleted = hub_hearts_used >= 4 or state.consecutive_get_heart_failures >= 2
+        hub_depleted = hub_hearts_used >= 5 or state.consecutive_get_heart_failures >= 3
 
         prompt = build_cross_role_prompt(
             current_gear=gear,
@@ -575,8 +586,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 skill = "gear_up_aligner" if len(known_alignable) >= len(state.known_extractors) else "gear_up_miner"
             elif gear == "aligner":
                 if hub_depleted and not has_heart:
-                    # Issue-16: hub depleted, can't get hearts — defend friendly junctions
-                    skill = "defend" if state.known_friendly_junctions else "explore"
+                    # Issue-16: hub depleted — switch to mining to fund heart production
+                    skill = "gear_up_miner"
                 elif not has_heart and state.known_hubs:
                     skill = "get_heart"
                 elif has_heart and known_alignable:
@@ -595,9 +606,9 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             reason = f"scripted fallback ({reason})"
 
         # Precondition enforcement
-        # Issue-16: prevent get_heart when hub is depleted — defend instead
+        # Issue-16: prevent get_heart when hub is depleted — switch to mining
         if skill == "get_heart" and hub_depleted and not has_heart:
-            skill = "defend" if state.known_friendly_junctions else "explore"
+            skill = "gear_up_miner" if gear == "aligner" else "explore"
             reason = f"overrode get_heart to {skill}: hub depleted (hearts_used={hub_hearts_used}, failures={state.consecutive_get_heart_failures})"
             logger.info("agent=%s hub_depletion_override: skill=%s hearts_used=%d failures=%d", obs.agent_id, skill, hub_hearts_used, state.consecutive_get_heart_failures)
         # Must have correct gear for role-specific skills
@@ -609,8 +620,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             reason = f"overrode to gear_up_aligner: need aligner gear for align_neutral"
         if skill == "align_neutral" and gear == "aligner" and not has_heart:
             if hub_depleted:
-                skill = "defend" if state.known_friendly_junctions else "explore"
-                reason = f"overrode align_neutral to {skill}: no heart and hub depleted"
+                skill = "gear_up_miner"
+                reason = "overrode align_neutral to gear_up_miner: no heart and hub depleted, switch to mining"
             else:
                 skill = "get_heart"
                 reason = "overrode to get_heart: need heart for align_neutral"
@@ -631,8 +642,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                 skill = "align_neutral"
                 reason = "overrode: already have aligner gear, have heart and target"
             elif not has_heart and hub_depleted:
-                skill = "defend" if state.known_friendly_junctions else "explore"
-                reason = f"overrode: already have aligner gear, hub depleted → {skill}"
+                skill = "gear_up_miner"
+                reason = "overrode: already have aligner gear, hub depleted → switch to mining"
             elif not has_heart and state.known_hubs:
                 skill = "get_heart"
                 reason = "overrode: already have aligner gear, need heart"
