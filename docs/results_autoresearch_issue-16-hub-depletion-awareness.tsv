@@ -14,3 +14,6 @@ f1e62bc	0.410000	junction.held=3099;junction.gained=4;noop=2816	1000	discard	v4:
 07a73d2	0.490000	junction.held=?;get_heart_stale=0	1000	keep	v7 seed42: explore-only (no mining switch); slightly worse than v6
 07a73d2	0.620000	junction.held=?;get_heart_stale=0	1000	keep	v7 seed43: explore-only; matches baseline
 07a73d2	0.500000	junction.held=?;get_heart_stale=0	1000	keep	v7 seed44: explore-only; matches baseline
+ca0dc0c	0.490000	get_heart_stale=0	1000	discard	v8 seed42: minimal cooldown (1 cycle); same as v7
+ca0dc0c	0.620000	get_heart_stale=0	1000	discard	v8 seed43: minimal cooldown; same as v7
+ca0dc0c	0.500000	get_heart_stale=0	1000	discard	v8 seed44: minimal cooldown; same as v7; cooldown duration doesn't matter
