@@ -122,3 +122,20 @@ Key changes in v7:
 5. Precondition enforcement prevents get_heart during cooldown/depletion
 
 Target >0.92 needs fixes beyond hub depletion (navigation, deaths, clip avoidance).
+
+## 2026-03-29T03:00:00Z: experiments v8-v11
+
+v8 (minimal cooldown), v9 (revert), v10 (shorter timeout), v11 (force align).
+All converge to ~0.54 avg. Results are deterministic per seed — LLM timing dominates.
+v10 was worse (0.50) because shorter timeout hurts align_neutral navigation.
+v11 force-align override has no effect since LLM already chooses correctly.
+
+2A1M composition tested: avg 0.513, worse than 3A (0.537). 3 aligners remains optimal.
+
+**Bottleneck analysis for reaching >0.92:**
+1. deposit_to_hub navigation: 400-step timeouts block make_heart resource cycle
+2. Agent deaths from clip ships: main variance source
+3. Limited hearts (5 initial): make_heart needs 28 resources agents can't reliably deposit
+4. LLM contention: 3 agents share 1 LLM at ~2s/decision
+
+**Advancing branch at v11** — includes all hub depletion improvements + alignment priority.
