@@ -39,3 +39,4 @@ b6904f9	0.960000	get_heart_stale=0	2000	keep	v13 2A1M 2000 steps seed43: exceeds
 b6904f9	0.620000	get_heart_stale=0	2000	discard	v13 2A1M 2000 steps seed44: deaths/timing
 8ae6bc1	0.572000	get_heart_stale=0	1000	discard	v14 avg: diverse mining worse (0.572 vs v13 0.626); reverted
 6f9a869	0.625000	get_heart_stale=0	1000	discard	v15 avg: prompt diversity hint; same as v13 (0.625); LLM ignores hint
+97886dd	0.770000	junction.gained=11;heart.withdrawn=12;deposited=163	1000	keep	v15 seed46: NEW BEST! 12 hearts (7 from make_heart); 11 junctions aligned!
