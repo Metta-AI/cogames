@@ -237,6 +237,7 @@ class CrossRoleState:
     explore_start_junctions: int = 0
     align_neutral_timeouts: int = 0
     get_heart_timeouts: int = 0
+    consecutive_get_heart_failures: int = 0  # Issue-16: tracks consecutive get_heart stale/stuck/timeout
     max_hp_seen: int = 0
     retreating: bool = False
 
@@ -508,11 +509,11 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         team_aligners, team_miners = self._team_gear_counts()
         team_size = max(1, len(self._shared_map.agent_gears) if self._shared_map and hasattr(self._shared_map, "agent_gears") else 8)
 
-        # Issue-16: detect hub depletion
-        # Hub starts with 5 hearts, hub_has filter requires >= 2 to withdraw, so max ~4 withdrawals
-        # before hub is empty (unless make_heart replenishes). Also use per-agent timeout count.
+        # Issue-16: detect hub depletion via multiple signals
+        # 1. Global: hub_hearts_withdrawn >= 4 (hub starts with 5, needs >= 2 to withdraw)
+        # 2. Per-agent: consecutive_get_heart_failures >= 2 (fast per-agent detection)
         hub_hearts_used = self._shared_map.hub_hearts_withdrawn if self._shared_map else 0
-        hub_depleted = hub_hearts_used >= 4 or state.get_heart_timeouts >= 3
+        hub_depleted = hub_hearts_used >= 4 or state.consecutive_get_heart_failures >= 2
 
         prompt = build_cross_role_prompt(
             current_gear=gear,
@@ -689,6 +690,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         elif state.current_skill == "get_heart" and has_heart and state.skill_steps > 0:
             self._event(state, "get_heart completed: acquired heart")
             state.get_heart_timeouts = 0
+            state.consecutive_get_heart_failures = 0  # Issue-16: reset on success
             # Issue-16: track hub heart withdrawals for depletion awareness
             if self._shared_map is not None:
                 self._shared_map.hub_hearts_withdrawn += 1
@@ -742,11 +744,14 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                             state.align_neutral_timeouts = 0
             elif state.current_skill == "get_heart":
                 state.get_heart_timeouts += 1
+                state.consecutive_get_heart_failures += 1  # Issue-16
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps")
             state.current_skill = None
         elif state.current_skill is not None and state.no_move_steps >= self._stuck_threshold:
             if state.current_skill in {"gear_up_aligner", "gear_up_miner"}:
                 state.gear_up_failures += 1
+            if state.current_skill == "get_heart":
+                state.consecutive_get_heart_failures += 1  # Issue-16
             self._event(state, f"{state.current_skill} exited as stuck after {state.no_move_steps} blocked steps")
             state.current_skill = None
         elif state.current_skill is not None and state.no_progress_on_target_steps >= self._stuck_threshold:
@@ -758,6 +763,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
                     self._event(state, f"removed depleted extractor at {current_abs}")
             if state.current_skill in {"gear_up_aligner", "gear_up_miner"}:
                 state.gear_up_failures += 1
+            if state.current_skill == "get_heart":
+                state.consecutive_get_heart_failures += 1  # Issue-16
             self._event(state, f"{state.current_skill} exited as stale after {state.no_progress_on_target_steps} steps")
             state.current_skill = None
 

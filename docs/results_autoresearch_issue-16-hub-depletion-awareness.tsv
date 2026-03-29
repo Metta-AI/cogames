@@ -1,2 +1,4 @@
 commit	mission_reward	secondary_rewards	steps	status	description
 eede8b0	0.570901	junction.held=4709;junction.gained=6;heart.withdrawn=5;get_heart_stale=83	1000	keep	Baseline: 3-agent cross_role 3 aligners; 0.57/agent; 83 get_heart stale exits confirm issue
+280102d	0.466403	junction.held=3664;junction.gained=5;heart.withdrawn=4;deaths=3	1000	discard	v1: hub depletion threshold>=5 never fired; agents contaminated by scrambler; worse due to variance
+07eee79	0.446800	junction.held=3468;junction.gained=4;heart.withdrawn=4;deaths=6	1000	discard	v2: threshold>=4 + timeouts>=3; override never fired; 6 agent deaths dominated outcome
