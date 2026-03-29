@@ -755,7 +755,7 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
             # Short timeouts waste 65% of step capacity in failed navigation to far hub/extractors.
             self._event(state, f"{state.current_skill} timed out after {state.skill_steps} steps (long-timeout)")
             state.current_skill = None
-        elif state.current_skill in {"get_heart", "align_neutral"} and state.skill_steps >= self._stuck_threshold * 5:
+        elif state.current_skill in {"get_heart", "align_neutral"} and state.skill_steps >= self._stuck_threshold * 3:
             if state.current_skill == "align_neutral":
                 state.align_neutral_timeouts += 1
                 if state.align_neutral_timeouts >= 1:
