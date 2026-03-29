@@ -415,12 +415,43 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
+    def _scarce_element_extractor_tags(self, obs: AgentObservation) -> set[int] | None:
+        """Issue-16: identify which element the agent has least of, return its extractor tags.
+
+        This helps miners diversify their mining to ensure all 4 elements are deposited
+        for the make_heart cycle (needs 7 of each element).
+        Returns None if inventory is empty or balanced.
+        """
+        counts = self._inventory_counts(obs)
+        if not counts:
+            return None
+        min_count = min(counts.get(e, 0) for e in ELEMENTS)
+        max_count = max(counts.get(e, 0) for e in ELEMENTS)
+        if max_count - min_count < 5:  # roughly balanced, don't override
+            return None
+        scarce = [e for e in ELEMENTS if counts.get(e, 0) == min_count]
+        if scarce:
+            # Return extractor tags for the scarce element
+            combined: set[int] = set()
+            for e in scarce:
+                combined.update(self._extractor_tags_by_element.get(e, set()))
+            return combined
+        return None
+
     def _mine_until_full(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
         if state.last_mode != "mine_until_full":
             logger.info("agent=%s mode=mine_until_full", obs.agent_id)
             state.last_mode = "mine_until_full"
         current_abs = self._current_abs(obs)
-        visible_target = self._closest_visible_location(obs, self._starter._extractor_tags)
+
+        # Issue-16: prefer scarce element extractors for make_heart diversity
+        scarce_tags = self._scarce_element_extractor_tags(obs)
+        preferred_tags = scarce_tags if scarce_tags else self._starter._extractor_tags
+
+        visible_target = self._closest_visible_location(obs, preferred_tags)
+        if visible_target is None and scarce_tags:
+            # Fall back to any extractor if scarce type not visible
+            visible_target = self._closest_visible_location(obs, self._starter._extractor_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
             action, next_state = self._move_toward_target(state, current_abs, target_abs)
