@@ -139,3 +139,32 @@ v11 force-align override has no effect since LLM already chooses correctly.
 4. LLM contention: 3 agents share 1 LLM at ~2s/decision
 
 **Advancing branch at v11** — includes all hub depletion improvements + alignment priority.
+
+## 2026-03-29T04:00:00Z: experiments v12-v13 - BREAKTHROUGH
+
+**v12: deposit_to_hub navigation fix**
+Critical bug found: _deposit_to_hub used BFS with hub cell as goal, but hubs are blocked objects (not in known_free_cells). BFS immediately returned None. Added _navigate_to_blocked_target() that finds approach cells adjacent to hub, navigates there, then steps in.
+
+**v13: removed hard block on get_heart**
+Previous versions permanently blocked get_heart after 5 withdrawals. But make_heart can create new hearts from deposited resources! v13 uses cooldown-only blocking, so agents retry after cooldown expires.
+
+**BREAKTHROUGH RESULT: 2A1M (2 aligners + 1 miner) with v13**
+- 9-seed average: **0.626** (baseline: 0.563, +11%)
+- Best: **0.74** (seed 46)
+- make_heart created up to 3 extra hearts!
+- 8 junctions aligned in best run (vs 5-6 baseline)
+- hub_hearts_withdrawn reached 8 (5 initial + 3 from make_heart)
+
+**The mine→make_heart→align cycle:**
+1. Miner deposits resources to hub (using fixed navigation)
+2. Hub's make_heart handler creates hearts from deposited resources
+3. Aligners retry get_heart (cooldown-based, not hard-blocked)
+4. New hearts → more junction alignments → higher reward
+
+**Remaining bottleneck:** Element diversity. Miner deposits mostly carbon/germanium (nearest extractors) but make_heart needs 7 of EACH element. Oxygen and silicon shortages limit heart creation.
+
+**Composition tests:**
+- 2A1M: 0.626 avg — optimal
+- 3A: 0.537 — no miner, no make_heart
+- 2A2M (4 agents): 0.17/agent — LLM bottleneck
+- 1A2M: 0.28 — not enough aligners
