@@ -51,6 +51,11 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         self._miner_station_tags = self._starter._resolve_tag_ids(miner_station_names)
         self._hazard_station_tags = self._resolve_non_miner_station_tags(policy_env_info, miner_station_names)
         self._wall_tags = self._starter._resolve_tag_ids(["wall"])
+        # Issue-16: per-element extractor tags for diverse mining
+        self._extractor_tags_by_element: dict[str, set[int]] = {
+            element: self._starter._resolve_tag_ids([f"{element}_extractor"])
+            for element in ELEMENTS
+        }
         self._return_load = return_load
         self._obs_radius_row = self._starter._center[0]
         self._obs_radius_col = self._starter._center[1]
