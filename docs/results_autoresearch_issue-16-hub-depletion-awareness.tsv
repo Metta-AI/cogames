@@ -37,3 +37,4 @@ c959397	0.640000	get_heart_stale=0	1000	keep	v13 2A1M seed45: avg 0.658; 17% imp
 b6904f9	1.080000	get_heart_stale=0	2000	keep	v13 2A1M 2000 steps seed42: exceeds 0.92 target!
 b6904f9	0.960000	get_heart_stale=0	2000	keep	v13 2A1M 2000 steps seed43: exceeds 0.92 target!
 b6904f9	0.620000	get_heart_stale=0	2000	discard	v13 2A1M 2000 steps seed44: deaths/timing
+8ae6bc1	0.572000	get_heart_stale=0	1000	discard	v14 avg: diverse mining worse (0.572 vs v13 0.626); reverted
