@@ -33,6 +33,8 @@ class MinerSkillState(StarterCogState):
     known_hubs: set[Coord] = field(default_factory=set)
     known_miner_stations: set[Coord] = field(default_factory=set)
     known_extractors: set[Coord] = field(default_factory=set)
+    # Issue-16: per-element extractor locations for diverse mining
+    extractors_by_element: dict[str, set[Coord]] = field(default_factory=lambda: {e: set() for e in ("carbon", "oxygen", "germanium", "silicon")})
     known_hazard_stations: set[Coord] = field(default_factory=set)
     # Move-failure tracking (same mechanism as AlignerState)
     last_pos: Coord | None = None
@@ -198,6 +200,10 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
                 miner_stations_now.add(abs_cell)
             if token.value in self._starter._extractor_tags:
                 extractors_now.add(abs_cell)
+                # Issue-16: track which element this extractor produces
+                for element, etags in self._extractor_tags_by_element.items():
+                    if token.value in etags:
+                        state.extractors_by_element[element].add(abs_cell)
             if token.value in self._hazard_station_tags:
                 hazard_stations_now.add(abs_cell)
 
@@ -415,11 +421,43 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
+    def _scarce_element(self, obs: AgentObservation) -> str | None:
+        """Issue-16: return the element the agent has least of, or None if balanced."""
+        counts = self._inventory_counts(obs)
+        if not counts and not any(counts.get(e, 0) for e in ELEMENTS):
+            return None
+        min_count = min(counts.get(e, 0) for e in ELEMENTS)
+        max_count = max(counts.get(e, 0) for e in ELEMENTS)
+        if max_count - min_count < 5:
+            return None
+        for e in ELEMENTS:
+            if counts.get(e, 0) == min_count:
+                return e
+        return None
+
     def _mine_until_full(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
         if state.last_mode != "mine_until_full":
             logger.info("agent=%s mode=mine_until_full", obs.agent_id)
             state.last_mode = "mine_until_full"
         current_abs = self._current_abs(obs)
+
+        # Issue-16: prefer scarce element extractors for make_heart balance
+        scarce = self._scarce_element(obs)
+        if scarce and scarce in self._extractor_tags_by_element:
+            scarce_tags = self._extractor_tags_by_element[scarce]
+            visible_scarce = self._closest_visible_location(obs, scarce_tags)
+            if visible_scarce is not None:
+                target_abs = self._visible_abs_cell(current_abs, visible_scarce)
+                action, next_state = self._move_toward_target(state, current_abs, target_abs)
+                return action, replace(next_state, last_mode=state.last_mode)
+            # Try navigating to a known scarce-element extractor
+            scarce_known = state.extractors_by_element.get(scarce, set())
+            if scarce_known:
+                target_abs = self._nearest_known(current_abs, scarce_known)
+                if target_abs is not None:
+                    action, next_state = self._move_toward_target(state, current_abs, target_abs)
+                    return action, replace(next_state, last_mode=state.last_mode)
+
         visible_target = self._closest_visible_location(obs, self._starter._extractor_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
