@@ -2,3 +2,9 @@ commit	mission_reward	secondary_rewards	steps	status	description
 eede8b0	0.570901	junction.held=4709;junction.gained=6;heart.withdrawn=5;get_heart_stale=83	1000	keep	Baseline: 3-agent cross_role 3 aligners; 0.57/agent; 83 get_heart stale exits confirm issue
 280102d	0.466403	junction.held=3664;junction.gained=5;heart.withdrawn=4;deaths=3	1000	discard	v1: hub depletion threshold>=5 never fired; agents contaminated by scrambler; worse due to variance
 07eee79	0.446800	junction.held=3468;junction.gained=4;heart.withdrawn=4;deaths=6	1000	discard	v2: threshold>=4 + timeouts>=3; override never fired; 6 agent deaths dominated outcome
+2c22f46	0.446800	junction.held=3468;junction.gained=4;get_heart_stale=0;deaths=8	1000	discard	v3 seed42: per-agent failures>=2; stale=0 but deaths dominated
+2c22f46	0.620000	junction.held=5159;junction.gained=?;get_heart_stale=0	1000	keep	v3 seed43: best v3 result; stale=0 no deaths
+f1e62bc	0.410000	junction.held=3099;junction.gained=4;noop=2816	1000	discard	v4: defend/noop too passive; 94% noop wasted steps
+0038266	0.510000	junction.held=4072;junction.gained=5;get_heart_stale=0	1000	keep	v5 seed42: mining switch; agents switched to mining after hub depleted
+0038266	0.640000	junction.held=5430;junction.gained=6;get_heart_stale=0	1000	keep	v5 seed43: best result! mining switch + good seed; 0 stale exits
+0038266	0.440000	junction.held=3409;junction.gained=5;get_heart_stale=0	1000	discard	v5 seed44: mining switch; deaths present

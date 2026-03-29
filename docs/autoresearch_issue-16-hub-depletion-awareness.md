@@ -52,4 +52,29 @@ The root cause is that agents have no way to know the hub is out of hearts. They
 
 ---
 
-## 2026-03-29T00:01:00Z: starting experiment v1 - hub depletion tracking
+## 2026-03-29T00:01:00Z: experiments v1-v5
+
+**v1-v2:** Hub depletion tracking via global counter (hub_hearts_withdrawn >= 5/4).
+Override never fired in time — agents got contaminated/died first. Worse than baseline.
+
+**v3:** Added per-agent consecutive_get_heart_failures >= 2 for faster detection.
+Get_heart stale exits: 83 → 0! But agents explore → wander into clip territory → die.
+Best seed43: 0.62. Average across seeds: 0.50.
+
+**v4:** Defend skill (noop near friendly junctions). Too passive — 94% noop, wasted all steps.
+Score: 0.41. Much worse.
+
+**v5:** When hub depleted, switch heartless aligners to mining → deposit resources → fund make_heart.
+Mining switch works but full mine→make_heart cycle takes too long for 1000-step episodes.
+Seed43: 0.64 (best result!). Average: 0.53. Baseline avg: 0.56.
+
+**Key learnings:**
+1. make_heart exists: costs 7 of each element (28 total). Mining can create hearts.
+2. get_last_heart handler allows all 5 initial hearts to be withdrawn (not just 3-4)
+3. LLM timing variance dominates results — agent deaths from clips ships are the main noise source
+4. The get_heart stale metric went from 83→0 consistently, but reward isn't improving proportionally
+5. The mining switch doesn't pay off in 1000 steps — too expensive (gear switch + mine + deposit cycles)
+
+---
+
+## 2026-03-29T01:00:00Z: starting experiment v6 - cooldown approach
