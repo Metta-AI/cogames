@@ -508,11 +508,11 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         team_aligners, team_miners = self._team_gear_counts()
         team_size = max(1, len(self._shared_map.agent_gears) if self._shared_map and hasattr(self._shared_map, "agent_gears") else 8)
 
-        # Issue-16: detect hub depletion (hub has 5 hearts; once all withdrawn, no more available)
-        hub_depleted = (
-            self._shared_map is not None
-            and self._shared_map.hub_hearts_withdrawn >= 5
-        )
+        # Issue-16: detect hub depletion
+        # Hub starts with 5 hearts, hub_has filter requires >= 2 to withdraw, so max ~4 withdrawals
+        # before hub is empty (unless make_heart replenishes). Also use per-agent timeout count.
+        hub_hearts_used = self._shared_map.hub_hearts_withdrawn if self._shared_map else 0
+        hub_depleted = hub_hearts_used >= 4 or state.get_heart_timeouts >= 3
 
         prompt = build_cross_role_prompt(
             current_gear=gear,
@@ -589,7 +589,8 @@ class CrossRolePolicyImpl(StatefulPolicyImpl[CrossRoleState]):
         # Issue-16: prevent get_heart when hub is depleted
         if skill == "get_heart" and hub_depleted and not has_heart:
             skill = "explore"
-            reason = "overrode get_heart to explore: hub depleted (all hearts withdrawn)"
+            reason = f"overrode get_heart to explore: hub depleted (hearts_used={hub_hearts_used}, timeouts={state.get_heart_timeouts})"
+            logger.info("agent=%s hub_depletion_override: skill=explore hearts_used=%d timeouts=%d", obs.agent_id, hub_hearts_used, state.get_heart_timeouts)
         # Must have correct gear for role-specific skills
         if skill == "get_heart" and gear != "aligner":
             skill = "gear_up_aligner"
