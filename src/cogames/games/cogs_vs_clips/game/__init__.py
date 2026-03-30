@@ -23,6 +23,7 @@ from cogames.games.cogs_vs_clips.game.roles.miner import MinerVariant
 from cogames.games.cogs_vs_clips.game.roles.scout import ScoutVariant
 from cogames.games.cogs_vs_clips.game.roles.scrambler import ScramblerVariant
 from cogames.games.cogs_vs_clips.game.solar import SolarVariant
+from cogames.games.cogs_vs_clips.game.talk import TalkVariant
 from cogames.games.cogs_vs_clips.game.teams import TeamVariant
 from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStationsVariant
 from cogames.games.cogs_vs_clips.game.teams.hub import TeamHubVariant
@@ -87,6 +88,7 @@ __all__ = [
     "TeamJunctionVariant",
     "TeamVariant",
     "TerritoryVariant",
+    "TalkVariant",
     "VibesVariant",
     "WildGearStationsVariant",
 ]
@@ -149,6 +151,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     TeamJunctionVariant(),
     TeamVariant(),
     TerritoryVariant(),
+    TalkVariant(),
     VibesVariant(),
     WildGearStationsVariant(),
 ]
