@@ -2657,6 +2657,18 @@ def _load_diagnose_missions(mission_set: str) -> list[CoGameMission]:
     if mission_set == "role_specific_evals":
         return _load_eval_missions("cogames.games.cogs_vs_clips.evals.role_specific_evals")
 
+    if mission_set == "cognitive_substrate_evals":
+        return _load_eval_missions("cogames.games.cogs_vs_clips.evals.cognitive_substrate_evals")
+
+    if mission_set == "cognitive_substrate_memory":
+        return _load_eval_missions("cogames.games.cogs_vs_clips.evals.cognitive_substrate.memory")
+
+    if mission_set == "cognitive_substrate_exploration":
+        return _load_eval_missions("cogames.games.cogs_vs_clips.evals.cognitive_substrate.exploration")
+
+    if mission_set == "cognitive_substrate_planning":
+        return _load_eval_missions("cogames.games.cogs_vs_clips.evals.cognitive_substrate.planning")
+
     raise ValueError(f"Unknown mission set: {mission_set}")
 
 
@@ -2753,6 +2765,10 @@ def diagnose_cmd(
     # --- Evaluation ---
     mission_set: Literal[
         "cvc_evals",
+        "cognitive_substrate_evals",
+        "cognitive_substrate_memory",
+        "cognitive_substrate_exploration",
+        "cognitive_substrate_planning",
         "diagnostic_evals",
         "integrated_evals",
         "role_specific_evals",
