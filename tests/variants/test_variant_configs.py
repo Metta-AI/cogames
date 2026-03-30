@@ -20,6 +20,7 @@ from cogames.games.cogs_vs_clips.game.roles.miner import MinerVariant
 from cogames.games.cogs_vs_clips.game.roles.scout import ScoutVariant
 from cogames.games.cogs_vs_clips.game.roles.scrambler import ScramblerVariant
 from cogames.games.cogs_vs_clips.game.solar import SolarVariant
+from cogames.games.cogs_vs_clips.game.talk import TalkVariant
 from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
 from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStationsVariant
 from cogames.games.cogs_vs_clips.game.teams.hub import TeamHubVariant
@@ -280,6 +281,15 @@ class TestVibesVariant:
     def test_enables_change_vibe_action(self):
         env = _make_mission([VibesVariant()]).make_env()
         assert env.game.actions.change_vibe.enabled is True
+
+
+class TestTalkVariant:
+    def test_replaces_change_vibe_with_talk(self):
+        env = _make_mission([TalkVariant()]).make_env()
+        assert env.game.actions.change_vibe.enabled is False
+        assert env.game.talk.enabled is True
+        assert env.game.talk.max_length == 140
+        assert env.game.talk.cooldown_steps == 50
 
 
 class TestTeamVariant:
