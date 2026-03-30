@@ -99,6 +99,10 @@ def main():
     parser.add_argument("--every", type=int, default=100)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--out", default="docs/autoresearch_director/frames.txt")
+    parser.add_argument("--policy-class", default="machina_llm_roles",
+                        help="Policy class name")
+    parser.add_argument("--policy-kw", nargs="*", default=[],
+                        help="Extra policy kwargs, e.g. llm_timeout_s=20 scripted_miners=true")
     args = parser.parse_args()
 
     if not os.environ.get("OPENROUTER_API_KEY"):
@@ -109,9 +113,11 @@ def main():
     capturer = FrameCaptureRenderer(output_path=output_path, capture_every=args.every)
 
     from cogames.cli.policy import parse_policy_spec
-    policy_spec_with_prop = parse_policy_spec(
-        f"class=machina_llm_roles,kw.num_aligners={args.aligners}"
-    )
+    extra_kw = ",".join(f"kw.{kv}" for kv in args.policy_kw)
+    spec_str = f"class={args.policy_class},kw.num_aligners={args.aligners}"
+    if extra_kw:
+        spec_str += "," + extra_kw
+    policy_spec_with_prop = parse_policy_spec(spec_str)
     policy_spec = policy_spec_with_prop.to_policy_spec()
 
     from cogames.cli.mission import get_mission

@@ -24,26 +24,27 @@
 
 <!-- LEADERBOARD_START -->
 ## Research Leaderboard
-_Updated by Director: 2026-03-29 (Session 3)_
+_Updated by Director: 2026-03-30 (Session 4)_
 
-| Rank | Reward | Commit | Config | Steps | Notes |
-|------|--------|--------|--------|-------|-------|
-| 1 | **1.08** | `3d2b232` | 2A1M, cross_role | 2000 | **#16 breakthrough**: make_heart creates 3+ hearts |
-| 2 | 0.92 | `7321afc` | 3A+miner, LLM | 1000 | action_timeout 3000ms, old baseline |
-| 3 | **0.72** | `3d2b232` | 2A1M, cross_role | 1000 | #16: stale exits 257→48, hallucinations 39→0 |
-| 4 | 0.71 | `802fcdd` | 3A, LLM | 1000 | forget-stuck-junction after 1 timeout |
-| 5 | 0.69 | `0f7a64a` | 3A, LLM | 1000 | optimistic BFS + max_cells 20k |
+| Rank | Reward/agent | Commit | Config | Agents | Steps | Notes |
+|------|-------------|--------|--------|--------|-------|-------|
+| 1 | **0.81** | `f4e7d4c` | 2A1M, cross_role | 3 | 1000 | #24: fast-extractor-abandon (3-step threshold) |
+| 2 | 0.753 | `7493f42` | 3A, machina_llm | 3 | 1000 | Old policy best, 7 junctions |
+| 3 | 0.700 | (issue-16) | 2A1M, cross_role+gemma-3-12b | 3 | 1000 | Faster model = more mining cycles |
+| 4 | 0.42 | (session 4) | **4A4M(scripted)** | **8** | 1000 | **NEW: 8-agent viable** (3.36 total, 4.2x old 8-agent) |
+| 5 | 1.24 | `6857db1` | 4A, cross_role | 4 | 2000 | Reclaim enemy junctions |
 
-_Note: March 21 results (2.260 best) used different reward normalization and are not directly comparable._
-
-**Current bottleneck**: Multi-agent scaling (55% move failures at 3 agents vs 0.2% at 1 agent) and unbalanced mining deposits
-**Next up**: PR #18 (hub depletion) → #24 (balanced mining) → #20 (coordinated exploration)
+**Current bottleneck**: Hub depletion — 93% of LLM calls have has_heart=False on main. PR #18 fixes this but is **not merged**.
+**Next up**: Merge PR #18 → #25 (8-agent scaling with scripted miners) → optimize 4A4M config
 
 **Research tree:**
 ```
-Immediate: #18 PR → #24 Balanced Mining (priority:1) → #10 Role Tuning (priority:1)
-Near-term: #20 Coordinated Exploration (priority:2) | #19 LLM Code Generation (priority:2) | #21 Intrinsic Motivation (priority:2)
-Longer-term: #22 Social Influence (priority:3) | #23 Meta-Learning (priority:3) | #15 8-Agent Scaling (blocked)
+CRITICAL: PR #18 merge (hub depletion fix, blocks everything)
+  └─ #25 8-Agent Scripted Miner Scaling (priority:1, blocked by #18)
+  └─ #24 Balanced Mining / fast-extractor (priority:1, best per-agent 0.81)
+Near-term: #10 Role Tuning (priority:2) | #20 Coordinated Exploration (priority:2)
+Research: #19 LLM Code Gen | #21 Intrinsic Motivation | #11 Active Inference (all priority:2)
+Longer-term: #22 Social Influence | #23 Meta-Learning (priority:3)
 ```
 <!-- LEADERBOARD_END -->
 

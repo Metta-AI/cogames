@@ -1,90 +1,75 @@
 # Director Notes
-_Written: 2026-03-29 (Session 3)_
+_Written: 2026-03-30 (Session 4)_
 
 ## What I observed in the replay
 
-Ran replays with both `machina_llm_roles` (old) and `cross_role` (v13) policies on the issue-16 branch:
+### 3-agent replay on main (3A, machina_llm_roles, 1000 steps)
+- **Reward: 0.563/agent** (total 1.689)
+- Reward growth: 0.08/100 steps through step 500, then decelerates to 0.03/100 by step 1000
+- **93% of LLM calls have has_heart=False** — hub depletes around step 500
+- 213 stale exits, 79 get_heart attempts (only 12 successful)
+- 176 LLM calls total, 0 LLM errors (new error handling works)
+- Skill distribution: 79 get_heart, 75 explore, 24 align_neutral, 3 gear_up
 
-### Old policy (machina_llm_roles)
-- **All 3 agents severely stuck**: A0 600+ steps, A1 400+ steps, A2 800+ steps at same positions
-- **154 stale exits** in 1000 steps
-- **88.5% of LLM decisions have has_heart=False** (hub depleted early)
-- **36 "unstick" hallucinations** (LLM outputting invalid skill name)
-- No hub_depleted awareness — agents loop get_heart→stale→unstuck forever
-
-### v13 cross_role policy
-- **Reward: 0.72/agent** (28% over baseline)
-- **8 junctions aligned** (vs 5-6 baseline)
-- **Stale exits: 48** (81% reduction from 257)
-- **0 hallucinated skills**
-- **make_heart cycle working**: miner deposited 47 resources → hub created 3 new hearts
-- **hub_depleted flag in prompts**: 88 True vs 42 False
+### 8-agent replay (4A4M scripted miners, 1000 steps)
+- **Reward: 0.4195/agent = 3.356 total** (4.2x over old 8-agent 0.80 total)
+- Same hub depletion pattern: 2.3% has_heart=True
+- Reward rate: 0.06/100 steps until step 600, then drops to 0.01/100
+- 255 LLM calls, 4 LLM errors (handled gracefully), 393 stale exits
+- Scripted miners work — mine_until_full and deposit_to_hub skills fire correctly
+- Per-agent at step 400: 0.215 (vs 0.259 for 3A = 17% worse per-agent but 2.2x total)
 
 ## Current bottleneck
 
-**Navigation failures** remain the primary issue after hub depletion fix:
-1. 48 stale exits still occur (was 257)
-2. deposit_to_hub sometimes times out ~400 steps
-3. Agent deaths from clip ship interactions are the main variance source
+**Hub depletion on main branch** is the single most limiting factor. PR #18 (hub depletion awareness + make_heart cycle) is still not merged. Until it is, all 8-agent configs are limited to ~0.42/agent because hearts run out at step 500-600.
 
-The hub depletion fix (PR #18) eliminates the get_heart death loop but doesn't fix the underlying navigation issues.
+Secondary: LLM timeout crashes were killing episodes silently. Fixed by adding try/except around `_planner.complete()` in `machina_llm_roles_policy.py`.
 
 ## What I expected to happen vs. what I found
 
-**Expected**: v13 fix would be merged to main after previous director session identified it as ready.
+**Expected**: PR #18 would have been merged by now based on session 3's recommendation.
 
-**Found**:
-1. No PR was created — researcher achieved breakthrough but didn't create PR
-2. The fix is in `cross_role_policy.py`, but `capture_frames.py` and other tools use `machina_llm_roles_policy.py`
-3. Running with wrong policy shows the old broken behavior
+**Found**: PR #18 is still open. Three researchers built on its branch (#16, #24, #10) but none got merged back. Added urgency comments to PR #18.
 
-**Action taken**: Created PR #18 to merge v13 fixes to main.
+**Surprise discovery**: 8-agent scaling works with scripted miners! 4A4M(scripted) achieves 3.356 total at 1000 steps — only limited by hub depletion. This is the clearest path to the 8-agent goal.
 
 ## Issues updated this session
+- **#16**: Removed in-progress (watchdog killed). Still priority:1, PR #18 is critical.
+- **#24**: Removed in-progress (watchdog killed). Best result 0.81/agent preserved.
+- **#10**: Removed in-progress, deprioritized to priority:2. Superseded by #24.
+- **#21**: Removed in-progress (watchdog killed, no results).
+- **#15**: Closed — superseded by #25.
+- **#25**: Created — 8-Agent Scaling with Scripted Miners (priority:1, blocked by PR #18).
+- **PR #18**: Added urgency comment with session 4 data.
 
-- **#16 (Hub Depletion)**: Added comment with verified results, linked to PR #18
-- **PR #18**: Created PR for issue-16 branch → main
+## Code changes this session
+- `machina_llm_roles_policy.py`: Added try/except around `_planner.complete()` to handle LLM timeouts gracefully instead of crashing.
+- `scripts/capture_frames.py`: Added `--policy-class` and `--policy-kw` CLI args for flexible replay configs.
 
 ## Research roadmap after this session
 ```
-## IMMEDIATE (merge + optimize existing cycle)
-#18 PR: Hub Depletion Fix (IN REVIEW - merge ASAP)
-  └─ enables make_heart cycle, +28% reward
-#24 Balanced Mining (priority:1) — deposits are 30:1 skewed, make_heart needs 1:1
-  └─ fixing this alone could double make_heart output
-#10 Role Tuning (priority:1, unblocked after #18)
-  └─ optimize deposit_to_hub, try 2A2M/1A3M
+CRITICAL PATH (merge + 8-agent optimization):
+  PR #18: Hub Depletion Fix → MERGE ASAP
+    └─ #25: 8-Agent 4A4M(scripted) Scaling (priority:1, blocked)
+    └─ #24: Fast-Extractor-Abandon (priority:1, 0.81/agent best)
 
-## NEAR-TERM (research directions to unlock next ceiling)
-#20 Coordinated Exploration (priority:2) — agents block each other (55% move fail vs 0.2% solo)
-#19 LLM Code Generation (priority:2) — runtime skill composition, not fixed menus
-#21 Intrinsic Motivation (priority:2) — empowerment-driven exploration for junction discovery
-#17 LLM Skill Validation (priority:2) — fixed in cross_role, low priority
+OPTIMIZATION (after #25 unblocked):
+  #10: Role Tuning (priority:2) — no element cycling, scarce_element preferred
+  #20: Coordinated Exploration (priority:2) — spatial partitioning
+  #17: LLM Skill Validation (priority:2)
 
-## LONGER-TERM (paradigm shifts)
-#22 Social Influence & Role Specialization (priority:3) — emergent roles from interaction
-#23 Meta-Learning: In-Context Adaptation (priority:3) — agents learn across episodes
-#15 8-Agent Scaling (priority:2, blocked by #10) — LLM contention
-#11 Active Inference (priority:2, independent)
-#12 Gear Acquisition (priority:3, deprioritized)
+RESEARCH DIRECTIONS:
+  #19: LLM Code Generation (priority:2)
+  #21: Intrinsic Motivation (priority:2)
+  #11: Active Inference (priority:2)
+  #22: Social Influence (priority:3)
+  #23: Meta-Learning (priority:3)
 ```
 
-## New issues created this session
-- **#19**: LLM Dynamic Code Generation — runtime skill composition (priority:2)
-- **#20**: Coordinated Multi-Agent Exploration — spatial partitioning (priority:2)
-- **#21**: Intrinsic Motivation & Empowerment — exploration drives (priority:2)
-- **#22**: Social Influence & Role Specialization — emergent coordination (priority:3)
-- **#23**: Meta-Learning: In-Context Adaptation — cross-episode learning (priority:3)
-- **#24**: Balanced Mining Strategy — element diversity for make_heart (priority:1)
-
-## Key replay insight driving these issues
-Single-agent efficiency is 100x better than multi-agent: 0.2% vs 55% move failures, 43k vs 12k cells visited. The multi-agent degradation is the fundamental research challenge. Issues #20, #21, #22 all attack this from different angles.
-
 ## Open questions for next director
-
-1. **Should cross_role become the default policy?** machina_llm_roles is still hardcoded in capture_frames.py.
-2. **What's the optimal agent count?** 1 agent is most efficient per-step but 3-4 give more total reward. Is there a sweet spot?
-3. **LLM model choice**: Could a more capable model (Claude/GPT-4) via #19 beat a faster model (Nemotron 49B) that makes more decisions per episode?
-4. **2000 steps vs 1000**: v13 hits 1.08 at 2000 steps. Should we optimize for the longer horizon?
-
-5. **8-agent scaling**: Still blocked by LLM contention (A40 GPU limit). With better navigation fixing single-agent efficiency first, then try 4-agent configs before 8.
+1. **PR #18 merge**: Has it been merged yet? If not, escalate further.
+2. **8-agent projection**: With hub depletion fixed, 4A4M should maintain 0.06/100 growth → ~0.60/agent (4.8 total). Verify this.
+3. **Optimal aligner/miner split**: 4A4M was tested, but 3A5M, 5A3M, 6A2M should also be tried.
+4. **Fast-extractor-abandon + 8 agents**: Apply issue #24's 3-step threshold to 8-agent config.
+5. **gemma-3-12b model**: Issue #16 showed 24% improvement with faster model. Test with 8 agents.
+6. **LLM error handling**: The fix works (4 graceful fallbacks in 1000 steps). Should this be committed to main?
