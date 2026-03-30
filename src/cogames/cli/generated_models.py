@@ -70,6 +70,12 @@ class CompletePolicySubmitRequest(CLIModel):
     policy_secret_env: Annotated[Optional[dict[str, str]], Field(title="Policy Secret Env")] = None
 
 
+class DiagnoseAxis(Enum):
+    stability = "stability"
+    efficiency = "efficiency"
+    control = "control"
+
+
 class EpisodeQueryRequest(CLIModel):
     primary_policy_version_ids: Annotated[Optional[list[UUID]], Field(title="Primary Policy Version Ids")] = None
     episode_ids: Annotated[Optional[list[UUID]], Field(title="Episode Ids")] = None
@@ -123,6 +129,15 @@ class MembershipHistoryEntry(CLIModel):
     """
     ISO 8601 timestamp of the membership change
     """
+
+
+class MissionMetrics(CLIModel):
+    reward_variance: Annotated[Optional[float], Field(title="Reward Variance")] = 0.0
+    non_zero_episode_pct: Annotated[Optional[float], Field(title="Non Zero Episode Pct")] = 0.0
+    timeout_rate: Annotated[Optional[float], Field(title="Timeout Rate")] = 0.0
+    mean_move_success: Annotated[Optional[float], Field(title="Mean Move Success")] = 0.0
+    mean_action_failed: Annotated[Optional[float], Field(title="Mean Action Failed")] = 0.0
+    mean_stuck_steps: Annotated[Optional[float], Field(title="Mean Stuck Steps")] = 0.0
 
 
 class MissionSpec(CLIModel):
@@ -621,6 +636,12 @@ class AssayRunResponse(CLIModel):
     completed_at: Annotated[Optional[datetime], Field(title="Completed At")] = None
 
 
+class AxisScore(CLIModel):
+    axis: DiagnoseAxis
+    score: Annotated[float, Field(title="Score")]
+    derived_metrics: MissionMetrics
+
+
 class CreateAssayRunRequest(CLIModel):
     policy_version_id: Annotated[UUID, Field(title="Policy Version Id")]
     name: Annotated[Optional[str], Field(title="Name")] = None
@@ -748,6 +769,12 @@ class PolicyVersionRow(CLIModel):
 class PolicyVersionsResponse(CLIModel):
     entries: Annotated[list[PolicyVersionRow], Field(title="Entries")]
     total_count: Annotated[int, Field(title="Total Count")]
+
+
+class AssayResultsResponse(CLIModel):
+    status: AssayStatus
+    missions: Annotated[dict[str, MissionMetrics], Field(title="Missions")]
+    axes: Annotated[list[AxisScore], Field(title="Axes")]
 
 
 class EpisodeResponse(CLIModel):
