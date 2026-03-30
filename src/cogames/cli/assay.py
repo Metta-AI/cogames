@@ -182,6 +182,67 @@ def assay_list(
     console.print(table)
 
 
+@assay_app.command(name="results", help="Get scoring results for an assay run.")
+def assay_results(
+    policy_or_run_id: str = typer.Argument(
+        ..., metavar="POLICY_OR_RUN_ID", help="Assay run UUID, or policy name (name[:version])."
+    ),
+    login_server: str = _LOGIN_SERVER_OPTION,
+    server: str = _SERVER_OPTION,
+    json_output: bool = _JSON_OPTION,
+) -> None:
+    client = _get_authed_client(login_server, server)
+    with cli_http_errors("Assay results"), client:
+        try:
+            run_id = UUID(policy_or_run_id)
+        except ValueError:
+            policy_version_id = _resolve_policy_version_id(client, policy_or_run_id)
+            runs = client.list_assay_runs(policy_version_id=policy_version_id)
+            if not runs:
+                console.print(f"[yellow]No assay runs found for policy {policy_or_run_id!r}.[/yellow]")
+                return
+            run_id = runs[0].id
+
+        results = client.get_assay_results(run_id)
+
+    if json_output:
+        emit_json(results.model_dump(mode="json"))
+        return
+
+    console.print(f"\n[bold]Assay Results[/bold] — {run_id}")
+    console.print(f"Status: {_format_status(results.status)}\n")
+
+    if results.axes:
+        table = Table(title="Axis Scores", box=box.SIMPLE_HEAVY, pad_edge=False)
+        table.add_column("Axis")
+        table.add_column("Score", justify="right")
+        for axis in results.axes:
+            table.add_row(axis.axis.value, f"{axis.score:.2f}")
+        console.print(table)
+        console.print()
+
+    if results.missions:
+        table = Table(title="Per-Mission Metrics", box=box.SIMPLE_HEAVY, pad_edge=False)
+        table.add_column("Mission")
+        table.add_column("Reward Var", justify="right")
+        table.add_column("Non-Zero %", justify="right")
+        table.add_column("Timeout %", justify="right")
+        table.add_column("Move Success", justify="right")
+        table.add_column("Action Failed", justify="right")
+        table.add_column("Stuck Steps", justify="right")
+        for name, m in results.missions.items():
+            table.add_row(
+                name,
+                f"{m.reward_variance:.3f}",
+                f"{m.non_zero_episode_pct:.1f}",
+                f"{m.timeout_rate:.1f}",
+                f"{m.mean_move_success:.0f}",
+                f"{m.mean_action_failed:.0f}",
+                f"{m.mean_stuck_steps:.1f}",
+            )
+        console.print(table)
+
+
 @assay_app.command(name="submit", help="Submit an assay run for a policy.")
 def assay_submit(
     policy: str = typer.Argument(..., metavar="POLICY", help="Policy name[:version] or UUID."),
