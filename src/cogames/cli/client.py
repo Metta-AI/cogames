@@ -10,6 +10,7 @@ from cogames.auth import has_saved_token, load_token
 from cogames.cli._model_base import CLIModel
 from cogames.cli.base import console
 from cogames.cli.generated_models import (
+    AssayResultsResponse,
     AssayRunResponse,
     EpisodeQueryResponse,
     EpisodeResponse,
@@ -454,6 +455,9 @@ class TournamentServerClient:
         if policy_version_id is not None:
             params["policy_version_id"] = str(policy_version_id)
         return self._get("/assay/runs", list[AssayRunResponse], params=params if params else None)
+
+    def get_assay_results(self, run_id: uuid.UUID) -> AssayResultsResponse:
+        return self._get(f"/assay/runs/{run_id}/results", AssayResultsResponse)
 
     def finalize_assay_run(self, run_id: uuid.UUID) -> AssayRunResponse:
         return self._post(f"/assay/runs/{run_id}/finalize", AssayRunResponse)
