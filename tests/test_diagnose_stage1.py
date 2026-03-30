@@ -107,6 +107,34 @@ def test_diagnose_cli_forwards_explicit_cogs_to_case_filters(
     assert captured["cogs"] == [8]
 
 
+@pytest.mark.parametrize(
+    "mission_set",
+    [
+        "cognitive_substrate_evals",
+        "cognitive_substrate_memory",
+        "cognitive_substrate_exploration",
+        "cognitive_substrate_planning",
+    ],
+)
+def test_diagnose_cli_accepts_cognitive_substrate_mission_sets(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mission_set: str,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def _capture_build_cases(**kwargs):  # type: ignore[no-untyped-def]
+        captured["mission_set"] = kwargs["mission_set"]
+        return []
+
+    monkeypatch.setattr(diagnose_module, "_build_diagnose_cases", _capture_build_cases)
+
+    result = _run_diagnose(output_dir=tmp_path, mission_set=mission_set)
+
+    assert result.exit_code == 1
+    assert captured["mission_set"] == mission_set
+
+
 def test_importing_diagnose_does_not_eagerly_import_cli_mission() -> None:
     result = subprocess.run(
         [

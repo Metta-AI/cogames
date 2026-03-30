@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from cogames.game import CoGame, register_game
+from cogames.games.cogs_vs_clips.evals.cognitive_substrate_evals import (
+    EVAL_MISSIONS as COGNITIVE_SUBSTRATE_EVAL_MISSIONS,
+)
 from cogames.games.cogs_vs_clips.evals.diagnostic_evals import DIAGNOSTIC_EVALS
 from cogames.games.cogs_vs_clips.evals.integrated_evals import (
     EVAL_MISSIONS as INTEGRATED_EVAL_MISSIONS,
@@ -23,6 +26,7 @@ class CvCGame(CoGame):
         eval_missions: list[CvCMission] = []
         eval_missions.extend(INTEGRATED_EVAL_MISSIONS)
         eval_missions.extend(SPANNING_EVAL_MISSIONS)
+        eval_missions.extend(COGNITIVE_SUBSTRATE_EVAL_MISSIONS)
         eval_missions.extend(m() for m in DIAGNOSTIC_EVALS)  # type: ignore[call-arg]
 
         super().__init__(
