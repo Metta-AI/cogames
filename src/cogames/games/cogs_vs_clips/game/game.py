@@ -14,6 +14,7 @@ from cogames.games.cogs_vs_clips.evals.spanning_evals import (
 from cogames.games.cogs_vs_clips.game import _get_all_variants
 from cogames.games.cogs_vs_clips.missions.arena import make_basic_mission
 from cogames.games.cogs_vs_clips.missions.empty import make_empty_mission
+from cogames.games.cogs_vs_clips.missions.four_score import FourScoreMission
 from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.missions.tutorial import make_tutorial_mission
@@ -36,6 +37,7 @@ class CvCGame(CoGame):
                 make_machina1_mission(),
                 make_basic_mission(),
                 make_tutorial_mission(),
+                FourScoreMission(),
             ],
             variants=_get_all_variants(),
             eval_missions=eval_missions,
