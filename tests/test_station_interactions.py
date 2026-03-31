@@ -36,8 +36,8 @@ RESOURCES = ["energy", "heart", "hp", "solar", *ELEMENTS, *GEAR]
 
 def _resource_limits() -> dict[str, ResourceLimitsConfig]:
     return {
-        "all": ResourceLimitsConfig(min=10000, max=10000, resources=RESOURCES),
-        "gear": ResourceLimitsConfig(min=1, max=1, resources=GEAR),
+        "all": ResourceLimitsConfig(base=10000, max=10000, resources=RESOURCES),
+        "gear": ResourceLimitsConfig(base=1, max=1, resources=GEAR),
     }
 
 

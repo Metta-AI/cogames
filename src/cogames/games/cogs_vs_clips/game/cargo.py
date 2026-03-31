@@ -38,5 +38,5 @@ class CargoLimitVariant(CoGameMissionVariant):
         for agent in env.game.agents:
             agent.inventory.limits.setdefault(
                 "cargo",
-                ResourceLimitsConfig(min=self.limit, resources=elements, modifiers=self.modifiers),
+                ResourceLimitsConfig(base=self.limit, resources=elements, modifiers=self.modifiers),
             )

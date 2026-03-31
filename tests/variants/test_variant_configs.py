@@ -124,7 +124,7 @@ class TestGearVariant:
         for agent in env.game.agents:
             assert "gear" in agent.inventory.limits
             gear = agent.inventory.limits["gear"]
-            assert gear.min == 1
+            assert gear.base == 1
             assert set(gear.resources) == set(GEAR)
 
     def test_adds_gear_stations(self):
@@ -183,7 +183,7 @@ class TestHeartVariant:
         for agent in env.game.agents:
             assert "heart" in agent.inventory.limits
             heart = agent.inventory.limits["heart"]
-            assert heart.min == 10
+            assert heart.base == 10
 
     def test_adds_heart_handlers_to_hub(self):
         env = _make_mission([TeamHubVariant(), HeartVariant(cost={"oxygen": 7})]).make_env()
@@ -335,8 +335,8 @@ class TestMachina1Variant:
         for agent in env.game.agents:
             assert "hp" in agent.inventory.limits
             assert "energy" in agent.inventory.limits
-            assert agent.inventory.limits["gear"].min == 1
-            assert agent.inventory.limits["heart"].min == 10
+            assert agent.inventory.limits["gear"].base == 1
+            assert agent.inventory.limits["heart"].base == 10
 
     def test_junction_deposit_forwards_resources_to_team_hub(self):
         mission = CvCMission(

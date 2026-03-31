@@ -52,8 +52,8 @@ def resource_limits() -> dict[str, ResourceLimitsConfig]:
     The 'gear' limit is required by TeamConfig.gear_station's ClearInventoryMutation.
     """
     return {
-        "all": ResourceLimitsConfig(min=10000, max=10000, resources=RESOURCES),
-        "gear": ResourceLimitsConfig(min=1, max=1, resources=GEAR),
+        "all": ResourceLimitsConfig(base=10000, max=10000, resources=RESOURCES),
+        "gear": ResourceLimitsConfig(base=1, max=1, resources=GEAR),
     }
 
 

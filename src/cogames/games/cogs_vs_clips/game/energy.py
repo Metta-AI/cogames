@@ -31,7 +31,7 @@ class EnergyVariant(CoGameMissionVariant):
         for agent in env.game.agents:
             agent.inventory.limits.setdefault(
                 "energy",
-                ResourceLimitsConfig(min=self.limit, resources=["energy"], modifiers=self.modifiers),
+                ResourceLimitsConfig(base=self.limit, resources=["energy"], modifiers=self.modifiers),
             )
             agent.inventory.initial["energy"] = self.initial
 
