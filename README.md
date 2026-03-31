@@ -24,27 +24,35 @@
 
 <!-- LEADERBOARD_START -->
 ## Research Leaderboard
-_Updated by Director: 2026-03-30 (Session 4)_
+_Updated by Director: 2026-03-31 (Session 5)_
 
-| Rank | Reward/agent | Commit | Config | Agents | Steps | Notes |
-|------|-------------|--------|--------|--------|-------|-------|
-| 1 | **0.81** | `f4e7d4c` | 2A1M, cross_role | 3 | 1000 | #24: fast-extractor-abandon (3-step threshold) |
-| 2 | 0.753 | `7493f42` | 3A, machina_llm | 3 | 1000 | Old policy best, 7 junctions |
-| 3 | 0.700 | (issue-16) | 2A1M, cross_role+gemma-3-12b | 3 | 1000 | Faster model = more mining cycles |
-| 4 | 0.42 | (session 4) | **4A4M(scripted)** | **8** | 1000 | **NEW: 8-agent viable** (3.36 total, 4.2x old 8-agent) |
-| 5 | 1.24 | `6857db1` | 4A, cross_role | 4 | 2000 | Reclaim enemy junctions |
+| Rank | Reward/agent | Total | Commit | Config | Agents | Steps | Notes |
+|------|-------------|-------|--------|--------|--------|-------|-------|
+| 1 | 0.77 | 2.31 | `97886dd` | 2A1M, cross_role v15 | 3 | 1000 | 12 hearts (7 from make_heart), 11 junctions |
+| 2 | 0.753 | 2.26 | `7493f42` | 3A, machina_llm | 3 | 1000 | Old policy best, 7 junctions |
+| 3 | 0.71 | 2.12 | (session 5) | 2A1M, cross_role (main) | 3 | 1000 | Post PR #18 merge, stale exits 300→25 |
+| 4 | 0.70 | 2.10 | `11008eb` | 2A1M, cross_role+gemma-12b | 3 | 1000 | Faster model = more mining cycles |
+| **5** | **0.42** | **3.36** | (session 4) | **4A4M(scripted)** | **8** | **1000** | **Best 8-agent** (4.2x old 8-agent) |
+| 6 | 0.40 | 3.23 | (session 5) | 4A4M, cross_role | 8 | 1000 | Post-merge; hub awareness helps but not enough |
+| 7 | 1.24 | 4.96 | `6857db1` | 4A, cross_role | 4 | 2000 | Reclaim enemy junctions |
 
-**Current bottleneck**: Hub depletion — 93% of LLM calls have has_heart=False on main. PR #18 fixes this but is **not merged**.
-**Next up**: Merge PR #18 → #25 (8-agent scaling with scripted miners) → optimize 4A4M config
+**Current bottleneck**: PR #18 merged! Hub depletion partially solved. New bottleneck: 8-agent make_heart cycle can't keep up with 4 aligners' heart demand. Scripted miners outperform LLM miners at 8 agents.
+**Next up**: #25 (8-agent scaling: cross_role aligners + scripted miners hybrid) → #24 (make_heart optimization)
 
 **Research tree:**
 ```
-CRITICAL: PR #18 merge (hub depletion fix, blocks everything)
-  └─ #25 8-Agent Scripted Miner Scaling (priority:1, blocked by #18)
-  └─ #24 Balanced Mining / fast-extractor (priority:1, best per-agent 0.81)
-Near-term: #10 Role Tuning (priority:2) | #20 Coordinated Exploration (priority:2)
-Research: #19 LLM Code Gen | #21 Intrinsic Motivation | #11 Active Inference (all priority:2)
-Longer-term: #22 Social Influence | #23 Meta-Learning (priority:3)
+ACTIVE (8-agent optimization):
+  #25 8-Agent Scaling (priority:1) — combine cross_role aligners + scripted miners
+  #24 Balanced Mining (priority:1) — make_heart cycle + element diversity
+  #12 Gear Acquisition (priority:2) — 8-agent gear_up failures
+
+OPTIMIZATION:
+  #10 Role Tuning (priority:2) | #20 Coordinated Exploration (priority:2)
+  #17 LLM Skill Validation (priority:2)
+
+RESEARCH:
+  #19 LLM Code Gen | #21 Intrinsic Motivation | #11 Active Inference (all priority:2)
+  #22 Social Influence | #23 Meta-Learning (priority:3)
 ```
 <!-- LEADERBOARD_END -->
 
