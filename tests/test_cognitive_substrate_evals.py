@@ -135,6 +135,14 @@ def test_cognitive_substrate_local_benchmark_runner_reports_required_metrics() -
         "inner_steps_1",
     }
     assert all("scripted_gap_closed" in row for row in rows)
+    assert all("success_rate_std" in row for row in rows)
+    assert all("cell_visited_std" in row for row in rows)
+    assert all("cell_unique_visited" in row for row in rows)
+    assert all("cell_unique_visited_std" in row for row in rows)
+    assert all("cell_max_distance_from_spawn" in row for row in rows)
+    assert all("cell_max_distance_from_spawn_std" in row for row in rows)
+    assert all("coverage_efficiency" in row for row in rows)
+    assert all("coverage_efficiency_std" in row for row in rows)
 
 
 def test_local_benchmark_runner_requires_scripted_and_default_policy_comparators() -> None:
@@ -152,3 +160,18 @@ def test_local_benchmark_runner_requires_scripted_and_default_policy_comparators
 def test_scripted_gap_closed_clips_to_unit_interval() -> None:
     assert scripted_gap_closed(0.0, default_policy_score=1.0, scripted_score=2.0) == 0.0
     assert scripted_gap_closed(2.0, default_policy_score=0.0, scripted_score=1.0) == 1.0
+
+
+def test_exploration_scripted_rollout_reports_true_coverage_metrics() -> None:
+    mission = next(mission for mission in EVAL_MISSIONS if mission.name == "exploration_sparse_search_easy")
+    results, _ = run_episode_local(
+        policy_specs=[PolicySpec(class_path=_SCRIPTED_POLICY_CLASS_PATH["exploration"])],
+        assignments=[0],
+        env=mission.make_env(),
+        seed=0,
+        render_mode="none",
+    )
+
+    agent_stats = results.stats["agent"][0]
+    assert agent_stats["cell.unique_visited"] > 0.0
+    assert agent_stats["cell.max_distance_from_spawn"] > 0.0
