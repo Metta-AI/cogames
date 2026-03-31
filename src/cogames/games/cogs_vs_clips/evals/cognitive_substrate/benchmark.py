@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from statistics import mean
+from statistics import mean, stdev
 from typing import Literal
 
 from cogames.cli.policy import parse_policy_spec
@@ -69,14 +69,25 @@ def _category_missions(category: CategoryName, mission_names: Sequence[str] | No
 def _result_metrics(result: PureSingleEpisodeResult, *, max_steps: int) -> dict[str, float]:
     agent_stats = result.stats["agent"][0]
     success = float(agent_stats.get("goal.reached", 0.0) > 0)
+    steps_to_goal = float(agent_stats.get("goal.steps_to_goal", result.steps if success else max_steps))
+    unique_visited = float(agent_stats.get("cell.unique_visited", 0.0))
+    path_steps = steps_to_goal if success else float(result.steps)
     return {
         "reward": float(result.rewards[0]),
         "success": success,
         "steps": float(result.steps),
-        "steps_to_goal": float(agent_stats.get("goal.steps_to_goal", result.steps if success else max_steps)),
+        "steps_to_goal": steps_to_goal,
         "timeout": float(success == 0.0 and result.steps >= max_steps),
         "cell_visited": float(agent_stats.get("cell.visited", 0.0)),
+        "cell_unique_visited": unique_visited,
+        "cell_max_distance_from_spawn": float(agent_stats.get("cell.max_distance_from_spawn", 0.0)),
+        "coverage_efficiency": unique_visited / max(1.0, path_steps + 1.0),
     }
+
+
+def _mean_std(metrics: Sequence[dict[str, float]], key: str) -> tuple[float, float]:
+    values = [item[key] for item in metrics]
+    return mean(values), stdev(values) if len(values) > 1 else 0.0
 
 
 def _validate_benchmark_inputs(policy_specs: Mapping[str, str], seeds: Sequence[int]) -> None:
@@ -123,18 +134,40 @@ def run_local_benchmark(
         default_policy_score = mean(item["success"] for item in mission_stats["default_policy"])
         scripted_score = mean(item["success"] for item in mission_stats["scripted"])
         for comparator_name, metrics in mission_stats.items():
-            success_rate = mean(item["success"] for item in metrics)
+            success_rate, success_rate_std = _mean_std(metrics, "success")
+            avg_reward, avg_reward_std = _mean_std(metrics, "reward")
+            avg_steps, avg_steps_std = _mean_std(metrics, "steps")
+            avg_steps_to_goal, avg_steps_to_goal_std = _mean_std(metrics, "steps_to_goal")
+            timeout_rate, timeout_rate_std = _mean_std(metrics, "timeout")
+            cell_visited, cell_visited_std = _mean_std(metrics, "cell_visited")
+            cell_unique_visited, cell_unique_visited_std = _mean_std(metrics, "cell_unique_visited")
+            cell_max_distance_from_spawn, cell_max_distance_from_spawn_std = _mean_std(
+                metrics, "cell_max_distance_from_spawn"
+            )
+            coverage_efficiency, coverage_efficiency_std = _mean_std(metrics, "coverage_efficiency")
             rows.append(
                 {
                     "category": category,
                     "mission": mission.name,
                     "comparator": comparator_name,
                     "success_rate": success_rate,
-                    "avg_reward": mean(item["reward"] for item in metrics),
-                    "avg_steps": mean(item["steps"] for item in metrics),
-                    "avg_steps_to_goal": mean(item["steps_to_goal"] for item in metrics),
-                    "timeout_rate": mean(item["timeout"] for item in metrics),
-                    "cell_visited": mean(item["cell_visited"] for item in metrics),
+                    "success_rate_std": success_rate_std,
+                    "avg_reward": avg_reward,
+                    "avg_reward_std": avg_reward_std,
+                    "avg_steps": avg_steps,
+                    "avg_steps_std": avg_steps_std,
+                    "avg_steps_to_goal": avg_steps_to_goal,
+                    "avg_steps_to_goal_std": avg_steps_to_goal_std,
+                    "timeout_rate": timeout_rate,
+                    "timeout_rate_std": timeout_rate_std,
+                    "cell_visited": cell_visited,
+                    "cell_visited_std": cell_visited_std,
+                    "cell_unique_visited": cell_unique_visited,
+                    "cell_unique_visited_std": cell_unique_visited_std,
+                    "cell_max_distance_from_spawn": cell_max_distance_from_spawn,
+                    "cell_max_distance_from_spawn_std": cell_max_distance_from_spawn_std,
+                    "coverage_efficiency": coverage_efficiency,
+                    "coverage_efficiency_std": coverage_efficiency_std,
                     "scripted_gap_closed": scripted_gap_closed(
                         success_rate,
                         default_policy_score=default_policy_score,
