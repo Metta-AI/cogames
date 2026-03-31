@@ -520,6 +520,10 @@ STAGE2_SOCIAL_PROBE_CATALOG_V1: list[Stage2SocialProbeDefinition] = [
 ]
 
 
+REPLAY_ARTIFACT_DIRS: tuple[str, ...] = ("replays", "replays_stage2", "stability_reruns")
+STAGE1_PACK_MISSION_SETS = frozenset({CVC_STAGE1_PACK_V1.mission_set, "role_specific_evals"})
+
+
 def validate_pack_definition(pack: DiagnosePack) -> None:
     seen_axes: set[DiagnoseAxis] = set()
     for requirement in pack.requirements:
@@ -580,25 +584,11 @@ def evaluate_stage1_pack_contract(
     )
 
 
-def make_run_id() -> str:
-    timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
-    return f"{timestamp}-{uuid.uuid4().hex[:8]}"
-
-
-def resolve_output_dir(output_dir: Optional[Path], run_id: str) -> Path:
-    if output_dir is not None:
-        return output_dir
-    return Path("outputs") / "cogames-diagnose" / run_id
-
-
-def replay_artifact_paths() -> tuple[str, ...]:
-    return ("replays", "replays_stage2", "stability_reruns")
-
-
 def write_json(path: Path, payload: BaseModel | dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    data = payload.model_dump(mode="json") if isinstance(payload, BaseModel) else payload
-    path.write_text(json.dumps(data, indent=2) + "\n")
+    path.write_text(
+        json.dumps(payload.model_dump(mode="json") if isinstance(payload, BaseModel) else payload, indent=2) + "\n"
+    )
 
 
 def write_html(path: Path, html: str) -> None:
@@ -610,12 +600,9 @@ def write_replay_bundle(output_dir: Path) -> Path:
     bundle_path = output_dir / "replay_bundle.zip"
     replay_paths: list[Path] = []
     for replay_path in output_dir.rglob("*.json.z"):
-        rel_path = replay_path.relative_to(output_dir)
-        rel_path_str = rel_path.as_posix()
-        if (
-            rel_path_str.startswith("replays/")
-            or rel_path_str.startswith("replays_stage2/")
-            or rel_path_str.startswith("stability_reruns/")
+        if any(
+            replay_path.relative_to(output_dir).as_posix().startswith(f"{artifact_dir}/")
+            for artifact_dir in REPLAY_ARTIFACT_DIRS
         ):
             replay_paths.append(replay_path)
     replay_paths.sort(key=lambda path: str(path.relative_to(output_dir)))
@@ -660,19 +647,20 @@ def write_bundle_guide(
     diagnose_validity: DiagnoseValidityReport,
 ) -> Path:
     guide_path = output_dir / "bundle_guide.md"
-    failed_checks = ", ".join(diagnose_validity.failed_check_ids) if diagnose_validity.failed_check_ids else "none"
     assert state.diagnosis_status is not None, "DiagnoseRunState.diagnosis_status must be set"
-    diagnosis_status = state.diagnosis_status
     guide = "\n".join(
         [
             "# Cogames Diagnose Bundle Guide",
             "",
             f"- Stage status: `{state.stage_status.value}`",
             f"- Run status: `{state.run_status.value}`",
-            f"- Diagnosis status: `{diagnosis_status.value}`",
+            f"- Diagnosis status: `{state.diagnosis_status.value}`",
             f"- Visit completeness checks pass: `{str(diagnose_validity.valid).lower()}`",
             f"- Stability check: `{str(interpretation_stability.stable).lower()}`",
-            f"- Failed completeness checks: `{failed_checks}`",
+            (
+                f"- Failed completeness checks: "
+                f"`{', '.join(diagnose_validity.failed_check_ids) if diagnose_validity.failed_check_ids else 'none'}`"
+            ),
             "",
             "## 5-Minute Workflow",
             "1. Open `diagnose_report.html` and classify the dominant issue.",
@@ -695,18 +683,12 @@ def write_bundle_guide(
 
 
 def load_doctor_note(path: Path) -> DiagnoseDoctorNote:
+    """Load a persisted diagnose doctor note from disk."""
     return DiagnoseDoctorNote.model_validate_json(path.read_text())
 
 
 def stage1_probe_catalog() -> list[Stage1ProbeDefinition]:
     return [probe.model_copy(deep=True) for probe in STAGE1_PROBE_CATALOG_V1]
-
-
-def stage1_probe_threshold_profile() -> Stage1ProbeThresholdProfile:
-    return Stage1ProbeThresholdProfile(
-        profile_id=STAGE1_PROBE_THRESHOLD_PROFILE_ID,
-        probes=stage1_probe_catalog(),
-    )
 
 
 def stage2_social_probe_catalog() -> list[Stage2SocialProbeDefinition]:
@@ -753,11 +735,11 @@ def build_run_config(
     scripted_baseline_policy: Optional[str] = None,
     known_strong_policy: Optional[str] = None,
 ) -> DiagnoseRunConfig:
-    run_id = make_run_id()
+    run_id = f"{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
     return DiagnoseRunConfig(
         run_id=run_id,
         created_at=datetime.now(UTC),
-        output_dir=resolve_output_dir(output_dir, run_id),
+        output_dir=output_dir or Path("outputs") / "cogames-diagnose" / run_id,
         policy=policy,
         mission_set=mission_set,
         experiments=experiments or [],
@@ -771,109 +753,38 @@ def build_run_config(
     )
 
 
-def build_incomplete_state(
+def build_run_state(
     *,
     config: DiagnoseRunConfig,
     stage_status: DiagnoseStageStatus,
+    run_status: DiagnoseRunStatus,
     requirement_results: list[Stage1RequirementResult],
     expected_replay_count: int,
     replay_count: int,
     notes: list[str],
-    stage1_signals: Optional[list[Stage1AxisSignal]] = None,
+    stage1_signals: list[Stage1AxisSignal],
 ) -> DiagnoseRunState:
-    missing_requirements = [result for result in requirement_results if not result.satisfied]
+    diagnosis_status = (
+        DiagnosisLifecycleStatus.DIAGNOSIS_COMPLETE
+        if run_status == DiagnoseRunStatus.COMPLETE
+        else DiagnosisLifecycleStatus.DIAGNOSIS_INCOMPLETE
+    )
     return DiagnoseRunState(
         run_id=config.run_id,
         created_at=config.created_at,
         stage_status=stage_status,
-        run_status=DiagnoseRunStatus.INCOMPLETE,
-        diagnosis_status=DiagnosisLifecycleStatus.DIAGNOSIS_INCOMPLETE,
+        run_status=run_status,
+        diagnosis_status=diagnosis_status,
         pack_id=config.pack_id,
         pack_version=config.pack_version,
-        missing_requirements=missing_requirements,
+        missing_requirements=[result for result in requirement_results if not result.satisfied],
         requirement_results=requirement_results,
         expected_replay_count=expected_replay_count,
         replay_count=replay_count,
         output_dir=str(config.output_dir),
         notes=notes,
-        stage1_signals=stage1_signals or [],
-    )
-
-
-def build_stage1_passed_state(
-    *,
-    config: DiagnoseRunConfig,
-    requirement_results: list[Stage1RequirementResult],
-    expected_replay_count: int,
-    replay_count: int,
-    stage1_signals: list[Stage1AxisSignal],
-) -> DiagnoseRunState:
-    return DiagnoseRunState(
-        run_id=config.run_id,
-        created_at=config.created_at,
-        stage_status=DiagnoseStageStatus.STAGE1_PASSED_FOR_SOCIAL,
-        run_status=DiagnoseRunStatus.INCOMPLETE,
-        diagnosis_status=DiagnosisLifecycleStatus.DIAGNOSIS_INCOMPLETE,
-        pack_id=config.pack_id,
-        pack_version=config.pack_version,
-        missing_requirements=[],
-        requirement_results=requirement_results,
-        expected_replay_count=expected_replay_count,
-        replay_count=replay_count,
-        output_dir=str(config.output_dir),
-        notes=["Stage 1 passed. Stage 2 social review is required before final diagnosis."],
         stage1_signals=stage1_signals,
     )
-
-
-def build_stage2_completed_state(
-    *,
-    config: DiagnoseRunConfig,
-    requirement_results: list[Stage1RequirementResult],
-    expected_replay_count: int,
-    replay_count: int,
-    stage1_signals: list[Stage1AxisSignal],
-    notes: Optional[list[str]] = None,
-) -> DiagnoseRunState:
-    return DiagnoseRunState(
-        run_id=config.run_id,
-        created_at=config.created_at,
-        stage_status=DiagnoseStageStatus.STAGE2_COMPLETED,
-        run_status=DiagnoseRunStatus.COMPLETE,
-        diagnosis_status=DiagnosisLifecycleStatus.DIAGNOSIS_COMPLETE,
-        pack_id=config.pack_id,
-        pack_version=config.pack_version,
-        missing_requirements=[],
-        requirement_results=requirement_results,
-        expected_replay_count=expected_replay_count,
-        replay_count=replay_count,
-        output_dir=str(config.output_dir),
-        notes=notes or ["Stage 1 and Stage 2 completed."],
-        stage1_signals=stage1_signals,
-    )
-
-
-def count_replays(replay_dir: Path) -> int:
-    if not replay_dir.exists():
-        return 0
-    return sum(1 for _ in replay_dir.glob("*.json.z"))
-
-
-def expected_replays(case_count: int, episodes: int) -> int:
-    return case_count * episodes
-
-
-def stage1_summary_payload(*, mission_names: list[str], episode_count: int, case_names: list[str]) -> dict:
-    return {
-        "stage": "stage1",
-        "mission_count": len(mission_names),
-        "episodes_per_case": episode_count,
-        "cases": case_names,
-    }
-
-
-def use_stage1_pack(mission_set: str) -> bool:
-    return mission_set in (CVC_STAGE1_PACK_V1.mission_set, "role_specific_evals")
 
 
 def _policy_episode_rewards(summary: MultiEpisodeRolloutSummary, policy_index: int = 0) -> list[float]:
@@ -1042,7 +953,10 @@ def evaluate_stage1_metric_correlation(
         )
 
     calibrations: list[Stage1ProbeThresholdCalibration] = []
-    profile = threshold_profile or stage1_probe_threshold_profile()
+    profile = threshold_profile or Stage1ProbeThresholdProfile(
+        profile_id=STAGE1_PROBE_THRESHOLD_PROFILE_ID,
+        probes=stage1_probe_catalog(),
+    )
     for probe in profile.probes:
         mission_metrics = metrics_by_mission.get(probe.mission, [])
         objective_values = objective_by_mission.get(probe.mission, [])
@@ -2739,7 +2653,7 @@ def _reset_diagnose_replay_artifacts(output_dir: Path) -> None:
             path.unlink(missing_ok=True)
 
     # Clear replay directories and stability rerun outputs.
-    for relative_path in replay_artifact_paths():
+    for relative_path in REPLAY_ARTIFACT_DIRS:
         _remove_path(output_dir / relative_path)
 
     # When reusing an output dir, stale top-level artifacts from prior runs can
@@ -2907,7 +2821,10 @@ def diagnose_cmd(
     )
     write_json(
         config.output_dir / "stage1_probe_threshold_profile.json",
-        stage1_probe_threshold_profile(),
+        Stage1ProbeThresholdProfile(
+            profile_id=STAGE1_PROBE_THRESHOLD_PROFILE_ID,
+            probes=stage1_probe_catalog(),
+        ),
     )
     write_json(
         config.output_dir / "stage2_probe_catalog.json",
@@ -3075,9 +2992,10 @@ def diagnose_cmd(
         mission_replay_refs: Optional[dict[str, list[str]]] = None,
         social_signal: Optional[Stage2SocialSignal] = None,
     ) -> None:
-        state = build_incomplete_state(
+        state = build_run_state(
             config=config,
             stage_status=stage_status,
+            run_status=DiagnoseRunStatus.INCOMPLETE,
             requirement_results=requirement_results,
             expected_replay_count=expected_replay_count,
             replay_count=replay_count,
@@ -3104,7 +3022,7 @@ def diagnose_cmd(
             baseline_notes.append(f"Comparison run missing doctor_note.json: {doctor_note_path}")
             continue
         try:
-            comparison_note = load_doctor_note(doctor_note_path)
+            comparison_note = DiagnoseDoctorNote.model_validate_json(doctor_note_path.read_text())
         except (OSError, ValueError) as error:
             baseline_notes.append(f"Failed to parse comparison doctor note at {doctor_note_path}: {error}")
             continue
@@ -3160,14 +3078,15 @@ def diagnose_cmd(
     write_json(config.output_dir / "stage1_gate.json", gate)
     write_json(
         config.output_dir / "stage1_summary.json",
-        stage1_summary_payload(
-            mission_names=[mission_from_case_name(case.name) for case in cases],
-            episode_count=episodes,
-            case_names=case_names,
-        ),
+        {
+            "stage": "stage1",
+            "mission_count": len({mission_from_case_name(case_name) for case_name in case_names}),
+            "episodes_per_case": episodes,
+            "cases": case_names,
+        },
     )
 
-    uses_stage1_pack = use_stage1_pack(mission_set)
+    uses_stage1_pack = mission_set in STAGE1_PACK_MISSION_SETS
     if not uses_stage1_pack or not gate.satisfied:
         notes = []
         if not uses_stage1_pack:
@@ -3408,19 +3327,13 @@ def diagnose_cmd(
         )
         return interpretation_snapshot_from_doctor_note(rerun_note, label=rerun_label)
 
-    running_state = DiagnoseRunState(
-        run_id=config.run_id,
-        created_at=config.created_at,
+    running_state = build_run_state(
+        config=config,
         stage_status=DiagnoseStageStatus.STAGE1_RUNNING,
         run_status=DiagnoseRunStatus.INCOMPLETE,
-        diagnosis_status=DiagnosisLifecycleStatus.DIAGNOSIS_INCOMPLETE,
-        pack_id=config.pack_id,
-        pack_version=config.pack_version,
-        missing_requirements=[],
         requirement_results=gate.results,
-        expected_replay_count=expected_replays(len(cases), episodes),
+        expected_replay_count=len(cases) * episodes,
         replay_count=0,
-        output_dir=str(config.output_dir),
         notes=["Stage 1 is running."],
         stage1_signals=[],
     )
@@ -3453,8 +3366,8 @@ def diagnose_cmd(
         metrics_by_mission=mission_metrics,
         objective_by_mission=stage1_objective_by_mission,
     )
-    expected_replay_count = expected_replays(len(cases), episodes)
-    replay_count = count_replays(replay_dir)
+    expected_replay_count = len(cases) * episodes
+    replay_count = sum(1 for _ in replay_dir.glob("*.json.z")) if replay_dir.exists() else 0
     expected_stage1_replay_count = expected_replay_count
     stage1_replay_count = replay_count
     replay_refs = sorted(_replay_ref(path) for path in replay_dir.glob("*.json.z"))
@@ -3551,30 +3464,27 @@ def diagnose_cmd(
         console.print(f"[yellow]Artifacts written to: {config.output_dir}[/yellow]")
         return
 
-    stage1_passed_state = build_stage1_passed_state(
+    stage1_passed_state = build_run_state(
         config=config,
+        stage_status=DiagnoseStageStatus.STAGE1_PASSED_FOR_SOCIAL,
+        run_status=DiagnoseRunStatus.INCOMPLETE,
         requirement_results=gate.results,
         expected_replay_count=expected_replay_count,
         replay_count=replay_count,
+        notes=["Stage 1 passed. Stage 2 social review is required before final diagnosis."],
         stage1_signals=stage1_signals,
     )
     write_json(config.output_dir / "diagnose_state.json", stage1_passed_state)
     console.print("[green]Stage 1 passed for social review.[/green]")
 
-    stage2_expected_replay_count = expected_replays(len(cases), episodes) * 2
-    stage2_running_state = DiagnoseRunState(
-        run_id=config.run_id,
-        created_at=config.created_at,
+    stage2_expected_replay_count = len(cases) * episodes * 2
+    stage2_running_state = build_run_state(
+        config=config,
         stage_status=DiagnoseStageStatus.STAGE2_RUNNING,
         run_status=DiagnoseRunStatus.INCOMPLETE,
-        diagnosis_status=DiagnosisLifecycleStatus.DIAGNOSIS_INCOMPLETE,
-        pack_id=config.pack_id,
-        pack_version=config.pack_version,
-        missing_requirements=[],
         requirement_results=gate.results,
         expected_replay_count=expected_replay_count + stage2_expected_replay_count,
         replay_count=replay_count,
-        output_dir=str(config.output_dir),
         notes=["Stage 2 social review is running."],
         stage1_signals=stage1_signals,
     )
@@ -3690,16 +3600,18 @@ def diagnose_cmd(
         console.print(f"[yellow]Artifacts written to: {config.output_dir}[/yellow]")
         return
 
-    complete_state = build_stage2_completed_state(
+    complete_state = build_run_state(
         config=config,
+        stage_status=DiagnoseStageStatus.STAGE2_COMPLETED,
+        run_status=DiagnoseRunStatus.COMPLETE,
         requirement_results=gate.results,
         expected_replay_count=expected_total_replays,
         replay_count=total_replay_count,
-        stage1_signals=stage1_signals,
         notes=[
             "Stage 1 and Stage 2 completed.",
             social_signal.summary,
         ],
+        stage1_signals=stage1_signals,
     )
     write_json(config.output_dir / "diagnose_state.json", complete_state)
     doctor_note = _write_stage1_doctor_note(

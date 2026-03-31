@@ -2,6 +2,7 @@ import json
 import subprocess
 import sys
 import zipfile
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -69,6 +70,22 @@ def _run_diagnose(*, output_dir: Path, mission_set: str, extra_args: list[str] |
 
 def _read_state(output_dir: Path) -> diagnose_module.DiagnoseRunState:
     return diagnose_module.DiagnoseRunState.model_validate_json((output_dir / "diagnose_state.json").read_text())
+
+
+def _run_config(output_dir: Path) -> diagnose_module.DiagnoseRunConfig:
+    return diagnose_module.DiagnoseRunConfig(
+        run_id="diagnose-test-run",
+        created_at=datetime(2026, 1, 2, tzinfo=UTC),
+        output_dir=output_dir,
+        policy="class=random",
+        mission_set="cvc_evals",
+        experiments=[],
+        cogs=[4],
+        steps=10,
+        episodes=1,
+        pack_id=diagnose_module.CVC_STAGE1_PACK_V1.pack_id,
+        pack_version=diagnose_module.CVC_STAGE1_PACK_V1.pack_version,
+    )
 
 
 def test_diagnose_cli_does_not_force_default_cogs_into_case_filters(
@@ -416,6 +433,66 @@ def test_write_replay_bundle_includes_replays_or_writes_readme(tmp_path: Path) -
     bundle_path = diagnose_module.write_replay_bundle(tmp_path)
     with zipfile.ZipFile(bundle_path, "r") as bundle:
         assert "replays/episode_0.json.z" in bundle.namelist()
+
+
+def test_build_run_state_derives_lifecycle_and_missing_requirements(tmp_path: Path) -> None:
+    config = _run_config(tmp_path)
+    requirement_results = [
+        diagnose_module.Stage1RequirementResult(
+            axis=diagnose_module.DiagnoseAxis.STABILITY,
+            satisfied=False,
+            matched_missions=[],
+            required_count=1,
+            accepted_probe_missions=["eval_balanced_spread"],
+        ),
+        diagnose_module.Stage1RequirementResult(
+            axis=diagnose_module.DiagnoseAxis.EFFICIENCY,
+            satisfied=True,
+            matched_missions=["eval_collect_resources"],
+            required_count=1,
+            accepted_probe_missions=["eval_collect_resources"],
+        ),
+    ]
+    stage1_signals = [
+        diagnose_module.Stage1AxisSignal(
+            axis=diagnose_module.DiagnoseAxis.STABILITY,
+            confirmed=False,
+            metric_refs=["eval_balanced_spread:reward_variance=1.5"],
+            replay_refs=["replays/example.json.z"],
+            summary="needs more evidence",
+        )
+    ]
+
+    incomplete_state = diagnose_module.build_run_state(
+        config=config,
+        stage_status=diagnose_module.DiagnoseStageStatus.STAGE1_INCOMPLETE,
+        run_status=diagnose_module.DiagnoseRunStatus.INCOMPLETE,
+        requirement_results=requirement_results,
+        expected_replay_count=6,
+        replay_count=2,
+        notes=["waiting on replays"],
+        stage1_signals=stage1_signals,
+    )
+
+    assert incomplete_state.diagnosis_status == diagnose_module.DiagnosisLifecycleStatus.DIAGNOSIS_INCOMPLETE
+    assert incomplete_state.missing_requirements == [requirement_results[0]]
+    assert incomplete_state.notes == ["waiting on replays"]
+    assert incomplete_state.stage1_signals == stage1_signals
+
+    complete_requirement_results = [requirement_results[1]]
+    completed_state = diagnose_module.build_run_state(
+        config=config,
+        stage_status=diagnose_module.DiagnoseStageStatus.STAGE2_COMPLETED,
+        run_status=diagnose_module.DiagnoseRunStatus.COMPLETE,
+        requirement_results=complete_requirement_results,
+        expected_replay_count=6,
+        replay_count=6,
+        notes=["done"],
+        stage1_signals=stage1_signals,
+    )
+
+    assert completed_state.diagnosis_status == diagnose_module.DiagnosisLifecycleStatus.DIAGNOSIS_COMPLETE
+    assert completed_state.missing_requirements == []
 
 
 def test_write_diagnose_bundle_zip_includes_report_files(tmp_path: Path) -> None:
