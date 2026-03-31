@@ -62,7 +62,7 @@ class ClipsConfig(TeamConfig):
     align_end: Optional[int] = Field(default=None)
 
     presence_end: Optional[int] = Field(default=None)
-    greedy_expand_from_ships: bool = Field(default=False)
+    greedy_expand_from_ships: bool = Field(default=True)
     greedy_max_search_radius: int = Field(default=120, ge=1)
     angry_target_enemy_hub: bool = Field(default=False)
 

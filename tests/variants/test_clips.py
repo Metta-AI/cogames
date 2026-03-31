@@ -17,7 +17,11 @@ from mettagrid.map_builder.ascii import AsciiMapBuilder
 
 def _clips_event_group(events: dict, base_name: str) -> dict:
     prefix = f"{base_name}_"
-    return {name: event for name, event in events.items() if name == base_name or name.startswith(prefix)}
+    return {
+        name: event
+        for name, event in events.items()
+        if (name == base_name or name.startswith(prefix)) and event.timesteps
+    }
 
 
 def _sum_max_targets(events: dict) -> int:
