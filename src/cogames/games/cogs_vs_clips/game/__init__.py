@@ -3,6 +3,7 @@ from __future__ import annotations
 from cogames.core import CoGameMissionVariant
 from cogames.games.cogs_vs_clips.game.cargo import CargoLimitVariant
 from cogames.games.cogs_vs_clips.game.clips import (
+    AdaptiveClipsVariant,
     AngryClipsVariant,
     ClipsVariant,
     GreedyClipsVariant,
@@ -48,6 +49,7 @@ from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant as Junct
 from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
 
 __all__ = [
+    "AdaptiveClipsVariant",
     "AlignerVariant",
     "AngryClipsVariant",
     "BaseCompoundVariant",
@@ -125,6 +127,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     ClipsVariant(),
     GreedyClipsVariant(),
     NoClipsVariant(),
+    AdaptiveClipsVariant(),
     DamageStrangersVariant(),
     DamageVariant(),
     DaysVariant(),

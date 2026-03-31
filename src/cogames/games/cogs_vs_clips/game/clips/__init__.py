@@ -1,4 +1,5 @@
 from cogames.games.cogs_vs_clips.game.clips.clips import (
+    AdaptiveClipsVariant,
     AngryClipsVariant,
     ClipsConfig,
     ClipsVariant,
@@ -20,6 +21,7 @@ from cogames.games.cogs_vs_clips.game.clips.ship import (
 __all__ = [
     "CLIPS_SHIP_MAP_NAME",
     "DEFAULT_CLIPS_SHIP_COUNT",
+    "AdaptiveClipsVariant",
     "AngryClipsVariant",
     "ClipsConfig",
     "ClipsVariant",
