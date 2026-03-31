@@ -145,7 +145,7 @@ class TeamHubVariant(CoGameMissionVariant):
             inventory = self.initial_inventory.get(
                 team.name,
                 InventoryConfig(
-                    limits={"resources": ResourceLimitsConfig(min=10000, resources=elements)},
+                    limits={"resources": ResourceLimitsConfig(base=10000, resources=elements)},
                     initial=default_initial,
                 ),
             )

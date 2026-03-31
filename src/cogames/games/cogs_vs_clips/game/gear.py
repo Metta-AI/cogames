@@ -46,5 +46,5 @@ class GearVariant(CoGameMissionVariant):
         for agent in env.game.agents:
             agent.inventory.limits.setdefault(
                 "gear",
-                ResourceLimitsConfig(min=self.limit, resources=list(self.items)),
+                ResourceLimitsConfig(base=self.limit, resources=list(self.items)),
             )
