@@ -1,0 +1,46 @@
+commit	mission_reward	secondary_rewards	steps	status	description
+eede8b0	0.570901	junction.held=4709;junction.gained=6;heart.withdrawn=5;get_heart_stale=83	1000	keep	Baseline: 3-agent cross_role 3 aligners; 0.57/agent; 83 get_heart stale exits confirm issue
+280102d	0.466403	junction.held=3664;junction.gained=5;heart.withdrawn=4;deaths=3	1000	discard	v1: hub depletion threshold>=5 never fired; agents contaminated by scrambler; worse due to variance
+07eee79	0.446800	junction.held=3468;junction.gained=4;heart.withdrawn=4;deaths=6	1000	discard	v2: threshold>=4 + timeouts>=3; override never fired; 6 agent deaths dominated outcome
+2c22f46	0.446800	junction.held=3468;junction.gained=4;get_heart_stale=0;deaths=8	1000	discard	v3 seed42: per-agent failures>=2; stale=0 but deaths dominated
+2c22f46	0.620000	junction.held=5159;junction.gained=?;get_heart_stale=0	1000	keep	v3 seed43: best v3 result; stale=0 no deaths
+f1e62bc	0.410000	junction.held=3099;junction.gained=4;noop=2816	1000	discard	v4: defend/noop too passive; 94% noop wasted steps
+0038266	0.510000	junction.held=4072;junction.gained=5;get_heart_stale=0	1000	keep	v5 seed42: mining switch; agents switched to mining after hub depleted
+0038266	0.640000	junction.held=5430;junction.gained=6;get_heart_stale=0	1000	keep	v5 seed43: best result! mining switch + good seed; 0 stale exits
+0038266	0.440000	junction.held=3409;junction.gained=5;get_heart_stale=0	1000	discard	v5 seed44: mining switch; deaths present
+273761f	0.510000	junction.held=4070;junction.gained=5;get_heart_stale=0	1000	keep	v6 seed42: cooldown approach; 0 stale; all get_heart attempts succeeded
+273761f	0.620000	junction.held=?;get_heart_stale=0	1000	keep	v6 seed43: cooldown; matches baseline
+273761f	0.500000	junction.held=?;get_heart_stale=0	1000	keep	v6 seed44: cooldown; matches baseline
+07a73d2	0.490000	junction.held=?;get_heart_stale=0	1000	keep	v7 seed42: explore-only (no mining switch); slightly worse than v6
+07a73d2	0.620000	junction.held=?;get_heart_stale=0	1000	keep	v7 seed43: explore-only; matches baseline
+07a73d2	0.500000	junction.held=?;get_heart_stale=0	1000	keep	v7 seed44: explore-only; matches baseline
+ca0dc0c	0.490000	get_heart_stale=0	1000	discard	v8 seed42: minimal cooldown (1 cycle); same as v7
+ca0dc0c	0.620000	get_heart_stale=0	1000	discard	v8 seed43: minimal cooldown; same as v7
+ca0dc0c	0.500000	get_heart_stale=0	1000	discard	v8 seed44: minimal cooldown; same as v7; cooldown duration doesn't matter
+b848dd1	0.560000	get_heart_stale=0	1000	discard	2A1M seed42: 2 aligners 1 miner; comparable to 3A
+b848dd1	0.530000	get_heart_stale=0	1000	discard	2A1M seed43: 2A1M worse than 3A on this seed
+b848dd1	0.450000	get_heart_stale=0	1000	discard	2A1M seed44: 2A1M worse; 3A remains best composition
+f61b0c6	0.500000	get_heart_stale=0	1000	discard	v10 avg 0.50: shorter timeout hurts align_neutral; reverted
+d91a275	0.537000	get_heart_stale=0	1000	keep	v11 avg: force align_neutral when heart+targets; same as v7
+c959397	0.720000	junction.held=6244;junction.gained=8;heart.withdrawn=8;deposited=46	1000	keep	v13 2A1M seed42: BEST! make_heart created 3 extra hearts; 8 junctions!
+c959397	0.620000	get_heart_stale=0	1000	keep	v13 2A1M seed43
+c959397	0.650000	get_heart_stale=0	1000	keep	v13 2A1M seed44
+c959397	0.640000	get_heart_stale=0	1000	keep	v13 2A1M seed45: avg 0.658; 17% improvement over baseline
+3d2b232	0.560000	get_heart_stale=0	1000	discard	v13 3A seed42: 3 aligners; no miner to fund make_heart
+3d2b232	0.170000	get_heart_stale=0	1000	discard	v13 2A2M c=4: too many agents; LLM bottleneck
+3d2b232	0.530000	get_heart_stale=0	1000	discard	v13 2A1M return_load=20: more frequent deposits worse; navigation overhead
+1fb842e	0.740000	get_heart_stale=0	1000	keep	v13 2A1M seed46: BEST 0.74; make_heart working well
+1fb842e	0.490000	get_heart_stale=0	1000	discard	v13 2A1M seed47: bad LLM timing
+1fb842e	0.590000	get_heart_stale=0	1000	keep	v13 2A1M seed48
+1fb842e	0.730000	get_heart_stale=0	1000	keep	v13 2A1M seed49: 0.73 make_heart working
+1fb842e	0.450000	get_heart_stale=0	1000	discard	v13 2A1M seed50: agent deaths; 9-seed avg=0.626; 11% over baseline
+b6904f9	1.080000	get_heart_stale=0	2000	keep	v13 2A1M 2000 steps seed42: exceeds 0.92 target!
+b6904f9	0.960000	get_heart_stale=0	2000	keep	v13 2A1M 2000 steps seed43: exceeds 0.92 target!
+b6904f9	0.620000	get_heart_stale=0	2000	discard	v13 2A1M 2000 steps seed44: deaths/timing
+8ae6bc1	0.572000	get_heart_stale=0	1000	discard	v14 avg: diverse mining worse (0.572 vs v13 0.626); reverted
+6f9a869	0.625000	get_heart_stale=0	1000	discard	v15 avg: prompt diversity hint; same as v13 (0.625); LLM ignores hint
+97886dd	0.770000	junction.gained=11;heart.withdrawn=12;deposited=163	1000	keep	v15 seed46: NEW BEST! 12 hearts (7 from make_heart); 11 junctions aligned!
+6ece281	0.652000	get_heart_stale=0	1000	keep	v16 avg (6 seeds): element-aware mining; best avg yet (+2.6% over v13)
+11008eb	0.700000	get_heart_stale=0	1000	keep	v16+gemma-3-12b avg (5 seeds): faster LLM = more decisions = more make_heart; NEW BEST AVG!
+db9a07a	0.370000	get_heart_stale=0	1000	discard	gemma-3-4b: too small model; can't plan well
+db9a07a	0.570000	get_heart_stale=0	1000	discard	qwen3-8b: decent but slower/less capable than gemma-12b

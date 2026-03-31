@@ -33,6 +33,8 @@ class MinerSkillState(StarterCogState):
     known_hubs: set[Coord] = field(default_factory=set)
     known_miner_stations: set[Coord] = field(default_factory=set)
     known_extractors: set[Coord] = field(default_factory=set)
+    # Issue-16: per-element extractor locations for diverse mining
+    extractors_by_element: dict[str, set[Coord]] = field(default_factory=lambda: {e: set() for e in ("carbon", "oxygen", "germanium", "silicon")})
     known_hazard_stations: set[Coord] = field(default_factory=set)
     # Move-failure tracking (same mechanism as AlignerState)
     last_pos: Coord | None = None
@@ -51,6 +53,11 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         self._miner_station_tags = self._starter._resolve_tag_ids(miner_station_names)
         self._hazard_station_tags = self._resolve_non_miner_station_tags(policy_env_info, miner_station_names)
         self._wall_tags = self._starter._resolve_tag_ids(["wall"])
+        # Issue-16: per-element extractor tags for diverse mining
+        self._extractor_tags_by_element: dict[str, set[int]] = {
+            element: self._starter._resolve_tag_ids([f"{element}_extractor"])
+            for element in ELEMENTS
+        }
         self._return_load = return_load
         self._obs_radius_row = self._starter._center[0]
         self._obs_radius_col = self._starter._center[1]
@@ -193,6 +200,10 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
                 miner_stations_now.add(abs_cell)
             if token.value in self._starter._extractor_tags:
                 extractors_now.add(abs_cell)
+                # Issue-16: track which element this extractor produces
+                for element, etags in self._extractor_tags_by_element.items():
+                    if token.value in etags:
+                        state.extractors_by_element[element].add(abs_cell)
             if token.value in self._hazard_station_tags:
                 hazard_stations_now.add(abs_cell)
 
@@ -410,11 +421,43 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
+    def _scarce_element(self, obs: AgentObservation) -> str | None:
+        """Issue-16: return the element the agent has least of, or None if balanced."""
+        counts = self._inventory_counts(obs)
+        if not counts and not any(counts.get(e, 0) for e in ELEMENTS):
+            return None
+        min_count = min(counts.get(e, 0) for e in ELEMENTS)
+        max_count = max(counts.get(e, 0) for e in ELEMENTS)
+        if max_count - min_count < 5:
+            return None
+        for e in ELEMENTS:
+            if counts.get(e, 0) == min_count:
+                return e
+        return None
+
     def _mine_until_full(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
         if state.last_mode != "mine_until_full":
             logger.info("agent=%s mode=mine_until_full", obs.agent_id)
             state.last_mode = "mine_until_full"
         current_abs = self._current_abs(obs)
+
+        # Issue-16: prefer scarce element extractors for make_heart balance
+        scarce = self._scarce_element(obs)
+        if scarce and scarce in self._extractor_tags_by_element:
+            scarce_tags = self._extractor_tags_by_element[scarce]
+            visible_scarce = self._closest_visible_location(obs, scarce_tags)
+            if visible_scarce is not None:
+                target_abs = self._visible_abs_cell(current_abs, visible_scarce)
+                action, next_state = self._move_toward_target(state, current_abs, target_abs)
+                return action, replace(next_state, last_mode=state.last_mode)
+            # Try navigating to a known scarce-element extractor
+            scarce_known = state.extractors_by_element.get(scarce, set())
+            if scarce_known:
+                target_abs = self._nearest_known(current_abs, scarce_known)
+                if target_abs is not None:
+                    action, next_state = self._move_toward_target(state, current_abs, target_abs)
+                    return action, replace(next_state, last_mode=state.last_mode)
+
         visible_target = self._closest_visible_location(obs, self._starter._extractor_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
@@ -433,6 +476,42 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
+    def _navigate_to_blocked_target(
+        self, state: MinerSkillState, current_abs: Coord, blocked_target: Coord
+    ) -> tuple[Action, MinerSkillState] | None:
+        """Navigate toward a blocked object (hub/station) via its best adjacent approach cell.
+
+        Issue-16 fix: hubs are blocked objects. BFS to them fails because they're
+        not in known_free_cells. Navigate to the nearest adjacent free cell instead,
+        then step into the blocked cell to trigger the interaction handler.
+        """
+        # Find adjacent cells that aren't blocked
+        approach_candidates = []
+        for _, (dr, dc) in (("north", (-1, 0)), ("south", (1, 0)), ("east", (0, 1)), ("west", (0, -1))):
+            neighbor = (blocked_target[0] + dr, blocked_target[1] + dc)
+            if neighbor not in state.blocked_cells:
+                approach_candidates.append(neighbor)
+        if not approach_candidates:
+            return None
+        approach = min(approach_candidates, key=lambda c: abs(c[0] - current_abs[0]) + abs(c[1] - current_abs[1]))
+        if current_abs == approach:
+            # Already adjacent — step into the blocked target
+            dr = blocked_target[0] - current_abs[0]
+            dc = blocked_target[1] - current_abs[1]
+            if abs(dr) >= abs(dc):
+                direction = "south" if dr > 0 else "north"
+            else:
+                direction = "east" if dc > 0 else "west"
+            return self._starter._action(f"move_{direction}"), state
+        # Navigate to approach cell
+        direction = self._bfs_first_direction(state, current_abs, approach)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), state
+        direction = self._bfs_optimistic_direction(state, current_abs, approach)
+        if direction is not None:
+            return self._starter._action(f"move_{direction}"), state
+        return None
+
     def _deposit_to_hub(self, obs: AgentObservation, state: MinerSkillState) -> tuple[Action, MinerSkillState]:
         if state.last_mode != "deposit_to_hub":
             logger.info("agent=%s mode=deposit_to_hub load=%s", obs.agent_id, self._carried_total(obs))
@@ -441,6 +520,11 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
         visible_target = self._closest_visible_location(obs, self._hub_tags)
         if visible_target is not None:
             target_abs = self._visible_abs_cell(current_abs, visible_target)
+            # Issue-16: hub is a blocked object — use approach-cell navigation
+            result = self._navigate_to_blocked_target(state, current_abs, target_abs)
+            if result is not None:
+                action, next_state = result
+                return action, replace(next_state, last_mode=state.last_mode)
             action, next_state = self._move_toward_target(state, current_abs, target_abs)
             return action, replace(next_state, last_mode=state.last_mode)
         target_abs = self._nearest_known(current_abs, state.known_hubs)
@@ -449,6 +533,11 @@ class MinerSkillImpl(StatefulPolicyImpl[MinerSkillState]):
             state.known_free_cells.add(target_abs)
         if target_abs is None:
             return self._explore(obs, state)
+        # Issue-16: hub is a blocked object — use approach-cell navigation
+        result = self._navigate_to_blocked_target(state, current_abs, target_abs)
+        if result is not None:
+            action, next_state = result
+            return action, replace(next_state, last_mode=state.last_mode)
         action, next_state = self._move_toward_target(state, current_abs, target_abs)
         return action, replace(next_state, last_mode=state.last_mode)
 
