@@ -25,6 +25,7 @@ from cogames.games.cogs_vs_clips.game.roles.scrambler import ScramblerVariant
 from cogames.games.cogs_vs_clips.game.solar import SolarVariant
 from cogames.games.cogs_vs_clips.game.talk import TalkVariant
 from cogames.games.cogs_vs_clips.game.teams import TeamVariant
+from cogames.games.cogs_vs_clips.game.teams.four_corners import FourCornersVariant
 from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStationsVariant
 from cogames.games.cogs_vs_clips.game.teams.hub import TeamHubVariant
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
@@ -65,6 +66,7 @@ __all__ = [
     "EnergyVariant",
     "ForcedRoleVibesVariant",
     "ForestVariant",
+    "FourCornersVariant",
     "GreedyClipsVariant",
     "GEAR",
     "GearStationsVariant",
@@ -132,6 +134,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     ExtractorsVariant(),
     ForcedRoleVibesVariant(),
     ForestVariant(),
+    FourCornersVariant(),
     GearStationsVariant(),
     HealTeamVariant(),
     HeartVariant(),
