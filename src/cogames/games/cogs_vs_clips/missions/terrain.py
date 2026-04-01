@@ -5,8 +5,9 @@ from collections import deque
 from typing import TYPE_CHECKING, Any, Literal, override
 
 import numpy as np
+from pydantic import Field
 
-from cogames.core import CoGameMissionVariant
+from cogames.core import CoGameMissionVariant, Deps
 
 if TYPE_CHECKING:
     from cogames.games.cogs_vs_clips.missions.mission import CvCMission
@@ -35,6 +36,7 @@ from mettagrid.mapgen.scenes.building_distributions import (
     UniformExtractorParams,
 )
 from mettagrid.mapgen.scenes.compound import CompoundConfig
+from mettagrid.mapgen.scenes.four_corner_compounds import FourCornerCompoundsConfig
 from mettagrid.mapgen.scenes.make_connected import MakeConnected
 from mettagrid.mapgen.scenes.maze import MazeConfig
 from mettagrid.mapgen.scenes.radial_maze import RadialMaze
@@ -244,11 +246,30 @@ class MachinaArenaConfig(SceneConfig):
     building_weights: dict[str, float] | None = None
 
     # Hub config. `spawn_count` will be set based on `spawn_count` in this config.
+    # Used when `compounds` is empty (default single-hub layout).
     hub: CompoundConfig = CompoundConfig(
         hub_object="empty",
         corner_bundle="none",
         cross_bundle="none",
         cross_distance=7,
+    )
+
+    # Multi-compound layout. Each entry is (location, CompoundConfig).
+    # Locations: "center", "nw", "ne", "sw", "se".
+    # "center" places the compound in the full area (default single-hub layout).
+    # Corner locations use FourCornerCompounds for quadrant placement.
+    compounds: list[tuple[str, CompoundConfig]] = Field(
+        default_factory=lambda: [
+            (
+                "center",
+                CompoundConfig(
+                    hub_object="empty",
+                    corner_bundle="none",
+                    cross_bundle="none",
+                    cross_distance=7,
+                ),
+            )
+        ]
     )
 
     # Optional asteroid-shaped boundary mask.
@@ -701,12 +722,34 @@ class SequentialMachinaArena(Scene[SequentialMachinaArenaConfig]):
                     where="full",
                 )
             )
-        children.append(
-            ChildrenAction(
-                scene=cfg.hub.model_copy(deep=True, update={"spawn_count": cfg.spawn_count}),
-                where="full",
+        # Separate center compounds (placed directly) from corner compounds (quadrant layout).
+        center_compounds = [(loc, c) for loc, c in cfg.compounds if loc == "center"]
+        corner_compounds = [(loc, c) for loc, c in cfg.compounds if loc != "center"]
+
+        if corner_compounds:
+            loc_to_index = {"nw": 0, "ne": 1, "sw": 2, "se": 3}
+            compound_cfgs: list[tuple[int, CompoundConfig]] = [
+                (loc_to_index[loc], compound.model_copy(deep=True)) for loc, compound in corner_compounds
+            ]
+            spawns_per_compound = max(1, cfg.spawn_count // max(1, len(compound_cfgs)))
+            fcc = FourCornerCompoundsConfig(
+                compound=compound_cfgs[0][1],
+                num_compounds=len(compound_cfgs),
+                spawn_count=spawns_per_compound,
             )
-        )
+            fcc.hub_objects = [c.hub_object for _, c in compound_cfgs]
+            fcc.spawn_symbols = [c.spawn_symbol for _, c in compound_cfgs]
+            fcc.stations_per_compound = [list(c.stations) for _, c in compound_cfgs]
+            children.append(ChildrenAction(scene=fcc, where="full"))
+
+        for _loc, _compound in center_compounds:
+            # Center compounds use cfg.hub (which variants like TeamHubVariant modify).
+            children.append(
+                ChildrenAction(
+                    scene=cfg.hub.model_copy(deep=True, update={"spawn_count": cfg.spawn_count}),
+                    where="full",
+                )
+            )
         children.append(
             ChildrenAction(
                 scene=MakeConnected.Config(),
@@ -825,3 +868,57 @@ class SequentialMachinaArenaVariant(EnvNodeVariant[SequentialMachinaArenaConfig]
         assert isinstance(env.game.map_builder, MapGen.Config)
         assert isinstance(env.game.map_builder.instance, SequentialMachinaArena.Config)
         return env.game.map_builder.instance
+
+
+CompoundLocation = Literal["center", "nw", "ne", "sw", "se"]
+
+
+class MachinaTerrainVariant(CoGameMissionVariant):
+    """Configure map size and compound placements for a machina arena.
+
+    Default: single compound in the center (standard machina1).
+    Override compounds to place multiple compounds at corners.
+    """
+
+    name: str = "machina_terrain"
+    description: str = "Map size and compound layout."
+    map_width: int = Field(default=88)
+    map_height: int = Field(default=88)
+    building_coverage_scale: float = Field(default=1.0)
+    compound_placements: list[tuple[CompoundLocation, CompoundConfig]] = Field(default_factory=list)
+
+    @override
+    def dependencies(self) -> Deps:
+        from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStationsVariant  # noqa: PLC0415
+        from cogames.games.cogs_vs_clips.game.teams.team import TeamVariant  # noqa: PLC0415
+
+        return Deps(required=[TeamVariant], optional=[TeamGearStationsVariant])
+
+    @override
+    def modify_env(self, mission, env: MettaGridConfig) -> None:
+        arena = find_machina_arena(env.game.map_builder)
+        if arena is None:
+            return
+
+        # Resize map.
+        map_builder = env.game.map_builder
+        if isinstance(map_builder, MapGen.Config):
+            map_builder.width = self.map_width
+            map_builder.height = self.map_height
+            if self.compound_placements:
+                map_builder.set_team_by_instance = True
+
+        # Scale building density.
+        if self.building_coverage_scale != 1.0:
+            arena.building_coverage = arena.building_coverage * self.building_coverage_scale
+
+        # Set compound placements. When empty, the arena uses its default single hub.
+        if self.compound_placements:
+            hub_stations = list(arena.hub.stations)
+            placements: list[tuple[str, CompoundConfig]] = []
+            for loc, compound in self.compound_placements:
+                compound = compound.model_copy(deep=True)
+                prefix = compound.hub_object.split(":")[0] + ":"
+                compound.stations = [s for s in hub_stations if s.startswith(prefix)]
+                placements.append((loc, compound))
+            arena.compounds = placements
