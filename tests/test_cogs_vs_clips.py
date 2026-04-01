@@ -10,6 +10,7 @@ from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
 from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_map_builder, make_machina1_mission
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
+from cogames.games.cogs_vs_clips.missions.tutorial import make_tutorial_mission
 from mettagrid.config.game_value import ConstValue, QueryCountValue, SumGameValue
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.query import ClosureQuery, MaterializedQuery
@@ -71,6 +72,27 @@ def test_cvc_enables_aoe_mask_observation() -> None:
     env = make_machina1_mission().make_env()
     assert env.game.obs.aoe_mask is True
     env.game.id_map().feature_id("aoe_mask")
+
+
+def test_tutorial_spawn_territory_offsets_passive_hp_drain() -> None:
+    mission = make_tutorial_mission().model_copy(
+        update={
+            "num_agents": 2,
+            "num_cogs": 2,
+            "min_cogs": 2,
+            "max_cogs": 2,
+        }
+    )
+    sim = Simulation(mission.make_env(), seed=42)
+
+    for i in range(2):
+        assert sim.agent(i).inventory.get("hp", 0) == 50
+        sim.agent(i).set_action("noop")
+
+    sim.step()
+
+    for i in range(2):
+        assert sim.agent(i).inventory.get("hp", 0) == 100
 
 
 @pytest.mark.skip(reason="Requires territory-only AOEs and team tag setup; not wired up yet")
