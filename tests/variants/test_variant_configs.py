@@ -4,6 +4,8 @@ Each test creates a CvCMission with specific variants and verifies the env confi
 is correctly modified.
 """
 
+import pytest
+
 from cogames.games.cogs_vs_clips.game import GEAR
 from cogames.games.cogs_vs_clips.game.cargo import CargoLimitVariant
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
@@ -259,8 +261,12 @@ class TestHealTeamVariant:
         territory = env.game.territories["team_territory"]
         assert "heal_energy" in territory.presence
 
-    def test_adds_heal_hp_when_hp_resource_exists(self):
-        env = _make_mission([DamageVariant(), HealTeamVariant()]).make_env()
+    @pytest.mark.parametrize(
+        "variant_types",
+        [(DamageVariant, HealTeamVariant), (HealTeamVariant, DamageVariant)],
+    )
+    def test_adds_heal_hp_when_damage_variant_is_present(self, variant_types):
+        env = _make_mission([variant_type() for variant_type in variant_types]).make_env()
         territory = env.game.territories["team_territory"]
         assert "heal_hp" in territory.presence
 

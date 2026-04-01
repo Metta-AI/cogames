@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from cogames.cli.mission import get_mission
+from cogames.cli.mission import find_mission, get_mission
 from cogames.games.cogs_vs_clips.game.clips import AngryClipsVariant, ClipsVariant
 from cogames.games.cogs_vs_clips.game.clips.clips import JUNCTION_ALIGN_DISTANCE
+from cogames.games.cogs_vs_clips.game.game import CvCGame
 from cogames.games.cogs_vs_clips.missions.machina_1 import MachinaOneMission
 from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
 
@@ -95,3 +96,11 @@ def test_cogs_override_updates_spawn_count_and_mission_counts() -> None:
     assert mission.model_dump()["num_agents"] == 2
     assert env_cfg.game.num_agents == 2
     assert arena.spawn_count == 2
+
+
+def test_all_listed_sub_missions_resolve_via_cli_lookup() -> None:
+    game = CvCGame()
+
+    for mission in game.missions:
+        for sub_name in mission.sub_missions:
+            assert find_mission(game, f"{mission.name}.{sub_name}") is not None
