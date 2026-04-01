@@ -22,6 +22,7 @@ from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStation
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
 from cogames.games.cogs_vs_clips.game.teams.junction import TeamJunctionVariant
 from cogames.games.cogs_vs_clips.game.teams.team import TeamVariant
+from cogames.games.cogs_vs_clips.game.territory.heal_team import HealTeamVariant
 from cogames.games.cogs_vs_clips.game.territory.territory import TerritoryVariant
 from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
 from cogames.games.cogs_vs_clips.missions.machina_1 import GEAR_COSTS
@@ -65,6 +66,7 @@ class CvCTutorialVariant(CoGameMissionVariant):
                 DaysVariant,
                 TeamGearStationsVariant,
                 DamageVariant,
+                HealTeamVariant,
                 ElementsVariant,
                 HeartVariant,
                 TeamJunctionVariant,
