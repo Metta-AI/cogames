@@ -12,6 +12,7 @@ from pydantic import Field
 from cogames.core import CoGameMissionVariant, Deps
 from cogames.games.cogs_vs_clips.game.cargo import CargoLimitVariant
 from cogames.games.cogs_vs_clips.game.clips.clips import ClipsVariant
+from cogames.games.cogs_vs_clips.game.clips.ship import clips_ship_map_names_in_map_config
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
 from cogames.games.cogs_vs_clips.game.days import DaysVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
@@ -38,8 +39,10 @@ from cogames.games.cogs_vs_clips.missions.terrain import (
     SequentialMachinaArena,
 )
 from cogames.variants import ResolvedDeps
-from mettagrid.config.game_value import num_tagged, val
+from mettagrid.config.game_value import SumGameValue, num_tagged, val
+from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import MettaGridConfig
+from mettagrid.config.mutation import logStatToGame
 from mettagrid.config.reward_config import reward
 from mettagrid.mapgen.mapgen import MapGen, MapGenConfig
 from mettagrid.mapgen.scenes.building_distributions import DistributionConfig, DistributionType
@@ -88,6 +91,11 @@ def _build_machina1_map_builder(spawn_count: int) -> MapGenConfig:
             ),
         }
     )
+
+
+def _held_junction_values(*, team_name: str, clips_ship_count: int = 0) -> list:
+    root_count = clips_ship_count if team_name == "clips" else 1
+    return [num_tagged(f"net:{team_name}"), val(-float(root_count))]
 
 
 GEAR_COSTS: dict[str, dict[str, int]] = {
@@ -149,16 +157,36 @@ class CvCMachina1Variant(CoGameMissionVariant):
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
         team_v = mission.required_variant(TeamVariant)
+        clips_v = mission.required_variant(ClipsVariant)
+        clips_ship_count = len(clips_ship_map_names_in_map_config(env.game.map_builder))
+        has_clips_ships = clips_ship_count > 0
+        live_held_teams = [
+            team
+            for team in team_v.teams.values()
+            if team.name != "clips" or (clips_v.clips is not None and not clips_v.clips.disabled and has_clips_ships)
+        ]
+
         for agent in env.game.agents:
             team_name = team_v.team_name(agent.team_id)
-            if team_name is not None:
-                # net:* includes the team's hub, so subtract the root node and
-                # reward only held junctions.
-                agent.rewards["aligned_junction_held"] = reward(
-                    [num_tagged(f"net:{team_name}"), val(-1.0)],
-                    weight=1.0 / mission.max_steps,
-                    per_tick=True,
-                )
+            if team_name is None:
+                continue
+
+            held_junction_values = _held_junction_values(team_name=team_name, clips_ship_count=clips_ship_count)
+
+            # net:* includes the team's root node, so subtract it and reward only held junctions.
+            agent.rewards["aligned_junction_held"] = reward(
+                held_junction_values,
+                weight=1.0 / mission.max_steps,
+                per_tick=True,
+            )
+
+        for team in live_held_teams:
+            held_junctions = SumGameValue(
+                values=_held_junction_values(team_name=team.name, clips_ship_count=clips_ship_count)
+            )
+            env.game.on_tick[f"aligned_junction_held_{team.name}"] = Handler(
+                mutations=[logStatToGame(f"{team.name}/aligned.junction.held", source=held_junctions)]
+            )
 
 
 class MachinaOneMission(CvCMission):
