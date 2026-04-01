@@ -199,7 +199,7 @@ def tutorial_cmd(
         play_module.play(
             console,
             env_cfg=env_cfg,
-            policy_spec=get_policy_spec(ctx, "class=tutorial_noop,kw.tutorial=play"),
+            policy_specs=[parse_policy_spec("class=tutorial_noop,kw.tutorial=play")],
             game_name="tutorial",
             render_mode="gui",
             autostart=False,
@@ -250,7 +250,7 @@ def cvc_tutorial_cmd(
         play_module.play(
             console,
             env_cfg=env_cfg,
-            policy_spec=get_policy_spec(ctx, "class=tutorial_noop,kw.tutorial=cvc"),
+            policy_specs=[parse_policy_spec("class=tutorial_noop,kw.tutorial=cvc")],
             game_name="tutorial",
             render_mode="gui",
             autostart=False,
@@ -501,10 +501,12 @@ def describe_cmd(
     rich_help_panel="Play",
     help="""Play a game interactively.
 
-This runs a single episode of the game using the specified policy.
+This runs a single episode of the game using one or more policies.
 
 By default, the policy is 'noop', so agents won't move unless manually controlled.
 To see agents move by themselves, use `--policy class=random` or `--policy class=baseline`.
+
+Multiple -p flags assign one policy per team (in team order).
 
 You can manually control the actions of a specific cog by clicking on a cog
 in GUI mode or pressing M in unicode mode and using your arrow or WASD keys.
@@ -517,6 +519,11 @@ Log mode is non-interactive and doesn't support manual control.
 [cyan]cogames play -m machina_1.basic -p class=random[/cyan]        Random policy
 
 [cyan]cogames play -m machina_1.basic -c 4 -p class=baseline[/cyan] Baseline, 4 cogs
+
+[cyan]cogames play -m four_score -p nlanky -p baseline -p random -p noop[/cyan]
+                                                                 One policy per team
+
+[cyan]cogames play -m four_score -p nlanky:1 -p random:2[/cyan]     Mixed teams (cycling pattern)
 
 [cyan]cogames play -m machina_1.basic --save-replay-file ./latest.json.z[/cyan] Overwrite fixed replay file
 
@@ -559,12 +566,12 @@ def play_cmd(
         rich_help_panel="Game Setup",
     ),
     # --- Policy ---
-    policy: str = typer.Option(
-        "class=noop",
+    policies: Optional[list[str]] = typer.Option(  # noqa: B008
+        None,
         "--policy",
         "-p",
         metavar="POLICY",
-        help="Policy controlling cogs ([bold]noop[/bold], [bold]random[/bold], [bold]lstm[/bold], or path).",
+        help="Policy per team. One -p applies to all teams; multiple -p assigns one per team.",
         rich_help_panel="Policy",
     ),
     device: str = typer.Option(
@@ -704,7 +711,8 @@ def play_cmd(
 
     seed_rollout_rng(seed)
     resolved_device = resolve_training_device(console, device)
-    policy_spec = get_policy_spec(ctx, policy, device=str(resolved_device))
+    raw_policies = policies if policies else ["class=noop"]
+    policy_specs = get_policy_specs_with_proportions(ctx, raw_policies, device=str(resolved_device))
 
     console.print(f"[cyan]Playing {resolved_mission}[/cyan]")
     console.print(f"Max Steps: {env_cfg.game.max_steps}, Render: {render}")
@@ -712,7 +720,7 @@ def play_cmd(
     play_module.play(
         console,
         env_cfg=env_cfg,
-        policy_spec=policy_spec,
+        policy_specs=policy_specs,
         seed=seed,
         device=str(resolved_device),
         render_mode=render,

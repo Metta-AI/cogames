@@ -9,8 +9,8 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
+from cogames.cli.policy import PolicySpecWithProportion
 from mettagrid import MettaGridConfig
-from mettagrid.policy.policy import PolicySpec
 from mettagrid.renderer.renderer import RenderMode
 from mettagrid.runner.rollout import run_episode_local
 from mettagrid.runner.types import PureSingleEpisodeResult
@@ -117,10 +117,38 @@ def _print_standard_stats(console: Console, agent_totals: dict[str, float], avg_
     console.print(table)
 
 
+def _build_team_assignments(env_cfg: "MettaGridConfig", specs: list[PolicySpecWithProportion]) -> list[int]:
+    """Map each agent to a policy index using per-team cycling.
+
+    Builds a repeating pattern from policy counts (the proportion field) and
+    applies it independently within each team.  For example, specs with
+    proportions [1, 2] produce pattern [0, 1, 1] which cycles per team:
+    a team of 4 agents gets [0, 1, 1, 0].
+    """
+    if len(specs) == 1:
+        return [0] * env_cfg.game.num_agents
+
+    pattern: list[int] = []
+    for idx, spec in enumerate(specs):
+        pattern.extend([idx] * int(spec.proportion))
+
+    # Group agent indices by team_id, preserving first-appearance order.
+    teams: dict[int, list[int]] = {}
+    for agent_idx, agent in enumerate(env_cfg.game.agents):
+        teams.setdefault(agent.team_id, []).append(agent_idx)
+
+    assignments = [0] * env_cfg.game.num_agents
+    for team_agents in teams.values():
+        for i, agent_idx in enumerate(team_agents):
+            assignments[agent_idx] = pattern[i % len(pattern)]
+
+    return assignments
+
+
 def play(
     console: Console,
     env_cfg: "MettaGridConfig",
-    policy_spec: PolicySpec,
+    policy_specs: list[PolicySpecWithProportion],
     game_name: str,
     seed: int = 42,
     device: str = "cpu",
@@ -130,12 +158,13 @@ def play(
     save_replay_file: Optional[Path] = None,
     autostart: bool = False,
 ) -> None:
-    """Play a single game episode with a policy.
+    """Play a single game episode with one or more policies.
 
     Args:
         console: Rich console for output
         env_cfg: Game configuration
-        policy_spec: Policy specification (class path and optional data path)
+        policy_specs: Policy specifications. One spec applies to all agents;
+            multiple specs assign one policy per team.
         game_name: Human-readable name of the game (used for logging/metadata)
         seed: Random seed
         render_mode: Render mode - "gui", "unicode", or "none"
@@ -155,9 +184,11 @@ def play(
         save_replay.mkdir(parents=True, exist_ok=True)
         replay_path = save_replay / f"{uuid.uuid4()}.json.z"
 
+    assignments = _build_team_assignments(env_cfg, policy_specs)
+
     results, _replay = run_episode_local(
-        policy_specs=[policy_spec],
-        assignments=[0] * env_cfg.game.num_agents,
+        policy_specs=[s.to_policy_spec() for s in policy_specs],
+        assignments=assignments,
         env=env_cfg,
         replay_path=replay_path,
         seed=seed,
