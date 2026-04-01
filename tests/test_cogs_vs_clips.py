@@ -9,6 +9,7 @@ from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
 from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant as JunctionNetVariant
 from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
+from cogames.games.cogs_vs_clips.missions.four_score import FourScoreMission
 from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_map_builder, make_machina1_mission
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
@@ -174,6 +175,81 @@ def test_machina_objective_reward_excludes_hub_baseline() -> None:
     assert reward_cfg.reward.values[0].query.source == "net:cogs"
     assert isinstance(reward_cfg.reward.values[1], ConstValue)
     assert reward_cfg.reward.values[1].value == -1.0
+
+
+def test_machina_1_emits_held_stat_per_tick_after_alignment() -> None:
+    mission = CvCMission(
+        name="held_metric_test",
+        description="Minimal Machina setup for held stat checks.",
+        map_builder=ObjectNameMapBuilder.Config(
+            map_data=[
+                ["wall", "wall", "wall", "wall", "wall"],
+                ["wall", "empty", "empty", "empty", "wall"],
+                ["wall", "agent.agent", "junction", "c:hub", "wall"],
+                ["wall", "empty", "empty", "empty", "wall"],
+                ["wall", "wall", "wall", "wall", "wall"],
+            ]
+        ),
+        num_agents=1,
+        num_cogs=1,
+        min_cogs=1,
+        max_cogs=1,
+        max_steps=100,
+    ).with_variants(["machina_1"])
+    env = mission.make_env()
+    env.game.agents[0].inventory.initial = {"aligner": 1, "heart": 1}
+
+    sim = Simulation(env, seed=42)
+    sim.agent(0).set_action("move_east")
+    sim.step()
+
+    assert sim.agent(0).last_action_success
+    assert sim._c_sim.get_game_stat("cogs/aligned.junction.gained") == pytest.approx(1.0)
+    assert sim._c_sim.get_game_stat("cogs/aligned.junction.held") == pytest.approx(1.0)
+    assert float(sim.episode_rewards[0]) == pytest.approx(0.01)
+
+    sim.agent(0).set_action("noop")
+    sim.step()
+
+    assert sim._c_sim.get_game_stat("cogs/aligned.junction.held") == pytest.approx(2.0)
+    assert float(sim.episode_rewards[0]) == pytest.approx(0.02)
+
+
+def test_machina_1_clips_held_stat_excludes_all_ship_roots() -> None:
+    env = make_machina1_mission(num_agents=2, max_steps=100).make_env()
+    sim = Simulation(env, seed=42)
+
+    for agent_id in range(sim.num_agents):
+        sim.agent(agent_id).set_action("noop")
+    sim.step()
+
+    assert sim._c_sim.get_game_stat("clips/aligned.junction.held") == pytest.approx(0.0)
+
+
+def test_machina_1_emits_held_stat_handlers_for_clips_team() -> None:
+    env = make_machina1_mission(num_agents=2, max_steps=100).make_env()
+
+    assert {
+        "aligned_junction_held_cogs",
+        "aligned_junction_held_clips",
+    } <= set(env.game.on_tick)
+
+
+def test_four_score_emits_held_stat_handlers_for_each_team() -> None:
+    env = FourScoreMission(
+        num_agents=4,
+        num_cogs=4,
+        min_cogs=4,
+        max_cogs=4,
+        max_steps=100,
+    ).make_env()
+
+    assert {
+        "aligned_junction_held_cogs_red",
+        "aligned_junction_held_cogs_blue",
+        "aligned_junction_held_cogs_green",
+        "aligned_junction_held_cogs_yellow",
+    } <= set(env.game.on_tick)
 
 
 def test_hub_global_obs_shows_own_team_only():
