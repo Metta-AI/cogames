@@ -1,8 +1,10 @@
 import pytest
 
+from cogames.cli.mission import find_mission
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
+from cogames.games.cogs_vs_clips.game.game import CvCGame
 from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
 from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant as JunctionNetVariant
@@ -33,10 +35,35 @@ def _normalize_dinky_tag_name(tag_name: str) -> str:
     return tag_name
 
 
+def _iter_cli_mission_names(game: CvCGame) -> list[str]:
+    names = [mission.full_name() for mission in game.missions]
+    names.extend(f"{mission.name}.{sub_name}" for mission in game.missions for sub_name in mission.sub_missions)
+    return names
+
+
 def test_make_cogs_vs_clips_scenario():
     """Test that make_cogs_vs_clips_scenario creates a valid configuration."""
     config = make_machina1_mission(num_agents=2).make_env()
     assert isinstance(config, MettaGridConfig)
+
+
+def test_resolved_cli_missions_with_passive_hp_and_territory_install_friendly_hp_heal() -> None:
+    game = CvCGame()
+    audited: dict[str, list[str]] = {}
+
+    for name in _iter_cli_mission_names(game):
+        env = find_mission(game, name).make_env()
+        territory = env.game.territories.get("team_territory")
+        presence = sorted(territory.presence) if territory is not None else []
+        audited[name] = presence
+
+        has_passive_hp_drain = "hp" in env.game.resource_names and any(
+            "hp_regen" in agent.on_tick for agent in env.game.agents
+        )
+        if territory is not None and has_passive_hp_drain:
+            assert "heal_hp" in territory.presence, f"{name} missing heal_hp; territory presence={presence}"
+
+    assert {"tutorial", "tutorial.aligner", "tutorial.miner", "tutorial.scout", "tutorial.scrambler"} <= audited.keys()
 
 
 def test_cvc_helper_defaults_use_8_agents() -> None:

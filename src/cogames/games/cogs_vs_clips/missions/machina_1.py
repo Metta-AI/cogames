@@ -172,7 +172,7 @@ class MachinaOneMission(CvCMission):
     max_cogs: int = 20
     max_steps: int = 10000
     default_variant: str = "machina_1"
-    sub_missions: list[str] = Field(default_factory=lambda: list(["solo", "clips", "auto_clips"]))
+    sub_missions: list[str] = Field(default_factory=lambda: ["clips"])
 
 
 def make_machina1_map_builder(num_agents: int = 8) -> MapGenConfig:
