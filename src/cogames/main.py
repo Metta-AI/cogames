@@ -1860,6 +1860,13 @@ def validate_bundle_cmd(
         help="Docker image for container validation.",
         rich_help_panel="Validation",
     ),
+    login_server: str = typer.Option(
+        DEFAULT_COGAMES_SERVER,
+        "--login-server",
+        metavar="URL",
+        help="Authentication server URL.",
+        rich_help_panel="Server",
+    ),
     _help: bool = typer.Option(
         False,
         "--help",
@@ -1872,7 +1879,7 @@ def validate_bundle_cmd(
 ) -> None:
     ensure_docker_daemon_access()
 
-    season_info = _resolve_season(server, season_name=season)
+    season_info = _resolve_season(server, login_server, season)
     entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool), None)
     if not entry_pool_info or not entry_pool_info.config_id:
         console.print("[red]No entry config found for season[/red]")
@@ -1881,7 +1888,8 @@ def validate_bundle_cmd(
     if image == DEFAULT_EPISODE_RUNNER_IMAGE and season_info.compat_version is not None:
         image = f"ghcr.io/metta-ai/episode-runner:compat-v{season_info.compat_version}"
 
-    with TournamentServerClient(server_url=server) as client:
+    auth_token = load_token(token_kind=TokenKind.COGAMES, server=login_server)
+    with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
         config_data = client.get_config(entry_pool_info.config_id)
 
     validate_bundle_docker(policy, config_data, image)
