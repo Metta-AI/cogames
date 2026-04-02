@@ -159,6 +159,7 @@ class TestGearVariant:
         )
         assert {f"c:{role}" for role in GEAR} <= env.game.objects.keys()
         assert set(GEAR).isdisjoint(env.game.objects)
+        assert env.game.objects["c:miner"].name == "miner"
         assert env.game.render.symbols["c:miner"] == "M"
         cost_filter = env.game.objects["c:miner"].on_use_handlers["change_gear"].filters[1]
         assert isinstance(cost_filter, GameValueFilter)

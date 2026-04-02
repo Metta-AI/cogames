@@ -86,14 +86,14 @@ def test_machina_1_team_station_tags_win_under_dinky_normalization() -> None:
     normalized_tag_to_id = {_normalize_dinky_tag_name(name): idx for idx, name in enumerate(pei.tags)}
     tag_to_id = {name: idx for idx, name in enumerate(pei.tags)}
 
-    assert normalized_tag_to_id["aligner"] == tag_to_id["type:c:aligner"]
-    assert normalized_tag_to_id["miner"] == tag_to_id["type:c:miner"]
-    assert normalized_tag_to_id["scout"] == tag_to_id["type:c:scout"]
-    assert normalized_tag_to_id["scrambler"] == tag_to_id["type:c:scrambler"]
-    assert "type:aligner" not in tag_to_id
-    assert "type:miner" not in tag_to_id
-    assert "type:scout" not in tag_to_id
-    assert "type:scrambler" not in tag_to_id
+    assert normalized_tag_to_id["aligner"] == tag_to_id["type:aligner"]
+    assert normalized_tag_to_id["miner"] == tag_to_id["type:miner"]
+    assert normalized_tag_to_id["scout"] == tag_to_id["type:scout"]
+    assert normalized_tag_to_id["scrambler"] == tag_to_id["type:scrambler"]
+    assert "type:c:aligner" not in tag_to_id
+    assert "type:c:miner" not in tag_to_id
+    assert "type:c:scout" not in tag_to_id
+    assert "type:c:scrambler" not in tag_to_id
 
 
 def test_cvc_enables_aoe_mask_observation() -> None:

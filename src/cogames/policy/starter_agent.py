@@ -30,6 +30,7 @@ GEAR = ("aligner", "scrambler", "miner", "scout")
 ELEMENTS = ("carbon", "oxygen", "germanium", "silicon")
 WANDER_DIRECTIONS = ("east", "south", "west", "north")
 WANDER_STEPS = 8
+TEAM_TAG_PREFIX = "team:"
 
 
 @dataclass
@@ -54,7 +55,7 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         self._fallback_action_name = "noop" if "noop" in self._action_name_set else self._action_names[0]
         self._center = (policy_env_info.obs_height // 2, policy_env_info.obs_width // 2)
         self._tag_name_to_id = {name: idx for idx, name in enumerate(policy_env_info.tags)}
-        self._gear_station_tags_by_gear = {gear: self._resolve_tag_ids([f"c:{gear}"]) for gear in GEAR}
+        self._gear_station_tags_by_gear = {gear: self._resolve_tag_ids([gear, f"c:{gear}"]) for gear in GEAR}
         self._gear_station_tags = set().union(*self._gear_station_tags_by_gear.values())
         self._extractor_tags = self._resolve_tag_ids([f"{element}_extractor" for element in ELEMENTS])
         self._junction_tags = self._resolve_tag_ids(["junction"])
@@ -115,6 +116,44 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
                 best_location = token.location
         return best_location
 
+    def _own_team_tag_ids(self, obs: AgentObservation) -> set[int]:
+        team_tag_ids: set[int] = set()
+        for token in obs.tokens:
+            if token.feature.name != "tag" or token.location != self._center:
+                continue
+            tag_name = self._policy_env_info.tags[token.value]
+            if tag_name.startswith(TEAM_TAG_PREFIX):
+                team_tag_ids.add(token.value)
+        return team_tag_ids
+
+    def _closest_friendly_gear_station(
+        self,
+        obs: AgentObservation,
+        gear_tag_ids: set[int],
+    ) -> Optional[tuple[int, int]]:
+        own_team_tag_ids = self._own_team_tag_ids(obs)
+        if not own_team_tag_ids:
+            return self._closest_tag_location(obs, gear_tag_ids)
+
+        tags_by_location: dict[tuple[int, int], set[int]] = {}
+        for token in obs.tokens:
+            if token.feature.name != "tag" or token.location is None:
+                continue
+            tags_by_location.setdefault(token.location, set()).add(token.value)
+
+        best_location: Optional[tuple[int, int]] = None
+        best_distance = 999
+        for location, location_tag_ids in tags_by_location.items():
+            if not (location_tag_ids & gear_tag_ids):
+                continue
+            if not (location_tag_ids & own_team_tag_ids):
+                continue
+            distance = abs(location[0] - self._center[0]) + abs(location[1] - self._center[1])
+            if distance < best_distance:
+                best_distance = distance
+                best_location = location
+        return best_location
+
     def _action(self, name: str) -> Action:
         if name in self._action_name_set:
             return Action(name=name)
@@ -168,7 +207,10 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         else:
             target_tags = set()
 
-        target_location = self._closest_tag_location(obs, target_tags) if target_tags else None
+        if target_tags & self._gear_station_tags:
+            target_location = self._closest_friendly_gear_station(obs, target_tags)
+        else:
+            target_location = self._closest_tag_location(obs, target_tags) if target_tags else None
         return self._move_toward(state, target_location)
 
     def initial_agent_state(self) -> StarterCogState:
