@@ -11,16 +11,18 @@ from mettagrid.simulator.interface import PackedCoordinate
 def _mock_policy_env_info() -> PolicyEnvInterface:
     action_names = ["noop", "move_north", "move_south", "move_east", "move_west"]
     tags = [
-        "type:c:miner",
+        "type:miner",
         "type:junction",
         "type:hub",
-        "type:c:aligner",
-        "type:c:scrambler",
-        "type:c:scout",
+        "type:aligner",
+        "type:scrambler",
+        "type:scout",
         "type:carbon_extractor",
         "type:oxygen_extractor",
         "type:germanium_extractor",
         "type:silicon_extractor",
+        "team:cogs",
+        "team:clips",
     ]
     return PolicyEnvInterface(
         obs_features=[],
@@ -82,7 +84,9 @@ def test_preferred_role_targets_its_station_when_not_equipped() -> None:
             _inv_token(3, "inv:aligner", 0),
             _inv_token(4, "inv:scrambler", 0),
             _inv_token(5, "inv:heart", 0),
-            _tag_token(0, row=2, col=3),  # type:c:miner (east)
+            _tag_token(10, row=2, col=2),  # team:cogs on self
+            _tag_token(0, row=2, col=3),  # type:miner (east)
+            _tag_token(10, row=2, col=3),  # team:cogs on station
             _tag_token(1, row=1, col=2),  # type:junction (north)
         ],
     )
@@ -143,6 +147,6 @@ def test_cogsguard_tags_resolve_role_station_targets() -> None:
     policy_env_info = PolicyEnvInterface.from_mg_cfg(make_basic_mission().make_env())
     for role in ["miner", "aligner", "scrambler", "scout"]:
         impl = StarterCogPolicyImpl(policy_env_info, agent_id=0, preferred_gear=role)
-        expected_tag_name = f"type:c:{role}"
+        expected_tag_name = f"type:{role}"
         expected_tag_id = policy_env_info.tags.index(expected_tag_name)
         assert expected_tag_id in impl._gear_station_tags_by_gear[role]

@@ -119,9 +119,12 @@ def _has_type_tag(tags: tuple[str, ...]) -> bool:
 
 def _entity_type_from_tags(tags: tuple[str, ...]) -> str:
     type_tag = next(tag for tag in tags if tag.startswith("type:"))
-    if type_tag.startswith("type:c:"):
-        return f"{type_tag.removeprefix('type:c:')}_station"
-    return type_tag.removeprefix("type:")
+    type_name = type_tag.removeprefix("type:")
+    if type_name.startswith("c:"):
+        type_name = type_name.removeprefix("c:")
+    if type_name in {"aligner", "miner", "scout", "scrambler"}:
+        return f"{type_name}_station"
+    return type_name
 
 
 def _entity_attributes(
