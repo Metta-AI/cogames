@@ -7,6 +7,7 @@ from cogames.cli.mission import get_all_missions
 from cogames.main import app
 
 runner = CliRunner()
+RUN_SMOKE_TEST_STEPS = 250
 
 
 @pytest.mark.parametrize("mission_name", get_all_missions())
@@ -28,6 +29,8 @@ def test_mission_run(mission_name: str):
             "class=random,proportion=5",
             "--episodes",
             "1",
+            "--steps",
+            str(RUN_SMOKE_TEST_STEPS),
         ],
     )
 
@@ -51,6 +54,8 @@ def test_alternate_run_format(mission_name):
             "class=random",
             "--episodes",
             "1",
+            "--steps",
+            str(RUN_SMOKE_TEST_STEPS),
         ],
     )
 
