@@ -249,6 +249,7 @@ def test_four_score_emits_held_stat_handlers_for_each_team() -> None:
         "aligned_junction_held_cogs_blue",
         "aligned_junction_held_cogs_green",
         "aligned_junction_held_cogs_yellow",
+        "aligned_junction_held_four_score_avg",
     } <= set(env.game.on_tick)
 
 
