@@ -19,6 +19,7 @@ import sys
 import webbrowser
 from pathlib import Path
 from typing import Literal, Optional
+from uuid import UUID
 
 import httpx
 import typer
@@ -1752,6 +1753,22 @@ def _resolve_season(server: str, login_server: str | None = None, season_name: s
         raise typer.Exit(1) from None
 
 
+def _resolve_validation_config_pool(season_info: SeasonDetail) -> tuple[str, UUID]:
+    entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool and p.config_id), None)
+    if entry_pool_info is not None:
+        entry_config_id = entry_pool_info.config_id
+        if entry_config_id is not None:
+            return entry_pool_info.name, entry_config_id
+
+    for pool_info in season_info.pools:
+        config_id = pool_info.config_id
+        if config_id is not None:
+            return pool_info.name, config_id
+
+    console.print(f"[red]No playable config found for season '{season_info.name}'[/red]")
+    raise typer.Exit(1)
+
+
 @app.command(
     name="create-bundle",
     help="Create a submission bundle zip from a policy.",
@@ -1880,20 +1897,18 @@ def validate_bundle_cmd(
     ensure_docker_daemon_access()
 
     season_info = _resolve_season(server, login_server, season)
-    entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool), None)
-    if not entry_pool_info or not entry_pool_info.config_id:
-        console.print("[red]No entry config found for season[/red]")
-        raise typer.Exit(1)
+    pool_name, config_id = _resolve_validation_config_pool(season_info)
 
     if image == DEFAULT_EPISODE_RUNNER_IMAGE and season_info.compat_version is not None:
         image = f"ghcr.io/metta-ai/episode-runner:compat-v{season_info.compat_version}"
 
     auth_token = load_token(token_kind=TokenKind.COGAMES, server=login_server)
     with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
-        config_data = client.get_config(entry_pool_info.config_id)
+        config_data = client.get_config(config_id)
 
     validate_bundle_docker(policy, config_data, image)
 
+    console.print(f"[dim]Validated against pool: {pool_name}[/dim]")
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
 

@@ -865,6 +865,79 @@ def test_validate_policy_fetches_config_and_runs(
     assert captured_args["config_data"]["game"]["num_agents"] == default_cfg.game.num_agents
 
 
+def test_validate_policy_falls_back_to_non_entry_pool_config(httpserver: HTTPServer) -> None:
+    default_cfg = MettaGridConfig()
+
+    httpserver.expect_request(
+        "/tournament/seasons/test-season",
+        method="GET",
+    ).respond_with_json(
+        {
+            "id": _SEASON_ID,
+            "name": "test-season",
+            "version": 1,
+            "canonical": True,
+            "is_default": True,
+            "status": "not_started",
+            "display_name": "Test Season",
+            "tournament_type": "team",
+            "created_at": "2026-01-01T00:00:00Z",
+            "public": True,
+            "entrant_count": 1,
+            "active_entrant_count": 1,
+            "match_count": 0,
+            "stage_count": 4,
+            "entry_pool": "entry",
+            "leaderboard_pool": "score",
+            "summary": "",
+            "pools": [
+                {"name": "entry", "description": "entry pool", "config_id": None},
+                {"name": "stage-1", "description": "stage 1", "config_id": _ENTRY_CONFIG_ID},
+                {"name": "score", "description": "score pool", "config_id": None},
+            ],
+        }
+    )
+
+    httpserver.expect_request(
+        f"/tournament/configs/{_ENTRY_CONFIG_ID}",
+        method="GET",
+    ).respond_with_json(default_cfg.model_dump(mode="json"))
+
+    captured_args: dict[str, Any] = {}
+
+    def fake_ensure_docker_daemon_access() -> None:
+        captured_args["preflight_called"] = True
+
+    def fake_validate_bundle_docker(policy_uri, config_data, image):
+        captured_args["called"] = True
+        captured_args["policy_uri"] = policy_uri
+        captured_args["config_data"] = config_data
+        captured_args["image"] = image
+
+    runner = CliRunner()
+    with (
+        patch("cogames.main.ensure_docker_daemon_access", fake_ensure_docker_daemon_access),
+        patch("cogames.main.validate_bundle_docker", fake_validate_bundle_docker),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "validate-bundle",
+                "--policy",
+                "class=cogames.policy.starter_agent.StarterPolicy",
+                "--season",
+                "test-season",
+                "--server",
+                httpserver.url_for(""),
+            ],
+        )
+
+    assert result.exit_code == 0, f"Validation failed:\n{result.output}"
+    assert captured_args.get("preflight_called") is True
+    assert captured_args.get("called") is True
+    assert captured_args["config_data"]["game"]["num_agents"] == default_cfg.game.num_agents
+
+
 def test_validate_policy_exits_early_when_docker_unavailable(httpserver: HTTPServer) -> None:
     def fake_ensure_docker_daemon_access() -> None:
         raise typer.Exit(1)
