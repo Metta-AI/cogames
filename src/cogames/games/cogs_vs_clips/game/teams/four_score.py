@@ -12,7 +12,7 @@ from cogames.games.cogs_vs_clips.game.teams.team import TeamConfig, TeamVariant
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.missions.terrain import CompoundLocation, MachinaTerrainVariant
 from cogames.variants import ResolvedDeps
-from mettagrid.config.game_value import SumGameValue, num_tagged, val
+from mettagrid.config.game_value import SumGameValue, num_tagged, val, weighted_sum
 from mettagrid.config.handler_config import Handler
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.mutation import logStatToGame
@@ -70,6 +70,7 @@ class FourScoreVariant(CoGameMissionVariant):
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
         team_v = mission.required_variant(TeamVariant)
         seen_team_names: set[str] = set()
+        held_junction_stats: list[SumGameValue] = []
 
         # Per-team junction rewards and held-tick stats.
         for agent in env.game.agents:
@@ -77,6 +78,8 @@ class FourScoreVariant(CoGameMissionVariant):
             assert team_name is not None, f"agent team_id={agent.team_id} has no team name"
             held_junction_values = [num_tagged(f"net:{team_name}"), val(-1.0)]
             held_junctions = SumGameValue(values=held_junction_values)
+            if team_name not in seen_team_names:
+                held_junction_stats.append(held_junctions)
             agent.rewards["aligned_junction_held"] = reward(
                 held_junction_values,
                 weight=1.0 / mission.max_steps,
@@ -88,3 +91,11 @@ class FourScoreVariant(CoGameMissionVariant):
                 mutations=[logStatToGame(f"{team_name}/aligned.junction.held", source=held_junctions)]
             )
             seen_team_names.add(team_name)
+
+        if held_junction_stats:
+            avg_held_junctions = weighted_sum(
+                [(1.0 / len(held_junction_stats), held_stat) for held_stat in held_junction_stats]
+            )
+            env.game.on_tick["aligned_junction_held_four_score_avg"] = Handler(
+                mutations=[logStatToGame("four_score/aligned.junction.held.avg", source=avg_held_junctions)]
+            )
