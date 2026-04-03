@@ -136,6 +136,13 @@ def _validate_policy_name_or_exit(name: str) -> None:
         raise typer.Exit(1)
 
 
+def _print_async_submission_follow_up(policy_name: str, season_name: str) -> None:
+    console.print("[dim]Evaluation runs asynchronously. Check status with:[/dim]")
+    console.print(f"[dim]  cogames submissions --season {season_name} --policy {policy_name}[/dim]")
+    console.print(f"[dim]  cogames leaderboard {season_name} --policy {policy_name}[/dim]")
+    console.print(f"[dim]Results:[/dim] {RESULTS_URL}")
+
+
 app = typer.Typer(
     help="CoGames - Multi-agent cooperative and competitive games.",
     context_settings={"help_option_names": ["-h", "--help"]},
@@ -2105,11 +2112,12 @@ def upload_cmd(
 
     if result:
         console.print(f"[green]Upload complete: {result.name}:v{result.version}[/green]")
+        if no_submit:
+            console.print(f"\nTo submit to a tournament: cogames submit {result.name}:v{result.version}")
+            return
         if result.pools:
             console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
-            console.print(f"[dim]Results:[/dim] {RESULTS_URL}")
-        elif no_submit:
-            console.print(f"\nTo submit to a tournament: cogames submit {result.name}:v{result.version}")
+        _print_async_submission_follow_up(result.name, season_info.name)
 
 
 @app.command(
@@ -2352,7 +2360,7 @@ def ship_cmd(
         console.print(f"[dim]Results:[/dim] {RESULTS_URL}")
         return
 
-    console.print(f"[dim]Results:[/dim] {RESULTS_URL}")
+    _print_async_submission_follow_up(result.name, season_info.name)
 
 
 @app.command(
