@@ -300,7 +300,7 @@ cogames tutorial play
 
 **Watch scripted agents** — see baseline behavior on the Arena map:
 ```bash
-cogames play -m cvc_machina_1.basic -p class=baseline
+cogames play -m arena -p class=baseline
 ```
 
 **Role-specific training tutorials** — deep-dive into each role:
@@ -329,4 +329,3 @@ print(f"Saved to {save_path}")
 
 !cogames upload -p "class=tutorial,data={save_path}" -n {POLICY_NAME} --skip-validation
 ```
-

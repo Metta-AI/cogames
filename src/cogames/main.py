@@ -451,7 +451,7 @@ def variants_cmd(
     rich_help_panel="Missions",
     epilog="""[dim]Examples:[/dim]
 
-  [cyan]cogames describe machina_1.basic[/cyan]             Describe mission
+  [cyan]cogames describe arena[/cyan]                       Describe mission
 
   [cyan]cogames describe arena -c 4 -v dark_side[/cyan]               With 4 cogs and variant""",
     add_help_option=False,
@@ -461,7 +461,7 @@ def describe_cmd(
     mission: str = typer.Argument(
         ...,
         metavar="MISSION",
-        help="Mission name (e.g., machina_1.basic).",
+        help="Mission name (e.g., arena).",
     ),
     cogs: Optional[int] = typer.Option(
         None,
@@ -515,18 +515,18 @@ Log mode is non-interactive and doesn't support manual control.
 """,
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames play -m machina_1.basic[/cyan]                        Interactive
+[cyan]cogames play -m arena[/cyan]                                  Interactive
 
-[cyan]cogames play -m machina_1.basic -p class=random[/cyan]        Random policy
+[cyan]cogames play -m arena -p class=random[/cyan]                  Random policy
 
-[cyan]cogames play -m machina_1.basic -c 4 -p class=baseline[/cyan] Baseline, 4 cogs
+[cyan]cogames play -m arena -c 4 -p class=baseline[/cyan]           Baseline, 4 cogs
 
 [cyan]cogames play -m four_score -p nlanky -p baseline -p random -p noop[/cyan]
                                                                  One policy per team
 
 [cyan]cogames play -m four_score -p nlanky:1 -p random:2[/cyan]     Mixed teams (cycling pattern)
 
-[cyan]cogames play -m machina_1.basic --save-replay-file ./latest.json.z[/cyan] Overwrite fixed replay file
+[cyan]cogames play -m arena --save-replay-file ./latest.json.z[/cyan] Overwrite fixed replay file
 
 [cyan]cogames play -m machina_1 -r unicode[/cyan]                   Terminal mode""",
     add_help_option=False,
@@ -974,13 +974,10 @@ def make_policy(
 
         if trainable:
             console.print(
-                "[dim]Train with: cogames tutorial train -m machina_1.basic -p class="
-                f"{dest_path.stem}.{policy_class}[/dim]"
+                f"[dim]Train with: cogames tutorial train -m arena -p class={dest_path.stem}.{policy_class}[/dim]"
             )
         else:
-            console.print(
-                f"[dim]Play with: cogames play -m machina_1.basic -p class={dest_path.stem}.{policy_class}[/dim]"
-            )
+            console.print(f"[dim]Play with: cogames play -m arena -p class={dest_path.stem}.{policy_class}[/dim]")
 
     except Exception as exc:  # pragma: no cover - user input
         console.print(f"[red]Error: {exc}[/red]")
@@ -1006,9 +1003,9 @@ Use wildcards (*) in mission names to match multiple missions at once.""",
     rich_help_panel="Tutorial",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames tutorial train -m machina_1.basic[/cyan]                   Basic training
+[cyan]cogames tutorial train -m arena[/cyan]                             Basic training
 
-[cyan]cogames tutorial train -m machina_1.basic -p class=baseline[/cyan]
+[cyan]cogames tutorial train -m arena -p class=baseline[/cyan]
                                                                  Train baseline policy
 
 [cyan]cogames tutorial train -p ./train_dir/my_run:v5[/cyan]                  Continue from checkpoint
@@ -1218,7 +1215,7 @@ With one policy, this command is equivalent to `cogames scrimmage`.
     rich_help_panel="Evaluate",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames run -m machina_1.basic -p lstm[/cyan]               Evaluate single policy
+[cyan]cogames run -m arena -p lstm[/cyan]                         Evaluate single policy
 
 [cyan]cogames run -m machina_1 -p ./train_dir/my_run:v5[/cyan]     Evaluate a checkpoint bundle
 
@@ -1237,7 +1234,7 @@ This command is equivalent to running `cogames run` with a single policy.
     rich_help_panel="Evaluate",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames scrimmage -m arena.battle -p lstm[/cyan]                   Single policy eval""",
+[cyan]cogames scrimmage -m arena -p lstm[/cyan]                          Single policy eval""",
     add_help_option=False,
 )
 @app.command("eval", hidden=True)
@@ -1417,7 +1414,7 @@ def pickup_cmd(
     ctx: typer.Context,
     # --- Mission ---
     mission: str = typer.Option(
-        "machina_1.basic",
+        "arena",
         "--mission",
         "-m",
         metavar="MISSION",
