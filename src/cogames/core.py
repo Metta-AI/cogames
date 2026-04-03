@@ -147,7 +147,7 @@ class CoGameMission(Config, ABC):
         preferred_modules = copy.variant_module_prefixes()
         for v in variants:
             if isinstance(v, CoGameMissionVariant):
-                copy._base_variants[v.name] = v
+                copy._base_variants[v.name] = v.model_copy(deep=True)
             else:
                 copy._base_variants[v] = CoGameMissionVariant.create(v, preferred_modules=preferred_modules)
         return copy
