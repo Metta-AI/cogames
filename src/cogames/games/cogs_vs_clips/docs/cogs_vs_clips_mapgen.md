@@ -199,7 +199,7 @@ Common patterns:
           ...
   ```
 
-CLI variants are composed in order, so `cogames play -m machina_1.basic -v city -v extractor_cross` applies `city`, then
+CLI variants are composed in order, so `cogames play -m machina_1 -v city -v extractor_cross` applies `city`, then
 `extractor_cross`.
 
 ---
@@ -266,7 +266,7 @@ mission = CvCMission(
 - Play with variants and overrides:
 
   ```bash
-  cogames play --mission cvc_machina_1.basic \
+  cogames play --mission machina_1 \
                --variant city \
                --cogs 8 \
                --policy random
@@ -274,7 +274,7 @@ mission = CvCMission(
 
 - Reproduce a procedural layout:
   ```bash
-  cogames play -m machina_1.basic --variant city --map-seed 24601 --seed 24601
+  cogames play -m machina_1 --variant city --map-seed 24601 --seed 24601
   ```
   (Use `--map-seed` for layout determinism; include `--seed` to reproduce simulator/policy RNG.)
 
