@@ -7,7 +7,7 @@ import typer
 from rich import box
 from rich.table import Table
 
-from cogames.auth import DEFAULT_COGAMES_SERVER, load_token
+from cogames.auth import DEFAULT_COGAMES_SERVER
 from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import (
     LeaderboardEntry,
@@ -18,7 +18,6 @@ from cogames.cli.client import (
 from cogames.cli.generated_models import Phase
 from cogames.cli.leaderboard import _format_score, _format_timestamp
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
-from cogames.token_storage import TokenKind
 
 LeaderboardEntries = list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]
 LeaderboardType = Literal["policy", "team", "score-policies"]
@@ -31,8 +30,8 @@ LEADERBOARD_TYPE_OPTION = typer.Option(
 
 
 def _get_client(login_server: str, server: str) -> TournamentServerClient:
-    token = load_token(token_kind=TokenKind.COGAMES, server=login_server)
-    return TournamentServerClient(server_url=server, token=token, login_server=login_server)
+    _ = login_server
+    return TournamentServerClient(server_url=server)
 
 
 def _team_label(team: TeamSummary) -> str:
