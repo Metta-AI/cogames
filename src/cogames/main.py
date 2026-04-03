@@ -10,6 +10,7 @@ suppress_noisy_logs()
 
 import importlib
 import importlib.metadata
+import importlib.resources
 import importlib.util
 import logging
 import os
@@ -103,6 +104,22 @@ except ImportError:  # pragma: no cover - plugin optional
 
 logger = logging.getLogger("cogames.main")
 POLICY_NAME_MAX_LENGTH = 64
+_REPO_COGAMES_ROOT = Path(__file__).resolve().parents[2]
+_DOC_DESCRIPTIONS: dict[str, str] = {
+    "readme": "CoGames overview and documentation",
+    "mission": "Mission briefing for CvC Deployment",
+    "technical_manual": "Technical manual for Cogames",
+    "scripted_agent": "Scripted agent policy documentation",
+    "evals": "Evaluation missions documentation",
+    "mapgen": "Cogs vs Clips map generation documentation",
+}
+_DOC_RESOURCE_PATHS: dict[str, tuple[str, ...]] = {
+    "mission": ("docs", "MISSION.md"),
+    "technical_manual": ("docs", "TECHNICAL_MANUAL.md"),
+    "scripted_agent": ("docs", "SCRIPTED_AGENT.md"),
+    "evals": ("games", "cogs_vs_clips", "evals", "README.md"),
+    "mapgen": ("games", "cogs_vs_clips", "docs", "cogs_vs_clips_mapgen.md"),
+}
 
 
 def _resolve_mettascope_script() -> Path:
@@ -121,6 +138,29 @@ def _resolve_mettascope_script() -> Path:
     raise FileNotFoundError(
         f"MettaScope sources not found relative to installed mettagrid package (searched from {package_dir})."
     )
+
+
+def _read_docs_readme() -> str:
+    try:
+        metadata = importlib.metadata.metadata("cogames")
+    except importlib.metadata.PackageNotFoundError:
+        metadata = None
+    if metadata is not None:
+        description = metadata.get("Description")
+        if description:
+            return description
+    return (_REPO_COGAMES_ROOT / "README.md").read_text()
+
+
+def _read_packaged_doc(doc_name: str) -> str:
+    resource_path = _DOC_RESOURCE_PATHS[doc_name]
+    return importlib.resources.files("cogames").joinpath(*resource_path).read_text()
+
+
+def _read_doc_text(doc_name: str) -> str:
+    if doc_name == "readme":
+        return _read_docs_readme()
+    return _read_packaged_doc(doc_name)
 
 
 def _register_policies() -> None:
@@ -2391,26 +2431,6 @@ def docs_cmd(
         callback=_help_callback,
     ),
 ) -> None:
-    # Hardcoded mapping of document names to file paths and descriptions
-    package_root = Path(__file__).parent.parent.parent
-    docs_map: dict[str, tuple[Path, str]] = {
-        "readme": (package_root / "README.md", "CoGames overview and documentation"),
-        "mission": (package_root / "MISSION.md", "Mission briefing for CvC Deployment"),
-        "technical_manual": (package_root / "TECHNICAL_MANUAL.md", "Technical manual for Cogames"),
-        "scripted_agent": (
-            Path(__file__).parent / "docs" / "SCRIPTED_AGENT.md",
-            "Scripted agent policy documentation",
-        ),
-        "evals": (
-            Path(__file__).parent / "cogs_vs_clips" / "evals" / "README.md",
-            "Evaluation missions documentation",
-        ),
-        "mapgen": (
-            Path(__file__).parent / "cogs_vs_clips" / "cogs_vs_clips_mapgen.md",
-            "Cogs vs Clips map generation documentation",
-        ),
-    }
-
     # If no argument provided, show available documents
     if doc_name is None:
         from rich.table import Table  # noqa: PLC0415
@@ -2420,7 +2440,7 @@ def docs_cmd(
         table.add_column("Document", style="blue", no_wrap=True)
         table.add_column("Description", style="white")
 
-        for name, (_, description) in sorted(docs_map.items()):
+        for name, description in sorted(_DOC_DESCRIPTIONS.items()):
             table.add_row(name, description)
 
         console.print(table)
@@ -2428,20 +2448,14 @@ def docs_cmd(
         console.print("Example: [bold]cogames docs mission[/bold]")
         return
 
-    if doc_name not in docs_map:
-        available = ", ".join(sorted(docs_map.keys()))
+    if doc_name not in _DOC_DESCRIPTIONS:
+        available = ", ".join(sorted(_DOC_DESCRIPTIONS.keys()))
         console.print(f"[red]Error: Unknown document '{doc_name}'[/red]")
         console.print(f"\nAvailable documents: {available}")
         raise typer.Exit(1)
 
-    doc_path, _ = docs_map[doc_name]
-
-    if not doc_path.exists():
-        console.print(f"[red]Error: Document file not found: {doc_path}[/red]")
-        raise typer.Exit(1)
-
     try:
-        content = doc_path.read_text()
+        content = _read_doc_text(doc_name)
         console.print(content)
     except Exception as exc:
         console.print(f"[red]Error reading document: {exc}[/red]")
