@@ -67,7 +67,8 @@ Roles are acquired at Gear Stations by spending resources. Each role has unique 
 | Scrambler | +200 HP, disrupts enemy control                    | Needs team presence to be effective |
 | Scout     | +100 energy, +400 HP, mobile reconnaissance        | Needs team to hold what they find   |
 
-Agents can switch roles at Gear Stations, but lose current gear when doing so.
+In CvC, agents can switch roles at Gear Stations when the hub can pay the cost, but they lose current gear when doing
+so.
 
 **No single role can succeed alone.** Cooperation is required.
 
@@ -114,7 +115,7 @@ bonus, can survive long enough to neutralize enemy junctions, clearing the way f
 Your team shares a hub inventory:
 
 - **Deposit resources** at aligned junctions and hubs
-- **Craft hearts** at the Assembler
+- **Withdraw hearts** at the hub, or spend pooled resources there to make one on demand
 - Hearts are required for capturing and disrupting junctions
 
 This creates interdependence: Miners gather resources for the team, while Aligners and Scramblers consume hearts to

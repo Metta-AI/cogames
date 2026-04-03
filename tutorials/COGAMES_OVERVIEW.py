@@ -43,8 +43,8 @@
 # It teaches you the basics step by step:
 # - Camera controls (scroll/pinch to zoom, drag to pan)
 # - Movement and energy (WASD/arrows, battery drains, recharge near Hub)
-# - Gear stations (pick a role: Aligner, Scrambler, Miner, Scout)
-# - Resources and hearts (extract resources at Extractors, craft Hearts at the Assembler)
+# - Gear stations (equip a role: Aligner, Scrambler, Miner, Scout)
+# - Resources and hearts (extract resources at Extractors, then use the Hub to collect Hearts)
 # - Junction control (Aligners capture neutral junctions, Scramblers neutralize enemy ones)
 #
 # ```bash
@@ -55,7 +55,7 @@
 #
 # This is a deeper tutorial focused on the full Cogs vs Clips game loop on a smaller 35x35 arena.
 # It walks through multi-phase strategy:
-# - Gear up and craft hearts
+# - Gear up and collect hearts from the Hub
 # - Expand from the Hub by capturing nearby junctions
 # - Handle Clips pressure as they scramble your junctions
 # - Use territory (friendly junctions restore HP and energy)
