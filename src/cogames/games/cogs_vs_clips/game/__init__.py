@@ -46,7 +46,7 @@ from cogames.games.cogs_vs_clips.game.terrain import (
 )
 from cogames.games.cogs_vs_clips.game.territory import DamageStrangersVariant, HealTeamVariant, TerritoryVariant
 from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant as JunctionNetVariant
-from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
+from cogames.games.cogs_vs_clips.game.vibes import NoVibesVariant, VibesVariant
 from cogames.games.cogs_vs_clips.missions.terrain import MachinaTerrainVariant
 
 __all__ = [
@@ -83,6 +83,7 @@ __all__ = [
     "JunctionVariant",
     "MinerVariant",
     "MultiTeamVariant",
+    "NoVibesVariant",
     "QuadrantBuildingsVariant",
     "RandomizeSpawnsVariant",
     "ScoutVariant",
@@ -162,6 +163,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     TerritoryVariant(),
     TalkVariant(),
     VibesVariant(),
+    NoVibesVariant(),
     WildGearStationsVariant(),
 ]
 

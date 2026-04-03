@@ -1,4 +1,4 @@
-"""Vibes variant: adds the change_vibe action and vibe names."""
+"""Vibes variants for enabling or disabling explicit vibe actions."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, override
 
 from pydantic import Field
 
-from cogames.core import CoGameMissionVariant
+from cogames.core import CoGameMissionVariant, Deps
 from mettagrid.config.action_config import ChangeVibeActionConfig
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.vibes import Vibe
@@ -36,3 +36,18 @@ class VibesVariant(CoGameMissionVariant):
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
         env.game.vibe_names = [v.name for v in self.vibes]
         env.game.actions.change_vibe = ChangeVibeActionConfig(vibes=self.vibes)
+
+
+class NoVibesVariant(CoGameMissionVariant):
+    """Disable explicit vibe-changing while preserving existing vibe semantics."""
+
+    name: str = "no_vibes"
+    description: str = "Remove change_vibe actions from the action space."
+
+    @override
+    def dependencies(self) -> Deps:
+        return Deps(optional=[VibesVariant])
+
+    @override
+    def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
+        env.game.actions.change_vibe.enabled = False

@@ -28,7 +28,7 @@ from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStation
 from cogames.games.cogs_vs_clips.game.teams.hub import TeamHubVariant
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
 from cogames.games.cogs_vs_clips.game.territory import DamageStrangersVariant, HealTeamVariant, TerritoryVariant
-from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
+from cogames.games.cogs_vs_clips.game.vibes import NoVibesVariant, VibesVariant
 from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
 from cogames.games.cogs_vs_clips.missions.machina_1 import CvCMachina1Variant
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
@@ -288,6 +288,13 @@ class TestVibesVariant:
     def test_enables_change_vibe_action(self):
         env = _make_mission([VibesVariant()]).make_env()
         assert env.game.actions.change_vibe.enabled is True
+
+
+class TestNoVibesVariant:
+    def test_disables_change_vibe_action(self):
+        env = _make_mission([NoVibesVariant()]).make_env()
+        assert env.game.actions.change_vibe.enabled is False
+        assert env.game.vibe_names == VIBE_NAMES
 
 
 class TestTalkVariant:
