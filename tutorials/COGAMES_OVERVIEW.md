@@ -32,8 +32,8 @@ The arena contains:
 - **Hub** — your team's home base, projects friendly territory
 - **Junctions** — capturable nodes that project territory in a radius
 - **Extractors** — resource nodes where Miners gather raw materials
-- **Gear Stations** — swap roles by spending resources
-- **Assembler** — craft hearts from deposited resources
+- **Gear Stations** — equip roles; in CvC, stepping on another station replaces your current role if the hub can pay
+- **Hub** — team base, shared inventory, and heart source
 
 ### 4 Roles
 
@@ -49,7 +49,7 @@ The arena contains:
 ### Cooperation Loop
 
 1. **Miners** extract resources and deposit them into their team hub inventory
-2. The **Assembler** crafts hearts from pooled resources
+2. The **Hub** turns pooled resources into hearts and hands them out to cogs
 3. **Aligners** spend hearts to capture neutral junctions → expand territory
 4. **Scramblers** spend hearts to neutralize enemy junctions → push the front line
 5. **Scouts** explore and apply pressure with their high HP and energy

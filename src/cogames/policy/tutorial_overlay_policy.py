@@ -32,18 +32,19 @@ _PLAY_PHASES: tuple[str, ...] = (
     ),
     (
         "Gear up\n"
-        "Walk into a Gear Station to pick a role.\n"
+        "Walk into a Gear Station to equip a role.\n"
         "From left to right:\n"
         "  Aligner - captures neutral junctions for your team\n"
         "  Scrambler - neutralizes enemy junctions\n"
         "  Miner - gathers resources\n"
         "  Scout - explores fast\n"
+        "In CvC, stepping on a different station replaces your current gear if your team can pay.\n"
         "Try equipping one now."
     ),
     (
         "Resources and hearts\n"
         "Walk into an Extractor to gather resources (Carbon, Oxygen, Germanium, Silicon).\n"
-        "Visit the Assembler to craft Hearts from resources.\n"
+        "Return them to the Hub to take a Heart or make one from team resources.\n"
         "Hearts are needed to capture and scramble junctions."
     ),
     (
@@ -71,7 +72,7 @@ _CVC_PHASES: tuple[str, ...] = (
         "Phase 1: Gear up and get a heart\n"
         "Grab the Aligner gear to capture neutral junctions.\n"
         "Then grab the Scrambler gear to neutralize Clip junctions.\n"
-        "Craft a heart at the Assembler - you need one for each capture or scramble."
+        "Take a heart from the Hub - it will spend team resources if needed."
     ),
     (
         "Phase 2: Expand from the Hub\n"
@@ -94,14 +95,10 @@ _CVC_PHASES: tuple[str, ...] = (
         "Aligners and Scramblers rotate across contested junctions.\n"
         "Keep all roles active."
     ),
-    (
-        "Phase 6: Keep crafting hearts\n"
-        "Hearts fuel captures and scrambles.\n"
-        "Convert resources into hearts continuously so you never stall."
-    ),
+    ("Phase 6: Keep hearts flowing\nHearts fuel captures and scrambles.\nKeep the Hub stocked so you never stall."),
     (
         "Phase 7: The control loop\n"
-        "Repeat: scout the map, gather resources, craft hearts, capture junctions, defend them.\n"
+        "Repeat: scout the map, gather resources, feed the Hub, collect hearts, capture junctions, defend them.\n"
         "Run this loop faster than Clips to win."
     ),
     ("Mission complete\nYou're ready for full CvC missions."),

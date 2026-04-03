@@ -80,7 +80,7 @@ class _DiagnosticMissionBase(CvCMission):
 
 
 # ----------------------------------------------------------------------
-# Diagnostic missions (no assemblers)
+# Diagnostic missions
 # ----------------------------------------------------------------------
 
 

@@ -24,6 +24,9 @@ def test_tutorial_overlay_policy_play_emits_mission_phases() -> None:
     assert phases[0].startswith("Welcome to CvC")
     assert phases[1].startswith("Camera and selection")
     assert "WASD" in phases[2]
+    assert "team can pay" in phases[3]
+    assert "Hub" in phases[4]
+    assert "Assembler" not in "\n".join(phases)
     assert len(phases) == 7
     assert "tutorial_overlay" not in infos
 
@@ -34,6 +37,8 @@ def test_tutorial_overlay_policy_cvc_emits_mission_phases() -> None:
 
     assert phases[0].startswith("CvC:")
     assert "clips" in phases[0].lower()
+    assert "Hub" in "\n".join(phases)
+    assert "Assembler" not in "\n".join(phases)
     assert "tutorial_overlay" not in infos
 
 
