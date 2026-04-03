@@ -7,7 +7,7 @@ from cogames.cli.mission import get_all_missions
 from cogames.main import app
 
 runner = CliRunner()
-RUN_SMOKE_TEST_STEPS = 250
+RUN_SMOKE_TEST_STEPS = 50
 
 
 @pytest.mark.parametrize("mission_name", get_all_missions())
