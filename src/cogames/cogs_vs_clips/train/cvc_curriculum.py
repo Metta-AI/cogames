@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Sequence
 
 from cogames.core import CoGameMissionVariant
 from cogames.games.cogs_vs_clips.game import VARIANTS
+from cogames.games.cogs_vs_clips.game.clips import ClipsConfig, ClipsVariant
+from cogames.games.cogs_vs_clips.game.days import DayConfig, DaysVariant
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.train.reward_variants import AVAILABLE_REWARD_VARIANTS
 
@@ -13,8 +15,7 @@ from cogames.games.cogs_vs_clips.train.reward_variants import AVAILABLE_REWARD_V
 @dataclass(frozen=True)
 class EventProfile:
     name: str
-    clips_overrides: dict[str, object]
-    weather_overrides: dict[str, object]
+    variants: tuple[CoGameMissionVariant, ...] = field(default_factory=tuple)
 
 
 CVC_FIXED_MAPS: list[str] = [
@@ -24,39 +25,49 @@ CVC_FIXED_MAPS: list[str] = [
     "vanilla_large.map",
 ]
 
-DEFAULT_EVENT_PROFILE = EventProfile("events_baseline", {}, {})
+DEFAULT_EVENT_PROFILE = EventProfile("events_baseline")
 CVC_EVENT_PROFILES: list[EventProfile] = [
     DEFAULT_EVENT_PROFILE,
     EventProfile(
         "events_fast_clips_short_day",
-        {
-            "initial_clips_start": 5,
-            "initial_clips_spots": 2,
-            "scramble_start": 25,
-            "scramble_interval": 50,
-            "scramble_radius": 35,
-            "align_start": 50,
-            "align_interval": 50,
-        },
-        {"day_length": 100},
+        variants=(
+            ClipsVariant(
+                clips_config=ClipsConfig(
+                    initial_clips_start=5,
+                    initial_clips_spots=2,
+                    scramble_start=25,
+                    scramble_interval=50,
+                    scramble_radius=35,
+                    align_start=50,
+                    align_interval=50,
+                )
+            ),
+            DaysVariant(days_config=DayConfig(day_length=100)),
+        ),
     ),
     EventProfile(
         "events_slow_clips_long_day",
-        {
-            "initial_clips_start": 50,
-            "initial_clips_spots": 1,
-            "scramble_start": 200,
-            "scramble_interval": 200,
-            "scramble_radius": 15,
-            "align_start": 300,
-            "align_interval": 200,
-        },
-        {"day_length": 400},
+        variants=(
+            ClipsVariant(
+                clips_config=ClipsConfig(
+                    initial_clips_start=50,
+                    initial_clips_spots=1,
+                    scramble_start=200,
+                    scramble_interval=200,
+                    scramble_radius=15,
+                    align_start=300,
+                    align_interval=200,
+                )
+            ),
+            DaysVariant(days_config=DayConfig(day_length=400)),
+        ),
     ),
     EventProfile(
         "events_no_clips",
-        {"disabled": True},
-        {"day_length": 200},
+        variants=(
+            ClipsVariant(num_ships=0, clips_config=ClipsConfig(disabled=True)),
+            DaysVariant(days_config=DayConfig(day_length=200)),
+        ),
     ),
 ]
 
