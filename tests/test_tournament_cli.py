@@ -893,6 +893,40 @@ class TestSeasonLookupAuth:
         assert season_reqs, "Expected a request to /tournament/seasons"
         assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
 
+    def test_season_list_sends_token_when_saved(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        _save_token(tmp_path, "service-token-xyz", "http://fake-login-server")
+        _setup_read_endpoints(httpserver)
+
+        result = _invoke_with_server(httpserver, "season", "list", "--json")
+
+        assert result.exit_code == 0
+        season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons"]
+        assert season_reqs, "Expected a request to /tournament/seasons"
+        assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
+
+    def test_season_show_sends_token_when_saved(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        _save_token(tmp_path, "service-token-xyz", "http://fake-login-server")
+        _setup_read_endpoints(httpserver)
+
+        result = _invoke_with_server(httpserver, "season", "show", "test-season", "--json")
+
+        assert result.exit_code == 0
+        season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons/test-season"]
+        assert season_reqs, "Expected a request to /tournament/seasons/test-season"
+        assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
+
     def test_upload_sends_no_token_in_season_lookup_when_absent(
         self,
         httpserver: HTTPServer,
