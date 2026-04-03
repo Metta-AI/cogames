@@ -9,7 +9,7 @@ from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.train.reward_variants import apply_reward_variants
 
 
-def test_role_conditional_applies_per_agent_shaping_using_role_id_when_present() -> None:
+def test_role_conditional_applies_per_agent_shaping_using_forced_role_vibes() -> None:
     mission = CvCMission(
         name="basic",
         description="test",
