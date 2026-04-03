@@ -339,12 +339,7 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
 
             role_name = _role_name_from_vibe(env, agent_cfg.vibe)
             if role_name is None:
-                explicit_role_id = agent_cfg.inventory.initial.get("role_id")
-                if explicit_role_id is not None:
-                    role_id = int(explicit_role_id)
-                else:
-                    role_id = idx_within_group
-                role_name = _ROLE_ORDER[role_id % len(_ROLE_ORDER)]
+                role_name = _ROLE_ORDER[idx_within_group % len(_ROLE_ORDER)]
 
             role_by_agent_idx.append(role_name)
 

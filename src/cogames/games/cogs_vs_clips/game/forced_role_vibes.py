@@ -1,4 +1,4 @@
-"""ForcedRoleVibes variant: assigns per-agent roles and forces initial vibes."""
+"""ForcedRoleVibes variant: forces initial role vibes per agent."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, override
 from pydantic import Field
 
 from cogames.core import CoGameMissionVariant
-from mettagrid.config.game_value import inv
 from mettagrid.config.mettagrid_config import MettaGridConfig
 
 if TYPE_CHECKING:
@@ -17,10 +16,9 @@ if TYPE_CHECKING:
 # TODO: unchecked variant
 class ForcedRoleVibesVariant(CoGameMissionVariant):
     name: str = "forced_role_vibes"
-    description: str = "Assign per-agent roles as a global observation and force each agent's initial vibe by role."
+    description: str = "Force each agent's initial vibe by role using team-local agent order."
 
     role_order: list[str] = Field(default_factory=lambda: ["miner", "aligner", "scrambler", "scout"])
-    role_id_item: str = Field(default="role_id", description="Inventory item used for the global role_id token.")
     disable_change_vibe: bool = Field(default=True, description="Disable change_vibe so role vibes are forced.")
     per_team: bool = Field(default=True, description="Assign roles by index-within-team.")
 
@@ -32,14 +30,6 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
         unknown = [r for r in self.role_order if r not in allowed_roles]
         if unknown:
             raise ValueError(f"Unknown role(s) in role_order: {unknown}. Allowed: {sorted(allowed_roles)}")
-
-        # Make role_id available as a resource, then add it as a per-agent global observation token.
-        if self.role_id_item not in env.game.resource_names:
-            env.game.resource_names = [*env.game.resource_names, self.role_id_item]
-
-        obs_key = f"inv:own:{self.role_id_item}"
-        if obs_key not in env.game.obs.global_obs.obs:
-            env.game.obs.global_obs.obs[obs_key] = inv(f"agent.{self.role_id_item}")
 
         vibe_id_by_name = {name: idx for idx, name in enumerate(env.game.vibe_names)}
         missing_vibes = [r for r in set(self.role_order) if r not in vibe_id_by_name]
@@ -59,11 +49,8 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
             idx = counters.get(group_key, 0)
             counters[group_key] = idx + 1
 
-            role_id = idx % len(self.role_order)
-            role_name = self.role_order[role_id]
-
+            role_name = self.role_order[idx % len(self.role_order)]
             agent.vibe = vibe_id_by_name[role_name]
-            agent.inventory.initial = {**agent.inventory.initial, self.role_id_item: role_id}
 
         if self.disable_change_vibe:
             env.game.actions.change_vibe.enabled = False
