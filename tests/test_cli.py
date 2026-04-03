@@ -22,6 +22,8 @@ def test_missions_list_command():
     assert "arena" in output
     assert "Cogs" in output
     assert "Map Size" in output
+    assert "machina_1.clips" in output
+    assert "machina_1.desert" not in output
 
 
 def test_missions_describe_command():

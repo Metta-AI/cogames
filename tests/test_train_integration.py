@@ -104,7 +104,7 @@ def test_train_lstm_and_load_policy_data(test_env_config, temp_checkpoint_dir):
 
 
 @pytest.mark.timeout(120)
-def test_make_policy_trainable_and_train(temp_checkpoint_dir):
+def test_make_policy_trainable_and_train(capsys, temp_checkpoint_dir):
     """Test that the trainable policy template can be trained."""
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
@@ -118,8 +118,7 @@ def test_make_policy_trainable_and_train(temp_checkpoint_dir):
         # Add tmpdir to sys.path so the policy module can be imported
         sys.path.insert(0, str(tmpdir))
         try:
-            # Train using the generated policy for a few steps
-            # Use training_facility (13x13 map) for faster execution
+            # Train using the generated policy for a few steps.
             train(
                 env_cfg=get_mission("arena")[1],
                 policy_class_path=f"{policy_file.stem}.MyTrainablePolicy",
@@ -138,6 +137,11 @@ def test_make_policy_trainable_and_train(temp_checkpoint_dir):
             # Check that checkpoints were created
             checkpoints = list(temp_checkpoint_dir.rglob("*.pt"))
             assert len(checkpoints) > 0, "Training should produce checkpoints"
+
+            normalized_output = " ".join(capsys.readouterr().out.split())
+            assert "training_facility_1" not in normalized_output
+            assert "cogames play -m arena -p class=" in normalized_output
+            assert "cogames eval -m arena -p class=" in normalized_output
         finally:
             sys.path.remove(str(tmpdir))
 
