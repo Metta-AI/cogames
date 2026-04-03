@@ -102,6 +102,7 @@ except ImportError:  # pragma: no cover - plugin optional
 
 
 logger = logging.getLogger("cogames.main")
+POLICY_NAME_MAX_LENGTH = 64
 
 
 def _resolve_mettascope_script() -> Path:
@@ -124,6 +125,15 @@ def _resolve_mettascope_script() -> Path:
 
 def _register_policies() -> None:
     discover_and_register_policies()
+
+
+def _validate_policy_name_or_exit(name: str) -> None:
+    if ":" in name:
+        console.print("[red]Policy name must not contain ':'[/red]")
+        raise typer.Exit(1)
+    if len(name) > POLICY_NAME_MAX_LENGTH:
+        console.print(f"[red]Policy name must be at most {POLICY_NAME_MAX_LENGTH} characters[/red]")
+        raise typer.Exit(1)
 
 
 app = typer.Typer(
@@ -2058,12 +2068,7 @@ def upload_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    if ":" in name:
-        console.print("[red]Policy name must not contain ':'[/red]")
-        raise typer.Exit(1)
-    if len(name) > 64:
-        console.print("[red]Policy name must be at most 64 characters[/red]")
-        raise typer.Exit(1)
+    _validate_policy_name_or_exit(name)
 
     season_info = _resolve_season(server, login_server, season)
 
@@ -2311,12 +2316,7 @@ def ship_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    if ":" in name:
-        console.print("[red]Policy name must not contain ':'[/red]")
-        raise typer.Exit(1)
-    if len(name) > 64:
-        console.print("[red]Policy name must be at most 64 characters[/red]")
-        raise typer.Exit(1)
+    _validate_policy_name_or_exit(name)
 
     season_info = _resolve_season(server, login_server, season)
 
