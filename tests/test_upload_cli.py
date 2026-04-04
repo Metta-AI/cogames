@@ -7,6 +7,7 @@ import subprocess
 import uuid
 import zipfile
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
@@ -474,6 +475,100 @@ def test_upload_zip_policy_with_includes_and_setup_script(
         assert "setup_script.py" in names
         assert spec["setup_script"] == "setup_script.py"
         assert spec["init_kwargs"] == {"num_layers": 4, "dropout": "0.1"}
+
+
+def _write_submission_bundle(bundle_dir: Path) -> None:
+    bundle_dir.mkdir(parents=True)
+    (bundle_dir / "policy_spec.json").write_text(
+        json.dumps(
+            {
+                "class_path": "my_policies.TrainedAgent",
+                "data_path": "weights.safetensors",
+                "init_kwargs": {"num_layers": 4},
+            }
+        )
+    )
+    (bundle_dir / "weights.safetensors").write_bytes(b"fake weights data")
+
+
+@pytest.mark.parametrize("use_zip", [False, True])
+def test_create_bundle_accepts_explicit_local_bundle_paths(tmp_path: Path, use_zip: bool) -> None:
+    bundle_dir = tmp_path / "bundle"
+    _write_submission_bundle(bundle_dir)
+
+    policy_arg = bundle_dir
+    if use_zip:
+        policy_arg = tmp_path / "bundle.zip"
+        with zipfile.ZipFile(policy_arg, "w") as zf:
+            for file_path in bundle_dir.rglob("*"):
+                if file_path.is_file():
+                    zf.write(file_path, arcname=file_path.relative_to(bundle_dir))
+
+    output = tmp_path / "submission.zip"
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "create-bundle",
+            "--policy",
+            str(policy_arg),
+            "--output",
+            str(output),
+            "--init-kwarg",
+            "dropout=0.1",
+        ],
+    )
+
+    assert result.exit_code == 0, f"Bundle creation failed:\n{result.output}"
+
+    with zipfile.ZipFile(output) as zf:
+        names = set(zf.namelist())
+        spec = json.loads(zf.read("policy_spec.json"))
+        assert "weights.safetensors" in names
+        assert spec["class_path"] == "my_policies.TrainedAgent"
+        assert spec["data_path"] == "weights.safetensors"
+        assert spec["init_kwargs"] == {"num_layers": 4, "dropout": "0.1"}
+
+
+def test_create_bundle_preserves_bare_policy_name_when_same_named_directory_exists(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    policy_dir = repo_root / "baseline"
+    policy_dir.mkdir()
+    (policy_dir / "policy_spec.json").write_text(json.dumps({"class_path": "wrong.DirPolicy", "init_kwargs": {}}))
+
+    monkeypatch.chdir(repo_root)
+
+    seen: dict[str, bool] = {"called": False}
+
+    def fake_get_policy_spec(ctx: Any, policy_arg: str, device: str | None = None) -> SimpleNamespace:
+        seen["called"] = True
+        assert policy_arg == "baseline"
+        return SimpleNamespace(class_path="correct.Policy", data_path=None, init_kwargs={})
+
+    monkeypatch.setattr("cogames.cli.submit.get_policy_spec", fake_get_policy_spec)
+
+    output = repo_root / "submission.zip"
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "create-bundle",
+            "--policy",
+            "baseline",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, f"Bundle creation failed:\n{result.output}"
+    assert seen["called"] is True
+    with zipfile.ZipFile(output) as zf:
+        spec = json.loads(zf.read("policy_spec.json"))
+        assert spec["class_path"] == "correct.Policy"
 
 
 def test_upload_s3_policy(

@@ -75,6 +75,23 @@ def _resolve_path_within_cwd(path_str: str, cwd: Path) -> Path:
     return resolved.relative_to(cwd)
 
 
+def _existing_local_bundle_path(policy: str) -> Path | None:
+    if "://" in policy:
+        return None
+
+    # Preserve NAME policy parsing unless the input is unambiguously a local path.
+    if not policy.endswith(".zip") and not Path(policy).is_absolute() and not policy.startswith((".", "~")):
+        return None
+
+    candidate = Path(policy).expanduser()
+    if not candidate.exists():
+        return None
+    resolved = candidate.resolve()
+    if resolved.is_dir() or resolved.suffix == ".zip":
+        return resolved
+    return None
+
+
 def validate_paths(paths: list[str]) -> list[Path]:
     """Validate paths exist and are within CWD, return them as relative paths."""
     cwd = Path.cwd().resolve()
@@ -250,7 +267,9 @@ def create_bundle(
     setup_script: str | None = None,
 ) -> Path:
     cwd = Path.cwd().resolve()
-    is_uri = parse_uri(policy, allow_none=True, default_scheme=None) is not None
+    local_bundle_path = _existing_local_bundle_path(policy)
+    bundle_source = local_bundle_path.as_uri() if local_bundle_path is not None else policy
+    is_uri = parse_uri(bundle_source, allow_none=True, default_scheme=None) is not None
     files_to_include = list(include_files or [])
 
     with tempfile.TemporaryDirectory(prefix="cogames_bundle_build_") as tmp_dir:
@@ -258,7 +277,7 @@ def create_bundle(
         bundle_root.mkdir()
 
         if is_uri:
-            submission_spec = _prepare_submission_spec_from_uri(policy, bundle_root, init_kwargs)
+            submission_spec = _prepare_submission_spec_from_uri(bundle_source, bundle_root, init_kwargs)
         else:
             submission_spec, policy_files = _prepare_submission_spec_from_policy(ctx, policy, cwd, init_kwargs)
             files_to_include.extend(policy_files)
