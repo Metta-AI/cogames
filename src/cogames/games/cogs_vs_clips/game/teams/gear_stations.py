@@ -69,7 +69,14 @@ class TeamGearStationsVariant(CoGameMissionVariant):
         cost: dict[str, int] | None = None,
     ) -> None:
         key = f"{team.short_name}:{gear_type}"
-        station = env.game.objects.setdefault(key, GridObjectConfig(name=key, tags=[f"team:{team.name}"]))
+        station = env.game.objects.setdefault(
+            key,
+            GridObjectConfig(
+                name=gear_type,
+                map_name=key,
+                tags=[f"team:{team.name}"],
+            ),
+        )
         env.game.render.symbols[key] = symbol
         if not isinstance(station, GridObjectConfig):
             return

@@ -415,8 +415,8 @@ def train(
             policy_class_arg = policy_shorthand if policy_shorthand else policy_class_path
             policy_arg = f"class={policy_class_arg},data={final_checkpoint}"
 
-            first_mission = missions_arg[0] if missions_arg else "training_facility_1"
-            all_missions = " ".join(f"-m {m}" for m in (missions_arg or ["training_facility_1"]))
+            first_mission = missions_arg[0] if missions_arg else "arena"
+            all_missions = " ".join(f"-m {m}" for m in (missions_arg or ["arena"]))
 
             console.print()
             console.print("To continue training this policy:", style="bold")

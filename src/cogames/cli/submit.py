@@ -478,6 +478,8 @@ def upload_policy(
                 zip_path.as_uri(),
                 "--server",
                 server,
+                "--login-server",
+                login_server,
             ]
             if season:
                 cmd.extend(["--season", season])

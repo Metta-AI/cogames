@@ -217,13 +217,19 @@ def parse_policy_spec(spec: str, device: str | None = None) -> PolicySpecWithPro
 
     if "=" not in first:
         if ":" in first:
-            dotted = first.replace(":", ".")
-            raise ValueError(
-                f"Policy shorthand cannot include ':'. "
-                f"Did you mean 'class={dotted}'? "
-                f"Use '.' as the module separator (not ':')."
-            )
-        entries[0] = f"class={first}"
+            name, suffix = first.rsplit(":", 1)
+            if suffix.isdigit() and int(suffix) > 0:
+                entries[0] = f"class={name}"
+                entries.append(f"proportion={suffix}")
+            else:
+                dotted = first.replace(":", ".")
+                raise ValueError(
+                    f"Policy shorthand cannot include ':'. "
+                    f"Did you mean 'class={dotted}'? "
+                    f"Use '.' as the module separator (not ':')."
+                )
+        else:
+            entries[0] = f"class={first}"
 
     class_path: str | None = None
     data_path: str | None = None

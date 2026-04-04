@@ -19,6 +19,7 @@ import sys
 import webbrowser
 from pathlib import Path
 from typing import Literal, Optional
+from uuid import UUID
 
 import httpx
 import typer
@@ -101,6 +102,7 @@ except ImportError:  # pragma: no cover - plugin optional
 
 
 logger = logging.getLogger("cogames.main")
+POLICY_NAME_MAX_LENGTH = 64
 
 
 def _resolve_mettascope_script() -> Path:
@@ -123,6 +125,15 @@ def _resolve_mettascope_script() -> Path:
 
 def _register_policies() -> None:
     discover_and_register_policies()
+
+
+def _validate_policy_name_or_exit(name: str) -> None:
+    if ":" in name:
+        console.print("[red]Policy name must not contain ':'[/red]")
+        raise typer.Exit(1)
+    if len(name) > POLICY_NAME_MAX_LENGTH:
+        console.print(f"[red]Policy name must be at most {POLICY_NAME_MAX_LENGTH} characters[/red]")
+        raise typer.Exit(1)
 
 
 app = typer.Typer(
@@ -199,7 +210,7 @@ def tutorial_cmd(
         play_module.play(
             console,
             env_cfg=env_cfg,
-            policy_spec=get_policy_spec(ctx, "class=tutorial_noop,kw.tutorial=play"),
+            policy_specs=[parse_policy_spec("class=tutorial_noop,kw.tutorial=play")],
             game_name="tutorial",
             render_mode="gui",
             autostart=False,
@@ -250,7 +261,7 @@ def cvc_tutorial_cmd(
         play_module.play(
             console,
             env_cfg=env_cfg,
-            policy_spec=get_policy_spec(ctx, "class=tutorial_noop,kw.tutorial=cvc"),
+            policy_specs=[parse_policy_spec("class=tutorial_noop,kw.tutorial=cvc")],
             game_name="tutorial",
             render_mode="gui",
             autostart=False,
@@ -450,7 +461,7 @@ def variants_cmd(
     rich_help_panel="Missions",
     epilog="""[dim]Examples:[/dim]
 
-  [cyan]cogames describe machina_1.basic[/cyan]             Describe mission
+  [cyan]cogames describe arena[/cyan]                       Describe mission
 
   [cyan]cogames describe arena -c 4 -v dark_side[/cyan]               With 4 cogs and variant""",
     add_help_option=False,
@@ -460,7 +471,7 @@ def describe_cmd(
     mission: str = typer.Argument(
         ...,
         metavar="MISSION",
-        help="Mission name (e.g., machina_1.basic).",
+        help="Mission name (e.g., arena).",
     ),
     cogs: Optional[int] = typer.Option(
         None,
@@ -501,10 +512,12 @@ def describe_cmd(
     rich_help_panel="Play",
     help="""Play a game interactively.
 
-This runs a single episode of the game using the specified policy.
+This runs a single episode of the game using one or more policies.
 
 By default, the policy is 'noop', so agents won't move unless manually controlled.
 To see agents move by themselves, use `--policy class=random` or `--policy class=baseline`.
+
+Multiple -p flags assign one policy per team (in team order).
 
 You can manually control the actions of a specific cog by clicking on a cog
 in GUI mode or pressing M in unicode mode and using your arrow or WASD keys.
@@ -512,13 +525,18 @@ Log mode is non-interactive and doesn't support manual control.
 """,
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames play -m machina_1.basic[/cyan]                        Interactive
+[cyan]cogames play -m arena[/cyan]                                  Interactive
 
-[cyan]cogames play -m machina_1.basic -p class=random[/cyan]        Random policy
+[cyan]cogames play -m arena -p class=random[/cyan]                  Random policy
 
-[cyan]cogames play -m machina_1.basic -c 4 -p class=baseline[/cyan] Baseline, 4 cogs
+[cyan]cogames play -m arena -c 4 -p class=baseline[/cyan]           Baseline, 4 cogs
 
-[cyan]cogames play -m machina_1.basic --save-replay-file ./latest.json.z[/cyan] Overwrite fixed replay file
+[cyan]cogames play -m four_score -p nlanky -p baseline -p random -p noop[/cyan]
+                                                                 One policy per team
+
+[cyan]cogames play -m four_score -p nlanky:1 -p random:2[/cyan]     Mixed teams (cycling pattern)
+
+[cyan]cogames play -m arena --save-replay-file ./latest.json.z[/cyan] Overwrite fixed replay file
 
 [cyan]cogames play -m machina_1 -r unicode[/cyan]                   Terminal mode""",
     add_help_option=False,
@@ -559,12 +577,12 @@ def play_cmd(
         rich_help_panel="Game Setup",
     ),
     # --- Policy ---
-    policy: str = typer.Option(
-        "class=noop",
+    policies: Optional[list[str]] = typer.Option(  # noqa: B008
+        None,
         "--policy",
         "-p",
         metavar="POLICY",
-        help="Policy controlling cogs ([bold]noop[/bold], [bold]random[/bold], [bold]lstm[/bold], or path).",
+        help="Policy per team. One -p applies to all teams; multiple -p assigns one per team.",
         rich_help_panel="Policy",
     ),
     device: str = typer.Option(
@@ -591,13 +609,13 @@ def play_cmd(
         min=1,
         rich_help_panel="Simulation",
     ),
-    render: Literal["auto", "gui", "vibescope", "unicode", "log", "none"] = typer.Option(  # noqa: B008
+    render: Literal["auto", "gui", "unicode", "log", "none"] = typer.Option(  # noqa: B008
         "auto",
         "--render",
         "-r",
         help=(
             "[bold]auto[/bold]=gui when display is available, otherwise unicode; "
-            "[bold]gui[/bold]=MettaScope, [bold]vibescope[/bold]=VibeScope, "
+            "[bold]gui[/bold]=MettaScope, "
             "[bold]unicode[/bold]=terminal, [bold]log[/bold]=metrics only."
         ),
         rich_help_panel="Simulation",
@@ -670,7 +688,7 @@ def play_cmd(
     display_available = has_display()
     if render == "auto":
         render = "gui" if display_available else "unicode"
-    if render in {"gui", "vibescope"} and not display_available:
+    if render == "gui" and not display_available:
         console.print("[red]Error: This render mode requires a GUI display.[/red]")
         raise typer.Exit(1)
 
@@ -704,7 +722,8 @@ def play_cmd(
 
     seed_rollout_rng(seed)
     resolved_device = resolve_training_device(console, device)
-    policy_spec = get_policy_spec(ctx, policy, device=str(resolved_device))
+    raw_policies = policies if policies else ["class=noop"]
+    policy_specs = get_policy_specs_with_proportions(ctx, raw_policies, device=str(resolved_device))
 
     console.print(f"[cyan]Playing {resolved_mission}[/cyan]")
     console.print(f"Max Steps: {env_cfg.game.max_steps}, Render: {render}")
@@ -712,7 +731,7 @@ def play_cmd(
     play_module.play(
         console,
         env_cfg=env_cfg,
-        policy_spec=policy_spec,
+        policy_specs=policy_specs,
         seed=seed,
         device=str(resolved_device),
         render_mode=render,
@@ -965,13 +984,10 @@ def make_policy(
 
         if trainable:
             console.print(
-                "[dim]Train with: cogames tutorial train -m machina_1.basic -p class="
-                f"{dest_path.stem}.{policy_class}[/dim]"
+                f"[dim]Train with: cogames tutorial train -m arena -p class={dest_path.stem}.{policy_class}[/dim]"
             )
         else:
-            console.print(
-                f"[dim]Play with: cogames play -m machina_1.basic -p class={dest_path.stem}.{policy_class}[/dim]"
-            )
+            console.print(f"[dim]Play with: cogames play -m arena -p class={dest_path.stem}.{policy_class}[/dim]")
 
     except Exception as exc:  # pragma: no cover - user input
         console.print(f"[red]Error: {exc}[/red]")
@@ -997,9 +1013,9 @@ Use wildcards (*) in mission names to match multiple missions at once.""",
     rich_help_panel="Tutorial",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames tutorial train -m machina_1.basic[/cyan]                   Basic training
+[cyan]cogames tutorial train -m arena[/cyan]                             Basic training
 
-[cyan]cogames tutorial train -m machina_1.basic -p class=baseline[/cyan]
+[cyan]cogames tutorial train -m arena -p class=baseline[/cyan]
                                                                  Train baseline policy
 
 [cyan]cogames tutorial train -p ./train_dir/my_run:v5[/cyan]                  Continue from checkpoint
@@ -1209,7 +1225,7 @@ With one policy, this command is equivalent to `cogames scrimmage`.
     rich_help_panel="Evaluate",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames run -m machina_1.basic -p lstm[/cyan]               Evaluate single policy
+[cyan]cogames run -m arena -p lstm[/cyan]                         Evaluate single policy
 
 [cyan]cogames run -m machina_1 -p ./train_dir/my_run:v5[/cyan]     Evaluate a checkpoint bundle
 
@@ -1228,7 +1244,7 @@ This command is equivalent to running `cogames run` with a single policy.
     rich_help_panel="Evaluate",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames scrimmage -m arena.battle -p lstm[/cyan]                   Single policy eval""",
+[cyan]cogames scrimmage -m arena -p lstm[/cyan]                          Single policy eval""",
     add_help_option=False,
 )
 @app.command("eval", hidden=True)
@@ -1408,7 +1424,7 @@ def pickup_cmd(
     ctx: typer.Context,
     # --- Mission ---
     mission: str = typer.Option(
-        "machina_1.basic",
+        "arena",
         "--mission",
         "-m",
         metavar="MISSION",
@@ -1744,6 +1760,22 @@ def _resolve_season(server: str, login_server: str | None = None, season_name: s
         raise typer.Exit(1) from None
 
 
+def _resolve_validation_config_pool(season_info: SeasonDetail) -> tuple[str, UUID]:
+    entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool and p.config_id), None)
+    if entry_pool_info is not None:
+        entry_config_id = entry_pool_info.config_id
+        if entry_config_id is not None:
+            return entry_pool_info.name, entry_config_id
+
+    for pool_info in season_info.pools:
+        config_id = pool_info.config_id
+        if config_id is not None:
+            return pool_info.name, config_id
+
+    console.print(f"[red]No playable config found for season '{season_info.name}'[/red]")
+    raise typer.Exit(1)
+
+
 @app.command(
     name="create-bundle",
     help="Create a submission bundle zip from a policy.",
@@ -1852,6 +1884,13 @@ def validate_bundle_cmd(
         help="Docker image for container validation.",
         rich_help_panel="Validation",
     ),
+    login_server: str = typer.Option(
+        DEFAULT_COGAMES_SERVER,
+        "--login-server",
+        metavar="URL",
+        help="Authentication server URL.",
+        rich_help_panel="Server",
+    ),
     _help: bool = typer.Option(
         False,
         "--help",
@@ -1864,20 +1903,19 @@ def validate_bundle_cmd(
 ) -> None:
     ensure_docker_daemon_access()
 
-    season_info = _resolve_season(server, season_name=season)
-    entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool), None)
-    if not entry_pool_info or not entry_pool_info.config_id:
-        console.print("[red]No entry config found for season[/red]")
-        raise typer.Exit(1)
+    season_info = _resolve_season(server, login_server, season)
+    pool_name, config_id = _resolve_validation_config_pool(season_info)
 
     if image == DEFAULT_EPISODE_RUNNER_IMAGE and season_info.compat_version is not None:
         image = f"ghcr.io/metta-ai/episode-runner:compat-v{season_info.compat_version}"
 
-    with TournamentServerClient(server_url=server) as client:
-        config_data = client.get_config(entry_pool_info.config_id)
+    auth_token = load_token(token_kind=TokenKind.COGAMES, server=login_server)
+    with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
+        config_data = client.get_config(config_id)
 
     validate_bundle_docker(policy, config_data, image)
 
+    console.print(f"[dim]Validated against pool: {pool_name}[/dim]")
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
 
@@ -1965,6 +2003,12 @@ def upload_cmd(
         help="Secret environment variable for policy execution (can be repeated). Stored in AWS Secrets Manager.",
         rich_help_panel="Secrets",
     ),
+    use_bedrock: bool = typer.Option(
+        False,
+        "--use-bedrock",
+        help="Enable AWS Bedrock access for this policy. Sets USE_BEDROCK=true in policy environment.",
+        rich_help_panel="Secrets",
+    ),
     # --- Tournament ---
     season: Optional[str] = typer.Option(
         None,
@@ -2024,12 +2068,7 @@ def upload_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    if ":" in name:
-        console.print("[red]Policy name must not contain ':'[/red]")
-        raise typer.Exit(1)
-    if len(name) > 64:
-        console.print("[red]Policy name must be at most 64 characters[/red]")
-        raise typer.Exit(1)
+    _validate_policy_name_or_exit(name)
 
     season_info = _resolve_season(server, login_server, season)
 
@@ -2041,6 +2080,8 @@ def upload_cmd(
 
     submitting = not no_submit
     parsed_secret_env: dict[str, str] = {}
+    if use_bedrock:
+        parsed_secret_env["USE_BEDROCK"] = "true"
     if secret_env:
         for kv in secret_env:
             key, val = _parse_secret_env(kv)
@@ -2275,12 +2316,7 @@ def ship_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    if ":" in name:
-        console.print("[red]Policy name must not contain ':'[/red]")
-        raise typer.Exit(1)
-    if len(name) > 64:
-        console.print("[red]Policy name must be at most 64 characters[/red]")
-        raise typer.Exit(1)
+    _validate_policy_name_or_exit(name)
 
     season_info = _resolve_season(server, login_server, season)
 

@@ -1,15 +1,19 @@
 import pytest
 
+from cogames.cli.mission import find_mission
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
+from cogames.games.cogs_vs_clips.game.game import CvCGame
 from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
 from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant as JunctionNetVariant
 from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
+from cogames.games.cogs_vs_clips.missions.four_score import FourScoreMission
 from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_map_builder, make_machina1_mission
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
+from cogames.games.cogs_vs_clips.missions.tutorial import make_tutorial_mission
 from mettagrid.config.game_value import ConstValue, QueryCountValue, SumGameValue
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.query import ClosureQuery, MaterializedQuery
@@ -32,10 +36,35 @@ def _normalize_dinky_tag_name(tag_name: str) -> str:
     return tag_name
 
 
+def _iter_cli_mission_names(game: CvCGame) -> list[str]:
+    names = [mission.full_name() for mission in game.missions]
+    names.extend(f"{mission.name}.{sub_name}" for mission in game.missions for sub_name in mission.sub_missions)
+    return names
+
+
 def test_make_cogs_vs_clips_scenario():
     """Test that make_cogs_vs_clips_scenario creates a valid configuration."""
     config = make_machina1_mission(num_agents=2).make_env()
     assert isinstance(config, MettaGridConfig)
+
+
+def test_resolved_cli_missions_with_passive_hp_and_territory_install_friendly_hp_heal() -> None:
+    game = CvCGame()
+    audited: dict[str, list[str]] = {}
+
+    for name in _iter_cli_mission_names(game):
+        env = find_mission(game, name).make_env()
+        territory = env.game.territories.get("team_territory")
+        presence = sorted(territory.presence) if territory is not None else []
+        audited[name] = presence
+
+        has_passive_hp_drain = "hp" in env.game.resource_names and any(
+            "hp_regen" in agent.on_tick for agent in env.game.agents
+        )
+        if territory is not None and has_passive_hp_drain:
+            assert "heal_hp" in territory.presence, f"{name} missing heal_hp; territory presence={presence}"
+
+    assert {"tutorial", "tutorial.aligner", "tutorial.miner", "tutorial.scout", "tutorial.scrambler"} <= audited.keys()
 
 
 def test_cvc_helper_defaults_use_8_agents() -> None:
@@ -57,20 +86,41 @@ def test_machina_1_team_station_tags_win_under_dinky_normalization() -> None:
     normalized_tag_to_id = {_normalize_dinky_tag_name(name): idx for idx, name in enumerate(pei.tags)}
     tag_to_id = {name: idx for idx, name in enumerate(pei.tags)}
 
-    assert normalized_tag_to_id["aligner"] == tag_to_id["type:c:aligner"]
-    assert normalized_tag_to_id["miner"] == tag_to_id["type:c:miner"]
-    assert normalized_tag_to_id["scout"] == tag_to_id["type:c:scout"]
-    assert normalized_tag_to_id["scrambler"] == tag_to_id["type:c:scrambler"]
-    assert "type:aligner" not in tag_to_id
-    assert "type:miner" not in tag_to_id
-    assert "type:scout" not in tag_to_id
-    assert "type:scrambler" not in tag_to_id
+    assert normalized_tag_to_id["aligner"] == tag_to_id["type:aligner"]
+    assert normalized_tag_to_id["miner"] == tag_to_id["type:miner"]
+    assert normalized_tag_to_id["scout"] == tag_to_id["type:scout"]
+    assert normalized_tag_to_id["scrambler"] == tag_to_id["type:scrambler"]
+    assert "type:c:aligner" not in tag_to_id
+    assert "type:c:miner" not in tag_to_id
+    assert "type:c:scout" not in tag_to_id
+    assert "type:c:scrambler" not in tag_to_id
 
 
 def test_cvc_enables_aoe_mask_observation() -> None:
     env = make_machina1_mission().make_env()
     assert env.game.obs.aoe_mask is True
     env.game.id_map().feature_id("aoe_mask")
+
+
+def test_tutorial_spawn_territory_offsets_passive_hp_drain() -> None:
+    mission = make_tutorial_mission().model_copy(
+        update={
+            "num_agents": 2,
+            "num_cogs": 2,
+            "min_cogs": 2,
+            "max_cogs": 2,
+        }
+    )
+    sim = Simulation(mission.make_env(), seed=42)
+
+    for i in range(2):
+        assert sim.agent(i).inventory.get("hp", 0) == 50
+        sim.agent(i).set_action("noop")
+
+    sim.step()
+
+    for i in range(2):
+        assert sim.agent(i).inventory.get("hp", 0) == 100
 
 
 @pytest.mark.skip(reason="Requires territory-only AOEs and team tag setup; not wired up yet")
@@ -125,6 +175,82 @@ def test_machina_objective_reward_excludes_hub_baseline() -> None:
     assert reward_cfg.reward.values[0].query.source == "net:cogs"
     assert isinstance(reward_cfg.reward.values[1], ConstValue)
     assert reward_cfg.reward.values[1].value == -1.0
+
+
+def test_machina_1_emits_held_stat_per_tick_after_alignment() -> None:
+    mission = CvCMission(
+        name="held_metric_test",
+        description="Minimal Machina setup for held stat checks.",
+        map_builder=ObjectNameMapBuilder.Config(
+            map_data=[
+                ["wall", "wall", "wall", "wall", "wall"],
+                ["wall", "empty", "empty", "empty", "wall"],
+                ["wall", "agent.agent", "junction", "c:hub", "wall"],
+                ["wall", "empty", "empty", "empty", "wall"],
+                ["wall", "wall", "wall", "wall", "wall"],
+            ]
+        ),
+        num_agents=1,
+        num_cogs=1,
+        min_cogs=1,
+        max_cogs=1,
+        max_steps=100,
+    ).with_variants(["machina_1"])
+    env = mission.make_env()
+    env.game.agents[0].inventory.initial = {"aligner": 1, "heart": 1}
+
+    sim = Simulation(env, seed=42)
+    sim.agent(0).set_action("move_east")
+    sim.step()
+
+    assert sim.agent(0).last_action_success
+    assert sim._c_sim.get_game_stat("cogs/aligned.junction.gained") == pytest.approx(1.0)
+    assert sim._c_sim.get_game_stat("cogs/aligned.junction.held") == pytest.approx(1.0)
+    assert float(sim.episode_rewards[0]) == pytest.approx(0.01)
+
+    sim.agent(0).set_action("noop")
+    sim.step()
+
+    assert sim._c_sim.get_game_stat("cogs/aligned.junction.held") == pytest.approx(2.0)
+    assert float(sim.episode_rewards[0]) == pytest.approx(0.02)
+
+
+def test_machina_1_clips_held_stat_excludes_all_ship_roots() -> None:
+    env = make_machina1_mission(num_agents=2, max_steps=100).make_env()
+    sim = Simulation(env, seed=42)
+
+    for agent_id in range(sim.num_agents):
+        sim.agent(agent_id).set_action("noop")
+    sim.step()
+
+    assert sim._c_sim.get_game_stat("clips/aligned.junction.held") == pytest.approx(0.0)
+
+
+def test_machina_1_emits_held_stat_handlers_for_clips_team() -> None:
+    env = make_machina1_mission(num_agents=2, max_steps=100).make_env()
+
+    assert {
+        "aligned_junction_held_cogs",
+        "aligned_junction_held_clips",
+    } <= set(env.game.on_tick)
+
+
+def test_four_score_emits_held_stat_handlers_for_each_team() -> None:
+    env = FourScoreMission(
+        num_agents=4,
+        num_cogs=4,
+        min_cogs=4,
+        max_cogs=4,
+        max_steps=100,
+    ).make_env()
+
+    assert {
+        "aligned_junction_held_cogs_red",
+        "aligned_junction_held_cogs_blue",
+        "aligned_junction_held_cogs_green",
+        "aligned_junction_held_cogs_yellow",
+        "aligned_junction_held_four_score_avg",
+    } <= set(env.game.on_tick)
 
 
 def test_hub_global_obs_shows_own_team_only():

@@ -22,7 +22,18 @@ from cogames.games.cogs_vs_clips.game.teams import TeamConfig
 from cogames.games.cogs_vs_clips.game.teams.team import TeamVariant
 from cogames.variants import ResolvedDeps
 from mettagrid.config.event_config import EventConfig, periodic
-from mettagrid.config.filter import AnyFilter, hasTag, hasTagPrefix, isNear, isNot, maxDistance
+from mettagrid.config.filter import (
+    AnyFilter,
+    GameValueFilter,
+    HandlerTarget,
+    anyOf,
+    hasTag,
+    hasTagPrefix,
+    isNear,
+    isNot,
+    maxDistance,
+)
+from mettagrid.config.game_value import QueryCountValue, SumGameValue
 from mettagrid.config.mettagrid_config import GridObjectConfig, MettaGridConfig
 from mettagrid.config.mutation import (
     addTag,
@@ -52,19 +63,22 @@ class ClipsConfig(TeamConfig):
     initial_clips_start: int = Field(default=10)
     initial_clips_spots: int = Field(default=1)
 
-    scramble_start: int = Field(default=50)
-    scramble_interval: int = Field(default=70)
+    scramble_start: int = Field(default=100)
+    scramble_interval: int = Field(default=200)
     scramble_radius: int = Field(default=JUNCTION_ALIGN_DISTANCE)
     scramble_end: Optional[int] = Field(default=None)
 
     align_start: int = Field(default=100)
-    align_interval: int = Field(default=70)
+    align_interval: int = Field(default=200)
     align_end: Optional[int] = Field(default=None)
 
     presence_end: Optional[int] = Field(default=None)
-    greedy_expand_from_ships: bool = Field(default=False)
+    greedy_expand_from_ships: bool = Field(default=True)
     greedy_max_search_radius: int = Field(default=120, ge=1)
     angry_target_enemy_hub: bool = Field(default=False)
+    adaptive_enabled: bool = Field(default=False)
+    adaptive_dominance_ratio: int = Field(default=2, ge=2)
+    adaptive_dominant_targets_per_lane: int = Field(default=3, ge=1)
 
     def ship_query(self) -> Query:
         return query(typeTag("ship"), hasTag(self.team_tag()))
@@ -86,6 +100,75 @@ class ClipsConfig(TeamConfig):
 
         events: dict[str, EventConfig] = {}
         max_search_radius = max(1, self.greedy_max_search_radius)
+
+        def build_adaptive_filters() -> tuple[list[AnyFilter], list[AnyFilter]]:
+            def linear_sum_team_counts(
+                cogs_cv: QueryCountValue,
+                clips_cv: QueryCountValue,
+                w_cogs: float,
+                w_clips: float,
+            ) -> SumGameValue:
+                return SumGameValue(
+                    values=[cogs_cv, clips_cv],
+                    weights=[w_cogs, w_clips],
+                )
+
+            def nonempty_cogs_plus_clips_filter(
+                cogs_cv: QueryCountValue,
+                clips_cv: QueryCountValue,
+            ) -> GameValueFilter:
+                return GameValueFilter(
+                    target=HandlerTarget.TARGET,
+                    value=linear_sum_team_counts(cogs_cv, clips_cv, 1.0, 1.0),
+                    min=1,
+                )
+
+            def cogs_dominant_linear_filter(
+                cogs_cv: QueryCountValue,
+                clips_cv: QueryCountValue,
+                ratio: int,
+            ) -> GameValueFilter:
+                return GameValueFilter(
+                    target=HandlerTarget.TARGET,
+                    value=linear_sum_team_counts(cogs_cv, clips_cv, 1.0, float(-ratio)),
+                    min=0,
+                )
+
+            def clips_dominant_linear_filter(
+                cogs_cv: QueryCountValue,
+                clips_cv: QueryCountValue,
+                ratio: int,
+            ) -> GameValueFilter:
+                return GameValueFilter(
+                    target=HandlerTarget.TARGET,
+                    value=linear_sum_team_counts(cogs_cv, clips_cv, float(-ratio), 1.0),
+                    min=0,
+                )
+
+            cogs_cnt = QueryCountValue(
+                query=query(typeTag("junction"), filters=[hasTag("team:cogs")]),
+            )
+            clips_cnt = QueryCountValue(
+                query=query(typeTag("junction"), filters=[hasTag("team:clips")]),
+            )
+            ratio = self.adaptive_dominance_ratio
+            cogs_linear = cogs_dominant_linear_filter(cogs_cnt, clips_cnt, ratio)
+            clips_linear = clips_dominant_linear_filter(cogs_cnt, clips_cnt, ratio)
+            nonempty_f = nonempty_cogs_plus_clips_filter(cogs_cnt, clips_cnt)
+            not_cogs_dominant = anyOf([isNot(cogs_linear), isNot(nonempty_f)])
+            not_clips_dominant = anyOf([isNot(clips_linear), isNot(nonempty_f)])
+            return (
+                [cogs_linear, nonempty_f],
+                [not_cogs_dominant, not_clips_dominant],
+            )
+
+        adaptive_burst_filters: list[AnyFilter] = []
+        adaptive_balanced_filters: list[AnyFilter] = []
+        if self.adaptive_enabled:
+            (
+                adaptive_burst_filters,
+                adaptive_balanced_filters,
+            ) = build_adaptive_filters()
 
         def add_greedy_event_chain(
             *,
@@ -109,10 +192,56 @@ class ClipsConfig(TeamConfig):
                 )
                 next_event_name = radius_name
 
+        def add_direct_event(
+            *,
+            name: str,
+            timesteps: list[int],
+            target_filters: list[AnyFilter],
+            mutations: list,
+        ) -> None:
+            events[name] = EventConfig(
+                name=name,
+                target_query=query(
+                    typeTag("junction"),
+                    filters=target_filters,
+                ),
+                timesteps=timesteps,
+                mutations=mutations,
+                max_targets=1,
+            )
+
+        def add_centered_lane_events(
+            *,
+            align_key: str,
+            scramble_key: str,
+            lane_suffix: str,
+            center_query: Query,
+            align_timesteps: list[int],
+            scramble_timesteps: list[int],
+            align_filters: list[AnyFilter],
+            scramble_filters: list[AnyFilter],
+            align_mutations: list,
+            scramble_mutations: list,
+        ) -> None:
+            add_greedy_event_chain(
+                base_name=align_key,
+                timesteps=align_timesteps,
+                target_filters=align_filters,
+                center_query=center_query,
+                mutations=align_mutations,
+            )
+            add_greedy_event_chain(
+                base_name=scramble_key,
+                timesteps=scramble_timesteps,
+                target_filters=scramble_filters,
+                center_query=center_query,
+                mutations=scramble_mutations,
+            )
+
         for lane_idx, ship_map_name in enumerate(ship_map_names):
-            suffix = "" if lane_idx == 0 else f"_s{lane_idx}"
-            align_key = f"neutral_to_clips{suffix}"
-            scramble_key = f"cogs_to_neutral{suffix}"
+            lane_suffix = "" if lane_idx == 0 else f"_s{lane_idx}"
+            align_key = f"neutral_to_clips{lane_suffix}"
+            scramble_key = f"cogs_to_neutral{lane_suffix}"
             ship_query = query(
                 typeTag("ship"),
                 filters=[hasTag(self.team_tag()), hasTag(ship_map_name)],
@@ -154,58 +283,77 @@ class ClipsConfig(TeamConfig):
             )
 
             if self.greedy_expand_from_ships:
-                add_greedy_event_chain(
-                    base_name=align_key,
-                    timesteps=align_timesteps,
-                    target_filters=align_filters,
+                add_centered_lane_events(
+                    align_key=align_key,
+                    scramble_key=scramble_key,
+                    lane_suffix=lane_suffix,
                     center_query=ship_query,
-                    mutations=align_mutations,
-                )
-                add_greedy_event_chain(
-                    base_name=scramble_key,
-                    timesteps=scramble_timesteps,
-                    target_filters=scramble_filters,
-                    center_query=ship_query,
-                    mutations=scramble_mutations,
+                    align_timesteps=align_timesteps,
+                    scramble_timesteps=scramble_timesteps,
+                    align_filters=align_filters,
+                    scramble_filters=scramble_filters,
+                    align_mutations=align_mutations,
+                    scramble_mutations=scramble_mutations,
                 )
                 continue
 
             if self.angry_target_enemy_hub:
-                add_greedy_event_chain(
-                    base_name=align_key,
-                    timesteps=align_timesteps,
-                    target_filters=align_filters,
+                add_centered_lane_events(
+                    align_key=align_key,
+                    scramble_key=scramble_key,
+                    lane_suffix=lane_suffix,
                     center_query=enemy_hub_query,
+                    align_timesteps=align_timesteps,
+                    scramble_timesteps=scramble_timesteps,
+                    align_filters=align_filters,
+                    scramble_filters=scramble_filters,
+                    align_mutations=align_mutations,
+                    scramble_mutations=scramble_mutations,
+                )
+                continue
+
+            if self.adaptive_enabled:
+                for burst_n in range(1, self.adaptive_dominant_targets_per_lane + 1):
+                    burst_align = f"neutral_to_clips_burst_{burst_n}{lane_suffix}"
+                    burst_scramble = f"cogs_to_neutral_burst_{burst_n}{lane_suffix}"
+                    add_direct_event(
+                        name=burst_align,
+                        timesteps=align_timesteps,
+                        target_filters=[*align_filters, *adaptive_burst_filters],
+                        mutations=align_mutations,
+                    )
+                    add_direct_event(
+                        name=burst_scramble,
+                        timesteps=scramble_timesteps,
+                        target_filters=[*scramble_filters, *adaptive_burst_filters],
+                        mutations=scramble_mutations,
+                    )
+
+                add_direct_event(
+                    name=f"neutral_to_clips_balanced{lane_suffix}",
+                    timesteps=align_timesteps,
+                    target_filters=[*align_filters, *adaptive_balanced_filters],
                     mutations=align_mutations,
                 )
-                add_greedy_event_chain(
-                    base_name=scramble_key,
+                add_direct_event(
+                    name=f"cogs_to_neutral_balanced{lane_suffix}",
                     timesteps=scramble_timesteps,
-                    target_filters=scramble_filters,
-                    center_query=enemy_hub_query,
+                    target_filters=[*scramble_filters, *adaptive_balanced_filters],
                     mutations=scramble_mutations,
                 )
                 continue
 
-            events[align_key] = EventConfig(
+            add_direct_event(
                 name=align_key,
-                target_query=query(
-                    typeTag("junction"),
-                    filters=align_filters,
-                ),
                 timesteps=align_timesteps,
+                target_filters=align_filters,
                 mutations=align_mutations,
-                max_targets=1,
             )
-            events[scramble_key] = EventConfig(
+            add_direct_event(
                 name=scramble_key,
-                target_query=query(
-                    typeTag("junction"),
-                    filters=scramble_filters,
-                ),
                 timesteps=scramble_timesteps,
+                target_filters=scramble_filters,
                 mutations=scramble_mutations,
-                max_targets=1,
             )
         return events
 
@@ -258,6 +406,32 @@ class ClipsVariant(CoGameMissionVariant):
             map_builder=env.game.map_builder,
         )
         env.game.events.update(clips_events)
+
+
+class AdaptiveClipsVariant(CoGameMissionVariant):
+    """Turn on adaptive clips events: balanced vs burst lanes from map-wide team counts."""
+
+    name: str = "adaptive_clips"
+    description: str = (
+        "Split clips align and scramble events into balanced and cogs-dominant burst families "
+        "using map-wide junction counts for cogs vs clips and a configurable dominance ratio."
+    )
+    dominance_ratio: int = Field(default=2, ge=2)
+    dominant_targets_per_lane: int = Field(default=3, ge=1)
+
+    @override
+    def dependencies(self) -> Deps:
+        return Deps(required=[ClipsVariant])
+
+    @override
+    def configure(self, deps: ResolvedDeps) -> None:
+        clips_v = deps.required(ClipsVariant)
+        assert clips_v.clips is not None and isinstance(clips_v.clips, ClipsConfig)
+        clips_v.clips.adaptive_enabled = True
+        clips_v.clips.greedy_expand_from_ships = False
+        clips_v.clips.angry_target_enemy_hub = False
+        clips_v.clips.adaptive_dominance_ratio = self.dominance_ratio
+        clips_v.clips.adaptive_dominant_targets_per_lane = self.dominant_targets_per_lane
 
 
 class GreedyClipsVariant(CoGameMissionVariant):

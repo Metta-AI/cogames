@@ -38,7 +38,7 @@ class DamageVariant(CoGameMissionVariant):
 
         for agent in env.game.agents:
             inv = agent.inventory
-            inv.limits["hp"] = ResourceLimitsConfig(min=self.limit, resources=["hp"], modifiers=self.modifiers)
+            inv.limits["hp"] = ResourceLimitsConfig(base=self.limit, resources=["hp"], modifiers=self.modifiers)
             inv.initial["hp"] = self.initial
             agent.on_tick["hp_regen"] = Handler(mutations=[updateActor({"hp": self.regen})])
 

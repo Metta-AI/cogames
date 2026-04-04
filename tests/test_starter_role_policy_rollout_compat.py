@@ -31,7 +31,7 @@ def test_starter_role_policy_resolves_current_cogsguard_tags(mission) -> None:
     hub_tag_id = policy_env_info.tags.index("type:hub")
     for role in ROLES:
         impl = StarterCogPolicyImpl(policy_env_info, agent_id=0, preferred_gear=role)
-        expected_station_tag = policy_env_info.tags.index(f"type:c:{role}")
+        expected_station_tag = policy_env_info.tags.index(f"type:{role}")
         assert impl._gear_station_tags_by_gear[role] == {expected_station_tag}
         assert hub_tag_id in impl._heart_source_tags
 

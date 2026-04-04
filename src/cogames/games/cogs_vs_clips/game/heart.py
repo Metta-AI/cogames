@@ -40,5 +40,5 @@ class HeartVariant(CoGameMissionVariant):
         for agent in env.game.agents:
             agent.inventory.limits.setdefault(
                 "heart",
-                ResourceLimitsConfig(min=self.limit, resources=["heart"]),
+                ResourceLimitsConfig(base=self.limit, resources=["heart"]),
             )
