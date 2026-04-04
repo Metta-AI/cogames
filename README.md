@@ -56,6 +56,12 @@ RESEARCH:
 ```
 <!-- LEADERBOARD_END -->
 
+### Autoresearch Progress
+
+Autonomous Claude Code agents continuously experiment with policy improvements across multiple research issues. Each dot is an experiment; solid lines track the running best per issue.
+
+![Autoresearch Progress](docs/autoresearch_progress.png)
+
 The [Alignment League Benchmark (ALB)](https://www.softmax.com/alignmentleague) is a suite of multi-agent games, designed to measure how well AI agents align, coordinate, and collaborate with others (both AIs and humans).
 
 CoGames is the games environment for ALB. You can use it to:
