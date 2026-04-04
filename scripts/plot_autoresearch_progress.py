@@ -50,6 +50,15 @@ def parse_tsv(filepath, commit_dates):
             except (ValueError, TypeError):
                 continue
 
+            # Rough normalization: scale by steps to per-1000-step equivalent
+            steps_str = row.get("steps", "1000")
+            try:
+                steps = int(steps_str)
+            except (ValueError, TypeError):
+                steps = 1000
+            if steps > 0 and steps != 1000:
+                reward = reward * (1000 / steps)
+
             status = row.get("status", "").strip()
 
             # Look up date
@@ -65,6 +74,8 @@ def parse_tsv(filepath, commit_dates):
 
             points.append((dt, reward, status))
 
+    # Filter out points using different reward scales (total vs per-agent)
+    points = [(d, r, s) for d, r, s in points if r <= 1.5]
     points.sort(key=lambda x: x[0])
     return points
 
@@ -165,7 +176,7 @@ def main():
     ax.spines["right"].set_visible(False)
     ax.grid(True, alpha=0.08, color="white")
 
-    ax.set_ylim(bottom=0, top=1.05)
+    ax.set_ylim(bottom=0)
 
     legend = ax.legend(loc="upper left", fontsize=8.5, ncol=2,
                        facecolor="#161b22", edgecolor="#30363d",
