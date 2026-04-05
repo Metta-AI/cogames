@@ -28,7 +28,7 @@ cogames login
 
 You can submit either:
 - A **policy class + weights** using `class=...` and `data=...`, or
-- A **checkpoint bundle** (directory with `policy_spec.json`).
+- A **self-contained submission bundle** (directory or `.zip` with `policy_spec.json` and any required runtime files).
 
 Examples below use placeholders. Replace them with your actual paths.
 
@@ -65,13 +65,16 @@ cogames upload -p class=my_policy.MyTrainablePolicy,data=./train_dir/<RUN_ID>/mo
 ```
 
 
-### Option B — Upload a checkpoint bundle
+### Option B — Build and upload a portable bundle
 
-If your training run produced a `policy_spec.json`, you can upload the run directory directly:
+Use `cogames create-bundle` whenever the raw checkpoint directory is not already self-contained:
 
 ```bash
-cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --skip-validation
+cogames create-bundle -p ./train_dir/<RUN_ID> -o submission.zip
+cogames upload -p ./submission.zip -n my_policy_name --skip-validation
 ```
+
+If you already have a self-contained bundle directory or zip, you can upload it directly with `cogames upload -p`.
 
 
 ## Step 3 — Dry run (optional)
@@ -79,7 +82,7 @@ cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --skip-validation
 Validate the upload package without sending it:
 
 ```bash
-cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --dry-run --skip-validation
+cogames upload -p ./submission.zip -n my_policy_name --dry-run --skip-validation
 ```
 
 
@@ -88,7 +91,7 @@ cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --dry-run --skip-valida
 By default, `cogames upload` both uploads and submits to a season. You can specify a season explicitly:
 
 ```bash
-cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --season beta-teams-small --skip-validation
+cogames upload -p ./submission.zip -n my_policy_name --season beta-teams-small --skip-validation
 ```
 
 Or submit a previously uploaded policy to a season:
@@ -127,7 +130,8 @@ cogames leaderboard --season beta-teams-small
 ## Troubleshooting
 
 - **Auth errors**: run `cogames login` again.
-- **Module not found**: use `class=...` with a fully qualified path or include the file in submission.
+- **Module not found**: use `class=...` with a fully qualified path or rebuild the portable bundle with
+  `cogames create-bundle`, `--include-files`, and `--setup-script` as needed.
 - **Invalid policy path**: ensure `-p` points to an existing bundle or weights file.
 - **Local vs S3 checkpoints**: local training saves files under `./train_dir/`. Cloud training may require downloading or referencing the S3 bundle.
 - **Policy too large**: the server enforces a 500 MB upload limit. Reduce your submission size by removing unnecessary files from your checkpoint directory before uploading.
