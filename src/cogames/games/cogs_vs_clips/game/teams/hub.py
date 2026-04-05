@@ -92,6 +92,9 @@ class TeamHubVariant(CoGameMissionVariant):
 
     name: str = "team_hub"
     description: str = "Each team gets a hub station for deposits."
+    initial_hearts: dict[str, int] = Field(
+        default_factory=dict, description="Per-team starting heart overrides, keyed by team name."
+    )
     initial_inventory: dict[str, InventoryConfig] = Field(
         default_factory=dict, description="Per-team hub inventory overrides, keyed by team name."
     )
@@ -141,7 +144,7 @@ class TeamHubVariant(CoGameMissionVariant):
         for team in (t for t in team_v.teams.values() if t.num_agents > 0):
             default_initial: dict[str, int] = {element: team.num_agents * 3 for element in elements}
             if heart is not None:
-                default_initial["heart"] = 5
+                default_initial["heart"] = self.initial_hearts.get(team.name, 5)
             inventory = self.initial_inventory.get(
                 team.name,
                 InventoryConfig(

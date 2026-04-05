@@ -179,6 +179,22 @@ class TestTeamHubVariant:
         hub = env.game.objects["c:hub"]
         assert "deposit" in hub.on_use_handlers
 
+    def test_initial_hearts_override_preserves_default_element_inventory(self):
+        env = _make_env_without_default(
+            [
+                ElementsVariant(),
+                HeartVariant(),
+                TeamHubVariant(initial_hearts={"cogs": 120}),
+            ]
+        )
+        hub = env.game.objects["c:hub"]
+        expected_element_inventory = len(env.game.agents) * 3
+        assert hub.inventory.initial["heart"] == 120
+        assert hub.inventory.initial["oxygen"] == expected_element_inventory
+        assert hub.inventory.initial["carbon"] == expected_element_inventory
+        assert hub.inventory.initial["germanium"] == expected_element_inventory
+        assert hub.inventory.initial["silicon"] == expected_element_inventory
+
 
 class TestHeartVariant:
     def test_adds_heart_limit_to_agents(self):
