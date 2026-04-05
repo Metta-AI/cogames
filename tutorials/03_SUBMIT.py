@@ -47,7 +47,7 @@
 #
 # You can submit either:
 # - A **policy class + weights** using `class=...` and `data=...`, or
-# - A **checkpoint bundle** (directory with `policy_spec.json`).
+# - A **self-contained submission bundle** (directory or `.zip` with `policy_spec.json` and any required runtime files).
 #
 # Examples below use placeholders. Replace them with your actual paths.
 #
@@ -87,13 +87,16 @@
 #
 
 # %% [markdown]
-# ### Option B — Upload a checkpoint bundle
+# ### Option B — Build and upload a portable bundle
 #
-# If your training run produced a `policy_spec.json`, you can upload the run directory directly:
+# Use `cogames create-bundle` whenever the raw checkpoint directory is not already self-contained:
 #
 # ```bash
-# cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --skip-validation
+# cogames create-bundle -p ./train_dir/<RUN_ID> -o submission.zip
+# cogames upload -p ./submission.zip -n my_policy_name --skip-validation
 # ```
+#
+# If you already have a self-contained bundle directory or zip, you can upload it directly with `cogames upload -p`.
 #
 
 # %% [markdown]
@@ -102,7 +105,7 @@
 # Validate the upload package without sending it:
 #
 # ```bash
-# cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --dry-run --skip-validation
+# cogames upload -p ./submission.zip -n my_policy_name --dry-run --skip-validation
 # ```
 #
 
@@ -112,7 +115,7 @@
 # By default, `cogames upload` both uploads and submits to a season. You can specify a season explicitly:
 #
 # ```bash
-# cogames upload -p ./train_dir/<RUN_ID> -n my_policy_name --season beta-teams-small --skip-validation
+# cogames upload -p ./submission.zip -n my_policy_name --season beta-teams-small --skip-validation
 # ```
 #
 # Or submit a previously uploaded policy to a season:
