@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING, override
 
 from pydantic import Field
 
-from cogames.core import CoGameMissionVariant
+from cogames.core import CoGameMissionVariant, Deps
+from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
 from mettagrid.config.mettagrid_config import MettaGridConfig
 
 if TYPE_CHECKING:
@@ -21,6 +22,10 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
     role_order: list[str] = Field(default_factory=lambda: ["miner", "aligner", "scrambler", "scout"])
     disable_change_vibe: bool = Field(default=True, description="Disable change_vibe so role vibes are forced.")
     per_team: bool = Field(default=True, description="Assign roles by index-within-team.")
+
+    @override
+    def dependencies(self) -> Deps:
+        return Deps(optional=[VibesVariant])
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
@@ -39,7 +44,6 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
                 "Expected role names to be present as vibe names."
             )
 
-        # Assign roles and force initial vibe.
         counters: dict[int, int] = {}
         for agent in env.game.agents:
             if self.per_team:
@@ -54,3 +58,4 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
 
         if self.disable_change_vibe:
             env.game.actions.change_vibe.enabled = False
+            env.game.actions.change_vibe.vibes = []

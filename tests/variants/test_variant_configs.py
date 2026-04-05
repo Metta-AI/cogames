@@ -13,6 +13,7 @@ from cogames.games.cogs_vs_clips.game.days import DayConfig, DaysVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
+from cogames.games.cogs_vs_clips.game.forced_role_vibes import ForcedRoleVibesVariant
 from cogames.games.cogs_vs_clips.game.gear import GearVariant
 from cogames.games.cogs_vs_clips.game.gear_stations import GearStationsVariant
 from cogames.games.cogs_vs_clips.game.heart import HeartVariant
@@ -311,6 +312,31 @@ class TestNoVibesVariant:
         env = _make_mission([NoVibesVariant()]).make_env()
         assert env.game.actions.change_vibe.enabled is False
         assert env.game.vibe_names == VIBE_NAMES
+
+
+class TestForcedRoleVibesVariant:
+    def test_assigns_roles_from_custom_role_order(self):
+        env = _make_mission(
+            [
+                ForcedRoleVibesVariant(
+                    role_order=["miner", "aligner", "scrambler"],
+                    per_team=False,
+                )
+            ]
+        ).make_env()
+
+        assert env.game.actions.change_vibe.enabled is False
+        assert env.game.actions.change_vibe.vibes == []
+        assert [agent.vibe for agent in env.game.agents] == [
+            VIBE_NAMES.index("miner"),
+            VIBE_NAMES.index("aligner"),
+            VIBE_NAMES.index("scrambler"),
+            VIBE_NAMES.index("miner"),
+            VIBE_NAMES.index("aligner"),
+            VIBE_NAMES.index("scrambler"),
+            VIBE_NAMES.index("miner"),
+            VIBE_NAMES.index("aligner"),
+        ]
 
 
 class TestTalkVariant:

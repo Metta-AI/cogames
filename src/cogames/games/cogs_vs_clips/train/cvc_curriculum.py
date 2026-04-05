@@ -91,10 +91,7 @@ def _is_parametrized_reward_variant(name: str) -> bool:
 def split_variants(
     variants: str | Sequence[str] | None,
 ) -> tuple[list[CoGameMissionVariant], list[str]]:
-    if variants is None:
-        names: list[str] = []
-    else:
-        names = normalize_variant_names(variants)
+    names = normalize_variant_names(variants)
     all_variants = {variant.name: variant for variant in VARIANTS}
     reward_variants = set(AVAILABLE_REWARD_VARIANTS)
 
