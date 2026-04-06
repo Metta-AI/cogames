@@ -34,12 +34,10 @@ from rich.prompt import Prompt
 from rich.table import Table
 
 import cogames.policy.starter_agent as starter_agent
-import cogames.policy.trainable_policy_template as trainable_policy_template
 from cogames import diagnose as diagnose_module
 from cogames import evaluate as evaluate_module
 from cogames import pickup as pickup_module
 from cogames import play as play_module
-from cogames import train as train_module
 from cogames import verbose
 from cogames.cli.assay import assay_app
 from cogames.cli.auth import auth_app
@@ -84,8 +82,6 @@ from cogames.cli.submit import (
 )
 from cogames.device import resolve_training_device
 from cogames.display_detect import has_display
-from cogames.games.cogs_vs_clips.train.curricula import make_rotation
-from cogames.seed import seed_rollout_rng
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.loader import discover_and_register_policies
 from mettagrid.policy.policy_registry import get_policy_registry
@@ -767,6 +763,8 @@ def play_cmd(
         if isinstance(map_builder, MapGen.Config):
             map_builder.seed = map_seed
 
+    from cogames.seed import seed_rollout_rng  # noqa: PLC0415
+
     seed_rollout_rng(seed)
     resolved_device = resolve_training_device(console, device)
     raw_policies = policies if policies else ["class=noop"]
@@ -1003,6 +1001,8 @@ def make_policy(
 
     try:
         if trainable:
+            import cogames.policy.trainable_policy_template as trainable_policy_template  # noqa: PLC0415
+
             template_path = Path(trainable_policy_template.__file__)
             policy_class = "MyTrainablePolicy"
             policy_type = "Trainable"
@@ -1222,11 +1222,15 @@ def train_cmd(
         console.print(f"Training on mission: {mission_name}\n")
     elif len(selected_missions) > 1:
         env_cfg = None
+        from cogames.games.cogs_vs_clips.train.curricula import make_rotation  # noqa: PLC0415
+
         supplier = make_rotation(selected_missions)
         console.print("Training on missions:\n" + "\n".join(f"- {m}" for m, _ in selected_missions) + "\n")
     else:
         # Should not get here
         raise ValueError("Please specify at least one mission")
+
+    from cogames import train as train_module  # noqa: PLC0415
 
     policy_spec = get_policy_spec(ctx, policy)
     torch_device = resolve_training_device(console, device)
