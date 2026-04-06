@@ -6,7 +6,6 @@ from typing import Any, Literal, TypeVar, overload
 import httpx
 from pydantic import TypeAdapter
 
-from cogames.auth import has_saved_token, load_token
 from cogames.cli._model_base import CLIModel
 from cogames.cli.base import console
 from cogames.cli.generated_models import (
@@ -33,7 +32,8 @@ from cogames.cli.generated_models import (
     TeamSummary,
     TeamTournamentProgress,
 )
-from cogames.token_storage import TokenKind
+from softmax.auth import has_saved_token, load_token
+from softmax.token_storage import TokenKind
 
 T = TypeVar("T")
 
@@ -68,7 +68,7 @@ class TournamentServerClient:
     def from_login(cls, server_url: str, login_server: str) -> TournamentServerClient | None:
         if not has_saved_token(token_kind=TokenKind.COGAMES, server=login_server):
             console.print("[red]Error:[/red] Not authenticated.")
-            console.print("Please run: [cyan]cogames login[/cyan]")
+            console.print("Please run: [cyan]softmax login[/cyan]")
             return None
 
         token = load_token(token_kind=TokenKind.COGAMES, server=login_server)
