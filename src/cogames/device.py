@@ -1,10 +1,18 @@
 """Utility functions for CoGames CLI."""
 
-import torch
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from rich.console import Console
+
+if TYPE_CHECKING:
+    import torch
 
 
 def resolve_training_device(console: Console, requested: str) -> torch.device:
+    import torch  # noqa: PLC0415
+
     normalized = requested.strip().lower()
 
     def cuda_usable() -> bool:
