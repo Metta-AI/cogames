@@ -201,7 +201,13 @@ def assay_results(
             if not runs:
                 console.print(f"[yellow]No assay runs found for policy {policy_or_run_id!r}.[/yellow]")
                 return
-            run_id = runs[0].id
+            scorable = [r for r in runs if r.status != AssayStatus.pending]
+            if not scorable:
+                console.print(
+                    f"[yellow]Latest run is still pending ({runs[0].id}). No completed runs available.[/yellow]"
+                )
+                return
+            run_id = scorable[0].id
 
         results = client.get_assay_results(run_id)
 
