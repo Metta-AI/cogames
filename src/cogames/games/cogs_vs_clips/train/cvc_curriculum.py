@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Sequence
+from typing import Any, Sequence
 
 from cogames.core import CoGameMissionVariant
 from cogames.games.cogs_vs_clips.game import VARIANTS
@@ -71,15 +71,19 @@ CVC_EVENT_PROFILES: list[EventProfile] = [
     ),
 ]
 
+VariantSpec = str | dict[str, Any] | CoGameMissionVariant
 
-def normalize_variant_names(variants: str | Sequence[str] | None) -> list[str]:
+
+def normalize_variant_names(
+    variants: str | Sequence[VariantSpec] | None,
+) -> list[VariantSpec]:
     if variants is None:
         return []
     if isinstance(variants, str):
         if variants.startswith("["):
             parsed = json.loads(variants)
             if isinstance(parsed, list):
-                return [str(name) for name in parsed]
+                return parsed
         return [variants]
     return list(variants)
 
@@ -89,7 +93,7 @@ def _is_parametrized_reward_variant(name: str) -> bool:
 
 
 def split_variants(
-    variants: str | Sequence[str] | None,
+    variants: str | Sequence[VariantSpec] | None,
 ) -> tuple[list[CoGameMissionVariant], list[str]]:
     names = normalize_variant_names(variants)
     all_variants = {variant.name: variant for variant in VARIANTS}
@@ -99,6 +103,19 @@ def split_variants(
     resolved_rewards: list[str] = []
     unknown: list[str] = []
     for name in names:
+        if isinstance(name, CoGameMissionVariant):
+            resolved.append(name.model_copy(deep=True))
+            continue
+        if isinstance(name, dict):
+            variant_name = name.get("name")
+            if not isinstance(variant_name, str):
+                raise ValueError(f"Variant spec must include string name, got: {name}")
+            base_variant = all_variants.get(variant_name)
+            if base_variant is None:
+                available_mission = ", ".join(v.name for v in VARIANTS)
+                raise ValueError(f"Unknown variant spec '{variant_name}'. Mission variants: {available_mission}.")
+            resolved.append(type(base_variant).model_validate(name))
+            continue
         if name in reward_variants or _is_parametrized_reward_variant(name):
             resolved_rewards.append(name)
             continue
