@@ -12,7 +12,6 @@ from __future__ import annotations
 import json
 import uuid
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import patch
 
@@ -34,12 +33,12 @@ from pytest_httpserver import HTTPServer
 from typer.main import get_command
 from typer.testing import CliRunner
 
-from cogames.auth import save_token
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.generated_models import MatchPlayerInfo
 from cogames.cli.submit import observatory_profile_url
 from cogames.main import app
-from cogames.token_storage import TokenKind
+from softmax.auth import save_token
+from softmax.token_storage import TokenKind
 
 _SEASON_ID = str(TEST_UUID)
 _POLICY_VERSION_ID = str(TEST_UUID_2)
@@ -208,10 +207,6 @@ class TestTournamentCommands:
         result = runner.invoke(app, ["submit", "--help"])
         assert result.exit_code == 0
         assert "submit" in result.output.lower()
-
-    def test_login_command_exists(self) -> None:
-        result = runner.invoke(app, ["login", "--help"])
-        assert result.exit_code == 0
 
     def test_hidden_alias_games_exists(self) -> None:
         result = runner.invoke(app, ["games", "--help"])
@@ -576,7 +571,7 @@ class TestAuthBehavior:
             ],
         )
         combined = result.output.lower()
-        assert "not authenticated" in combined or "cogames login" in combined
+        assert "not authenticated" in combined or "softmax login" in combined
 
     def test_matches_requires_auth(self, httpserver: HTTPServer) -> None:
         result = runner.invoke(
@@ -590,7 +585,7 @@ class TestAuthBehavior:
             ],
         )
         combined = result.output.lower()
-        assert "not authenticated" in combined or "cogames login" in combined
+        assert "not authenticated" in combined or "softmax login" in combined
 
     def test_upload_requires_auth(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
@@ -610,7 +605,7 @@ class TestAuthBehavior:
             ],
         )
         combined = result.output.lower()
-        assert "not authenticated" in combined or "cogames login" in combined
+        assert "not authenticated" in combined or "softmax login" in combined
 
     def test_submit_requires_auth(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
@@ -628,7 +623,7 @@ class TestAuthBehavior:
             ],
         )
         combined = result.output.lower()
-        assert "not authenticated" in combined or "cogames login" in combined
+        assert "not authenticated" in combined or "softmax login" in combined
 
     def test_season_list_no_auth_header_sent_for_public_read(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
@@ -657,7 +652,7 @@ class TestAuthBehavior:
                 "http://nonexistent-login-server",
             ],
         )
-        assert "cogames login" in result.output.lower()
+        assert "softmax login" in result.output.lower()
 
     def test_matches_sends_auth_header_when_authenticated(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
@@ -729,118 +724,6 @@ class TestHelpTextContent:
         )
         assert result.exit_code == 0
         assert "Tournament" in result.output
-
-    def test_auth_subcommands_exist(self) -> None:
-        output = self._invoke_help("auth")
-        assert "login" in output
-        assert "get-login-url" in output
-        assert "status" in output
-        assert "get-token" in output
-        assert "set-token" in output
-
-    def test_auth_login_help_mentions_manual_first_flow(self) -> None:
-        command = self._get_command("auth", "login")
-        option_names = self._option_names("auth", "login")
-        assert "--no-browser" in option_names
-        assert "--timeout" not in option_names
-        assert command.help == "Sign in to cogames interactively."
-
-    def test_auth_status_help_uses_login_server_and_server(self) -> None:
-        option_names = self._option_names("auth", "status")
-        assert "--login-server" in option_names
-        assert "--server" in option_names
-        assert "--api-server" not in option_names
-
-    def test_auth_token_commands_use_login_server_flag(self) -> None:
-        login_url_option_names = self._option_names("auth", "get-login-url")
-        get_option_names = self._option_names("auth", "get-token")
-        set_option_names = self._option_names("auth", "set-token")
-        assert "--login-server" in login_url_option_names
-        assert "--server" not in login_url_option_names
-        assert "--login-server" in get_option_names
-        assert "--server" not in get_option_names
-        assert "--login-server" in set_option_names
-        assert "--server" not in set_option_names
-
-    def test_top_level_login_help_mentions_manual_first_flow(self) -> None:
-        command = self._get_command("login")
-        option_names = self._option_names("login")
-        assert "--no-browser" in option_names
-        assert "--timeout" not in option_names
-        assert command.help == "Sign in to cogames interactively."
-
-
-def test_top_level_login_forwards_no_browser_flag(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured: dict[str, Any] = {}
-    monkeypatch.setattr(
-        "cogames.cli.auth.sys",
-        SimpleNamespace(stdin=SimpleNamespace(isatty=lambda: True)),
-    )
-    monkeypatch.setattr("cogames.cli.auth.has_saved_token", lambda **_: False)
-
-    def fake_do_interactive_login_for_token(
-        *,
-        login_server: str,
-        server_to_save_token_under: str,
-        token_kind: object,
-        agent_hint: str | None,
-        open_browser: bool,
-    ) -> bool:
-        captured["login_server"] = login_server
-        captured["server_to_save_token_under"] = server_to_save_token_under
-        captured["token_kind"] = token_kind
-        captured["open_browser"] = open_browser
-        captured["agent_hint"] = agent_hint
-        return True
-
-    monkeypatch.setattr("cogames.cli.auth.do_interactive_login_for_token", fake_do_interactive_login_for_token)
-
-    result = runner.invoke(app, ["login", "--login-server", "https://example.com/api", "--no-browser"])
-
-    assert result.exit_code == 0
-    assert captured == {
-        "login_server": "https://example.com/api",
-        "server_to_save_token_under": "https://example.com/api",
-        "token_kind": TokenKind.COGAMES,
-        "open_browser": False,
-        "agent_hint": captured["agent_hint"],
-    }
-
-
-def test_top_level_login_non_tty_prints_manual_instructions(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        "cogames.cli.auth.sys",
-        SimpleNamespace(stdin=SimpleNamespace(isatty=lambda: False)),
-    )
-    monkeypatch.setattr(
-        "cogames.cli.auth.do_interactive_login_for_token",
-        lambda **_: (_ for _ in ()).throw(AssertionError("perform_login should not be called")),
-    )
-
-    result = runner.invoke(app, ["login", "--login-server", "https://example.com/api"])
-
-    assert result.exit_code == 1
-    assert "Interactive login requires a TTY." in result.stdout
-    assert "https://example.com/cli-login" in result.stdout
-    assert "coding agent" in result.stdout
-    assert "cogames auth set-token '<TOKEN>' --login-server 'https://example.com/api'" in result.stdout
-
-
-def test_auth_get_login_url_prints_clean_manual_url() -> None:
-    result = runner.invoke(app, ["auth", "get-login-url"])
-
-    assert result.exit_code == 0
-    assert result.stdout.strip() == "https://softmax.com/cli-login"
-
-
-def test_auth_get_login_url_respects_custom_login_server() -> None:
-    result = runner.invoke(
-        app,
-        ["auth", "get-login-url", "--login-server", "https://example.ngrok.app/api/"],
-    )
-
-    assert result.exit_code == 0
-    assert result.stdout.strip() == "https://example.ngrok.app/cli-login"
 
 
 # ---------------------------------------------------------------------------

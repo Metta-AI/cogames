@@ -41,7 +41,6 @@ from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import train as train_module
 from cogames import verbose
-from cogames.auth import DEFAULT_COGAMES_SERVER, load_token
 from cogames.cli.assay import assay_app
 from cogames.cli.auth import auth_app
 from cogames.cli.base import console, emit_json
@@ -87,11 +86,12 @@ from cogames.device import resolve_training_device
 from cogames.display_detect import has_display
 from cogames.games.cogs_vs_clips.train.curricula import make_rotation
 from cogames.seed import seed_rollout_rng
-from cogames.token_storage import TokenKind
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.loader import discover_and_register_policies
 from mettagrid.policy.policy_registry import get_policy_registry
 from mettagrid.simulator import Simulator
+from softmax.auth import DEFAULT_COGAMES_SERVER, load_token
+from softmax.token_storage import TokenKind
 
 # Always add current directory to Python path so optional plugins in the repo are discoverable.
 sys.path.insert(0, ".")
@@ -1674,7 +1674,7 @@ def policies_cmd() -> None:
 
 @app.command(
     name="login",
-    help="Sign in to cogames interactively.",
+    help="Compatibility alias for softmax login.",
     rich_help_panel="Tournament",
     add_help_option=False,
 )

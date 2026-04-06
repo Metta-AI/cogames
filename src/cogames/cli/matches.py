@@ -10,11 +10,11 @@ import typer
 from rich import box
 from rich.table import Table
 
-from cogames.auth import DEFAULT_COGAMES_SERVER
 from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import MatchResponse, TournamentServerClient
 from cogames.cli.leaderboard import _format_score, _format_timestamp, parse_policy_identifier, parse_season_ref
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
+from softmax.auth import DEFAULT_COGAMES_SERVER
 
 
 def _help_callback(ctx: typer.Context, value: bool) -> None:

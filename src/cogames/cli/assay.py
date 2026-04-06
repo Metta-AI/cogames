@@ -11,11 +11,11 @@ import typer
 from rich import box
 from rich.table import Table
 
-from cogames.auth import DEFAULT_COGAMES_SERVER
 from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.generated_models import AssayRunResponse, AssayStatus, MissionSpec
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
+from softmax.auth import DEFAULT_COGAMES_SERVER
 
 assay_app = typer.Typer(
     help="Assay run commands.",
