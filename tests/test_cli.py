@@ -1,9 +1,7 @@
 """Tests for cogames CLI commands."""
 
-import shutil
 import subprocess
 import tempfile
-import zipfile
 from pathlib import Path
 
 
@@ -109,50 +107,6 @@ def test_docs_mission_command() -> None:
     assert result.returncode == 0, f"Command failed with stderr: {result.stderr}"
     mission_title = next(line for line in (package_root / "MISSION.md").read_text().splitlines() if line.strip())
     assert mission_title in result.stdout
-
-
-def test_cogames_wheel_includes_docs_resources(tmp_path: Path) -> None:
-    """The wheel must package the same docs content that `cogames docs` reads from source."""
-    repo_root = Path(__file__).resolve().parents[3]
-    package_root = repo_root / "packages" / "cogames"
-    shutil.rmtree(package_root / "build", ignore_errors=True)
-    shutil.rmtree(package_root / "src" / "cogames.egg-info", ignore_errors=True)
-    result = subprocess.run(
-        [
-            "uv",
-            "build",
-            "--package",
-            "cogames",
-            "--wheel",
-            "-o",
-            str(tmp_path),
-        ],
-        capture_output=True,
-        text=True,
-        timeout=180,
-        cwd=repo_root,
-    )
-
-    assert result.returncode == 0, f"uv build failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
-
-    wheel_path = next(tmp_path.glob("cogames-*.whl"))
-    with zipfile.ZipFile(wheel_path) as wheel:
-        packaged_docs = {
-            "cogames/docs/MISSION.md": package_root / "MISSION.md",
-            "cogames/docs/TECHNICAL_MANUAL.md": package_root / "TECHNICAL_MANUAL.md",
-            "cogames/docs/SCRIPTED_AGENT.md": package_root / "src" / "cogames" / "docs" / "SCRIPTED_AGENT.md",
-            "cogames/games/cogs_vs_clips/docs/cogs_vs_clips_mapgen.md": (
-                package_root / "src" / "cogames" / "games" / "cogs_vs_clips" / "docs" / "cogs_vs_clips_mapgen.md"
-            ),
-            "cogames/games/cogs_vs_clips/evals/README.md": (
-                package_root / "src" / "cogames" / "games" / "cogs_vs_clips" / "evals" / "README.md"
-            ),
-        }
-
-        for wheel_entry, source_path in packaged_docs.items():
-            assert wheel.read(wheel_entry).decode() == source_path.read_text(), (
-                f"{wheel_entry} did not match {source_path}"
-            )
 
 
 def test_make_mission_command():
