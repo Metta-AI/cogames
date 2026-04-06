@@ -87,7 +87,8 @@ extend = "../../.ruff.toml"
 # Ignoring:
 # - E501 Line too long (notebook .py files can have long lines from cell content)
 # - E402 Module level import not at top of file (cells can have imports even when not the first cell)
-"README.py" = ["E501", "E402"]
-"tutorials/*.py" = ["E501", "E402"]
+# - I001 Import block not sorted (notebook import grouping/order should stay aligned with docsync output)
+"README.py" = ["E501", "E402", "I001"]
+"tutorials/*.py" = ["E501", "E402", "I001"]
 # generated_models.py is auto-generated from openapi.json via datamodel-codegen
 "src/cogames/cli/generated_models.py" = ["E501", "I001"]

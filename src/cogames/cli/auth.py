@@ -1,8 +1,9 @@
 """Compatibility wrappers for softmax auth commands."""
 
+import importlib
+
 import typer
 
-from softmax import cli as softmax_cli
 from softmax.auth import DEFAULT_COGAMES_SERVER
 
 auth_app = typer.Typer(
@@ -11,6 +12,12 @@ auth_app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
+
+
+def _softmax_cli():
+    # Import lazily so the standalone cogames CLI does not form a cycle through
+    # softmax -> cogames.softmax_cli -> cogames.main during startup.
+    return importlib.import_module("softmax.cli")
 
 
 @auth_app.command(name="login")
@@ -34,7 +41,7 @@ def login_cmd(
     ),
 ) -> None:
     """Compatibility wrapper for softmax login."""
-    softmax_cli.login_cmd(login_server=login_server, no_browser=no_browser, force=force)
+    _softmax_cli().login_cmd(login_server=login_server, no_browser=no_browser, force=force)
 
 
 @auth_app.command(name="logout")
@@ -47,7 +54,7 @@ def logout_cmd(
     ),
 ) -> None:
     """Compatibility wrapper for softmax logout."""
-    softmax_cli.logout_cmd(login_server=login_server)
+    _softmax_cli().logout_cmd(login_server=login_server)
 
 
 @auth_app.command(name="get-login-url")
@@ -60,7 +67,7 @@ def get_login_url_cmd(
     ),
 ) -> None:
     """Compatibility wrapper for softmax get-login-url."""
-    softmax_cli.get_login_url_cmd(login_server=login_server)
+    _softmax_cli().get_login_url_cmd(login_server=login_server)
 
 
 @auth_app.command(name="status")
@@ -81,7 +88,7 @@ def status_cmd(
 ) -> None:
     """Compatibility wrapper for softmax status."""
     _ = server
-    softmax_cli.status_cmd(login_server=login_server)
+    _softmax_cli().status_cmd(login_server=login_server)
 
 
 @auth_app.command(name="get-token")
@@ -94,7 +101,7 @@ def get_token_cmd(
     ),
 ) -> None:
     """Compatibility wrapper for softmax get-token."""
-    softmax_cli.get_token_cmd(login_server=login_server)
+    _softmax_cli().get_token_cmd(login_server=login_server)
 
 
 @auth_app.command(name="set-token")
@@ -108,4 +115,4 @@ def set_token_cmd(
     ),
 ) -> None:
     """Compatibility wrapper for softmax set-token."""
-    softmax_cli.set_token_cmd(token=token, login_server=login_server)
+    _softmax_cli().set_token_cmd(token=token, login_server=login_server)
