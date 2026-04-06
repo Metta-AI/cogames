@@ -8,6 +8,7 @@ from pydantic import Field
 
 from cogames.core import CoGameMissionVariant, Deps
 from cogames.games.cogs_vs_clips.game.clips.clips import NoClipsVariant
+from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
 from cogames.games.cogs_vs_clips.game.teams.team import TeamConfig, TeamVariant
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.missions.terrain import CompoundLocation, MachinaTerrainVariant
@@ -32,7 +33,14 @@ class FourScoreVariant(CoGameMissionVariant):
 
     @override
     def dependencies(self) -> Deps:
-        return Deps(required=[TeamVariant, NoClipsVariant, MachinaTerrainVariant])
+        return Deps(
+            required=[
+                TeamVariant,
+                NoClipsVariant,
+                MachinaTerrainVariant,
+                ExtractorsVariant,
+            ]
+        )
 
     @override
     def configure(self, deps: ResolvedDeps) -> None:
@@ -45,6 +53,9 @@ class FourScoreVariant(CoGameMissionVariant):
             )
             for i in range(self.num_teams)
         }
+
+        # Reduce extractor stock for four-score so corners do not start too rich.
+        deps.required(ExtractorsVariant).initial_amount = 100
 
         # Configure terrain with corner compounds.
         terrain = deps.required(MachinaTerrainVariant)
