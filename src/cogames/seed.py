@@ -7,7 +7,7 @@ import numpy as np
 
 def seed_rollout_rng(seed: int) -> None:
     """Seed process RNGs so stochastic policy sampling is reproducible."""
-    import torch  # noqa: PLC0415
+    import torch  # noqa: PLC0415  # deferred so importing this module doesn't pull in torch
 
     random.seed(seed)
     np.random.seed(seed)
