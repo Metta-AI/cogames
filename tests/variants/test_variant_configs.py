@@ -343,6 +343,7 @@ class TestTalkVariant:
     def test_replaces_change_vibe_with_talk(self):
         env = _make_mission([TalkVariant()]).make_env()
         assert env.game.actions.change_vibe.enabled is False
+        assert env.game.vibe_names == VIBE_NAMES
         assert env.game.talk.enabled is True
         assert env.game.talk.max_length == 140
         assert env.game.talk.cooldown_steps == 50
