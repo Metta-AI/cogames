@@ -103,6 +103,8 @@ from cogames.cli.submit import (
 )
 from cogames.device import resolve_training_device
 from cogames.display_detect import has_display
+from cogames.games.cogs_vs_clips.train.curricula import make_rotation
+from cogames.seed import seed_rollout_rng
 from softmax.auth import DEFAULT_COGAMES_SERVER, load_token
 from softmax.token_storage import TokenKind
 
@@ -822,8 +824,6 @@ def play_cmd(
         if isinstance(map_builder, MapGen.Config):
             map_builder.seed = map_seed
 
-    from cogames.seed import seed_rollout_rng  # noqa: PLC0415
-
     seed_rollout_rng(seed)
     resolved_device = resolve_training_device(console, device)
     raw_policies = policies if policies else ["class=noop"]
@@ -1061,12 +1061,11 @@ def make_policy(
         raise typer.Exit(1)
 
     try:
+        # Deferred: trainable_policy_template imports torch at module level
         import cogames.policy.starter_agent as starter_agent  # noqa: PLC0415
         import cogames.policy.trainable_policy_template as trainable_policy_template  # noqa: PLC0415
 
         if trainable:
-            import cogames.policy.trainable_policy_template as trainable_policy_template  # noqa: PLC0415
-
             template_path = Path(trainable_policy_template.__file__)
             policy_class = "MyTrainablePolicy"
             policy_type = "Trainable"
@@ -1274,9 +1273,8 @@ def train_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
+    # Deferred: train module imports torch at module level
     from cogames import train as train_module  # noqa: PLC0415
-    from cogames.device import resolve_training_device  # noqa: PLC0415
-    from cogames.games.cogs_vs_clips.train.curricula import make_rotation  # noqa: PLC0415
 
     selected_missions = get_mission_names_and_configs(
         ctx,

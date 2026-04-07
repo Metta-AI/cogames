@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 def resolve_training_device(console: Console, requested: str) -> torch.device:
-    import torch  # noqa: PLC0415
+    import torch  # noqa: PLC0415  # deferred so importing this module doesn't pull in torch
 
     normalized = requested.strip().lower()
 
