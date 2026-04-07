@@ -6,6 +6,7 @@ import importlib.util
 import json
 import re
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Optional
 
@@ -16,12 +17,11 @@ from rich.console import Console
 from rich.table import Table
 
 from cogames.cli.base import console
-from cogames.cli.utils import parse_variants
 from cogames.core import CoGameMission, CoGameMissionVariant
 from cogames.game import CoGame, get_game
 from cogames.variants import VariantRegistry
 from mettagrid.config.mettagrid_config import MettaGridConfig
-from mettagrid.mapgen.mapgen import MapGen
+from mettagrid.mapgen.mapgen import MapGenConfig
 
 _SUPPORTED_MISSION_EXTENSIONS = [".yaml", ".yml", ".json"]
 
@@ -70,7 +70,7 @@ def find_mission(
 
 def apply_variants(
     mission: CoGameMission,
-    variants: list[CoGameMissionVariant],
+    variants: Sequence[str | CoGameMissionVariant],
     cogs: Optional[int],
 ) -> CoGameMission:
     """Apply variants and cogs override to a mission."""
@@ -79,6 +79,51 @@ def apply_variants(
     if cogs is not None:
         mission = apply_cogs_override(mission, cogs)
     return mission
+
+
+def _resolve_mission_scoped_variant(mission: CoGameMission, name: str) -> CoGameMissionVariant | None:
+    mission._ensure_variant_modules_loaded()
+    for prefix in mission.variant_module_prefixes():
+        for candidate in reversed(CoGameMissionVariant._type_candidates.get(name, [])):
+            if candidate.__module__.startswith(prefix):
+                return candidate()  # pyright: ignore[reportCallIssue]
+    return None
+
+
+def _resolve_cli_variants(
+    game: CoGame,
+    mission: CoGameMission,
+    variants_arg: Optional[list[str]],
+) -> list[CoGameMissionVariant]:
+    if not variants_arg:
+        return []
+
+    mission_variant_names = {
+        name
+        for name, candidates in CoGameMissionVariant._type_candidates.items()
+        if any(
+            candidate.__module__.startswith(prefix)
+            for prefix in mission.variant_module_prefixes()
+            for candidate in candidates
+        )
+    }
+    available = ", ".join(sorted({variant.name for variant in game.variant_registry.all()} | mission_variant_names))
+
+    resolved: list[CoGameMissionVariant] = []
+    for name in variants_arg:
+        mission_variant = _resolve_mission_scoped_variant(mission, name)
+        if mission_variant is not None:
+            resolved.append(mission_variant)
+            continue
+
+        game_variant = game.variant_registry.get(name)
+        if game_variant is not None:
+            resolved.append(game_variant)
+            continue
+
+        raise ValueError(f"Unknown variant '{name}'.\nAvailable variants: {available}")
+
+    return resolved
 
 
 def apply_cogs_override(mission: CoGameMission, cogs: int) -> CoGameMission:
@@ -117,9 +162,9 @@ def resolve_mission(
             return mission_arg, load_mission_config(path), None
         raise ValueError(f"Unsupported file format: {path.suffix}")
 
-    variants = parse_variants(game.variant_registry, variants_arg)
     mission = find_mission(game, mission_arg, include_evals=True)
-    mission = apply_variants(mission, variants, cogs)
+    requested_variants = _resolve_cli_variants(game, mission, variants_arg)
+    mission = apply_variants(mission, requested_variants, cogs)
     return mission.full_name(), mission.make_env(), mission
 
 
@@ -327,7 +372,7 @@ def print_mission_dependencies(game: CoGame, con: Console) -> None:
 
 
 def _print_dependency_tree(
-    registry: "VariantRegistry",
+    registry: VariantRegistry,
     edges: list[tuple[str, str, str]],
     con: Console,
     indent: str = "",
@@ -518,7 +563,7 @@ def describe_mission(
 
     console.print("[bold]Mission Configuration:[/bold]")
     console.print(f"  • Number of agents: {game_config.game.num_agents}")
-    if isinstance(game_config.game.map_builder, MapGen.Config):
+    if isinstance(game_config.game.map_builder, MapGenConfig):
         console.print(f"  • Map size: {game_config.game.map_builder.width}x{game_config.game.map_builder.height}")
         instance = getattr(game_config.game.map_builder, "instance", None)
         if isinstance(instance, MachinaArena.Config):
