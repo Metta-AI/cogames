@@ -278,6 +278,29 @@ class PolicyCreate(CLIModel):
     is_system_policy: Annotated[Optional[bool], Field(title="Is System Policy")] = False
 
 
+class PolicyRanking(CLIModel):
+    season_name: Annotated[str, Field(title="Season Name")]
+    """
+    Season this ranking is from
+    """
+    pool_name: Annotated[str, Field(title="Pool Name")]
+    """
+    Pool within the season
+    """
+    rank: Annotated[int, Field(title="Rank")]
+    """
+    1-indexed position on the leaderboard
+    """
+    score: Annotated[float, Field(title="Score")]
+    """
+    Leaderboard score
+    """
+    match_count: Annotated[int, Field(title="Match Count")]
+    """
+    Number of matches played in this pool
+    """
+
+
 class PolicyVersionCreate(CLIModel):
     policy_spec: Annotated[Optional[dict[str, Any]], Field(title="Policy Spec")] = None
     git_hash: Annotated[Optional[str], Field(title="Git Hash")] = None
@@ -291,6 +314,16 @@ class PolicyVersionResponse(CLIModel):
     version: Annotated[int, Field(title="Version")]
     pools: Annotated[Optional[list[str]], Field(title="Pools")] = None
     submit_error: Annotated[Optional[str], Field(title="Submit Error")] = None
+
+
+class PolicyVersionScore(CLIModel):
+    version: Annotated[int, Field(title="Version")]
+    policy_version_id: Annotated[UUID, Field(title="Policy Version Id")]
+    season_name: Annotated[str, Field(title="Season Name")]
+    pool_name: Annotated[str, Field(title="Pool Name")]
+    score: Annotated[float, Field(title="Score")]
+    score_stddev: Annotated[Optional[float], Field(title="Score Stddev")] = None
+    match_count: Annotated[int, Field(title="Match Count")]
 
 
 class PolicyVersionSummary(CLIModel):
