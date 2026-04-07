@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from cogames.cli.mission import find_mission, get_mission
+import pytest
+
+from cogames.cli.mission import find_mission, get_mission, resolve_mission
 from cogames.games.cogs_vs_clips.game.clips import AngryClipsVariant, ClipsVariant
 from cogames.games.cogs_vs_clips.game.clips.clips import JUNCTION_ALIGN_DISTANCE
 from cogames.games.cogs_vs_clips.game.game import CvCGame
@@ -104,3 +106,10 @@ def test_all_listed_sub_missions_resolve_via_cli_lookup() -> None:
     for mission in game.missions:
         for sub_name in mission.sub_missions:
             assert find_mission(game, f"{mission.name}.{sub_name}") is not None
+
+
+def test_resolve_mission_rejects_variants_from_other_games() -> None:
+    game = CvCGame()
+
+    with pytest.raises(ValueError, match="Unknown variant 'full'"):
+        resolve_mission(game, "machina_1", variants_arg=["full"])

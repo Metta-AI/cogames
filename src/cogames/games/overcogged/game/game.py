@@ -14,7 +14,7 @@ from cogames.core import CoGameMission, CoGameMissionVariant
 from cogames.game import CoGame, register_game
 from cogames.games.overcogged.defaults import FRIES_BURN_TICKS, FRIES_COOK_TICKS, SOUP_BURN_TICKS, SOUP_COOK_TICKS
 from cogames.games.overcogged.game import load_variants
-from cogames.games.overcogged.missions import make_basic_mission
+from cogames.games.overcogged.missions import make_basic_mission, make_classic_mission
 from cogames.games.overcogged.variants import (
     HIDDEN_VARIANT_NAMES,
     normalize_variant_names,
@@ -985,7 +985,7 @@ class OvercookedGame(CoGameMission):
 
     @classmethod
     def variant_module_prefixes(cls) -> tuple[str, ...]:
-        return ("cogames.games.overcogged.",)
+        return ("cogames.games.overcogged.variants.",)
 
     def with_variants(self, variants: Sequence[str | CoGameMissionVariant]) -> Self:
         copy = super().with_variants(variants)
@@ -1293,7 +1293,7 @@ class OvercookedCoGame(CoGame):
             return
 
         _, _, variants = load_variants()
-        self._missions = [make_basic_mission()]
+        self._missions = [make_basic_mission(), make_classic_mission()]
         self._variant_registry = VariantRegistry(list(variants))
 
     @property
