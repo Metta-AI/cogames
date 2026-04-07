@@ -52,6 +52,15 @@ class CogsguardStateAdapter(SemanticStateAdapter):
             if (cell.row, cell.col) != (decoded.center_row, decoded.center_col)
             if _has_type_tag(cell.tags)
         ]
+        _attach_visible_talk(
+            self_state=self_state,
+            visible_entities=visible_entities,
+            visible_talk=decoded.observation.talk,
+            center_col=decoded.center_col,
+            center_row=decoded.center_row,
+            self_global_x=global_x,
+            self_global_y=global_y,
+        )
         visible_entities.sort(key=lambda entity: (entity.position.y, entity.position.x, entity.entity_id))
 
         team_members = [
@@ -172,6 +181,62 @@ def _labels_for_entity(*, entity_type: str, team: str | None, owner: str | None,
     else:
         labels.append("enemy")
     return labels
+
+
+def _attach_visible_talk(
+    *,
+    self_state: SelfState,
+    visible_entities: list[SemanticEntity],
+    visible_talk,
+    center_col: int,
+    center_row: int,
+    self_global_x: int,
+    self_global_y: int,
+) -> None:
+    agents_by_id: dict[int, SemanticEntity] = {}
+    agents_by_position: dict[tuple[int, int], SemanticEntity] = {}
+    for entity in visible_entities:
+        if entity.entity_type != "agent":
+            continue
+        agent_id = entity.attributes.get("agent_id")
+        if isinstance(agent_id, int):
+            agents_by_id[agent_id] = entity
+        agents_by_position[(entity.position.x, entity.position.y)] = entity
+
+    self_agent_id = self_state.attributes.get("agent_id")
+    for talk in visible_talk:
+        rel_x = talk.location.col - center_col
+        rel_y = talk.location.row - center_row
+        if isinstance(self_agent_id, int) and talk.agent_id == self_agent_id and rel_x == 0 and rel_y == 0:
+            _attach_talk_fields(self_state, text=talk.text, remaining_steps=talk.remaining_steps)
+            continue
+
+        entity = agents_by_id.get(talk.agent_id) or agents_by_position.get((rel_x, rel_y))
+        if entity is None:
+            entity = SemanticEntity(
+                entity_id=f"agent-{talk.agent_id}",
+                entity_type="agent",
+                position=GridPosition(x=rel_x, y=rel_y),
+                labels=["agent", "talking"],
+                attributes={
+                    "agent_id": talk.agent_id,
+                    "global_x": self_global_x + rel_x,
+                    "global_y": self_global_y + rel_y,
+                },
+            )
+            visible_entities.append(entity)
+            agents_by_position[(rel_x, rel_y)] = entity
+        entity.attributes["agent_id"] = talk.agent_id
+        entity.entity_id = f"agent-{talk.agent_id}"
+        agents_by_id[talk.agent_id] = entity
+        _attach_talk_fields(entity, text=talk.text, remaining_steps=talk.remaining_steps)
+
+
+def _attach_talk_fields(entity: SemanticEntity, *, text: str, remaining_steps: int) -> None:
+    entity.attributes["talk_text"] = text
+    entity.attributes["talk_remaining_steps"] = remaining_steps
+    if "talking" not in entity.labels:
+        entity.labels.append("talking")
 
 
 def _team_from_tags(tags: tuple[str, ...]) -> str | None:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from cogames.sdk.cogsguard.learnings import render_cogsguard_learnings
 from cogames.sdk.cogsguard.scenarios import CogsguardScenarioPresets
 from mettagrid.sdk.agent import MettagridState
@@ -15,6 +17,11 @@ _COGSGUARD_SKILLS = (
         "focused_extractor_lock",
         "When one exact extractor is productive or oscillation is detected, "
         "set target_entity_id to pin that extractor until facts change.",
+    ),
+    (
+        "teammate_shadowing",
+        "If coordination requires staying together, set target_entity_id to a visible friendly agent like "
+        "agent-1 to shadow them until the local situation changes.",
     ),
     (
         "region_reanchor",
@@ -44,6 +51,19 @@ _COGSGUARD_BEST_PRACTICES = (
         "as progress signals before escalating phases or rewriting plans."
     ),
     (
+        "Only use sdk.state fields and helpers that are explicitly documented; do not invent convenience flags such "
+        "as sdk.state.just_deposited."
+    ),
+    (
+        "If talk mode is enabled, the talk directive field is live: set talk to emit a short speech bubble over "
+        "your cog, and nearby talking agents show up directly in visible_entities with label=talking plus "
+        "talk_text/talk_remaining_steps attributes."
+    ),
+    (
+        "If you must stay in observation range for coordination, set target_entity_id to a visible teammate "
+        "entity_id such as agent-1 instead of hoping the baseline wanders nearby."
+    ),
+    (
         "Keep step(sdk) short and strategic; let the semantic baseline handle movement, mining, "
         "deposits, and junction actions."
     ),
@@ -53,9 +73,12 @@ _COGSGUARD_BEST_PRACTICES = (
 _CONTROL_PRIMITIVES = (
     "role: choose miner, aligner, or scrambler to switch the semantic baseline behavior family",
     "objective: choose resource_coverage, economy_bootstrap, or aligner_pressure for the current phase",
-    "target_entity_id: strongest focus primitive; use it for one exact extractor, junction, or visible entity",
+    "target_entity_id: strongest focus primitive; use it for one exact extractor, junction, "
+    "or visible entity such as a teammate agent-1 when you need to shadow them",
     "target_region: broader lane or region bias when you do not want to pin one exact entity yet",
     "resource_bias: resource-type preference among viable extractors; not a hard lock on one extractor",
+    "talk: optional <=140-char coordination message; this is the canonical communication "
+    "field when talk mode is enabled",
 )
 
 
@@ -74,6 +97,7 @@ class CogsguardPromptAdapter:
             f"position: ({self_state.position.x}, {self_state.position.y})",
             f"inventory: {inventory_text}",
             f"status: {status_text}",
+            f"talk: {_format_talk(self_state.attributes)}",
             f"shared_inventory: {_format_mapping(team_summary.shared_inventory)}",
             f"shared_objectives: {', '.join(team_summary.shared_objectives) or 'none'}",
             "VISIBLE",
@@ -113,10 +137,18 @@ class CogsguardPromptAdapter:
         )
 
 
-def _format_mapping(values: dict[str, str | int | float | bool] | dict[str, int]) -> str:
+def _format_mapping(values: Mapping[str, str | int | float | bool]) -> str:
     if not values:
         return "none"
     return ", ".join(f"{key}={values[key]}" for key in sorted(values))
+
+
+def _format_talk(attributes: Mapping[str, str | int | float | bool]) -> str:
+    talk_text = attributes.get("talk_text")
+    if not isinstance(talk_text, str) or not talk_text:
+        return "none"
+    remaining_steps = attributes.get("talk_remaining_steps", 0)
+    return f"{talk_text} (ttl={remaining_steps})"
 
 
 def _render_lines(lines: tuple[str, ...]) -> list[str]:
