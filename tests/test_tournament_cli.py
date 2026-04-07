@@ -36,7 +36,7 @@ from typer.testing import CliRunner
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.generated_models import MatchPlayerInfo
 from cogames.cli.submit import observatory_profile_url
-from cogames.main import app
+from cogames.main import _submit_browser_launch_skip_reason, app
 from softmax.auth import save_token
 from softmax.token_storage import TokenKind
 
@@ -889,7 +889,6 @@ class TestSeasonLookupAuth:
             )
 
         assert result.exit_code == 0
-        assert "Browser launch skipped: no GUI display detected" in result.output
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons/test-season"]
         assert season_reqs, "Expected a request to /tournament/seasons/test-season"
         assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
@@ -924,6 +923,25 @@ class TestSeasonLookupAuth:
 
 
 class TestSubmitProfileLaunch:
+    def test_submit_browser_launch_allows_redirected_stdout_in_gui_session(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr("cogames.main.has_display", lambda: True)
+        monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+        monkeypatch.setattr("sys.stdout.isatty", lambda: False)
+
+        assert _submit_browser_launch_skip_reason() is None
+
+    def test_submit_browser_launch_reports_non_interactive_sessions(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr("cogames.main.has_display", lambda: True)
+        monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+
+        assert _submit_browser_launch_skip_reason() == "non-interactive session detected"
+
     @pytest.mark.parametrize(
         ("login_server_url", "expected_base_url"),
         [
