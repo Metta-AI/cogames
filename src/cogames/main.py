@@ -33,9 +33,30 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
-import cogames.policy.starter_agent as starter_agent
-from cogames import diagnose as diagnose_module
-from cogames import evaluate as evaluate_module
+
+def _run_metadata_only_cli() -> None:
+    if __name__ != "__main__" or len(sys.argv) <= 1 or sys.argv[1] not in {"games", "missions", "mission"}:
+        return
+
+    from cogames.cli.mission import list_missions  # noqa: PLC0415
+
+    metadata_app = typer.Typer(add_help_option=False)
+
+    @metadata_app.command("games", hidden=True)
+    @metadata_app.command("missions")
+    @metadata_app.command("mission", hidden=True)
+    def _missions_cmd(
+        mission_filter: Optional[str] = typer.Argument(None, metavar="MISSION"),
+        game_name: str = typer.Option("cogs_vs_clips", "--game", help="Game whose missions to list."),
+    ) -> None:
+        list_missions(mission_filter, game_name=game_name)
+
+    metadata_app(prog_name="cogames", standalone_mode=False, args=sys.argv[1:])
+    raise SystemExit(0)
+
+
+_run_metadata_only_cli()
+
 from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import verbose
@@ -82,10 +103,6 @@ from cogames.cli.submit import (
 )
 from cogames.device import resolve_training_device
 from cogames.display_detect import has_display
-from mettagrid.mapgen.mapgen import MapGen
-from mettagrid.policy.loader import discover_and_register_policies
-from mettagrid.policy.policy_registry import get_policy_registry
-from mettagrid.simulator import Simulator
 from softmax.auth import DEFAULT_COGAMES_SERVER, load_token
 from softmax.token_storage import TokenKind
 
@@ -115,6 +132,24 @@ _DOC_RESOURCE_PATHS: dict[str, tuple[str, ...]] = {
     "scripted_agent": ("docs", "SCRIPTED_AGENT.md"),
     "evals": ("games", "cogs_vs_clips", "evals", "README.md"),
     "mapgen": ("games", "cogs_vs_clips", "docs", "cogs_vs_clips_mapgen.md"),
+}
+
+_POLICY_FREE_COMMANDS = {
+    "describe",
+    "docs",
+    "docsync",
+    "evals",
+    "games",
+    "leaderboard",
+    "login",
+    "match-artifacts",
+    "matches",
+    "mission",
+    "missions",
+    "replay",
+    "submissions",
+    "variants",
+    "version",
 }
 
 
@@ -168,6 +203,11 @@ def _read_doc_text(doc_name: str) -> str:
 
 
 def _register_policies() -> None:
+    if len(sys.argv) <= 1 or sys.argv[1] in _POLICY_FREE_COMMANDS:
+        return
+
+    from mettagrid.policy.loader import discover_and_register_policies  # noqa: PLC0415
+
     discover_and_register_policies()
 
 
@@ -227,6 +267,7 @@ def tutorial_cmd(
     ctx: typer.Context,
 ) -> None:
     """Run the CoGames tutorial."""
+
     if not has_display():
         console.print("[red]Error: This command requires a GUI display.[/red]")
         raise typer.Exit(1)
@@ -279,6 +320,7 @@ def cvc_tutorial_cmd(
     ctx: typer.Context,
 ) -> None:
     """Run the CvC tutorial."""
+
     if not has_display():
         console.print("[red]Error: This command requires a GUI display.[/red]")
         raise typer.Exit(1)
@@ -359,6 +401,12 @@ This command has two modes:
 @app.command("mission", hidden=True)
 def games_cmd(
     ctx: typer.Context,
+    game_name: str = typer.Option(
+        "cogs_vs_clips",
+        "--game",
+        help="Game whose missions to list or describe.",
+        rich_help_panel="Describe",
+    ),
     # --- List ---
     site: Optional[str] = typer.Argument(
         None,
@@ -437,15 +485,16 @@ def games_cmd(
         if dependencies:
             from cogames.game import get_game  # noqa: PLC0415
 
-            print_mission_dependencies(get_game("cogs_vs_clips"), console)
+            print_mission_dependencies(get_game(game_name), console)
         else:
-            list_missions(site)
+            list_missions(site, game_name=game_name)
         return
 
     try:
         resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(
             ctx,
             mission,
+            game_name=game_name,
             variants_arg=variant,
             cogs=cogs,
         )
@@ -732,6 +781,8 @@ def play_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
+    from mettagrid.mapgen.mapgen import MapGen  # noqa: PLC0415
+
     if save_replay_dir is not None and save_replay_file is not None:
         console.print("[red]Error: Use only one of --save-replay-dir or --save-replay-file.[/red]")
         raise typer.Exit(1)
@@ -919,6 +970,8 @@ def make_mission(
     ),
 ) -> None:
     try:
+        from mettagrid.simulator import Simulator  # noqa: PLC0415
+
         resolved_mission, env_cfg, _ = get_mission_name_and_config(ctx, base_mission)
 
         # Update map dimensions if explicitly provided and supported
@@ -1008,6 +1061,9 @@ def make_policy(
         raise typer.Exit(1)
 
     try:
+        import cogames.policy.starter_agent as starter_agent  # noqa: PLC0415
+        import cogames.policy.trainable_policy_template as trainable_policy_template  # noqa: PLC0415
+
         if trainable:
             import cogames.policy.trainable_policy_template as trainable_policy_template  # noqa: PLC0415
 
@@ -1218,6 +1274,10 @@ def train_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
+    from cogames import train as train_module  # noqa: PLC0415
+    from cogames.device import resolve_training_device  # noqa: PLC0415
+    from cogames.games.cogs_vs_clips.train.curricula import make_rotation  # noqa: PLC0415
+
     selected_missions = get_mission_names_and_configs(
         ctx,
         missions,
@@ -1230,15 +1290,11 @@ def train_cmd(
         console.print(f"Training on mission: {mission_name}\n")
     elif len(selected_missions) > 1:
         env_cfg = None
-        from cogames.games.cogs_vs_clips.train.curricula import make_rotation  # noqa: PLC0415
-
         supplier = make_rotation(selected_missions)
         console.print("Training on missions:\n" + "\n".join(f"- {m}" for m, _ in selected_missions) + "\n")
     else:
         # Should not get here
         raise ValueError("Please specify at least one mission")
-
-    from cogames import train as train_module  # noqa: PLC0415
 
     policy_spec = get_policy_spec(ctx, policy)
     torch_device = resolve_training_device(console, device)
@@ -1422,6 +1478,10 @@ def run_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
+    from cogames import evaluate as evaluate_module  # noqa: PLC0415
+    from cogames.device import resolve_training_device  # noqa: PLC0415
+    from mettagrid.mapgen.mapgen import MapGen  # noqa: PLC0415
+
     # When structured output is requested, redirect all status messages to stderr
     # so only clean JSON/YAML appears on stdout.
     out = Console(stderr=True) if format_ else console
@@ -1672,6 +1732,8 @@ def version_cmd() -> None:
   [cyan]cogames play -m arena -p class=baseline[/cyan]   Use baseline policy""",
 )
 def policies_cmd() -> None:
+    from mettagrid.policy.policy_registry import get_policy_registry  # noqa: PLC0415
+
     policy_registry = get_policy_registry()
     table = Table(show_header=False, box=None, show_lines=False, pad_edge=False)
     table.add_column("", justify="left", style="bold cyan")
@@ -1787,7 +1849,7 @@ app.command(
 )(match_artifacts_cmd)
 
 
-app.command(
+@app.command(
     name="diagnose",
     help="Run diagnostic evals for a policy checkpoint.",
     rich_help_panel="Evaluate",
@@ -1797,11 +1859,19 @@ app.command(
 
 [cyan]cogames diagnose lstm --scripted-baseline-policy scripted.basic[/cyan]   Compare against scripted baseline
 
-[cyan]cogames diagnose lstm --known-strong-policy my_best_policy[/cyan]         Normalize against known-strong policy
+[cyan]cogames diagnose lstm --known-strong-policy my_best_policy[/cyan]
+    Normalize against known-strong policy
 
 [cyan]cogames diagnose lstm --compare-run-dir outputs/cogames-diagnose/prev_run[/cyan]  Stability comparison""",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
     add_help_option=False,
-)(diagnose_module.diagnose_cmd)
+)
+def diagnose_cmd(ctx: typer.Context) -> None:
+    from cogames import diagnose as diagnose_module  # noqa: PLC0415
+
+    diagnose_app = typer.Typer(add_help_option=False)
+    diagnose_app.command()(diagnose_module.diagnose_cmd)
+    diagnose_app(prog_name="cogames diagnose", args=list(ctx.args))
 
 
 def _resolve_season(server: str, login_server: str | None = None, season_name: str | None = None) -> SeasonDetail:
