@@ -11,14 +11,14 @@ if TYPE_CHECKING:
 
 
 class TalkVariant(CoGameMissionVariant):
-    """Enable speech-bubble talk without coupling the variant to vibes."""
+    """Enable speech-bubble talk as the talk flavor of vibes."""
 
     name: str = "talk"
-    description: str = "Agents can send short speech-bubble messages."
+    description: str = "Agents can send short speech-bubble messages instead of change_vibe actions."
 
     @override
     def dependencies(self) -> Deps:
-        return Deps(optional=[VibesVariant])
+        return Deps(required=[VibesVariant])
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:

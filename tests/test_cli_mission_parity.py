@@ -108,6 +108,15 @@ def test_all_listed_sub_missions_resolve_via_cli_lookup() -> None:
             assert find_mission(game, f"{mission.name}.{sub_name}") is not None
 
 
+def test_get_mission_accepts_talk_variant() -> None:
+    _, env_cfg, _ = get_mission("machina_1", variants_arg=["talk"])
+
+    assert env_cfg.game.actions.change_vibe.enabled is False
+    assert env_cfg.game.talk.enabled is True
+    assert env_cfg.game.talk.max_length == 140
+    assert env_cfg.game.talk.cooldown_steps == 50
+
+
 def test_resolve_mission_rejects_variants_from_other_games() -> None:
     game = CvCGame()
 

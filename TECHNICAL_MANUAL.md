@@ -187,6 +187,25 @@ Example command names:
 
 > **Note**: The available vibes are configurable via `change_vibe.vibes`.
 
+#### Talk Variant
+
+CoGames exposes talk-and-walk as the `talk` mission variant:
+
+- `-v vibes`: communication uses `change_vibe_*`
+- `-v talk`: communication uses short speech sidecars and disables `change_vibe_*`
+
+`talk` is the speech-bubble variant of `vibes`, so it preserves vibe identity while swapping the explicit
+`change_vibe_*` action surface out for short nearby speech.
+
+For SDK and cyborg policies, the canonical communication contract is:
+
+- send communication with `{"talk": "..."}` or `MacroDirective(talk="...")`
+- read teammate speech from visible agent entities with `label="talking"`
+- inspect `entity.attributes["talk_text"]` and `entity.attributes["talk_remaining_steps"]`
+
+When `talk` is active, MettaScope renders the active message as a speech bubble above the cog and nearby teammates
+see that same text directly on nearby talking agent observations.
+
 ---
 
 ## COMMAND EXECUTION FLOW

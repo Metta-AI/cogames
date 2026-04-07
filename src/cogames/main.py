@@ -396,6 +396,8 @@ This command has two modes:
 
   [cyan]cogames missions -m machina_1[/cyan]                       Describe a mission
 
+  [cyan]cogames missions -m machina_1 -v talk[/cyan]               Describe talk-variant config
+
   [cyan]cogames missions -m arena --format json[/cyan]             Output as JSON""",
     add_help_option=False,
 )
@@ -565,7 +567,7 @@ def variants_cmd(
 
   [cyan]cogames describe arena[/cyan]                       Describe mission
 
-  [cyan]cogames describe arena -c 4 -v dark_side[/cyan]               With 4 cogs and variant""",
+  [cyan]cogames describe arena -c 4 -v talk[/cyan]          With 4 cogs and talk enabled""",
     add_help_option=False,
 )
 def describe_cmd(
@@ -639,6 +641,8 @@ Log mode is non-interactive and doesn't support manual control.
 [cyan]cogames play -m four_score -p nlanky:1 -p random:2[/cyan]     Mixed teams (cycling pattern)
 
 [cyan]cogames play -m arena --save-replay-file ./latest.json.z[/cyan] Overwrite fixed replay file
+
+[cyan]cogames play -m machina_1 -v talk -r gui[/cyan]             Speech bubbles over cogs
 
 [cyan]cogames play -m machina_1 -r unicode[/cyan]                   Terminal mode""",
     add_help_option=False,
