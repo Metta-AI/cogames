@@ -118,6 +118,14 @@ _DOC_RESOURCE_PATHS: dict[str, tuple[str, ...]] = {
 }
 
 
+def _submit_browser_launch_skip_reason() -> str | None:
+    if not has_display():
+        return "no GUI display detected"
+    if not sys.stdin.isatty():
+        return "non-interactive session detected"
+    return None
+
+
 def _resolve_mettascope_script() -> Path:
     spec = importlib.util.find_spec("mettagrid")
     if spec is None or spec.origin is None:
@@ -2259,10 +2267,11 @@ def submit_cmd(
         console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
     profile_url = observatory_profile_url(pv.id, login_server_url=login_server)
     console.print(f"[dim]Profile:[/dim] {profile_url}")
-    if has_display():
+    browser_skip_reason = _submit_browser_launch_skip_reason()
+    if browser_skip_reason is None:
         webbrowser.open(profile_url)
     else:
-        console.print("[dim]Browser launch skipped: no GUI display detected[/dim]")
+        console.print(f"[dim]Browser launch skipped: {browser_skip_reason}[/dim]")
     console.print(f"[dim]Results:[/dim] {RESULTS_URL}")
     console.print(f"[dim]CLI:[/dim] cogames leaderboard --season {season_name}")
 
