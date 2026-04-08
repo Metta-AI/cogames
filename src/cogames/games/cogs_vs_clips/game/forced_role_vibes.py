@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, override
 from pydantic import Field
 
 from cogames.core import CoGameMissionVariant, Deps
+from cogames.games.cogs_vs_clips.game.roles import ROLE_NAMES, assign_role_vibes, validate_role_name
 from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
 from mettagrid.config.mettagrid_config import MettaGridConfig
 
@@ -19,7 +20,7 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
     name: str = "forced_role_vibes"
     description: str = "Force each agent's initial vibe by role using team-local agent order."
 
-    role_order: list[str] = Field(default_factory=lambda: ["miner", "aligner", "scrambler", "scout"])
+    role_order: list[str] = Field(default_factory=lambda: list(ROLE_NAMES))
     disable_change_vibe: bool = Field(default=True, description="Disable change_vibe so role vibes are forced.")
     per_team: bool = Field(default=True, description="Assign roles by index-within-team.")
 
@@ -29,32 +30,17 @@ class ForcedRoleVibesVariant(CoGameMissionVariant):
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
-        allowed_roles = {"miner", "aligner", "scrambler", "scout"}
         if not self.role_order:
             raise ValueError("role_order must be non-empty")
-        unknown = [r for r in self.role_order if r not in allowed_roles]
-        if unknown:
-            raise ValueError(f"Unknown role(s) in role_order: {unknown}. Allowed: {sorted(allowed_roles)}")
-
-        vibe_id_by_name = {name: idx for idx, name in enumerate(env.game.vibe_names)}
-        missing_vibes = [r for r in set(self.role_order) if r not in vibe_id_by_name]
-        if missing_vibes:
-            raise ValueError(
-                f"Missing role vibe(s) in env.game.vibe_names: {missing_vibes}. "
-                "Expected role names to be present as vibe names."
-            )
-
+        validated_role_order = tuple(validate_role_name(role_name) for role_name in self.role_order)
         counters: dict[int, int] = {}
+        role_names_by_agent: list[str] = []
         for agent in env.game.agents:
-            if self.per_team:
-                group_key: int = agent.team_id
-            else:
-                group_key = 0
+            group_key = agent.team_id if self.per_team else 0
             idx = counters.get(group_key, 0)
             counters[group_key] = idx + 1
-
-            role_name = self.role_order[idx % len(self.role_order)]
-            agent.vibe = vibe_id_by_name[role_name]
+            role_names_by_agent.append(validated_role_order[idx % len(validated_role_order)])
+        assign_role_vibes(env, role_names_by_agent)
 
         if self.disable_change_vibe:
             env.game.actions.change_vibe.enabled = False
