@@ -11,6 +11,7 @@ import json
 import math
 from typing import Literal, Sequence, cast
 
+from cogames.games.cogs_vs_clips.game.roles import ROLE_NAME_SET, ROLE_NAMES
 from mettagrid.config.game_value import (
     AnyGameValue,
     SumGameValue,
@@ -51,17 +52,22 @@ AVAILABLE_REWARD_VARIANTS: tuple[CvCRewardVariant, ...] = (
 _OBJECTIVE_STAT_KEY = "aligned_junction_held"
 _OBJECTIVE_MINE_PREFIX = "objective_mine:"
 _OBJECTIVE_MINE_DEFAULT_COMPOUNDING_FACTOR = 5.0
-_ROLE_ORDER: tuple[str, ...] = ("miner", "aligner", "scrambler", "scout")
-_ROLE_NAMES = set(_ROLE_ORDER)
 
 
-def _role_name_from_vibe(env: MettaGridConfig, vibe_id: int) -> str | None:
-    if vibe_id < 0 or vibe_id >= len(env.game.vibe_names):
-        return None
-    vibe_name = env.game.vibe_names[vibe_id]
-    if vibe_name not in _ROLE_NAMES:
-        return None
-    return vibe_name
+def _role_names_from_vibes_or_fallback_order(env: MettaGridConfig, agent_cfgs) -> list[str]:
+    role_names_by_agent: list[str] = []
+    counters: dict[int, int] = {}
+    for agent_cfg in agent_cfgs:
+        group_key = agent_cfg.team_id
+        idx_within_group = counters.get(group_key, 0)
+        counters[group_key] = idx_within_group + 1
+        if 0 <= agent_cfg.vibe < len(env.game.vibe_names):
+            vibe_name = env.game.vibe_names[agent_cfg.vibe]
+            if vibe_name in ROLE_NAME_SET:
+                role_names_by_agent.append(vibe_name)
+                continue
+        role_names_by_agent.append(ROLE_NAMES[idx_within_group % len(ROLE_NAMES)])
+    return role_names_by_agent
 
 
 def _parse_objective_mine_factor(variant_name: str) -> float | None:
@@ -331,17 +337,7 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
 
     role_by_agent_idx: list[str] = []
     if "role_conditional" in enabled:
-        counters: dict[int, int] = {}
-        for agent_cfg in agent_cfgs:
-            group_key = agent_cfg.team_id
-            idx_within_group = counters.get(group_key, 0)
-            counters[group_key] = idx_within_group + 1
-
-            role_name = _role_name_from_vibe(env, agent_cfg.vibe)
-            if role_name is None:
-                role_name = _ROLE_ORDER[idx_within_group % len(_ROLE_ORDER)]
-
-            role_by_agent_idx.append(role_name)
+        role_by_agent_idx = _role_names_from_vibes_or_fallback_order(env, agent_cfgs)
 
     for agent_cfg in agent_cfgs:
         rewards = dict(agent_cfg.rewards)
@@ -385,8 +381,10 @@ def apply_reward_variants(env: MettaGridConfig, *, variants: str | Sequence[str]
         agent_cfg.rewards = rewards
 
     # Deterministic label suffix order (exclude "objective").
+    label = env.label or ""
     for variant in AVAILABLE_REWARD_VARIANTS:
         if variant == "objective":
             continue
         if variant in enabled:
-            env.label += f".{variant}"
+            label += f".{variant}"
+    env.label = label
