@@ -194,6 +194,7 @@ def _or_neg_gate_signatures(o: OrFilter) -> set[tuple[tuple[float, ...], int]]:
         val = gvf.value
         assert isinstance(val, SumGameValue)
         assert val.weights is not None
+        assert isinstance(gvf.min, int)
         sigs.add((tuple(val.weights), gvf.min))
     return sigs
 
@@ -223,6 +224,7 @@ def _assert_adaptive_burst_cogs_dominant_conjunction(event) -> None:
         value = filter_cfg.value
         assert isinstance(value, SumGameValue)
         assert value.weights is not None
+        assert isinstance(filter_cfg.min, int)
         burst_weight_mins.add((tuple(value.weights), filter_cfg.min))
     assert burst_weight_mins == {((1.0, -2.0), 0), ((1.0, 1.0), 1)}
 
@@ -258,6 +260,7 @@ def _burst_adaptive_weight_mins(event) -> set[tuple[tuple[float, ...], int]]:
         value = filter_cfg.value
         assert isinstance(value, SumGameValue)
         assert value.weights is not None
+        assert isinstance(filter_cfg.min, int)
         burst_weight_mins.add((tuple(value.weights), filter_cfg.min))
     return burst_weight_mins
 
