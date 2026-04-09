@@ -17,6 +17,8 @@ from cogames.cli.generated_models import (
     MatchResponse,
     MembershipHistoryEntry,
     MissionSpec,
+    PlayerLoginResponse,
+    PlayerResponse,
     PoliciesResponse,
     PolicySummary,
     PolicyVersionResponse,
@@ -135,6 +137,12 @@ class TournamentServerClient:
         if seasons:
             return seasons[0]
         raise RuntimeError("No seasons available from server")
+
+    def list_players(self) -> list[PlayerResponse]:
+        return self._get("/players", list[PlayerResponse])
+
+    def login_player(self, player_id: str) -> PlayerLoginResponse:
+        return self._post(f"/players/{player_id}/login", PlayerLoginResponse)
 
     def get_season_matches(
         self,
