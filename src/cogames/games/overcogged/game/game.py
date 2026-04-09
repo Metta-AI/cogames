@@ -306,6 +306,167 @@ def resource_names_for_tickets(ticket_specs: list[TicketSpec]) -> list[str]:
     ]
 
 
+def overcooked_render_asset(
+    asset_name: str,
+    *,
+    resources: dict[str, int] | None = None,
+) -> RenderAsset:
+    return RenderAsset(
+        asset=asset_name,
+        resources={} if resources is None else dict(resources),
+    )
+
+
+def overcooked_render_assets() -> dict[str, list[RenderAsset]]:
+    return {
+        "agent": [RenderAsset(asset="scrambler")],
+        "veg_station": [overcooked_render_asset("overcooked_veg_station")],
+        "meat_station": [overcooked_render_asset("overcooked_meat_station")],
+        "plate_station": [overcooked_render_asset("overcooked_plate_station")],
+        "chopping_station": [overcooked_render_asset("overcooked_chopping_station")],
+        "cooking_station": [
+            overcooked_render_asset(
+                "overcooked_cooking_burned",
+                resources={POT_SOUP_BURNED: 1},
+            ),
+            overcooked_render_asset(
+                "overcooked_cooking_ready",
+                resources={POT_SOUP_READY: 1},
+            ),
+            overcooked_render_asset(
+                "overcooked_cooking_station",
+                resources={POT_SOUP_COOKING: 1},
+            ),
+            overcooked_render_asset("overcooked_cooking_station"),
+        ],
+        "fryer_station": [
+            overcooked_render_asset(
+                "overcooked_fryer_burned",
+                resources={FRYER_FRIES_BURNED: 1},
+            ),
+            overcooked_render_asset(
+                "overcooked_fryer_ready",
+                resources={FRYER_FRIES_READY: 1},
+            ),
+            overcooked_render_asset(
+                "overcooked_fryer_station",
+                resources={FRYER_FRIES_COOKING: 1},
+            ),
+            overcooked_render_asset("overcooked_fryer_station"),
+        ],
+        "serving_station": [overcooked_render_asset("overcooked_serving_station")],
+        "wash_station": [overcooked_render_asset("overcooked_wash_station")],
+        "order_board": [overcooked_render_asset("overcooked_order_board")],
+    }
+
+
+def overcooked_render_config(
+    settings: OvercookedSettings,
+    ticket_specs: list[TicketSpec],
+) -> RenderConfig:
+    return RenderConfig(
+        agent_huds={
+            DISH_SALAD: RenderHudConfig(resource=DISH_SALAD, short_name="SD", max=1, rank=0),
+            DISH_SOUP: RenderHudConfig(resource=DISH_SOUP, short_name="SP", max=1, rank=1),
+            DISH_FRIES: RenderHudConfig(resource=DISH_FRIES, short_name="FR", max=1, rank=2),
+            CLEAN_PLATE: RenderHudConfig(resource=CLEAN_PLATE, short_name="PL", max=1, rank=3),
+            DIRTY_PLATE: RenderHudConfig(resource=DIRTY_PLATE, short_name="DP", max=1, rank=4),
+        },
+        object_status={
+            "agent": {
+                CHOPPED_VEG: RenderStatusBarConfig(resource=CHOPPED_VEG, short_name="CV", max=1, rank=0),
+                CHOPPED_MEAT: RenderStatusBarConfig(resource=CHOPPED_MEAT, short_name="CM", max=1, rank=1),
+                DISH_SALAD: RenderStatusBarConfig(resource=DISH_SALAD, short_name="SD", max=1, rank=2),
+                DISH_SOUP: RenderStatusBarConfig(resource=DISH_SOUP, short_name="SP", max=1, rank=3),
+                DISH_FRIES: RenderStatusBarConfig(resource=DISH_FRIES, short_name="FR", max=1, rank=4),
+            },
+            "chopping_station": {
+                CHOP_VEG_PROGRESS: RenderStatusBarConfig(
+                    resource=CHOP_VEG_PROGRESS,
+                    short_name="VG",
+                    max=settings.chop_ticks,
+                    rank=0,
+                ),
+                CHOP_MEAT_PROGRESS: RenderStatusBarConfig(
+                    resource=CHOP_MEAT_PROGRESS,
+                    short_name="MT",
+                    max=settings.chop_ticks,
+                    rank=1,
+                ),
+            },
+            "order_board": {
+                QUEUE_SALAD: RenderStatusBarConfig(
+                    resource=QUEUE_SALAD,
+                    short_name="QSD",
+                    max=settings.order_queue_max,
+                    rank=0,
+                ),
+                QUEUE_SOUP: RenderStatusBarConfig(
+                    resource=QUEUE_SOUP,
+                    short_name="QSP",
+                    max=settings.order_queue_max,
+                    rank=1,
+                ),
+                QUEUE_FRIES: RenderStatusBarConfig(
+                    resource=QUEUE_FRIES,
+                    short_name="QFR",
+                    max=settings.order_queue_max,
+                    rank=2,
+                ),
+            },
+            "cooking_station": {
+                POT_SOUP_COOKING: RenderStatusBarConfig(
+                    resource=POT_SOUP_COOKING,
+                    short_name="CK",
+                    max=1,
+                    rank=0,
+                ),
+                POT_SOUP_READY: RenderStatusBarConfig(
+                    resource=POT_SOUP_READY,
+                    short_name="RD",
+                    max=1,
+                    rank=1,
+                ),
+                POT_SOUP_BURNED: RenderStatusBarConfig(
+                    resource=POT_SOUP_BURNED,
+                    short_name="BR",
+                    max=1,
+                    rank=2,
+                ),
+            },
+            "fryer_station": {
+                FRYER_FRIES_COOKING: RenderStatusBarConfig(
+                    resource=FRYER_FRIES_COOKING,
+                    short_name="FC",
+                    max=1,
+                    rank=0,
+                ),
+                FRYER_FRIES_READY: RenderStatusBarConfig(
+                    resource=FRYER_FRIES_READY,
+                    short_name="FR",
+                    max=1,
+                    rank=1,
+                ),
+                FRYER_FRIES_BURNED: RenderStatusBarConfig(
+                    resource=FRYER_FRIES_BURNED,
+                    short_name="FB",
+                    max=1,
+                    rank=2,
+                ),
+            },
+            "wash_station": {
+                WASH_PROGRESS: RenderStatusBarConfig(
+                    resource=WASH_PROGRESS,
+                    short_name="WS",
+                    max=settings.wash_ticks,
+                    rank=0,
+                ),
+            },
+        },
+        assets=overcooked_render_assets(),
+    )
+
+
 def veg_station_config(*, enable_veg_pickup: bool = True) -> GridObjectConfig:
     handlers: dict[str, Handler] = {}
     if enable_veg_pickup:
@@ -1127,129 +1288,7 @@ class OvercookedGame(CoGameMission):
                 ),
                 **queue_instrumentation_events(max_steps=settings.max_steps),
             },
-            render=RenderConfig(
-                agent_huds={
-                    DISH_SALAD: RenderHudConfig(resource=DISH_SALAD, short_name="SD", max=1, rank=0),
-                    DISH_SOUP: RenderHudConfig(resource=DISH_SOUP, short_name="SP", max=1, rank=1),
-                    DISH_FRIES: RenderHudConfig(resource=DISH_FRIES, short_name="FR", max=1, rank=2),
-                    CLEAN_PLATE: RenderHudConfig(resource=CLEAN_PLATE, short_name="PL", max=1, rank=3),
-                    DIRTY_PLATE: RenderHudConfig(resource=DIRTY_PLATE, short_name="DP", max=1, rank=4),
-                },
-                object_status={
-                    "agent": {
-                        CHOPPED_VEG: RenderStatusBarConfig(resource=CHOPPED_VEG, short_name="CV", max=1, rank=0),
-                        CHOPPED_MEAT: RenderStatusBarConfig(resource=CHOPPED_MEAT, short_name="CM", max=1, rank=1),
-                        DISH_SALAD: RenderStatusBarConfig(resource=DISH_SALAD, short_name="SD", max=1, rank=2),
-                        DISH_SOUP: RenderStatusBarConfig(resource=DISH_SOUP, short_name="SP", max=1, rank=3),
-                        DISH_FRIES: RenderStatusBarConfig(resource=DISH_FRIES, short_name="FR", max=1, rank=4),
-                    },
-                    "chopping_station": {
-                        CHOP_VEG_PROGRESS: RenderStatusBarConfig(
-                            resource=CHOP_VEG_PROGRESS,
-                            short_name="VG",
-                            max=settings.chop_ticks,
-                            rank=0,
-                        ),
-                        CHOP_MEAT_PROGRESS: RenderStatusBarConfig(
-                            resource=CHOP_MEAT_PROGRESS,
-                            short_name="MT",
-                            max=settings.chop_ticks,
-                            rank=1,
-                        ),
-                    },
-                    "order_board": {
-                        QUEUE_SALAD: RenderStatusBarConfig(
-                            resource=QUEUE_SALAD,
-                            short_name="QSD",
-                            max=settings.order_queue_max,
-                            rank=0,
-                        ),
-                        QUEUE_SOUP: RenderStatusBarConfig(
-                            resource=QUEUE_SOUP,
-                            short_name="QSP",
-                            max=settings.order_queue_max,
-                            rank=1,
-                        ),
-                        QUEUE_FRIES: RenderStatusBarConfig(
-                            resource=QUEUE_FRIES,
-                            short_name="QFR",
-                            max=settings.order_queue_max,
-                            rank=2,
-                        ),
-                    },
-                    "cooking_station": {
-                        POT_SOUP_COOKING: RenderStatusBarConfig(
-                            resource=POT_SOUP_COOKING,
-                            short_name="CK",
-                            max=1,
-                            rank=0,
-                        ),
-                        POT_SOUP_READY: RenderStatusBarConfig(
-                            resource=POT_SOUP_READY,
-                            short_name="RD",
-                            max=1,
-                            rank=1,
-                        ),
-                        POT_SOUP_BURNED: RenderStatusBarConfig(
-                            resource=POT_SOUP_BURNED,
-                            short_name="BR",
-                            max=1,
-                            rank=2,
-                        ),
-                    },
-                    "fryer_station": {
-                        FRYER_FRIES_COOKING: RenderStatusBarConfig(
-                            resource=FRYER_FRIES_COOKING,
-                            short_name="FC",
-                            max=1,
-                            rank=0,
-                        ),
-                        FRYER_FRIES_READY: RenderStatusBarConfig(
-                            resource=FRYER_FRIES_READY,
-                            short_name="FR",
-                            max=1,
-                            rank=1,
-                        ),
-                        FRYER_FRIES_BURNED: RenderStatusBarConfig(
-                            resource=FRYER_FRIES_BURNED,
-                            short_name="FB",
-                            max=1,
-                            rank=2,
-                        ),
-                    },
-                    "wash_station": {
-                        WASH_PROGRESS: RenderStatusBarConfig(
-                            resource=WASH_PROGRESS,
-                            short_name="WS",
-                            max=settings.wash_ticks,
-                            rank=0,
-                        ),
-                    },
-                },
-                assets={
-                    "agent": [RenderAsset(asset="scrambler")],
-                    "wall": [RenderAsset(asset="overcooked_wall")],
-                    "veg_station": [RenderAsset(asset="overcooked_veg_station")],
-                    "meat_station": [RenderAsset(asset="overcooked_meat_station")],
-                    "plate_station": [RenderAsset(asset="overcooked_plate_station")],
-                    "chopping_station": [RenderAsset(asset="overcooked_chopping_station")],
-                    "cooking_station": [
-                        RenderAsset(asset="overcooked_cooking_burned", resources={POT_SOUP_BURNED: 1}),
-                        RenderAsset(asset="overcooked_cooking_ready", resources={POT_SOUP_READY: 1}),
-                        RenderAsset(asset="overcooked_cooking_station", resources={POT_SOUP_COOKING: 1}),
-                        RenderAsset(asset="overcooked_cooking_station"),
-                    ],
-                    "fryer_station": [
-                        RenderAsset(asset="overcooked_fryer_burned", resources={FRYER_FRIES_BURNED: 1}),
-                        RenderAsset(asset="overcooked_fryer_ready", resources={FRYER_FRIES_READY: 1}),
-                        RenderAsset(asset="overcooked_fryer_station", resources={FRYER_FRIES_COOKING: 1}),
-                        RenderAsset(asset="overcooked_fryer_station"),
-                    ],
-                    "serving_station": [RenderAsset(asset="overcooked_serving_station")],
-                    "wash_station": [RenderAsset(asset="overcooked_wash_station")],
-                    "order_board": [RenderAsset(asset="overcooked_order_board")],
-                },
-            ),
+            render=overcooked_render_config(settings, ticket_specs),
         )
         return MettaGridConfig(game=game)
 
