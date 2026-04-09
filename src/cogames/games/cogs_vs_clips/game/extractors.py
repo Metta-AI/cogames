@@ -62,6 +62,7 @@ class ExtractorsVariant(CoGameMissionVariant):
     extractor_density: float = 0.3
     extraction_handlers: list[ExtractionHandlerConfig] = Field(default_factory=list)
     initial_amount: int = 200
+    remove_when_empty: bool = True
 
     def add_extraction_handler(
         self, name: str, required_resources: dict[str, int], cost: dict[str, int], amount: int
@@ -98,11 +99,14 @@ class ExtractorsVariant(CoGameMissionVariant):
                             filters=[actorHas({k: v}) for k, v in eh.required_resources.items()],
                             mutations=[
                                 updateActor({k: -v for k, v in eh.cost.items()}),
-                                withdraw({resource: eh.amount}, remove_when_empty=True),
+                                withdraw({resource: eh.amount}, remove_when_empty=self.remove_when_empty),
                             ],
                         )
                         for eh in self.extraction_handlers
                     },
                 },
-                inventory=InventoryConfig(initial={resource: self.initial_amount}),
+                inventory=InventoryConfig(
+                    initial={resource: self.initial_amount},
+                    default_limit=self.initial_amount,
+                ),
             )
