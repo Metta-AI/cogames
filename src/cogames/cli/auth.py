@@ -4,6 +4,7 @@ import importlib
 
 import typer
 
+from cogames.cli.player import player_app
 from softmax.auth import DEFAULT_COGAMES_SERVER
 
 auth_app = typer.Typer(
@@ -12,6 +13,7 @@ auth_app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
+auth_app.add_typer(player_app, name="player")
 
 
 def _softmax_cli():

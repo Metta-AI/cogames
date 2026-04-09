@@ -109,8 +109,7 @@ from cogames.display_detect import has_display
 from cogames.games.cogs_vs_clips.train.curricula import make_rotation
 from cogames.optional_deps import require_neural
 from cogames.seed import seed_rollout_rng
-from softmax.auth import DEFAULT_COGAMES_SERVER, load_token
-from softmax.token_storage import TokenKind
+from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
 
 # Always add current directory to Python path so optional plugins in the repo are discoverable.
 sys.path.insert(0, ".")
@@ -1887,7 +1886,7 @@ def diagnose_cmd(ctx: typer.Context) -> None:
 
 
 def _resolve_season(server: str, login_server: str | None = None, season_name: str | None = None) -> SeasonDetail:
-    auth_token = load_token(token_kind=TokenKind.COGAMES, server=login_server) if login_server else None
+    auth_token = load_current_cogames_token(login_server=login_server) if login_server else None
     try:
         with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
             if season_name is None:
@@ -2050,7 +2049,7 @@ def validate_bundle_cmd(
     if image == DEFAULT_EPISODE_RUNNER_IMAGE and season_info.compat_version is not None:
         image = f"ghcr.io/metta-ai/episode-runner:compat-v{season_info.compat_version}"
 
-    auth_token = load_token(token_kind=TokenKind.COGAMES, server=login_server)
+    auth_token = load_current_cogames_token(login_server=login_server)
     with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
         config_data = client.get_config(config_id)
 

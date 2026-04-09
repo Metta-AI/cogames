@@ -34,8 +34,7 @@ from cogames.cli.generated_models import (
     TeamSummary,
     TeamTournamentProgress,
 )
-from softmax.auth import has_saved_token, load_token
-from softmax.token_storage import TokenKind
+from softmax.auth import load_current_cogames_token
 
 T = TypeVar("T")
 
@@ -68,14 +67,10 @@ class TournamentServerClient:
 
     @classmethod
     def from_login(cls, server_url: str, login_server: str) -> TournamentServerClient | None:
-        if not has_saved_token(token_kind=TokenKind.COGAMES, server=login_server):
+        token = load_current_cogames_token(login_server=login_server)
+        if token is None:
             console.print("[red]Error:[/red] Not authenticated.")
             console.print("Please run: [cyan]softmax login[/cyan]")
-            return None
-
-        token = load_token(token_kind=TokenKind.COGAMES, server=login_server)
-        if not token:
-            console.print(f"[red]Error:[/red] Token not found for {login_server}")
             return None
 
         return cls(server_url=server_url, token=token, login_server=login_server)
