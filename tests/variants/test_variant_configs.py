@@ -11,6 +11,7 @@ from cogames.games.cogs_vs_clips.game.cargo import CargoLimitVariant
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
 from cogames.games.cogs_vs_clips.game.days import DayConfig, DaysVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
+from cogames.games.cogs_vs_clips.game.endless import EndlessVariant
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
 from cogames.games.cogs_vs_clips.game.forced_role_vibes import ForcedRoleVibesVariant
@@ -34,6 +35,11 @@ from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
 from cogames.games.cogs_vs_clips.missions.machina_1 import CvCMachina1Variant
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from mettagrid.config.filter import GameValueFilter, ResourceFilter
+from mettagrid.config.filter.periodic_filter import PeriodicFilter
+from mettagrid.config.game_value import GameValue, RatioGameValue
+from mettagrid.config.mutation.query_inventory_mutation import QueryInventoryMutation
+from mettagrid.config.mutation.resource_mutation import ResourceTransferMutation
+from mettagrid.simulator import Simulation
 from variants.conftest import StationTestHarness
 
 ELEMENTS = ElementsVariant().elements
@@ -52,8 +58,9 @@ def _make_mission(variants, num_cogs=4, max_steps=100):
     ).with_variants([TeamVariant(default_teams={"cogs": TeamConfig(name="cogs", num_agents=num_cogs)}), *variants])
 
 
-def _make_env_without_default(variants):
-    return _make_mission(variants).model_copy(update={"default_variant": None}).make_env()
+def _make_env_without_default(variants, num_cogs=4):
+    mission = _make_mission(variants, num_cogs=num_cogs)
+    return mission.model_copy(update={"default_variant": None, "num_agents": num_cogs}).make_env()
 
 
 class TestElementsVariant:
@@ -119,6 +126,77 @@ class TestExtractorsVariant:
         for element in ELEMENTS:
             key = f"{element}_extractor"
             assert key in env.game.objects, f"Missing {key}"
+
+    def test_default_limit_set_to_initial_amount(self):
+        initial = 300
+        env = _make_mission([ExtractorsVariant(initial_amount=initial)]).make_env()
+        for element in ELEMENTS:
+            obj = env.game.objects[f"{element}_extractor"]
+            assert obj.inventory.default_limit == initial
+
+    def test_remove_when_empty_defaults_true(self):
+        env = _make_mission([ExtractorsVariant()]).make_env()
+        for element in ELEMENTS:
+            obj = env.game.objects[f"{element}_extractor"]
+            for handler in obj.on_use_handlers.values():
+                for mutation in handler.mutations:
+                    if isinstance(mutation, ResourceTransferMutation):
+                        assert mutation.remove_source_when_empty is True
+
+
+class TestEndlessVariant:
+    def test_sets_max_steps_zero(self):
+        env = _make_mission([EndlessVariant()]).make_env()
+        assert env.game.max_steps == 0
+
+    def test_works_without_extractors(self):
+        env = _make_env_without_default([EndlessVariant()])
+        assert env.game.max_steps == 0
+        # No on_tick refill handlers when extractors not present
+        for key in env.game.on_tick:
+            assert "refill" not in key
+
+    def test_sets_remove_when_empty_false(self):
+        env = _make_mission([EndlessVariant(), ExtractorsVariant()]).make_env()
+        for element in ELEMENTS:
+            obj = env.game.objects[f"{element}_extractor"]
+            for handler in obj.on_use_handlers.values():
+                for mutation in handler.mutations:
+                    if isinstance(mutation, ResourceTransferMutation):
+                        assert mutation.remove_source_when_empty is False
+
+    def test_adds_refill_tick_handlers(self):
+        env = _make_mission([EndlessVariant(), ExtractorsVariant()]).make_env()
+        for element in ELEMENTS:
+            key = f"{element}_extractor_refill"
+            assert key in env.game.on_tick, f"Missing on_tick handler {key}"
+
+    def test_refill_handler_uses_periodic_filter(self):
+        period = 500
+        env = _make_mission([EndlessVariant(refill_period=period), ExtractorsVariant()]).make_env()
+        handler = env.game.on_tick[f"{ELEMENTS[0]}_extractor_refill"]
+        periodic_filters = [f for f in handler.filters if isinstance(f, PeriodicFilter)]
+        assert len(periodic_filters) == 1
+        assert periodic_filters[0].period == period
+
+    def test_refill_handler_uses_gamevalue_max_items(self):
+        env = _make_mission([EndlessVariant(refill_fraction=4), ExtractorsVariant()]).make_env()
+        handler = env.game.on_tick[f"{ELEMENTS[0]}_extractor_refill"]
+        qi_mutations = [m for m in handler.mutations if isinstance(m, QueryInventoryMutation)]
+        assert len(qi_mutations) == 1
+        q = qi_mutations[0].query
+        assert isinstance(q.max_items, GameValue)
+        assert isinstance(q.max_items, RatioGameValue)
+
+    def test_produces_runnable_simulation(self):
+        """EndlessVariant + ExtractorsVariant produces a config that can be compiled to C++ and stepped."""
+        env = _make_env_without_default([EndlessVariant(refill_period=5), ExtractorsVariant()])
+        sim = Simulation(env, seed=42)
+        for _ in range(20):
+            for i in range(sim.num_agents):
+                sim.agent(i).set_action("noop")
+            sim.step()
+        sim.close()
 
 
 class TestGearVariant:

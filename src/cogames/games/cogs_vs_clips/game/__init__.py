@@ -11,6 +11,7 @@ from cogames.games.cogs_vs_clips.game.clips import (
 )
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
 from cogames.games.cogs_vs_clips.game.days import DaysVariant
+from cogames.games.cogs_vs_clips.game.endless import EndlessVariant
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.game.extractors import CvCExtractorConfig, ExtractorsVariant
 from cogames.games.cogs_vs_clips.game.forced_role_vibes import ForcedRoleVibesVariant
@@ -66,6 +67,7 @@ __all__ = [
     "DesertVariant",
     "DistantResourcesVariant",
     "EmptyBaseVariant",
+    "EndlessVariant",
     "EnergyVariant",
     "ForcedRoleVibesVariant",
     "ForestVariant",
@@ -136,6 +138,7 @@ VARIANTS: list[CoGameMissionVariant] = [
     DaysVariant(),
     DesertVariant(),
     EmptyBaseVariant(),
+    EndlessVariant(),
     EnergyVariant(),
     ExtractorsVariant(),
     ForcedRoleVibesVariant(),
