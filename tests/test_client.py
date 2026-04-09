@@ -10,6 +10,8 @@ from cogames.cli.client import (
     EpisodeQueryResponse,
     EpisodeResponse,
     LeaderboardEntry,
+    PlayerLoginResponse,
+    PlayerResponse,
     PoliciesResponse,
     ScorePoliciesLeaderboardEntry,
     StageStats,
@@ -126,6 +128,25 @@ def _policy_row_payload() -> dict:
         "user_id": _PV_ID,
         "attributes": {"tag": "v1"},
         "version_count": 5,
+    }
+
+
+def _player_response_payload() -> dict:
+    return {
+        "id": "ply_playeralpha",
+        "user_id": "regular@example.com",
+        "user": None,
+        "name": "alpha",
+        "created_at": "2026-02-20T12:00:00Z",
+        "disabled_at": None,
+    }
+
+
+def _player_login_response_payload() -> dict:
+    return {
+        "player_id": "ply_playeralpha",
+        "token": "ply_secret-token",
+        "expires_at": "2026-02-21T12:00:00Z",
     }
 
 
@@ -256,6 +277,21 @@ class TestPoliciesResponseModel:
         assert resp.entries[0].user_id == "gh732qp1wp4svaaiakiywlnr"
 
 
+class TestPlayerResponseModel:
+    def test_parse(self) -> None:
+        player = PlayerResponse.model_validate(_player_response_payload())
+        assert player.id == "ply_playeralpha"
+        assert player.user_id == "regular@example.com"
+        assert player.name == "alpha"
+
+
+class TestPlayerLoginResponseModel:
+    def test_parse(self) -> None:
+        login = PlayerLoginResponse.model_validate(_player_login_response_payload())
+        assert login.player_id == "ply_playeralpha"
+        assert login.token == "ply_secret-token"
+
+
 # ---------------------------------------------------------------------------
 # Client method tests (request shape + response parsing)
 # ---------------------------------------------------------------------------
@@ -275,6 +311,24 @@ class TestGetStages:
         assert len(stages) == 1
         assert isinstance(stages[0], StageStats)
         assert stages[0].name == "stage-1"
+
+
+class TestPlayers:
+    def test_list_players(self, httpserver: HTTPServer, client: TournamentServerClient) -> None:
+        httpserver.expect_request("/players", method="GET").respond_with_json([_player_response_payload()])
+        players = client.list_players()
+        assert len(players) == 1
+        assert isinstance(players[0], PlayerResponse)
+        assert players[0].id == "ply_playeralpha"
+
+    def test_login_player(self, httpserver: HTTPServer, client: TournamentServerClient) -> None:
+        httpserver.expect_request("/players/ply_playeralpha/login", method="POST").respond_with_json(
+            _player_login_response_payload()
+        )
+        login = client.login_player("ply_playeralpha")
+        assert isinstance(login, PlayerLoginResponse)
+        assert login.player_id == "ply_playeralpha"
+        assert login.token == "ply_secret-token"
 
 
 class TestGetProgress:
