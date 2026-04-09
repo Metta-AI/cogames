@@ -19,7 +19,10 @@ import subprocess
 import sys
 import webbrowser
 from pathlib import Path
-from typing import Literal, Optional
+from typing import TYPE_CHECKING, Literal, Optional, cast
+
+if TYPE_CHECKING:
+    import torch
 from uuid import UUID
 
 import httpx
@@ -104,6 +107,7 @@ from cogames.cli.submit import (
 from cogames.device import resolve_training_device
 from cogames.display_detect import has_display
 from cogames.games.cogs_vs_clips.train.curricula import make_rotation
+from cogames.optional_deps import require_neural
 from cogames.seed import seed_rollout_rng
 from softmax.auth import DEFAULT_COGAMES_SERVER, load_token
 from softmax.token_storage import TokenKind
@@ -1065,15 +1069,17 @@ def make_policy(
         raise typer.Exit(1)
 
     try:
-        # Deferred: trainable_policy_template imports torch at module level
-        import cogames.policy.starter_agent as starter_agent  # noqa: PLC0415
-        import cogames.policy.trainable_policy_template as trainable_policy_template  # noqa: PLC0415
-
         if trainable:
+            require_neural("cogames make-policy --trainable")
+            import cogames.policy.trainable_policy_template as trainable_policy_template  # noqa: PLC0415
+
             template_path = Path(trainable_policy_template.__file__)
             policy_class = "MyTrainablePolicy"
             policy_type = "Trainable"
         else:
+            # Deferred: imported only to locate its source file as a template.
+            import cogames.policy.starter_agent as starter_agent  # noqa: PLC0415
+
             template_path = Path(starter_agent.__file__)
             policy_class = "StarterPolicy"
             policy_type = "Scripted"
@@ -1114,6 +1120,9 @@ app.command(name="make-policy", hidden=True)(make_policy)
 @tutorial_app.command(
     name="train",
     help="""Train a policy on one or more missions.
+
+Requires the ``neural`` extra (PyTorch + PufferLib).
+Install with: ``pip install cogames[neural]``.
 
 By default, our 'lstm' policy architecture is used. You can select a different architecture
 (like 'stateless' or 'baseline'), or define your own implementing the MultiAgentPolicy
@@ -1277,7 +1286,7 @@ def train_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    # Deferred: train module imports torch at module level
+    require_neural("cogames train")
     from cogames import train as train_module  # noqa: PLC0415
 
     selected_missions = get_mission_names_and_configs(
@@ -1299,7 +1308,8 @@ def train_cmd(
         raise ValueError("Please specify at least one mission")
 
     policy_spec = get_policy_spec(ctx, policy)
-    torch_device = resolve_training_device(console, device)
+    # require_neural above guarantees torch is installed, so this always returns torch.device.
+    torch_device = cast("torch.device", resolve_training_device(console, device))
 
     try:
         train_module.train(

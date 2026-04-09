@@ -61,17 +61,28 @@ def describe_policy_arg(with_proportion: bool):
     console.print("\n[dim]Note: data= must be a file path, not a directory.[/dim]\n")
 
 
+_NEURAL_MODULES = ("torch", "pufferlib", "cortex")
+
+
 def _translate_error(e: Exception) -> str:
     msg = str(e)
     translated = msg.replace("Invalid symbol name", "Could not find policy class")
     if isinstance(e, ModuleNotFoundError):
-        translated += ". Please make sure to specify your policy class."
-        translated += (
-            "\n\n[dim]Hint: If uploading a custom policy, make sure to include its source "
-            "with --include-files / -f, e.g.:\n"
-            "  cogames upload -p class=my_pkg.MyPolicy -n my-policy "
-            "-f src/my_pkg[/dim]"
-        )
+        # Detect missing neural deps and point users at the optional extra.
+        missing = getattr(e, "name", "") or ""
+        if any(missing == m or missing.startswith(m + ".") for m in _NEURAL_MODULES):
+            translated += (
+                f"\n\n[dim]Hint: '{missing}' is part of the [bold]neural[/bold] optional extra.\n"
+                "Install it with:  pip install cogames[neural][/dim]"
+            )
+        else:
+            translated += ". Please make sure to specify your policy class."
+            translated += (
+                "\n\n[dim]Hint: If uploading a custom policy, make sure to include its source "
+                "with --include-files / -f, e.g.:\n"
+                "  cogames upload -p class=my_pkg.MyPolicy -n my-policy "
+                "-f src/my_pkg[/dim]"
+            )
     # Hint at ':' vs '.' confusion in class paths
     if ":" in msg and ("No module named" in msg or "Could not find" in translated):
         translated += " Note: use '.' as the module separator (not ':')."

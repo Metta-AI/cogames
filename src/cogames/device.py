@@ -6,12 +6,24 @@ from typing import TYPE_CHECKING
 
 from rich.console import Console
 
+from cogames.optional_deps import has_neural
+
 if TYPE_CHECKING:
     import torch
 
 
-def resolve_training_device(console: Console, requested: str) -> torch.device:
-    import torch  # noqa: PLC0415  # deferred so importing this module doesn't pull in torch
+def resolve_training_device(console: Console, requested: str) -> torch.device | str:
+    """Resolve the requested device to a ``torch.device``.
+
+    When PyTorch is not installed (the ``neural`` extra is missing), returns
+    the string ``"cpu"`` so that callers using only scripted policies still
+    work.  Commands that actually need a real ``torch.device`` should call
+    :func:`cogames.optional_deps.require_neural` before reaching this point.
+    """
+    if not has_neural():
+        return "cpu"
+
+    import torch  # noqa: PLC0415
 
     normalized = requested.strip().lower()
 
