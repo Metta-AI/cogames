@@ -2,6 +2,7 @@
 
 import typer
 
+from cogames.cli.player import player_app
 from cogames.main import create_bundle_cmd, make_policy, play_cmd, run_cmd, train_cmd, tutorial_cmd
 
 app = typer.Typer(
@@ -35,6 +36,7 @@ tutorial_app.command(
 )(make_policy)
 
 app.add_typer(tutorial_app, name="tutorial", rich_help_panel="Tutorials")
+app.add_typer(player_app, name="player", rich_help_panel="Tournament")
 app.command(
     name="play",
     help="Play a CoGames mission locally.",

@@ -37,7 +37,7 @@ from cogames.cli.client import TournamentServerClient
 from cogames.cli.generated_models import MatchPlayerInfo
 from cogames.cli.submit import observatory_profile_url
 from cogames.main import _submit_browser_launch_skip_reason, app
-from softmax.auth import save_token
+from softmax.auth import load_token, save_token
 from softmax.token_storage import TokenKind
 
 _SEASON_ID = str(TEST_UUID)
@@ -129,6 +129,25 @@ def _policy_version_info() -> dict[str, Any]:
         created_at="2026-02-25T12:00:00+00:00",
         policy_created_at="2026-02-25T11:00:00+00:00",
     ).model_dump(mode="json")
+
+
+def _player_response_payload() -> dict[str, Any]:
+    return {
+        "id": "ply_playeralpha",
+        "user_id": "regular@example.com",
+        "user": None,
+        "name": "alpha",
+        "created_at": "2026-02-20T12:00:00Z",
+        "disabled_at": None,
+    }
+
+
+def _player_login_response_payload() -> dict[str, Any]:
+    return {
+        "player_id": "ply_playeralpha",
+        "token": "ply_secret-token",
+        "expires_at": "2026-02-21T12:00:00Z",
+    }
 
 
 def _setup_read_endpoints(httpserver: HTTPServer) -> None:
@@ -685,6 +704,140 @@ class TestAuthBehavior:
 
 
 # ---------------------------------------------------------------------------
+# Player session tests
+# ---------------------------------------------------------------------------
+
+
+class TestPlayerSessions:
+    def test_player_list_uses_saved_user_token_even_when_active_session_is_player(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        login_server = "http://fake-login-server"
+        _save_user_token(tmp_path, "user-token", login_server)
+        _save_token(tmp_path, "player-token", login_server)
+        httpserver.expect_request("/players", method="GET").respond_with_json([_player_response_payload()])
+
+        result = runner.invoke(
+            app,
+            [
+                "auth",
+                "player",
+                "list",
+                "--json",
+                "--server",
+                httpserver.url_for(""),
+                "--login-server",
+                login_server,
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(result.output)[0]["id"] == "ply_playeralpha"
+        player_reqs = [req for req, _ in httpserver.log if req.path == "/players"]
+        assert player_reqs, "Expected a request to /players"
+        assert player_reqs[0].headers.get("X-Auth-Token") == "user-token"
+
+    def test_player_login_switches_active_session_but_preserves_user_token(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        login_server = "http://fake-login-server"
+        _save_user_token(tmp_path, "user-token", login_server)
+        httpserver.expect_request("/players/ply_playeralpha/login", method="POST").respond_with_json(
+            _player_login_response_payload()
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "auth",
+                "player",
+                "login",
+                "ply_playeralpha",
+                "--json",
+                "--server",
+                httpserver.url_for(""),
+                "--login-server",
+                login_server,
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert json.loads(result.output)["token"] == "ply_secret-token"
+        assert load_token(token_kind=TokenKind.COGAMES, server=login_server) == "ply_secret-token"
+        assert load_token(token_kind=TokenKind.COGAMES_USER, server=login_server) == "user-token"
+        login_reqs = [req for req, _ in httpserver.log if req.path == "/players/ply_playeralpha/login"]
+        assert login_reqs, "Expected a request to /players/ply_playeralpha/login"
+        assert login_reqs[0].headers.get("X-Auth-Token") == "user-token"
+
+    def test_player_logout_restores_user_session(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        login_server = httpserver.url_for("").rstrip("/")
+        _save_user_token(tmp_path, "user-token", login_server)
+        _save_token(tmp_path, "player-token", login_server)
+        httpserver.expect_request("/whoami", method="GET").respond_with_json(
+            {
+                "user_email": "regular@example.com",
+                "is_softmax_team_member": False,
+                "is_softmax_admin": False,
+                "subject_type": "user",
+                "subject_id": "regular@example.com",
+                "owner_user_id": "regular@example.com",
+                "scopes": [],
+            }
+        )
+
+        result = runner.invoke(app, ["auth", "player", "logout", "--login-server", login_server])
+
+        assert result.exit_code == 0
+        assert load_token(token_kind=TokenKind.COGAMES, server=login_server) == "user-token"
+        assert "Restored user session." in result.output
+        whoami_reqs = [req for req, _ in httpserver.log if req.path == "/whoami"]
+        assert whoami_reqs, "Expected a request to /whoami"
+        assert whoami_reqs[0].headers.get("Authorization") == "Bearer user-token"
+
+    def test_player_list_requires_saved_user_session(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
+        login_server = "http://fake-login-server"
+        _save_token(tmp_path, "active-only-token", login_server)
+
+        result = runner.invoke(
+            app,
+            [
+                "auth",
+                "player",
+                "list",
+                "--json",
+                "--server",
+                httpserver.url_for(""),
+                "--login-server",
+                login_server,
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "No saved user session found." in result.output
+        assert not httpserver.log
+
+
+# ---------------------------------------------------------------------------
 # Help text content tests
 # ---------------------------------------------------------------------------
 
@@ -734,6 +887,11 @@ class TestHelpTextContent:
 def _save_token(tmp_path: Path, token: str, login_server: str) -> None:
     _ = tmp_path
     save_token(token_kind=TokenKind.COGAMES, token=token, server=login_server)
+
+
+def _save_user_token(tmp_path: Path, token: str, login_server: str) -> None:
+    _ = tmp_path
+    save_token(token_kind=TokenKind.COGAMES_USER, token=token, server=login_server)
 
 
 class TestSeasonLookupAuth:
