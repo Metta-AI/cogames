@@ -17,6 +17,9 @@ from cogames.cli.generated_models import (
     MatchResponse,
     MembershipHistoryEntry,
     MissionSpec,
+    PlayerCredentialCreateResponse,
+    PlayerCredentialDeleteResponse,
+    PlayerCredentialResponseBase,
     PlayerLoginResponse,
     PlayerResponse,
     PoliciesResponse,
@@ -118,6 +121,13 @@ class TournamentServerClient:
     def _put(self, path: str, response_type: type[T] | None = None, **kwargs: Any) -> T | dict[str, Any]:
         return self._request("PUT", path, response_type, **kwargs)
 
+    @overload
+    def _delete(self, path: str, response_type: type[T], **kwargs: Any) -> T: ...
+    @overload
+    def _delete(self, path: str, response_type: None = None, **kwargs: Any) -> dict[str, Any]: ...
+    def _delete(self, path: str, response_type: type[T] | None = None, **kwargs: Any) -> T | dict[str, Any]:
+        return self._request("DELETE", path, response_type, **kwargs)
+
     def get_seasons(self) -> list[SeasonSummary]:
         return self._get("/tournament/seasons", list[SeasonSummary])
 
@@ -138,6 +148,23 @@ class TournamentServerClient:
 
     def login_player(self, player_id: str) -> PlayerLoginResponse:
         return self._post(f"/players/{player_id}/login", PlayerLoginResponse)
+
+    def create_player(self, name: str) -> PlayerResponse:
+        return self._post("/players", PlayerResponse, json={"name": name})
+
+    def list_player_credentials(self, player_id: str) -> list[PlayerCredentialResponseBase]:
+        return self._get(f"/players/{player_id}/credentials", list[PlayerCredentialResponseBase])
+
+    def create_player_credential(
+        self, player_id: str, name: str, scopes: list[str] | None = None
+    ) -> PlayerCredentialCreateResponse:
+        payload: dict[str, Any] = {"name": name}
+        if scopes:
+            payload["scopes"] = scopes
+        return self._post(f"/players/{player_id}/credentials", PlayerCredentialCreateResponse, json=payload)
+
+    def revoke_player_credential(self, player_id: str, credential_id: str) -> PlayerCredentialDeleteResponse:
+        return self._delete(f"/players/{player_id}/credentials/{credential_id}", PlayerCredentialDeleteResponse)
 
     def get_season_matches(
         self,
