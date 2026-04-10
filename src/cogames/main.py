@@ -1843,6 +1843,8 @@ app.command(
 
 [cyan]cogames matches <match-id> --logs[/cyan]            Show available logs
 
+[cyan]cogames match-artifacts <match-id> error-info[/cyan]  Show runner error info
+
 [cyan]cogames matches <match-id> -d ./logs[/cyan]         Download logs""",
     add_help_option=False,
 )(matches_cmd)
@@ -1854,6 +1856,8 @@ app.command(
     epilog="""[dim]Examples:[/dim]
 
 [cyan]cogames match-artifacts <match-id>[/cyan]                     Get match logs
+
+[cyan]cogames match-artifacts <match-id> error-info[/cyan]          Get runner error info
 
 [cyan]cogames match-artifacts <match-id> logs -o out.txt[/cyan]     Save to file""",
     add_help_option=False,

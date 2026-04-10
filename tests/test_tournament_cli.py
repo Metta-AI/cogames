@@ -486,6 +486,28 @@ class TestJsonOutputStability:
         assert data["id"] == _MATCH_ID
         assert data["status"] == "completed"
 
+    def test_failed_match_detail_shows_runner_error_hint(self, httpserver: HTTPServer) -> None:
+        _setup_read_endpoints(httpserver)
+        httpserver.expect_request(
+            f"/tournament/matches/{_MATCH_ID}",
+            method="GET",
+        ).respond_with_json(
+            _match_response()
+            | {
+                "status": "failed",
+                "job_id": _POLICY_ID,
+                "error": "websockets.exceptions.ConnectionClosedError: received 1011 (internal error)",
+            }
+        )
+
+        with _mock_from_login(httpserver):
+            result = _invoke_with_server(httpserver, "matches", _MATCH_ID)
+
+        assert result.exit_code == 0
+        assert f"Job: {_POLICY_ID}" in result.output
+        assert "Runner error: cogames match-artifacts" in result.output
+        assert "error-info" in result.output
+
     def test_submissions_json_output(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
         httpserver.expect_request(
