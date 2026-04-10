@@ -256,6 +256,8 @@ def _show_match_detail(
     console.print(f"Pool: {match.pool_name}")
     console.print(f"Status: {match.status}")
     console.print(f"Date: {_format_timestamp(match.created_at.isoformat())}")
+    if match.job_id:
+        console.print(f"Job: {match.job_id}")
 
     if match.error:
         # Show only the last line of the traceback
@@ -287,6 +289,8 @@ def _show_match_detail(
     else:
         hints = [f"[dim]Logs: cogames matches {match_id_str} --logs[/dim]"]
         hints.append(f"[dim]Artifacts: cogames match-artifacts {match_id_str}[/dim]")
+        if match.status == "failed":
+            hints.append(f"[dim]Runner error: cogames match-artifacts {match_id_str} error-info[/dim]")
         if match.episode_id:
             episode_id = str(match.episode_id)
             hints.append(f"[dim]Episode: cogames episode show {episode_id}[/dim]")
@@ -371,7 +375,7 @@ def match_artifacts_cmd(
     artifact_type: str = typer.Argument(
         "logs",
         metavar="ARTIFACT_TYPE",
-        help="Type of artifact to retrieve (e.g. 'logs').",
+        help="Type of artifact to retrieve (e.g. 'logs', 'error-info').",
     ),
     policy: Optional[str] = typer.Option(
         None,
