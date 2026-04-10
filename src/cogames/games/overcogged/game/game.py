@@ -47,6 +47,7 @@ from mettagrid.config.mettagrid_config import (
     InventoryConfig,
     MettaGridConfig,
     ResourceLimitsConfig,
+    TalkConfig,
     WallConfig,
 )
 from mettagrid.config.mutation.stats_mutation import logActorAgentStat, logStatToGame
@@ -1234,6 +1235,7 @@ class OvercookedGame(CoGameMission):
                 noop=NoopActionConfig(),
                 change_vibe=ChangeVibeActionConfig(enabled=False, vibes=[]),
             ),
+            talk=TalkConfig(enabled=True, max_length=140, cooldown_steps=0),
             agents=[_agent_config() for _ in range(num_cogs)],
             objects={
                 "wall": counter_config(),
