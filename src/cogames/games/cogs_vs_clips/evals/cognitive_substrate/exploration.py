@@ -6,12 +6,14 @@ from mettagrid.map_builder.maze import MazePrimMapBuilder
 
 
 def _exploration_goal() -> dict[str, GridObjectConfig]:
+    solve = success_handler()
+    solve.name = "solve"
     return {
         "hub": GridObjectConfig(
             name="goal",
             map_name="hub",
             tags=["exploration:goal"],
-            on_use_handlers={"solve": success_handler()},
+            on_use_handler=solve,
         )
     }
 

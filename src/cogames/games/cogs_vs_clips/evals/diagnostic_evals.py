@@ -142,7 +142,7 @@ class DiagnosticChargeUp(_DiagnosticMissionBase):
         agent = cfg.game.agent
         agent.inventory.initial = dict(agent.inventory.initial)
         agent.inventory.initial["energy"] = 60
-        agent.on_tick = {"regen": Handler(mutations=[updateActor({"energy": 0})])}
+        agent.on_tick = Handler(name="regen", mutations=[updateActor({"energy": 0})])
 
 
 class DiagnosticMemory(_DiagnosticMissionBase):
@@ -208,7 +208,7 @@ class DiagnosticChargeUpHard(_DiagnosticMissionBase):
         agent = cfg.game.agent
         agent.inventory.initial = dict(agent.inventory.initial)
         agent.inventory.initial["energy"] = 60
-        agent.on_tick = {"regen": Handler(mutations=[updateActor({"energy": 0})])}
+        agent.on_tick = Handler(name="regen", mutations=[updateActor({"energy": 0})])
 
 
 class DiagnosticMemoryHard(_DiagnosticMissionBase):

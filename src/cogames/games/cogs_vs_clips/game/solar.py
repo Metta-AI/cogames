@@ -8,7 +8,7 @@ from cogames.core import CoGameMissionVariant, Deps
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.variants import ResolvedDeps
 from mettagrid.config.game_value import inv
-from mettagrid.config.handler_config import EntityTarget, Handler
+from mettagrid.config.handler_config import EntityTarget, Handler, allOf
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.mutation.game_value_mutation import SetGameValueMutation
 
@@ -36,6 +36,8 @@ class SolarVariant(CoGameMissionVariant):
 
         for agent in env.game.agents:
             agent.inventory.initial["solar"] = 1
-            agent.on_tick["solar_to_energy"] = Handler(
-                mutations=[SetGameValueMutation(value=inv("energy"), source=inv("solar"), target=EntityTarget.ACTOR)]
+            solar_handler = Handler(
+                name="solar_to_energy",
+                mutations=[SetGameValueMutation(value=inv("energy"), source=inv("solar"), target=EntityTarget.ACTOR)],
             )
+            agent.on_tick = allOf([agent.on_tick, solar_handler])

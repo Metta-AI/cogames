@@ -17,7 +17,7 @@ from mettagrid.config.filter import (
     isNear,
     isNot,
 )
-from mettagrid.config.handler_config import Handler, actorHas, updateActor
+from mettagrid.config.handler_config import Handler, actorHas, firstMatch, updateActor
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.mutation import addTag, recomputeMaterializedQuery, removeTag
 from mettagrid.config.mutation.stats_mutation import logActorAgentStat, logStatToGame
@@ -69,6 +69,7 @@ class TeamJunctionVariant(CoGameMissionVariant):
             t.net_tag(): Handler(filters=[], mutations=[removeTag(t.team_tag())]) for t in all_teams
         }
 
+        handlers: list[Handler] = []
         for t in all_teams:
             scramble_filters: list = [
                 hasTag(t.team_tag()),
@@ -82,9 +83,12 @@ class TeamJunctionVariant(CoGameMissionVariant):
                 logStatToGame(f"{t.name}/aligned.junction.lost"),
                 recomputeMaterializedQuery(t.net_tag()),
             ]
-            junction.on_use_handlers[f"scramble_{t.name}"] = Handler(
-                filters=scramble_filters,
-                mutations=scramble_mutations,
+            handlers.append(
+                Handler(
+                    name=f"scramble_{t.name}",
+                    filters=scramble_filters,
+                    mutations=scramble_mutations,
+                )
             )
 
             # Only create align handlers for teams with agents.
@@ -111,10 +115,15 @@ class TeamJunctionVariant(CoGameMissionVariant):
                 recomputeMaterializedQuery(t.net_tag()),
             ]
 
-            junction.on_use_handlers[f"align_{t.name}"] = Handler(
-                filters=align_filters,
-                mutations=align_mutations,
+            handlers.append(
+                Handler(
+                    name=f"align_{t.name}",
+                    filters=align_filters,
+                    mutations=align_mutations,
+                )
             )
+
+        junction.on_use_handler = firstMatch([junction.on_use_handler] + handlers)
 
         env.game.render.assets["junction"] = [
             RenderAsset(asset="junction.working", tags=[t.team_tag()]) for t in all_teams

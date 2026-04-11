@@ -26,13 +26,13 @@ def _memory_objects() -> dict[str, GridObjectConfig]:
             name="memory_goal",
             map_name="memory_goal_reward",
             tags=["memory:goal"],
-            on_use_handlers={"solve": success_handler()},
+            on_use_handler=success_handler().model_copy(update={"name": "solve"}),
         ),
         "memory_goal_decoy": GridObjectConfig(
             name="memory_goal",
             map_name="memory_goal_decoy",
             tags=["memory:goal"],
-            on_use_handlers={"touch": Handler()},
+            on_use_handler=Handler(name="touch"),
         ),
     }
 

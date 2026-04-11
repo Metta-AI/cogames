@@ -66,19 +66,18 @@ def test_align_without_isNear_does_not_crash():
     """Alignment without isNear filter works (isolates isNear as crash source)."""
     junction = GridObjectConfig(
         name="junction",
-        on_use_handlers={
-            "align_cogs": Handler(
-                filters=[
-                    actorHasTag("team:cogs"),
-                    actorHas({"aligner": 1, **ALIGN_COST}),
-                    isNot(hasTagPrefix("team:")),
-                ],
-                mutations=[
-                    updateActor({k: -v for k, v in ALIGN_COST.items()}),
-                    addTag("team:cogs"),
-                ],
-            ),
-        },
+        on_use_handler=Handler(
+            name="align_cogs",
+            filters=[
+                actorHasTag("team:cogs"),
+                actorHas({"aligner": 1, **ALIGN_COST}),
+                isNot(hasTagPrefix("team:")),
+            ],
+            mutations=[
+                updateActor({k: -v for k, v in ALIGN_COST.items()}),
+                addTag("team:cogs"),
+            ],
+        ),
     )
 
     harness = StationTestHarness.create(
@@ -101,21 +100,20 @@ def test_align_with_isNear_filter():
 
     junction = GridObjectConfig(
         name="junction",
-        on_use_handlers={
-            "align_cogs": Handler(
-                filters=[
-                    actorHasTag("team:cogs"),
-                    actorHas({"aligner": 1, **ALIGN_COST}),
-                    isNot(hasTagPrefix("team:")),
-                    isNear(make_query(cogs.net_tag()), radius=10),
-                ],
-                mutations=[
-                    updateActor({k: -v for k, v in ALIGN_COST.items()}),
-                    addTag("team:cogs"),
-                    recomputeMaterializedQuery(cogs.net_tag()),
-                ],
-            ),
-        },
+        on_use_handler=Handler(
+            name="align_cogs",
+            filters=[
+                actorHasTag("team:cogs"),
+                actorHas({"aligner": 1, **ALIGN_COST}),
+                isNot(hasTagPrefix("team:")),
+                isNear(make_query(cogs.net_tag()), radius=10),
+            ],
+            mutations=[
+                updateActor({k: -v for k, v in ALIGN_COST.items()}),
+                addTag("team:cogs"),
+                recomputeMaterializedQuery(cogs.net_tag()),
+            ],
+        ),
     )
 
     hub = GridObjectConfig(
@@ -146,21 +144,20 @@ def test_alignment_updates_network_tag():
 
     junction = GridObjectConfig(
         name="junction",
-        on_use_handlers={
-            "align_cogs": Handler(
-                filters=[
-                    actorHasTag("team:cogs"),
-                    actorHas({"aligner": 1, **ALIGN_COST}),
-                    isNot(hasTagPrefix("team:")),
-                    isNear(make_query(cogs.net_tag()), radius=10),
-                ],
-                mutations=[
-                    updateActor({k: -v for k, v in ALIGN_COST.items()}),
-                    addTag("team:cogs"),
-                    recomputeMaterializedQuery(cogs.net_tag()),
-                ],
-            ),
-        },
+        on_use_handler=Handler(
+            name="align_cogs",
+            filters=[
+                actorHasTag("team:cogs"),
+                actorHas({"aligner": 1, **ALIGN_COST}),
+                isNot(hasTagPrefix("team:")),
+                isNear(make_query(cogs.net_tag()), radius=10),
+            ],
+            mutations=[
+                updateActor({k: -v for k, v in ALIGN_COST.items()}),
+                addTag("team:cogs"),
+                recomputeMaterializedQuery(cogs.net_tag()),
+            ],
+        ),
     )
 
     hub = GridObjectConfig(

@@ -19,11 +19,12 @@ _PLANNING_CHAR_TO_MAP_NAME = {
 }
 
 
-def _tag_progression_handler(required_tag: str | None, gained_tag: str, stat_name: str) -> Handler:
+def _tag_progression_handler(name: str, required_tag: str | None, gained_tag: str, stat_name: str) -> Handler:
     filters: list[AnyFilter] = [isNot(actorHasTag(gained_tag))]
     if required_tag is not None:
         filters.insert(0, actorHasTag(required_tag))
     return Handler(
+        name=name,
         filters=filters,
         mutations=[
             addTag(gained_tag, target=EntityTarget.ACTOR),
@@ -34,30 +35,32 @@ def _tag_progression_handler(required_tag: str | None, gained_tag: str, stat_nam
 
 
 def _planning_objects() -> dict[str, GridObjectConfig]:
+    solve = success_handler(actorHasTag("state:door"))
+    solve.name = "solve"
     return {
         "key": GridObjectConfig(
             name="key",
             map_name="key",
             tags=["planning:key"],
-            on_use_handlers={"pickup": _tag_progression_handler(None, "state:key", "planning.key")},
+            on_use_handler=_tag_progression_handler("pickup", None, "state:key", "planning.key"),
         ),
         "switch": GridObjectConfig(
             name="switch",
             map_name="switch",
             tags=["planning:switch"],
-            on_use_handlers={"flip": _tag_progression_handler("state:key", "state:switch", "planning.switch")},
+            on_use_handler=_tag_progression_handler("flip", "state:key", "state:switch", "planning.switch"),
         ),
         "door": GridObjectConfig(
             name="door",
             map_name="door",
             tags=["planning:door"],
-            on_use_handlers={"unlock": _tag_progression_handler("state:switch", "state:door", "planning.door")},
+            on_use_handler=_tag_progression_handler("unlock", "state:switch", "state:door", "planning.door"),
         ),
         "goal": GridObjectConfig(
             name="goal",
             map_name="goal",
             tags=["planning:goal"],
-            on_use_handlers={"solve": success_handler(actorHasTag("state:door"))},
+            on_use_handler=solve,
         ),
     }
 

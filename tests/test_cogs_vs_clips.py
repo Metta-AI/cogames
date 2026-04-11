@@ -15,6 +15,7 @@ from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
 from cogames.games.cogs_vs_clips.missions.tutorial import make_tutorial_mission
 from mettagrid.config.game_value import ConstValue, QueryCountValue, SumGameValue
+from mettagrid.config.handler_config import AllOf, FirstMatch, Handler
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.query import ClosureQuery, MaterializedQuery
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
@@ -22,6 +23,20 @@ from mettagrid.simulator import Simulation
 from mettagrid.test_support.map_builders import ObjectNameMapBuilder
 
 ELEMENTS = ElementsVariant().elements
+
+
+def _handler_names(handler) -> set[str]:
+    """Collect all handler names from a handler tree."""
+    if handler is None:
+        return set()
+    if isinstance(handler, Handler):
+        return {handler.name} if handler.name else set()
+    if isinstance(handler, (FirstMatch, AllOf)):
+        names = set()
+        for h in handler.handlers:
+            names |= _handler_names(h)
+        return names
+    return set()
 
 
 def _normalize_dinky_tag_name(tag_name: str) -> str:
@@ -59,7 +74,7 @@ def test_resolved_cli_missions_with_passive_hp_and_territory_install_friendly_hp
         audited[name] = presence
 
         has_passive_hp_drain = "hp" in env.game.resource_names and any(
-            "hp_regen" in agent.on_tick for agent in env.game.agents
+            "hp_regen" in _handler_names(agent.on_tick) for agent in env.game.agents
         )
         if territory is not None and has_passive_hp_drain:
             assert "heal_hp" in territory.presence, f"{name} missing heal_hp; territory presence={presence}"
@@ -232,7 +247,7 @@ def test_machina_1_emits_held_stat_handlers_for_clips_team() -> None:
     assert {
         "aligned_junction_held_cogs",
         "aligned_junction_held_clips",
-    } <= set(env.game.on_tick)
+    } <= _handler_names(env.game.on_tick)
 
 
 def test_four_score_emits_held_stat_handlers_for_each_team() -> None:
@@ -250,7 +265,7 @@ def test_four_score_emits_held_stat_handlers_for_each_team() -> None:
         "aligned_junction_held_cogs_green",
         "aligned_junction_held_cogs_yellow",
         "aligned_junction_held_four_score_avg",
-    } <= set(env.game.on_tick)
+    } <= _handler_names(env.game.on_tick)
 
 
 def test_hub_global_obs_shows_own_team_only():

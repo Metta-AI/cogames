@@ -24,7 +24,7 @@ from mettagrid.config.filter import (
     targetHas,
     targetHasAnyOf,
 )
-from mettagrid.config.handler_config import Handler
+from mettagrid.config.handler_config import Handler, firstMatch
 from mettagrid.config.mettagrid_config import GridObjectConfig, MettaGridConfig, ResourceLimitsConfig
 from mettagrid.config.mutation import ResourceDeltaMutation, deposit, updateActor, updateTarget, withdraw
 from mettagrid.config.render_config import RenderStatusBarConfig
@@ -89,16 +89,16 @@ class RecipesVariant(CoGameMissionVariant):
         for element in EXTRA_CARRY:
             env.game.objects[f"{element}_extractor"] = GridObjectConfig(
                 name=f"{element}_extractor",
-                on_use_handlers={
-                    "pick_up": Handler(
-                        filters=[actorHas({"miner": 1}), isNot(actorHasAnyOf(ALL_CARRY))],
-                        mutations=[updateActor({element: 1, "num_items": 1})],
-                    ),
-                },
+                on_use_handler=Handler(
+                    name="pick_up",
+                    filters=[actorHas({"miner": 1}), isNot(actorHasAnyOf(ALL_CARRY))],
+                    mutations=[updateActor({element: 1, "num_items": 1})],
+                ),
             )
 
-        hub_handlers: dict[str, Handler] = {
-            "pickup_heart": Handler(
+        hub_handlers: list[Handler] = [
+            Handler(
+                name="pickup_heart",
                 filters=[
                     actorHas({"scrambler": 1}),
                     isNot(actorHasAnyOf(ALL_CARRY)),
@@ -109,19 +109,22 @@ class RecipesVariant(CoGameMissionVariant):
                     updateTarget({"heart": -1}),
                 ],
             )
-        }
+        ]
         for element in all_elements:
-            hub_handlers[f"deposit_{element}"] = Handler(
-                filters=[
-                    actorHas({element: 1}),
-                    targetHas({f"recipe_{element}": 1}),
-                    targetHas({"missing": 1}),
-                    isNot(targetHas({"heart": 1})),
-                ],
-                mutations=[
-                    updateActor({element: -1, "num_items": -1}),
-                    updateTarget({"missing": -1, f"recipe_{element}": -1}),
-                ],
+            hub_handlers.append(
+                Handler(
+                    name=f"deposit_{element}",
+                    filters=[
+                        actorHas({element: 1}),
+                        targetHas({f"recipe_{element}": 1}),
+                        targetHas({"missing": 1}),
+                        isNot(targetHas({"heart": 1})),
+                    ],
+                    mutations=[
+                        updateActor({element: -1, "num_items": -1}),
+                        updateTarget({"missing": -1, f"recipe_{element}": -1}),
+                    ],
+                )
             )
 
         hub_base = env.game.objects["hub"]
@@ -146,7 +149,7 @@ class RecipesVariant(CoGameMissionVariant):
             hub_config.name = "hub"
             hub_config.map_name = f"hub_{i}"
             hub_config.tags = [hub_tags[i]]
-            hub_config.on_use_handlers = hub_handlers
+            hub_config.on_use_handler = firstMatch(hub_handlers)
             hub_config.inventory.limits.pop("ingredients", None)
             hub_config.inventory.limits["recipes"] = ResourceLimitsConfig(
                 base=INGREDIENTS_NEEDED * len(RECIPE_RESOURCES),
@@ -224,23 +227,31 @@ class RecipesVariant(CoGameMissionVariant):
 
         chest = env.game.objects["chest"]
         chest.inventory.limits["items"].resources = all_elements
+        extra_handlers: list[Handler] = []
         for resource in EXTRA_CARRY:
-            chest.on_use_handlers[f"deposit_{resource}"] = Handler(
-                filters=[
-                    actorHas({"miner": 1}),
-                    actorHas({resource: 1}),
-                    isNot(targetHasAnyOf(all_elements)),
-                ],
-                mutations=[deposit({resource: 1}), updateActor({"num_items": -1})],
+            extra_handlers.append(
+                Handler(
+                    name=f"deposit_{resource}",
+                    filters=[
+                        actorHas({"miner": 1}),
+                        actorHas({resource: 1}),
+                        isNot(targetHasAnyOf(all_elements)),
+                    ],
+                    mutations=[deposit({resource: 1}), updateActor({"num_items": -1})],
+                )
             )
-            chest.on_use_handlers[f"withdraw_{resource}"] = Handler(
-                filters=[
-                    actorHas({"miner": 1}),
-                    isNot(actorHasAnyOf(ALL_CARRY)),
-                    targetHas({resource: 1}),
-                ],
-                mutations=[withdraw({resource: 1}), updateActor({"num_items": 1})],
+            extra_handlers.append(
+                Handler(
+                    name=f"withdraw_{resource}",
+                    filters=[
+                        actorHas({"miner": 1}),
+                        isNot(actorHasAnyOf(ALL_CARRY)),
+                        targetHas({resource: 1}),
+                    ],
+                    mutations=[withdraw({resource: 1}), updateActor({"num_items": 1})],
+                )
             )
+        chest.on_use_handler = firstMatch([chest.on_use_handler] + extra_handlers)
 
 
 class TipsVariant(CoGameMissionVariant):
@@ -265,34 +276,20 @@ class BurnVariant(CoGameMissionVariant):
         hub_names = [name for name in env.game.objects if name == "hub" or name.startswith("hub_")]
         carry_resources = list(env.game.agents[0].inventory.limits["carry"].resources)
 
+        clear_burned = Handler(
+            name="clear_burned",
+            filters=[
+                isNot(actorHasAnyOf(carry_resources)),
+                targetHas({"decoder": 1}),
+            ],
+            mutations=[updateTarget({"decoder": -1})],
+        )
         for hub_name in hub_names:
             hub = env.game.objects[hub_name]
             hub.inventory.limits["burn"] = ResourceLimitsConfig(base=65535, max=65535, resources=["laser"])
             hub.inventory.limits["burned"] = ResourceLimitsConfig(base=1, max=1, resources=["decoder"])
 
-            old_handlers = dict(hub.on_use_handlers)
-            new_handlers: dict[str, Handler] = {}
-            inserted = False
-            for key, handler in old_handlers.items():
-                if key.startswith("deposit_") and not inserted:
-                    new_handlers["clear_burned"] = Handler(
-                        filters=[
-                            isNot(actorHasAnyOf(carry_resources)),
-                            targetHas({"decoder": 1}),
-                        ],
-                        mutations=[updateTarget({"decoder": -1})],
-                    )
-                    inserted = True
-                new_handlers[key] = handler
-            if not inserted:
-                new_handlers["clear_burned"] = Handler(
-                    filters=[
-                        isNot(actorHasAnyOf(carry_resources)),
-                        targetHas({"decoder": 1}),
-                    ],
-                    mutations=[updateTarget({"decoder": -1})],
-                )
-            hub.on_use_handlers = new_handlers
+            hub.on_use_handler = firstMatch([clear_burned, hub.on_use_handler])
 
         env.game.events["cook_tick"].filters = list(env.game.events["cook_tick"].filters) + [
             isNot(targetHas({"decoder": 1}))

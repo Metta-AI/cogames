@@ -6,8 +6,23 @@ from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.variants import VariantRegistry
+from mettagrid.config.handler_config import AllOf, FirstMatch, Handler
 
 _CVC_VARIANT_MODULES = ("cogames.games.cogs_vs_clips.",)
+
+
+def _handler_names(handler) -> set[str]:
+    """Collect all handler names from a handler tree."""
+    if handler is None:
+        return set()
+    if isinstance(handler, Handler):
+        return {handler.name} if handler.name else set()
+    if isinstance(handler, (FirstMatch, AllOf)):
+        names = set()
+        for h in handler.handlers:
+            names |= _handler_names(h)
+        return names
+    return set()
 
 
 def _make_mission(default_variant: str | None = "machina_1") -> CvCMission:
@@ -61,7 +76,7 @@ class TestSolarVariant:
 
         for agent in env.game.agents:
             assert "solar" in agent.inventory.initial
-            assert "solar_to_energy" in agent.on_tick
+            assert "solar_to_energy" in _handler_names(agent.on_tick)
             # Energy should also be set (auto-created dependency)
             assert "energy" in agent.inventory.limits
 
@@ -102,7 +117,7 @@ class TestMakeEnvWithDefaultVariant:
         # Solar
         for agent in env.game.agents:
             assert "solar" in agent.inventory.initial
-            assert "solar_to_energy" in agent.on_tick
+            assert "solar_to_energy" in _handler_names(agent.on_tick)
 
         # Weather
         assert "day" in env.game.events
@@ -116,5 +131,5 @@ class TestMakeEnvWithDefaultVariant:
             assert "energy" not in agent.inventory.limits
             assert "energy" not in agent.inventory.initial
             assert "solar" not in agent.inventory.initial
-            assert "solar_to_energy" not in agent.on_tick
+            assert "solar_to_energy" not in _handler_names(agent.on_tick)
         assert "day" not in env.game.events

@@ -8,7 +8,7 @@ from pydantic import Field
 
 from cogames.core import CoGameMissionVariant
 from mettagrid.config.filter import isNot
-from mettagrid.config.handler_config import Handler, actorHas, updateActor
+from mettagrid.config.handler_config import Handler, actorHas, allOf, updateActor
 from mettagrid.config.mettagrid_config import MettaGridConfig, ResourceLimitsConfig
 from mettagrid.config.mutation import ClearInventoryMutation, EntityTarget
 
@@ -40,13 +40,17 @@ class DamageVariant(CoGameMissionVariant):
             inv = agent.inventory
             inv.limits["hp"] = ResourceLimitsConfig(base=self.limit, resources=["hp"], modifiers=self.modifiers)
             inv.initial["hp"] = self.initial
-            agent.on_tick["hp_regen"] = Handler(mutations=[updateActor({"hp": self.regen})])
+
+            hp_regen = Handler(name="hp_regen", mutations=[updateActor({"hp": self.regen})])
+            agent.on_tick = allOf([agent.on_tick, hp_regen])
 
             if self.destroy_items:
-                agent.on_tick["hp_death"] = Handler(
+                hp_death = Handler(
+                    name="hp_death",
                     filters=[isNot(actorHas({"hp": 1}))],
                     mutations=[
                         ClearInventoryMutation(target=EntityTarget.ACTOR, limit_name=item)
                         for item in self.destroy_items
                     ],
                 )
+                agent.on_tick = allOf([agent.on_tick, hp_death])

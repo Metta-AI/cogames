@@ -48,29 +48,26 @@ Everything on the grid is a `GridObjectConfig`. Objects have an inventory (what 
 ore_vein = GridObjectConfig(
     name="ore_vein",
     inventory=InventoryConfig(initial={"ore": 100}),
-    on_use_handlers={
-        "extract": Handler(
-            filters=[],
-            mutations=[withdraw({"ore": 5})]  # transfers 5 ore from vein → agent
-        )
-    }
+    on_use_handler=Handler(
+        name="extract",
+        mutations=[withdraw({"ore": 5})]  # transfers 5 ore from vein → agent
+    )
 )
 
 # A station that converts ore into ingots
 refinery = GridObjectConfig(
     name="refinery",
-    on_use_handlers={
-        "smelt": Handler(
-            filters=[actorHas({"ore": 5})],
-            mutations=[updateActor({"ore": -5, "ingot": 1})]
-        )
-    }
+    on_use_handler=Handler(
+        name="smelt",
+        filters=[actorHas({"ore": 5})],
+        mutations=[updateActor({"ore": -5, "ingot": 1})]
+    )
 )
 ```
 
 `withdraw` takes resources from the object and gives them to the agent. `deposit` does the reverse. `updateActor`/`updateTarget` apply signed deltas directly — useful for crafting and conversion.
 
-Handlers use **FirstMatch**: the first handler whose filters all pass fires, and the rest are skipped. This lets you define conditional interactions — a handler that requires a key, with a weaker fallback for agents without one.
+For single interactions, use a bare `Handler`. When an object needs multiple conditional interactions, wrap them in `firstMatch([...])` — the first handler whose filters all pass fires, and the rest are skipped. This lets you define conditional interactions — a handler that requires a key, with a weaker fallback for agents without one.
 
 **Area-of-effect handlers** fire every timestep on all agents within a radius, without any agent action required — useful for territory effects, passive damage, healing zones.
 

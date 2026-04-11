@@ -9,7 +9,7 @@ from cogames.games.cogs_vs_clips.game.territory import (
     net_materialized_query,
 )
 from mettagrid.config.filter import anyOf, hasTag, hasTagPrefix, isNear, isNot, sharedTagPrefix
-from mettagrid.config.handler_config import Handler, actorHas, updateActor
+from mettagrid.config.handler_config import Handler, actorHas, firstMatch, updateActor
 from mettagrid.config.mettagrid_config import (
     ActionsConfig,
     AgentConfig,
@@ -48,19 +48,18 @@ def test_scramble_enemy_junction():
     station = GridObjectConfig(
         name="junction",
         tags=["team:clips"],
-        on_use_handlers={
-            "scramble": Handler(
-                filters=[
-                    hasTagPrefix("team:"),
-                    actorHas({"scrambler": 1, **SCRAMBLE_COST}),
-                ],
-                mutations=[
-                    removeTag("team:cogs"),
-                    removeTag("team:clips"),
-                    updateActor({k: -v for k, v in SCRAMBLE_COST.items()}),
-                ],
-            ),
-        },
+        on_use_handler=Handler(
+            name="scramble",
+            filters=[
+                hasTagPrefix("team:"),
+                actorHas({"scrambler": 1, **SCRAMBLE_COST}),
+            ],
+            mutations=[
+                removeTag("team:cogs"),
+                removeTag("team:clips"),
+                updateActor({k: -v for k, v in SCRAMBLE_COST.items()}),
+            ],
+        ),
     )
 
     harness = StationTestHarness.create(
@@ -96,46 +95,54 @@ def test_scramble_removes_team_tag_via_on_tag_remove():
     teams = [cogs, clips]
     align_required_resources = {"aligner": 1, "heart": 1}
     scramble_required_resources = {"scrambler": 1, "heart": 1}
+    handlers: list[Handler] = []
+    for t in teams:
+        handlers.append(
+            Handler(
+                name=f"align_{t.name}",
+                filters=[
+                    actorHas(align_required_resources),
+                    isNot(hasTagPrefix("team:")),
+                    anyOf(
+                        [
+                            isNear(query(t.net_tag()), radius=JUNCTION_ALIGN_DISTANCE),
+                            isNear(query(typeTag("hub"), hasTag(t.team_tag())), radius=HUB_ALIGN_DISTANCE),
+                        ]
+                    ),
+                ],
+                mutations=[
+                    updateActor({"heart": -1}),
+                    logActorAgentStat("junction.aligned_by_agent"),
+                    logStatToGame(f"{t.name}/aligned.junction.gained"),
+                    addTag(t.team_tag()),
+                    addTag(t.net_tag()),
+                    recomputeMaterializedQuery(t.net_tag()),
+                ],
+            )
+        )
+        handlers.append(
+            Handler(
+                name=f"scramble_{t.name}",
+                filters=[
+                    hasTag(t.team_tag()),
+                    isNot(sharedTagPrefix("team:")),
+                    actorHas(scramble_required_resources),
+                ],
+                mutations=[
+                    updateActor({"heart": -1}),
+                    removeTagPrefix("net:"),
+                    logActorAgentStat("junction.scrambled_by_agent"),
+                    logStatToGame(f"{t.name}/aligned.junction.lost"),
+                    recomputeMaterializedQuery("net:"),
+                ],
+            )
+        )
     junction_cfg = GridObjectConfig(
         name="junction",
         tags=[f"team:{clips.name}"],
         on_tag_remove={f"net:{t.name}": Handler(filters=[], mutations=[removeTag(f"team:{t.name}")]) for t in teams},
+        on_use_handler=firstMatch(handlers),
     )
-    for t in teams:
-        junction_cfg.on_use_handlers[f"align_{t.name}"] = Handler(
-            filters=[
-                actorHas(align_required_resources),
-                isNot(hasTagPrefix("team:")),
-                anyOf(
-                    [
-                        isNear(query(t.net_tag()), radius=JUNCTION_ALIGN_DISTANCE),
-                        isNear(query(typeTag("hub"), hasTag(t.team_tag())), radius=HUB_ALIGN_DISTANCE),
-                    ]
-                ),
-            ],
-            mutations=[
-                updateActor({"heart": -1}),
-                logActorAgentStat("junction.aligned_by_agent"),
-                logStatToGame(f"{t.name}/aligned.junction.gained"),
-                addTag(t.team_tag()),
-                addTag(t.net_tag()),
-                recomputeMaterializedQuery(t.net_tag()),
-            ],
-        )
-        junction_cfg.on_use_handlers[f"scramble_{t.name}"] = Handler(
-            filters=[
-                hasTag(t.team_tag()),
-                isNot(sharedTagPrefix("team:")),
-                actorHas(scramble_required_resources),
-            ],
-            mutations=[
-                updateActor({"heart": -1}),
-                removeTagPrefix("net:"),
-                logActorAgentStat("junction.scrambled_by_agent"),
-                logStatToGame(f"{t.name}/aligned.junction.lost"),
-                recomputeMaterializedQuery("net:"),
-            ],
-        )
     objects: dict[str, Any] = {"wall": WallConfig()}
     objects["clips:hub"] = GridObjectConfig(
         name="hub",

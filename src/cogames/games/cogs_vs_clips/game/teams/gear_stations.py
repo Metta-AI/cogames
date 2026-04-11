@@ -13,8 +13,10 @@ from mettagrid.config.filter import sharedTagPrefix
 from mettagrid.config.handler_config import (
     ClearInventoryMutation,
     EntityTarget,
+    FirstMatch,
     Handler,
     actorHas,
+    firstMatch,
     queryDelta,
     updateActor,
 )
@@ -89,10 +91,10 @@ class TeamGearStationsVariant(CoGameMissionVariant):
             change_mutations.append(queryDelta(hq, {k: -v for k, v in cost.items()}))
         change_mutations.append(updateActor({gear_type: 1}))
 
-        station.on_use_handlers.update(
-            {
-                "keep_gear": Handler(filters=[sharedTagPrefix("team:"), actorHas({gear_type: 1})], mutations=[]),
-                "change_gear": Handler(filters=change_filters, mutations=change_mutations),
-            }
-        )
+        new_handlers = [
+            Handler(name="keep_gear", filters=[sharedTagPrefix("team:"), actorHas({gear_type: 1})], mutations=[]),
+            Handler(name="change_gear", filters=change_filters, mutations=change_mutations),
+        ]
+        existing = station.on_use_handler.handlers if isinstance(station.on_use_handler, FirstMatch) else []
+        station.on_use_handler = firstMatch(existing + new_handlers)
         env.game.render.assets[key] = [RenderAsset(asset=f"{gear_type}_station")]
