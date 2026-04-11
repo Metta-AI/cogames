@@ -97,7 +97,7 @@ The game will open in a new window, and the terminal will give you instructions 
 2. Upload a starter policy and submit it to the tournament.
 
     ```bash
-    cogames upload --policy "class=cogames.policy.starter_agent.StarterPolicy" --name "$USER.README-quickstart-starter-policy" --season beta-teams-small --skip-validation
+    cogames upload --policy "class=cogames.policy.starter_agent.StarterPolicy" --name "$USER.README-quickstart-starter-policy" --season beta-teams-small
     ```
 
 3. Check your submission status.
@@ -188,17 +188,21 @@ cogames login
 cogames season list
 cogames season show <SEASON>
 
-# 3) Upload (bundle + validate + upload + submit)
-cogames upload -p <POLICY_SPEC_OR_CHECKPOINT> -n <POLICY_NAME> --season <SEASON>
+# 3) Create a submission bundle
+cogames create-bundle -p <POLICY_OR_CHECKPOINT> -o submission.zip \
+  -f <RUNTIME_PATH> ... --setup-script <SETUP_SCRIPT.py>
+
+# 4) Upload the bundle
+cogames upload -p ./submission.zip -n <POLICY_NAME> --season <SEASON>
 
 # Alternative if already uploaded:
 cogames submit <POLICY_NAME[:vN]> --season <SEASON>
 
-# 4) Track status
+# 5) Track status
 cogames submissions --season <SEASON> --policy <POLICY_NAME>
 cogames season matches <SEASON> --limit 20
 
-# 5) Debug specific outcomes
+# 6) Debug specific outcomes
 cogames matches <MATCH_ID>
 cogames match-artifacts <MATCH_ID>
 cogames episode show <EPISODE_ID>
@@ -299,6 +303,7 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Describe ──────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--game</span>             <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT       </span>  Game whose missions to list or describe. <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: cogs_vs_clips]</span>               <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--mission</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">MISSION    </span>  Mission to describe.                                                            <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--cogs</span>     <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-c</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">INTEGER    </span>  Override agent count (requires <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span>).                                             <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--variant</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-v</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">VARIANT    </span>  Apply variant (requires <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span>, repeatable).                                        <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
@@ -322,6 +327,7 @@ cogames [COMMAND] --help
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
  <span style="color: #008080; text-decoration-color: #008080">cogames missions</span>                                    List all missions                                             
  <span style="color: #008080; text-decoration-color: #008080">cogames missions </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> machina_1</span>                       Describe a mission                                            
+ <span style="color: #008080; text-decoration-color: #008080">cogames missions </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> machina_1 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-v</span><span style="color: #008080; text-decoration-color: #008080"> talk</span>               Describe talk-variant config                                  
  <span style="color: #008080; text-decoration-color: #008080">cogames missions </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> arena </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--format</span><span style="color: #008080; text-decoration-color: #008080"> json</span>             Output as JSON                                                
 
 </pre>
@@ -440,7 +446,7 @@ cogames [COMMAND] --help
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
  <span style="color: #008080; text-decoration-color: #008080">cogames describe arena</span>                       Describe mission                                                     
- <span style="color: #008080; text-decoration-color: #008080">cogames describe arena </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-c</span><span style="color: #008080; text-decoration-color: #008080"> 4 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-v</span><span style="color: #008080; text-decoration-color: #008080"> dark_side</span>               With 4 cogs and variant                                    
+ <span style="color: #008080; text-decoration-color: #008080">cogames describe arena </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-c</span><span style="color: #008080; text-decoration-color: #008080"> 4 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-v</span><span style="color: #008080; text-decoration-color: #008080"> talk</span>          With 4 cogs and talk enabled                                         
 
 </pre>
 
@@ -617,6 +623,7 @@ cogames [COMMAND] --help
  One policy per team                                                                                               
  <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> four_score </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> nlanky:1 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> random:2</span>     Mixed teams (cycling pattern)                              
  <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> arena </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--save-replay-file</span><span style="color: #008080; text-decoration-color: #008080"> ./latest.json.z</span> Overwrite fixed replay file                              
+ <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> machina_1 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-v</span><span style="color: #008080; text-decoration-color: #008080"> talk </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-r</span><span style="color: #008080; text-decoration-color: #008080"> gui</span>             Speech bubbles over cogs                                     
  <span style="color: #008080; text-decoration-color: #008080">cogames play </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span><span style="color: #008080; text-decoration-color: #008080"> machina_1 </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-r</span><span style="color: #008080; text-decoration-color: #008080"> unicode</span>                   Terminal mode                                              
 
 </pre>
@@ -936,7 +943,7 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="font-weight: bold">                                                                                                                   </span>
-<span style="font-weight: bold"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">Usage: </span><span style="font-weight: bold">cogames diagnose [OPTIONS] POLICY                                                                          </span>
+<span style="font-weight: bold"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">Usage: </span><span style="font-weight: bold">cogames diagnose [OPTIONS]                                                                                 </span>
 <span style="font-weight: bold">                                                                                                                   </span>
 </pre>
 
@@ -950,72 +957,11 @@ cogames [COMMAND] --help
 
 
 
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #800000; text-decoration-color: #800000">*</span>    policy      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Policy specification: URI (bundle dir or .zip) or NAME or                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                        class=NAME[,data=FILE][,kw.x=val]                                                        <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                        <span style="color: #bf7f7f; text-decoration-color: #bf7f7f">[required]                                                                              </span> <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
-</pre>
-
-
-
-
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Evaluation ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--mission-set</span>               <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-S</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">SET   </span>  Eval suite to run (full Stage 2 diagnosis currently requires        <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                             cvc_evals).                                                         <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                             <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: cvc_evals]                                               </span> <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--experiments</span>                       <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">NAME  </span>  Specific experiments (subset of mission set).                       <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--cogs</span>                      <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-c</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N     </span>  Agent counts to test (repeatable).                                  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--device</span>                            <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">DEVICE</span>  Policy device (auto, cpu, cuda, cuda:0, etc.). <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: auto]</span>      <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--scripted-baseline-policy</span>          <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">POLICY</span>  Reference scripted baseline policy (URI (bundle dir or .zip) or     <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                             NAME or class=NAME[,data=FILE][,kw.x=val])                          <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--known-strong-policy</span>               <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">POLICY</span>  Reference known-strong policy (URI (bundle dir or .zip) or NAME or  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                             class=NAME[,data=FILE][,kw.x=val])                                  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
-</pre>
-
-
-
-
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Simulation ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--steps</span>     <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-s</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N</span>  Max steps per episode. <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 1000]</span>                                                   <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--episodes</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-e</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N</span>  Episodes per case. <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 3]</span>                                                          <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
-</pre>
-
-
-
-
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Output ────────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--output-dir</span>                           <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">DIR     </span>  Directory for structured diagnose artifacts.                   <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--compare-run-dir</span>                      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">DIR     </span>  Previous diagnose run directory containing doctor_note.json    <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                                  for interpretation stability comparison.                       <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--bundle-zip</span>                           <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">FILE    </span>  Write a portable diagnose artifact zip suitable for            <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                                  upload/import in profile tools.                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--stability-reruns</span>                     <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N [x&gt;=0</span><span style="color: #bfbf7f; text-decoration-color: #bfbf7f; font-weight: bold">]</span>  Number of additional fixed-seed reruns to compute              <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                                  interpretation stability snapshots.                            <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                                  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: 0]                                                  </span> <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--require-stable-interpretation</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">        </span>  Mark diagnosis incomplete when interpretation stability check  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                                  fails.                                                         <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
-</pre>
-
-
-
-
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Other ─────────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--help</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-h</span>        Show this message and exit.                                                                   <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
-</pre>
-
-
-
-
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
  <span style="color: #008080; text-decoration-color: #008080">cogames diagnose ./train_dir/my_run</span>                         Default CvC evals                                     
  <span style="color: #008080; text-decoration-color: #008080">cogames diagnose lstm </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--scripted-baseline-policy</span><span style="color: #008080; text-decoration-color: #008080"> scripted.basic</span>   Compare against scripted baseline               
- <span style="color: #008080; text-decoration-color: #008080">cogames diagnose lstm </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--known-strong-policy</span><span style="color: #008080; text-decoration-color: #008080"> my_best_policy</span>         Normalize against known-strong policy          
+ <span style="color: #008080; text-decoration-color: #008080">cogames diagnose lstm </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--known-strong-policy</span><span style="color: #008080; text-decoration-color: #008080"> my_best_policy</span>     Normalize against known-strong policy              
  <span style="color: #008080; text-decoration-color: #008080">cogames diagnose lstm </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--compare-run-dir</span><span style="color: #008080; text-decoration-color: #008080"> outputs/cogames-diagnose/prev_run</span>  Stability comparison                   
 
 </pre>
@@ -1208,6 +1154,18 @@ cogames [COMMAND] --help
 
 
 
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
+ <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
+ <span style="color: #008080; text-decoration-color: #008080">cogames create-bundle </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=my_module.MyPolicy </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-f</span><span style="color: #008080; text-decoration-color: #008080"> my_module.py</span>   Create a submission bundle  
+ from a Python policy                                                                                              
+ <span style="color: #008080; text-decoration-color: #008080">cogames create-bundle </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;CHECKPOINT&gt;</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> submission.zip \   </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-f</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;RUNTIME_PATH&gt;</span><span style="color: #008080; text-decoration-color: #008080"> ... </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--setup-script</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;SETUP.py&gt;</span>       
+ Create a submission bundle from a checkpoint plus runtime files                                                   
+
+</pre>
+
+
+
     
 
 
@@ -1292,7 +1250,7 @@ cogames [COMMAND] --help
 
 
 
-<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> Sign in to cogames interactively.                                                                                 
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> Compatibility alias for softmax login.                                                                            
 
 </pre>
 
@@ -1548,6 +1506,7 @@ cogames [COMMAND] --help
  <span style="color: #008080; text-decoration-color: #008080">cogames matches </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--policy</span><span style="color: #008080; text-decoration-color: #008080"> slanky</span>               Filter by policy name                                               
  <span style="color: #008080; text-decoration-color: #008080">cogames matches </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;match-id&gt;</span>                   Show match details                                                   
  <span style="color: #008080; text-decoration-color: #008080">cogames matches </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;match-id&gt;</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--logs</span>            Show available logs                                                  
+ <span style="color: #008080; text-decoration-color: #008080">cogames match-artifacts </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;match-id&gt;</span><span style="color: #008080; text-decoration-color: #008080"> error-info</span>  Show runner error info                                             
  <span style="color: #008080; text-decoration-color: #008080">cogames matches </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;match-id&gt;</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-d</span><span style="color: #008080; text-decoration-color: #008080"> ./logs</span>         Download logs                                                        
 
 </pre>
@@ -1579,7 +1538,7 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #800000; text-decoration-color: #800000">*</span>    match_id           <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Match ID to fetch artifacts for. <span style="color: #bf7f7f; text-decoration-color: #bf7f7f">[required]</span>                                       <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>      artifact_type      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Type of artifact to retrieve (e.g. 'logs'). <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: logs]</span>                       <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>      artifact_type      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Type of artifact to retrieve (e.g. 'logs', 'error-info'). <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: logs]</span>         <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
 </pre>
 
@@ -1622,6 +1581,7 @@ cogames [COMMAND] --help
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
  <span style="color: #008080; text-decoration-color: #008080">cogames match-artifacts </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;match-id&gt;</span>                     Get match logs                                             
+ <span style="color: #008080; text-decoration-color: #008080">cogames match-artifacts </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;match-id&gt;</span><span style="color: #008080; text-decoration-color: #008080"> error-info</span>          Get runner error info                                      
  <span style="color: #008080; text-decoration-color: #008080">cogames match-artifacts </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;match-id&gt;</span><span style="color: #008080; text-decoration-color: #008080"> logs </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> out.txt</span>     Save to file                                               
 
 </pre>
@@ -1700,8 +1660,8 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Validation ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>                <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">    </span>  Run validation only without uploading.                                           <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--skip-validation</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">    </span>  Skip policy validation in Docker.                                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>                <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">    </span>  Run the Docker smoke test only without uploading.                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--skip-validation</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">    </span>  Skip the Docker smoke test.                                                      <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--image</span>                  <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Docker image for container validation.                                           <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: ghcr.io/metta-ai/episode-runner:latest]</span>                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
@@ -1729,10 +1689,10 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./train_dir/my_run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy</span>       Upload and submit to default season                       
- <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta-cvc</span>  Upload and submit to specific season                      
- <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--no-submit</span>        Upload without submitting                                 
- <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> lstm </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-lstm </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>             Validate only                                             
+ <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta-cvc</span>   Upload a submission bundle and submit to a    
+ specific season                                                                                                   
+ <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--no-submit</span>   Upload a submission bundle without submitting       
+ <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>   Run the Docker smoke test without uploading           
 
 </pre>
 
@@ -1864,8 +1824,8 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Validation ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>                <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">    </span>  Run validation only without uploading.                                           <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--skip-validation</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">    </span>  Skip policy validation in Docker.                                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>                <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">    </span>  Run the Docker smoke test only without uploading.                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--skip-validation</span>        <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">    </span>  Skip the Docker smoke test.                                                      <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--image</span>                  <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">TEXT</span>  Docker image for container validation.                                           <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: ghcr.io/metta-ai/episode-runner:latest]</span>                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
@@ -1893,8 +1853,9 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames ship </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./train_dir/my_run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy</span>            Ship and submit                                        
- <span style="color: #008080; text-decoration-color: #008080">cogames ship </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./run </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>               Validate only                                          
+ <span style="color: #008080; text-decoration-color: #008080">cogames ship </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta-cvc</span>   Ship a prepared submission bundle               
+ <span style="color: #008080; text-decoration-color: #008080">cogames ship </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=my_module.MyPolicy </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-f</span><span style="color: #008080; text-decoration-color: #008080"> my_module.py </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>   Bundle a Python policy and run  
+ the Docker smoke test                                                                                             
 
 </pre>
 
@@ -2038,6 +1999,9 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> Train a policy on one or more missions.                                                                           
+
+ <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Requires the ``neural`` extra (PyTorch + PufferLib).</span>                                                              
+ <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Install with: ``pip install cogames``.</span>                                                                            
 
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">By default, our 'lstm' policy architecture is used. You can select a different architecture</span>                       
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">(like 'stateless' or 'baseline'), or define your own implementing the MultiAgentPolicy</span>                            

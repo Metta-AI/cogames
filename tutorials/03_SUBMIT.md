@@ -6,7 +6,7 @@ This notebook walks through submitting a policy to the CoGames leaderboard and v
 ## Prerequisites
 
 - Run from the repo root with your virtual environment activated.
-- You need a policy checkpoint or script ready to submit.
+- You need the files required to build a submission bundle.
 
 
 Optional: confirm the CLI is available:
@@ -24,13 +24,13 @@ Authenticate before submitting or checking the leaderboard.
 cogames login
 ```
 
-## Step 2 — Choose a policy to submit
+## Step 2 — Build a submission bundle
 
-You can submit either:
-- A **policy class + weights** using `class=...` and `data=...`, or
-- A **self-contained submission bundle** (directory or `.zip` with `policy_spec.json` and any required runtime files).
+The canonical workflow is:
+1. Build `submission.zip` with `cogames create-bundle`
+2. Upload that bundle with `cogames upload`
+3. Submit it to a season
 
-Examples below use placeholders. Replace them with your actual paths.
 
 Tip: find your run id and checkpoint by listing `./train_dir`:
 
@@ -52,53 +52,63 @@ The newest folder name is your `RUN_ID`. Inside that run:
 ```text
 train_dir/176850340101/
   model_000001.pt
-  policy_spec.json
 ```
 
-`model_*.pt` is the weights file you can submit with `class=...,data=...`.
+Use the checkpoint path plus any runtime files your policy needs when creating the bundle.
 
 
-### Option A — Upload with class + weights
+### Example A — Build a bundle from a Python policy
 
 ```bash
-cogames upload -p class=my_policy.MyTrainablePolicy,data=./train_dir/<RUN_ID>/model_000001.pt -n my_policy_name --skip-validation
+cogames create-bundle -p class=my_policy.MyPolicy -o submission.zip -f my_policy.py
 ```
 
 
-### Option B — Build and upload a portable bundle
+### Example B — Build a bundle from a checkpoint plus runtime files
 
-Use `cogames create-bundle` whenever the raw checkpoint directory is not already self-contained:
+For a checkpoint-backed policy, include the files the policy imports at runtime:
 
 ```bash
-cogames create-bundle -p ./train_dir/<RUN_ID> -o submission.zip
-cogames upload -p ./submission.zip -n my_policy_name --skip-validation
+cogames create-bundle -p ./train_dir/<RUN_ID>:latest -o submission.zip \
+  -f agent \
+  -f packages/cortex/pyproject.toml \
+  -f packages/cortex/src \
+  --setup-script cogames-agents/trained_setup_script.py
+cogames upload -p ./submission.zip -n my_policy_name
 ```
 
-If you already have a self-contained bundle directory or zip, you can upload it directly with `cogames upload -p`.
+If your policy needs extra runtime files or setup, include them in the bundle (more details in `agent/COGAMES_SUBMISSION.md`).
 
 
-## Step 3 — Dry run (optional)
+## Step 3 — Upload the bundle
 
-Validate the upload package without sending it:
+Upload the prepared bundle:
 
 ```bash
-cogames upload -p ./submission.zip -n my_policy_name --dry-run --skip-validation
+cogames upload -p ./submission.zip -n my_policy_name --no-submit
 ```
 
 
-## Step 4 — Submit to a season
+## Step 4 — Dry run (optional)
 
-By default, `cogames upload` both uploads and submits to a season. You can specify a season explicitly:
+Run the Docker smoke test without sending the bundle:
 
 ```bash
-cogames upload -p ./submission.zip -n my_policy_name --season beta-teams-small --skip-validation
+cogames upload -p ./submission.zip -n my_policy_name --dry-run
 ```
 
-Or submit a previously uploaded policy to a season:
+Dry-run is a smoke test, not a guarantee that later tournament matches will succeed.
+
+
+## Step 5 — Submit to a season
+
+Submit the uploaded policy to a season:
 
 ```bash
 cogames submit my_policy_name --season beta-teams-small
 ```
+
+`cogames upload` can also upload and submit in one command if you pass `--season`.
 
 List available seasons:
 
@@ -109,29 +119,26 @@ cogames seasons
 Note: Scores can take a while to appear after submission.
 
 
-## Step 5 — View your submissions
+## Step 6 — View your submissions
 
 ```bash
 cogames submissions
 ```
 
 
-## Step 6 — View the leaderboard
+## Step 7 — View the leaderboard
 
 ```bash
 cogames leaderboard --season beta-teams-small
 ```
 
 
-## Limits
-
-- **Max upload size**: 500 MB. Submissions exceeding this limit are rejected with an HTTP 413 error. If your submission is too large, try excluding unnecessary files or compressing model weights.
-
 ## Troubleshooting
 
 - **Auth errors**: run `cogames login` again.
-- **Module not found**: use `class=...` with a fully qualified path or rebuild the portable bundle with
-  `cogames create-bundle`, `--include-files`, and `--setup-script` as needed.
+- **Module not found / 1011 during qualifying**: rebuild `submission.zip` with the runtime files your policy imports
+  and a `--setup-script` if needed (more details in `agent/COGAMES_SUBMISSION.md`).
 - **Invalid policy path**: ensure `-p` points to an existing bundle or weights file.
 - **Local vs S3 checkpoints**: local training saves files under `./train_dir/`. Cloud training may require downloading or referencing the S3 bundle.
-- **Policy too large**: the server enforces a 500 MB upload limit. Reduce your submission size by removing unnecessary files from your checkpoint directory before uploading.
+- **Dry-run passed but qualifying failed**: the default validation run is only a short smoke test. Check the season
+  match artifacts to debug full-match failures.

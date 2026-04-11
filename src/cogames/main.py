@@ -1924,6 +1924,14 @@ def _resolve_validation_config_pool(season_info: SeasonDetail) -> tuple[str, UUI
     name="create-bundle",
     help="Create a submission bundle zip from a policy.",
     rich_help_panel="Policies",
+    epilog="""[dim]Examples:[/dim]
+
+[cyan]cogames create-bundle -p class=my_module.MyPolicy -o submission.zip -f my_module.py[/cyan]
+  Create a submission bundle from a Python policy
+
+[cyan]cogames create-bundle -p <CHECKPOINT> -o submission.zip \\
+  -f <RUNTIME_PATH> ... --setup-script <SETUP.py>[/cyan]
+  Create a submission bundle from a checkpoint plus runtime files""",
     add_help_option=False,
 )
 def create_bundle_cmd(
@@ -2086,13 +2094,14 @@ def _parse_secret_env(value: str) -> tuple[str, str]:
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames upload -p ./train_dir/my_run -n my-policy[/cyan]       Upload and submit to default season
+[cyan]cogames upload -p ./submission.zip -n my-policy --season beta-cvc[/cyan]
+  Upload a submission bundle and submit to a specific season
 
-[cyan]cogames upload -p ./run -n my-policy --season beta-cvc[/cyan]  Upload and submit to specific season
+[cyan]cogames upload -p ./submission.zip -n my-policy --no-submit[/cyan]
+  Upload a submission bundle without submitting
 
-[cyan]cogames upload -p ./run -n my-policy --no-submit[/cyan]        Upload without submitting
-
-[cyan]cogames upload -p lstm -n my-lstm --dry-run[/cyan]             Validate only""",
+[cyan]cogames upload -p ./submission.zip -n my-policy --dry-run[/cyan]
+  Run the Docker smoke test without uploading""",
     add_help_option=False,
 )
 def upload_cmd(
@@ -2171,13 +2180,13 @@ def upload_cmd(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Run validation only without uploading.",
+        help="Run the Docker smoke test only without uploading.",
         rich_help_panel="Validation",
     ),
     skip_validation: bool = typer.Option(
         False,
         "--skip-validation",
-        help="Skip policy validation in Docker.",
+        help="Skip the Docker smoke test.",
         rich_help_panel="Validation",
     ),
     image: str = typer.Option(
@@ -2367,9 +2376,11 @@ def submit_cmd(
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames ship -p ./train_dir/my_run -n my-policy[/cyan]            Ship and submit
+[cyan]cogames ship -p ./submission.zip -n my-policy --season beta-cvc[/cyan]
+  Ship a prepared submission bundle
 
-[cyan]cogames ship -p ./run -n my-policy --dry-run[/cyan]               Validate only""",
+[cyan]cogames ship -p class=my_module.MyPolicy -n my-policy -f my_module.py --dry-run[/cyan]
+  Bundle a Python policy and run the Docker smoke test""",
     add_help_option=False,
 )
 def ship_cmd(
@@ -2423,13 +2434,13 @@ def ship_cmd(
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
-        help="Run validation only without uploading.",
+        help="Run the Docker smoke test only without uploading.",
         rich_help_panel="Validation",
     ),
     skip_validation: bool = typer.Option(
         False,
         "--skip-validation",
-        help="Skip policy validation in Docker.",
+        help="Skip the Docker smoke test.",
         rich_help_panel="Validation",
     ),
     image: str = typer.Option(
