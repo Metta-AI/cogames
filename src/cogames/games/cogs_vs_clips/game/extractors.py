@@ -13,6 +13,7 @@ from mettagrid.base_config import Config
 from mettagrid.config.handler_config import (
     Handler,
     actorHas,
+    firstMatch,
     updateActor,
     withdraw,
 )
@@ -36,11 +37,10 @@ class CvCExtractorConfig(CvCStationConfig):
     def station_cfg(self) -> GridObjectConfig:
         return GridObjectConfig(
             name=f"{self.resource}_extractor",
-            on_use_handlers={
-                "extract": Handler(
-                    mutations=[withdraw({self.resource: self.small_amount}, remove_when_empty=True)],
-                ),
-            },
+            on_use_handler=Handler(
+                name="extract",
+                mutations=[withdraw({self.resource: self.small_amount}, remove_when_empty=True)],
+            ),
             inventory=InventoryConfig(initial={self.resource: self.initial_amount}),
         )
 
@@ -93,9 +93,10 @@ class ExtractorsVariant(CoGameMissionVariant):
             key = f"{resource}_extractor"
             env.game.objects[key] = GridObjectConfig(
                 name=f"{resource}_extractor",
-                on_use_handlers={
-                    **{
-                        eh.name: Handler(
+                on_use_handler=firstMatch(
+                    [
+                        Handler(
+                            name=eh.name,
                             filters=[actorHas({k: v}) for k, v in eh.required_resources.items()],
                             mutations=[
                                 updateActor({k: -v for k, v in eh.cost.items()}),
@@ -103,8 +104,8 @@ class ExtractorsVariant(CoGameMissionVariant):
                             ],
                         )
                         for eh in self.extraction_handlers
-                    },
-                },
+                    ]
+                ),
                 inventory=InventoryConfig(
                     initial={resource: self.initial_amount},
                     default_limit=self.initial_amount,

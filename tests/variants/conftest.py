@@ -16,7 +16,7 @@ from cogames.games.cogs_vs_clips.game.territory import (
     net_materialized_query,
 )
 from mettagrid.config.filter import anyOf, hasTag, hasTagPrefix, isNear, isNot, sharedTagPrefix
-from mettagrid.config.handler_config import Handler, actorHas, updateActor
+from mettagrid.config.handler_config import Handler, actorHas, firstMatch, updateActor
 from mettagrid.config.mettagrid_config import (
     ActionsConfig,
     AgentConfig,
@@ -268,6 +268,7 @@ def make_junction_sim(
     junction.on_tag_remove = {
         f"net:{t.name}": Handler(filters=[], mutations=[removeTag(f"team:{t.name}")]) for t in teams
     }
+    handlers: list[Handler] = []
     for t in teams:
         align_filters: list = [
             actorHas(req_check_align),
@@ -287,9 +288,12 @@ def make_junction_sim(
             addTag(t.net_tag()),
             recomputeMaterializedQuery(t.net_tag()),
         ]
-        junction.on_use_handlers[f"align_{t.name}"] = Handler(
-            filters=align_filters,
-            mutations=align_mutations,
+        handlers.append(
+            Handler(
+                name=f"align_{t.name}",
+                filters=align_filters,
+                mutations=align_mutations,
+            )
         )
 
         scramble_filters: list = [
@@ -304,10 +308,14 @@ def make_junction_sim(
             logStatToGame(f"{t.name}/aligned.junction.lost"),
             recomputeMaterializedQuery("net:"),
         ]
-        junction.on_use_handlers[f"scramble_{t.name}"] = Handler(
-            filters=scramble_filters,
-            mutations=scramble_mutations,
+        handlers.append(
+            Handler(
+                name=f"scramble_{t.name}",
+                filters=scramble_filters,
+                mutations=scramble_mutations,
+            )
         )
+    junction.on_use_handler = firstMatch(handlers)
 
     objects["junction"] = junction
 

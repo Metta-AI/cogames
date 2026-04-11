@@ -24,7 +24,7 @@ from mettagrid.config.filter import (
     targetHasAnyOf,
 )
 from mettagrid.config.game_value import stat as game_stat
-from mettagrid.config.handler_config import Handler
+from mettagrid.config.handler_config import Handler, firstMatch
 from mettagrid.config.mettagrid_config import (
     AgentConfig,
     GameConfig,
@@ -57,15 +57,14 @@ RESOURCE_NAMES = ["carbon", "miner", "scrambler", "heart", "energy", "missing", 
 def _carbon_extractor() -> GridObjectConfig:
     return GridObjectConfig(
         name="carbon_extractor",
-        on_use_handlers={
-            "pick_up": Handler(
-                filters=[
-                    actorHas({"miner": 1}),
-                    isNot(actorHasAnyOf(CARRY_RESOURCES)),
-                ],
-                mutations=[updateActor({"carbon": 1, "num_items": 1})],
-            ),
-        },
+        on_use_handler=Handler(
+            name="pick_up",
+            filters=[
+                actorHas({"miner": 1}),
+                isNot(actorHasAnyOf(CARRY_RESOURCES)),
+            ],
+            mutations=[updateActor({"carbon": 1, "num_items": 1})],
+        ),
     )
 
 
@@ -92,77 +91,85 @@ def _hub() -> GridObjectConfig:
                 "energy": COOK_TIME,
             },
         ),
-        on_use_handlers={
-            "pickup_heart": Handler(
-                filters=[
-                    actorHas({"scrambler": 1}),
-                    isNot(actorHasAnyOf(CARRY_RESOURCES)),
-                    targetHas({"heart": 1}),
-                ],
-                mutations=[
-                    updateActor({"heart": 1, "num_items": 1}),
-                    updateTarget({"heart": -1}),
-                ],
-            ),
-            "deposit_carbon": Handler(
-                filters=[
-                    actorHas({"carbon": 1}),
-                    targetHas({"carbon": 1}),
-                    isNot(targetHas({"heart": 1})),
-                ],
-                mutations=[
-                    updateActor({"carbon": -1, "num_items": -1}),
-                    updateTarget({"carbon": -1, "missing": -1}),
-                ],
-            ),
-        },
+        on_use_handler=firstMatch(
+            [
+                Handler(
+                    name="pickup_heart",
+                    filters=[
+                        actorHas({"scrambler": 1}),
+                        isNot(actorHasAnyOf(CARRY_RESOURCES)),
+                        targetHas({"heart": 1}),
+                    ],
+                    mutations=[
+                        updateActor({"heart": 1, "num_items": 1}),
+                        updateTarget({"heart": -1}),
+                    ],
+                ),
+                Handler(
+                    name="deposit_carbon",
+                    filters=[
+                        actorHas({"carbon": 1}),
+                        targetHas({"carbon": 1}),
+                        isNot(targetHas({"heart": 1})),
+                    ],
+                    mutations=[
+                        updateActor({"carbon": -1, "num_items": -1}),
+                        updateTarget({"carbon": -1, "missing": -1}),
+                    ],
+                ),
+            ]
+        ),
     )
 
 
 def _miner_station() -> GridObjectConfig:
     return GridObjectConfig(
         name="miner_station",
-        on_use_handlers={
-            "swap_to_miner": Handler(
-                filters=[isNot(actorHas({"miner": 1})), isNot(actorHas({"heart": 1}))],
-                mutations=[updateActor({"scrambler": -1, "miner": 1})],
-            ),
-        },
+        on_use_handler=Handler(
+            name="swap_to_miner",
+            filters=[isNot(actorHas({"miner": 1})), isNot(actorHas({"heart": 1}))],
+            mutations=[updateActor({"scrambler": -1, "miner": 1})],
+        ),
     )
 
 
 def _scrambler_station() -> GridObjectConfig:
     return GridObjectConfig(
         name="scrambler_station",
-        on_use_handlers={
-            "swap_to_scrambler": Handler(
-                filters=[isNot(actorHas({"scrambler": 1}))],
-                mutations=[updateActor({"miner": -1, "scrambler": 1})],
-            ),
-        },
+        on_use_handler=Handler(
+            name="swap_to_scrambler",
+            filters=[isNot(actorHas({"scrambler": 1}))],
+            mutations=[updateActor({"miner": -1, "scrambler": 1})],
+        ),
     )
 
 
 def _chest() -> GridObjectConfig:
     element_resources = [resource for resource in CARRY_RESOURCES if resource != "heart"]
-    handlers: dict[str, Handler] = {}
+    handlers: list[Handler] = []
     for resource in element_resources:
-        handlers[f"deposit_{resource}"] = Handler(
-            filters=[
-                actorHas({"miner": 1}),
-                actorHas({resource: 1}),
-                isNot(targetHasAnyOf(element_resources)),
-            ],
-            mutations=[deposit({resource: 1}), updateActor({"num_items": -1})],
+        handlers.append(
+            Handler(
+                name=f"deposit_{resource}",
+                filters=[
+                    actorHas({"miner": 1}),
+                    actorHas({resource: 1}),
+                    isNot(targetHasAnyOf(element_resources)),
+                ],
+                mutations=[deposit({resource: 1}), updateActor({"num_items": -1})],
+            )
         )
     for resource in element_resources:
-        handlers[f"withdraw_{resource}"] = Handler(
-            filters=[
-                actorHas({"miner": 1}),
-                isNot(actorHasAnyOf(CARRY_RESOURCES)),
-                targetHas({resource: 1}),
-            ],
-            mutations=[withdraw({resource: 1}), updateActor({"num_items": 1})],
+        handlers.append(
+            Handler(
+                name=f"withdraw_{resource}",
+                filters=[
+                    actorHas({"miner": 1}),
+                    isNot(actorHasAnyOf(CARRY_RESOURCES)),
+                    targetHas({resource: 1}),
+                ],
+                mutations=[withdraw({resource: 1}), updateActor({"num_items": 1})],
+            )
         )
 
     return GridObjectConfig(
@@ -172,7 +179,7 @@ def _chest() -> GridObjectConfig:
                 "items": ResourceLimitsConfig(base=1, max=1, resources=element_resources),
             },
         ),
-        on_use_handlers=handlers,
+        on_use_handler=firstMatch(handlers),
     )
 
 
@@ -184,16 +191,15 @@ def _junction() -> GridObjectConfig:
                 "served": ResourceLimitsConfig(base=1, max=1, resources=["heart"]),
             },
         ),
-        on_use_handlers={
-            "serve_heart": Handler(
-                filters=[actorHas({"heart": 1}), isNot(targetHas({"heart": 1}))],
-                mutations=[
-                    updateActor({"heart": -1, "num_items": -1}),
-                    updateTarget({"heart": 1}),
-                    logActorAgentStat("delivery"),
-                ],
-            ),
-        },
+        on_use_handler=Handler(
+            name="serve_heart",
+            filters=[actorHas({"heart": 1}), isNot(targetHas({"heart": 1}))],
+            mutations=[
+                updateActor({"heart": -1, "num_items": -1}),
+                updateTarget({"heart": 1}),
+                logActorAgentStat("delivery"),
+            ],
+        ),
     )
 
 

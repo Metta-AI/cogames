@@ -1,7 +1,7 @@
 """Tests for the miner role variant: extractor bonus and cargo capacity."""
 
 from cogames.games.cogs_vs_clips.game.extractors import CvCExtractorConfig, ExtractorsVariant
-from mettagrid.config.handler_config import Handler, actorHas, withdraw
+from mettagrid.config.handler_config import Handler, actorHas, firstMatch, withdraw
 
 from .conftest import StationTestHarness
 
@@ -13,12 +13,12 @@ def _extractor_with_miner_handler(resource: str, initial_amount: int, small_amou
         initial_amount=initial_amount,
         small_amount=small_amount,
     ).station_cfg()
-    default_extract = station.on_use_handlers.pop("extract")
-    station.on_use_handlers["miner_extract"] = Handler(
+    miner_handler = Handler(
+        name="miner_extract",
         filters=[actorHas({"miner": 1})],
         mutations=[withdraw({resource: miner_amount}, remove_when_empty=True)],
     )
-    station.on_use_handlers["extract"] = default_extract
+    station.on_use_handler = firstMatch([miner_handler, station.on_use_handler])
     return station
 
 

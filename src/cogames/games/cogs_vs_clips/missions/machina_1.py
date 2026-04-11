@@ -40,7 +40,7 @@ from cogames.games.cogs_vs_clips.missions.terrain import (
 )
 from cogames.variants import ResolvedDeps
 from mettagrid.config.game_value import SumGameValue, num_tagged, val
-from mettagrid.config.handler_config import Handler
+from mettagrid.config.handler_config import Handler, allOf
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.mutation import logStatToGame
 from mettagrid.config.reward_config import reward
@@ -184,9 +184,11 @@ class CvCMachina1Variant(CoGameMissionVariant):
             held_junctions = SumGameValue(
                 values=_held_junction_values(team_name=team.name, clips_ship_count=clips_ship_count)
             )
-            env.game.on_tick[f"aligned_junction_held_{team.name}"] = Handler(
-                mutations=[logStatToGame(f"{team.name}/aligned.junction.held", source=held_junctions)]
+            handler = Handler(
+                name=f"aligned_junction_held_{team.name}",
+                mutations=[logStatToGame(f"{team.name}/aligned.junction.held", source=held_junctions)],
             )
+            env.game.on_tick = allOf([env.game.on_tick, handler])
 
 
 class MachinaOneMission(CvCMission):

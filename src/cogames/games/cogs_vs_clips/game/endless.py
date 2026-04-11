@@ -8,7 +8,7 @@ from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
 from cogames.variants import ResolvedDeps
 from mettagrid.config.filter.periodic_filter import PeriodicFilter
 from mettagrid.config.game_value import GameValueRatio, QueryCountValue, val
-from mettagrid.config.handler_config import Handler, query
+from mettagrid.config.handler_config import Handler, allOf, query
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.mutation.query_inventory_mutation import queryDelta
 from mettagrid.config.tag import typeTag
@@ -44,7 +44,8 @@ class EndlessVariant(CoGameMissionVariant):
         if extractors:
             elements = mission.required_variant(ElementsVariant)
             for element in elements.elements:
-                env.game.on_tick[f"{element}_extractor_refill"] = self._refill_handler(element)
+                handler = self._refill_handler(element)
+                env.game.on_tick = allOf([env.game.on_tick, handler])
 
     def _refill_handler(self, element: str) -> Handler:
         """Periodic handler that refills a random subset of extractors for one element."""
@@ -55,6 +56,7 @@ class EndlessVariant(CoGameMissionVariant):
         q.max_items = max_items_gv
         q.order_by = "random"
         return Handler(
+            name=f"{element}_extractor_refill",
             filters=[PeriodicFilter(period=self.refill_period)],
             mutations=[queryDelta(q, {element: self.refill_amount})],
         )

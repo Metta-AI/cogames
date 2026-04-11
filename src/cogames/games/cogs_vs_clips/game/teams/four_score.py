@@ -14,7 +14,7 @@ from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.missions.terrain import CompoundLocation, MachinaTerrainVariant
 from cogames.variants import ResolvedDeps
 from mettagrid.config.game_value import SumGameValue, num_tagged, val, weighted_sum
-from mettagrid.config.handler_config import Handler
+from mettagrid.config.handler_config import Handler, allOf
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.mutation import logStatToGame
 from mettagrid.config.reward_config import reward
@@ -98,15 +98,19 @@ class FourScoreVariant(CoGameMissionVariant):
             )
             if team_name in seen_team_names:
                 continue
-            env.game.on_tick[f"aligned_junction_held_{team_name}"] = Handler(
-                mutations=[logStatToGame(f"{team_name}/aligned.junction.held", source=held_junctions)]
+            handler = Handler(
+                name=f"aligned_junction_held_{team_name}",
+                mutations=[logStatToGame(f"{team_name}/aligned.junction.held", source=held_junctions)],
             )
+            env.game.on_tick = allOf([env.game.on_tick, handler])
             seen_team_names.add(team_name)
 
         if held_junction_stats:
             avg_held_junctions = weighted_sum(
                 [(1.0 / len(held_junction_stats), held_stat) for held_stat in held_junction_stats]
             )
-            env.game.on_tick["aligned_junction_held_four_score_avg"] = Handler(
-                mutations=[logStatToGame("four_score/aligned.junction.held.avg", source=avg_held_junctions)]
+            handler = Handler(
+                name="aligned_junction_held_four_score_avg",
+                mutations=[logStatToGame("four_score/aligned.junction.held.avg", source=avg_held_junctions)],
             )
+            env.game.on_tick = allOf([env.game.on_tick, handler])

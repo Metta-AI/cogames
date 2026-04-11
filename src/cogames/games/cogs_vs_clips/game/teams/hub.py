@@ -21,6 +21,7 @@ from mettagrid.config.filter import (
 from mettagrid.config.game_value import QueryInventoryValue
 from mettagrid.config.handler_config import (
     Handler,
+    firstMatch,
     queryDelta,
     queryDeposit,
     queryWithdraw,
@@ -72,18 +73,17 @@ class CvCHubConfig(CvCStationConfig):
             map_name=f"{self.team.short_name}:hub",
             tags=[self.team.team_tag()],
             inventory=self.inventory,
-            on_use_handlers={
-                "deposit": Handler(
-                    filters=[sharedTagPrefix("team:"), actorHasAnyOf(self.elements)],
-                    mutations=[
-                        queryDeposit(
-                            hq,
-                            {resource: 100 for resource in self.elements},
-                            stat_prefix=f"{self.team.name}/",
-                        ),
-                    ],
-                ),
-            },
+            on_use_handler=Handler(
+                name="deposit",
+                filters=[sharedTagPrefix("team:"), actorHasAnyOf(self.elements)],
+                mutations=[
+                    queryDeposit(
+                        hq,
+                        {resource: 100 for resource in self.elements},
+                        stat_prefix=f"{self.team.name}/",
+                    ),
+                ],
+            ),
         )
 
 
@@ -104,18 +104,20 @@ class TeamHubVariant(CoGameMissionVariant):
         return {k: -v for k, v in recipe.items()}
 
     @staticmethod
-    def _hub_heart_handlers(team: TeamConfig, heart_cost: dict[str, int]) -> dict[str, Handler]:
+    def _hub_heart_handlers(team: TeamConfig, heart_cost: dict[str, int]) -> list[Handler]:
         """Heart crafting and distribution handlers for a team's hub."""
         hq = CvCHubConfig.hub_query(team)
-        return {
-            "get_heart": Handler(
+        return [
+            Handler(
+                name="get_heart",
                 filters=[sharedTagPrefix("team:"), *CvCHubConfig.hub_has(team, {"heart": 1})],
                 mutations=[
                     queryWithdraw(hq, {"heart": 1}),
                     logStatToGame(f"{team.name}/heart.withdrawn"),
                 ],
             ),
-            "make_and_get_heart": Handler(
+            Handler(
+                name="make_and_get_heart",
                 filters=[sharedTagPrefix("team:"), *CvCHubConfig.hub_has(team, heart_cost)],
                 mutations=[
                     queryDelta(hq, TeamHubVariant._neg(heart_cost)),
@@ -123,7 +125,7 @@ class TeamHubVariant(CoGameMissionVariant):
                     *[logStatToGame(f"{team.name}/{resource}.withdrawn") for resource in heart_cost],
                 ],
             ),
-        }
+        ]
 
     @override
     def dependencies(self) -> Deps:
@@ -157,5 +159,5 @@ class TeamHubVariant(CoGameMissionVariant):
             cfg = hub.station_cfg()
             if heart is not None:
                 heart_cost = heart.cost or {}
-                cfg.on_use_handlers.update(self._hub_heart_handlers(team, heart_cost))
+                cfg.on_use_handler = firstMatch([cfg.on_use_handler] + self._hub_heart_handlers(team, heart_cost))
             env.game.objects.setdefault(map_name, cfg)

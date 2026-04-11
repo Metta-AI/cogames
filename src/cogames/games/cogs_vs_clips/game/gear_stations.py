@@ -15,6 +15,7 @@ from mettagrid.config.handler_config import (
     EntityTarget,
     Handler,
     actorHas,
+    firstMatch,
     updateActor,
 )
 from mettagrid.config.mettagrid_config import GridObjectConfig, MettaGridConfig
@@ -42,10 +43,11 @@ class GearStationsVariant(CoGameMissionVariant):
             symbol = gear.station_symbols.get(item_name)
             if symbol is not None:
                 env.game.render.symbols[item_name] = symbol
-            station.on_use_handlers.update(
-                {
-                    "keep_gear": Handler(filters=[actorHas({item_name: 1})], mutations=[]),
-                    "change_gear": Handler(
+            station.on_use_handler = firstMatch(
+                [
+                    Handler(name="keep_gear", filters=[actorHas({item_name: 1})], mutations=[]),
+                    Handler(
+                        name="change_gear",
                         filters=[actorHas(cost)] if cost else [],
                         mutations=[
                             ClearInventoryMutation(target=EntityTarget.ACTOR, limit_name="gear"),
@@ -53,7 +55,7 @@ class GearStationsVariant(CoGameMissionVariant):
                             updateActor({item_name: 1}),
                         ],
                     ),
-                }
+                ]
             )
 
 
