@@ -1926,12 +1926,12 @@ def _resolve_validation_config_pool(season_info: SeasonDetail) -> tuple[str, UUI
     rich_help_panel="Policies",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames create-bundle -p class=my_module.MyPolicy -o submission.zip -f my_module.py[/cyan]
-  Create a submission bundle from a Python policy
+[cyan]cogames create-bundle -p <POLICY_OR_CHECKPOINT> -o submission.zip[/cyan]
+  Create a submission bundle
 
-[cyan]cogames create-bundle -p <CHECKPOINT> -o submission.zip \\
-  -f <RUNTIME_PATH> ... --setup-script <SETUP.py>[/cyan]
-  Create a submission bundle from a checkpoint plus runtime files""",
+[cyan]cogames create-bundle -p <POLICY_OR_CHECKPOINT> -o submission.zip
+  -f <EXTRA_PATH> ... --setup-script <SETUP.py>[/cyan]
+  Include extra runtime files or setup when needed""",
     add_help_option=False,
 )
 def create_bundle_cmd(
@@ -2094,14 +2094,11 @@ def _parse_secret_env(value: str) -> tuple[str, str]:
     rich_help_panel="Tournament",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames upload -p ./submission.zip -n my-policy --season beta-cvc[/cyan]
-  Upload a submission bundle and submit to a specific season
-
 [cyan]cogames upload -p ./submission.zip -n my-policy --no-submit[/cyan]
   Upload a submission bundle without submitting
 
 [cyan]cogames upload -p ./submission.zip -n my-policy --dry-run[/cyan]
-  Run the Docker smoke test without uploading""",
+  Validate a submission bundle locally without uploading""",
     add_help_option=False,
 )
 def upload_cmd(
@@ -2379,8 +2376,8 @@ def submit_cmd(
 [cyan]cogames ship -p ./submission.zip -n my-policy --season beta-cvc[/cyan]
   Ship a prepared submission bundle
 
-[cyan]cogames ship -p class=my_module.MyPolicy -n my-policy -f my_module.py --dry-run[/cyan]
-  Bundle a Python policy and run the Docker smoke test""",
+[cyan]cogames ship -p ./submission.zip -n my-policy --dry-run[/cyan]
+  Validate a prepared submission bundle locally""",
     add_help_option=False,
 )
 def ship_cmd(

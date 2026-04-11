@@ -94,10 +94,12 @@ The game will open in a new window, and the terminal will give you instructions 
     cogames login
     ```
 
-2. Upload a starter policy and submit it to the tournament.
+2. Create, upload, and submit a starter bundle.
 
     ```bash
-    cogames upload --policy "class=cogames.policy.starter_agent.StarterPolicy" --name "$USER.README-quickstart-starter-policy" --season beta-teams-small
+    cogames create-bundle -p class=cogames.policy.starter_agent.StarterPolicy -o submission.zip
+    cogames upload -p ./submission.zip -n "$USER.README-quickstart-starter-policy" --no-submit
+    cogames submit "$USER.README-quickstart-starter-policy" --season beta-teams-small
     ```
 
 3. Check your submission status.
@@ -189,20 +191,19 @@ cogames season list
 cogames season show <SEASON>
 
 # 3) Create a submission bundle
-cogames create-bundle -p <POLICY_OR_CHECKPOINT> -o submission.zip \
-  -f <RUNTIME_PATH> ... --setup-script <SETUP_SCRIPT.py>
+cogames create-bundle -p <POLICY_OR_CHECKPOINT> -o submission.zip [-f <EXTRA_PATH> ...] [--setup-script <SETUP_SCRIPT.py>]
 
 # 4) Upload the bundle
-cogames upload -p ./submission.zip -n <POLICY_NAME> --season <SEASON>
+cogames upload -p ./submission.zip -n <POLICY_NAME> --no-submit
 
-# Alternative if already uploaded:
+# 5) Submit to the season
 cogames submit <POLICY_NAME[:vN]> --season <SEASON>
 
-# 5) Track status
+# 6) Track status
 cogames submissions --season <SEASON> --policy <POLICY_NAME>
 cogames season matches <SEASON> --limit 20
 
-# 6) Debug specific outcomes
+# 7) Debug specific outcomes
 cogames matches <MATCH_ID>
 cogames match-artifacts <MATCH_ID>
 cogames episode show <EPISODE_ID>
@@ -1157,10 +1158,9 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames create-bundle </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=my_module.MyPolicy </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-f</span><span style="color: #008080; text-decoration-color: #008080"> my_module.py</span>   Create a submission bundle  
- from a Python policy                                                                                              
- <span style="color: #008080; text-decoration-color: #008080">cogames create-bundle </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;CHECKPOINT&gt;</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> submission.zip \   </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-f</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;RUNTIME_PATH&gt;</span><span style="color: #008080; text-decoration-color: #008080"> ... </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--setup-script</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;SETUP.py&gt;</span>       
- Create a submission bundle from a checkpoint plus runtime files                                                   
+ <span style="color: #008080; text-decoration-color: #008080">cogames create-bundle </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;POLICY_OR_CHECKPOINT&gt;</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> submission.zip</span>   Create a submission bundle                    
+ <span style="color: #008080; text-decoration-color: #008080">cogames create-bundle </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;POLICY_OR_CHECKPOINT&gt;</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-f</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;EXTRA_PATH&gt;</span><span style="color: #008080; text-decoration-color: #008080"> ... </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--setup-script</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #808000; text-decoration-color: #808000; font-weight: bold">&lt;SETUP.py&gt;</span>   
+ Include extra runtime files or setup when needed                                                                  
 
 </pre>
 
@@ -1689,10 +1689,9 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta-cvc</span>   Upload a submission bundle and submit to a    
- specific season                                                                                                   
  <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--no-submit</span>   Upload a submission bundle without submitting       
- <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>   Run the Docker smoke test without uploading           
+ <span style="color: #008080; text-decoration-color: #008080">cogames upload </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>   Validate a submission bundle locally without          
+ uploading                                                                                                         
 
 </pre>
 
@@ -1854,8 +1853,7 @@ cogames [COMMAND] --help
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
  <span style="color: #008080; text-decoration-color: #008080">cogames ship </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--season</span><span style="color: #008080; text-decoration-color: #008080"> beta-cvc</span>   Ship a prepared submission bundle               
- <span style="color: #008080; text-decoration-color: #008080">cogames ship </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> class=my_module.MyPolicy </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-f</span><span style="color: #008080; text-decoration-color: #008080"> my_module.py </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>   Bundle a Python policy and run  
- the Docker smoke test                                                                                             
+ <span style="color: #008080; text-decoration-color: #008080">cogames ship </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-p</span><span style="color: #008080; text-decoration-color: #008080"> ./submission.zip </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-n</span><span style="color: #008080; text-decoration-color: #008080"> my-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--dry-run</span>   Validate a prepared submission bundle locally           
 
 </pre>
 
