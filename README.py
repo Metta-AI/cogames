@@ -116,10 +116,12 @@
 #     cogames login
 #     ```
 #
-# 2. Upload a starter policy and submit it to the tournament.
+# 2. Create, upload, and submit a starter bundle.
 #
 #     ```bash
-#     cogames upload --policy "class=cogames.policy.starter_agent.StarterPolicy" --name "$USER.README-quickstart-starter-policy" --season beta-teams-small
+#     cogames create-bundle -p class=cogames.policy.starter_agent.StarterPolicy -o submission.zip
+#     cogames upload -p ./submission.zip -n "$USER.README-quickstart-starter-policy" --no-submit
+#     cogames submit "$USER.README-quickstart-starter-policy" --season beta-teams-small
 #     ```
 #
 # 3. Check your submission status.
@@ -214,20 +216,19 @@
 # cogames season show <SEASON>
 #
 # # 3) Create a submission bundle
-# cogames create-bundle -p <POLICY_OR_CHECKPOINT> -o submission.zip \
-#   -f <RUNTIME_PATH> ... --setup-script <SETUP_SCRIPT.py>
+# cogames create-bundle -p <POLICY_OR_CHECKPOINT> -o submission.zip [-f <EXTRA_PATH> ...] [--setup-script <SETUP_SCRIPT.py>]
 #
 # # 4) Upload the bundle
-# cogames upload -p ./submission.zip -n <POLICY_NAME> --season <SEASON>
+# cogames upload -p ./submission.zip -n <POLICY_NAME> --no-submit
 #
-# # Alternative if already uploaded:
+# # 5) Submit to the season
 # cogames submit <POLICY_NAME[:vN]> --season <SEASON>
 #
-# # 5) Track status
+# # 6) Track status
 # cogames submissions --season <SEASON> --policy <POLICY_NAME>
 # cogames season matches <SEASON> --limit 20
 #
-# # 6) Debug specific outcomes
+# # 7) Debug specific outcomes
 # cogames matches <MATCH_ID>
 # cogames match-artifacts <MATCH_ID>
 # cogames episode show <EPISODE_ID>

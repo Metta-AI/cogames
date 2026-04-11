@@ -74,32 +74,13 @@
 #   model_000001.pt
 # ```
 #
-# Use the checkpoint path plus any runtime files your policy needs when creating the bundle.
-#
-
-# %% [markdown]
-# ### Example A — Build a bundle from a Python policy
+# Use the policy or checkpoint path, plus any extra runtime files or setup your policy needs, when creating the bundle.
 #
 # ```bash
-# cogames create-bundle -p class=my_policy.MyPolicy -o submission.zip -f my_policy.py
+# cogames create-bundle -p <policy-or-checkpoint> -o submission.zip [-f <extra-path> ...] [--setup-script <setup.py>]
 # ```
 #
-
-# %% [markdown]
-# ### Example B — Build a bundle from a checkpoint plus runtime files
-#
-# For a checkpoint-backed policy, include the files the policy imports at runtime:
-#
-# ```bash
-# cogames create-bundle -p ./train_dir/<RUN_ID>:latest -o submission.zip \
-#   -f agent \
-#   -f packages/cortex/pyproject.toml \
-#   -f packages/cortex/src \
-#   --setup-script cogames-agents/trained_setup_script.py
-# cogames upload -p ./submission.zip -n my_policy_name
-# ```
-#
-# If your policy needs extra runtime files or setup, include them in the bundle (more details in `agent/COGAMES_SUBMISSION.md`).
+# If your policy needs extra runtime files or setup, include them here. `agent/COGAMES_SUBMISSION.md` has a full repo example.
 #
 
 # %% [markdown]
@@ -115,13 +96,11 @@
 # %% [markdown]
 # ## Step 4 — Dry run (optional)
 #
-# Run the Docker smoke test without sending the bundle:
+# Validate the bundle locally without uploading:
 #
 # ```bash
 # cogames upload -p ./submission.zip -n my_policy_name --dry-run
 # ```
-#
-# Dry-run is a smoke test, not a guarantee that later tournament matches will succeed.
 #
 
 # %% [markdown]
@@ -132,8 +111,6 @@
 # ```bash
 # cogames submit my_policy_name --season beta-teams-small
 # ```
-#
-# `cogames upload` can also upload and submit in one command if you pass `--season`.
 #
 # List available seasons:
 #
@@ -164,9 +141,7 @@
 # ## Troubleshooting
 #
 # - **Auth errors**: run `cogames login` again.
-# - **Module not found / 1011 during qualifying**: rebuild `submission.zip` with the runtime files your policy imports
-#   and a `--setup-script` if needed (more details in `agent/COGAMES_SUBMISSION.md`).
-# - **Invalid policy path**: ensure `-p` points to an existing bundle or weights file.
+# - **Module not found / 1011 during qualifying**: rebuild `submission.zip` with every runtime file and setup step your policy needs.
+#   `agent/COGAMES_SUBMISSION.md` has a full repo example.
+# - **Invalid policy path**: ensure `-p` points to an existing policy, checkpoint, or bundle.
 # - **Local vs S3 checkpoints**: local training saves files under `./train_dir/`. Cloud training may require downloading or referencing the S3 bundle.
-# - **Dry-run passed but qualifying failed**: the default validation run is only a short smoke test. Check the season
-#   match artifacts to debug full-match failures.
