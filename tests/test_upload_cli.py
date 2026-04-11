@@ -491,6 +491,20 @@ def _write_submission_bundle(bundle_dir: Path) -> None:
     (bundle_dir / "weights.safetensors").write_bytes(b"fake weights data")
 
 
+def _write_metta_checkpoint_bundle(bundle_dir: Path) -> None:
+    bundle_dir.mkdir(parents=True)
+    (bundle_dir / "policy_spec.json").write_text(
+        json.dumps(
+            {
+                "class_path": "metta.agent.policy.CheckpointPolicy",
+                "data_path": "weights.safetensors",
+                "init_kwargs": {"architecture_spec": "dummy", "device": "cpu"},
+            }
+        )
+    )
+    (bundle_dir / "weights.safetensors").write_bytes(b"fake checkpoint data")
+
+
 @pytest.mark.parametrize("use_zip", [False, True])
 def test_create_bundle_accepts_explicit_local_bundle_paths(tmp_path: Path, use_zip: bool) -> None:
     bundle_dir = tmp_path / "bundle"
@@ -569,6 +583,99 @@ def test_create_bundle_preserves_bare_policy_name_when_same_named_directory_exis
     with zipfile.ZipFile(output) as zf:
         spec = json.loads(zf.read("policy_spec.json"))
         assert spec["class_path"] == "correct.Policy"
+
+
+def test_create_bundle_accepts_embedded_namespace_package_runtime(tmp_path: Path) -> None:
+    checkpoint_dir = tmp_path / "checkpoint"
+    checkpoint_dir.mkdir(parents=True)
+    (checkpoint_dir / "policy_spec.json").write_text(
+        json.dumps(
+            {
+                "class_path": "metta.agent.namespace_policy.NamespacePolicy",
+                "init_kwargs": {},
+            }
+        )
+    )
+    runtime_dir = checkpoint_dir / "src" / "metta" / "agent"
+    runtime_dir.mkdir(parents=True)
+    (runtime_dir / "namespace_policy.py").write_text("class NamespacePolicy:\n    pass\n")
+
+    output = tmp_path / "submission.zip"
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "create-bundle",
+            "--policy",
+            str(checkpoint_dir),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, f"Bundle creation failed:\n{result.output}"
+    with zipfile.ZipFile(output) as zf:
+        assert "src/metta/agent/namespace_policy.py" in zf.namelist()
+
+
+def test_create_bundle_rejects_raw_metta_checkpoint_without_setup_script(tmp_path: Path) -> None:
+    checkpoint_dir = tmp_path / "checkpoint"
+    _write_metta_checkpoint_bundle(checkpoint_dir)
+
+    output = tmp_path / "submission.zip"
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "create-bundle",
+            "--policy",
+            str(checkpoint_dir),
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Build a submission bundle" in result.output
+    assert "--setup-script" in result.output
+    assert "agent/COGAMES_SUBMISSION.md" in result.output
+
+
+def test_upload_help_promotes_submission_bundle_for_trained_policies() -> None:
+    runner = CliRunner()
+    result = runner.invoke(app, ["upload", "--help"])
+
+    assert result.exit_code == 0
+    assert "submission.zip" in result.output
+    assert "submission bundle" in result.output
+    assert "./train_dir/my_run -n my-policy" not in result.output
+
+
+def test_upload_rejects_raw_metta_checkpoint_without_setup_script(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checkpoint_dir = tmp_path / "checkpoint"
+    _write_metta_checkpoint_bundle(checkpoint_dir)
+
+    monkeypatch.setattr("cogames.main._resolve_season", lambda *_args, **_kwargs: SimpleNamespace(name="test-season"))
+    monkeypatch.setattr("cogames.cli.submit.TournamentServerClient.from_login", lambda **_kwargs: object())
+
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        [
+            "upload",
+            "--policy",
+            str(checkpoint_dir),
+            "--name",
+            "test-policy",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert "Build a submission bundle" in result.output
+    assert "--setup-script" in result.output
 
 
 def test_upload_s3_policy(

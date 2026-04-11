@@ -21,7 +21,7 @@ import typer
 from cogames.cli.base import console
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.policy import PolicySpec, get_policy_spec
-from mettagrid.policy.prepare_policy_spec import extract_submission_archive
+from mettagrid.policy.prepare_policy_spec import extract_submission_archive, find_package_source_root
 from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec, write_submission_policy_spec
 from mettagrid.runner.types import PureSingleEpisodeResult
 from mettagrid.util.uri_resolvers.schemes import localize_uri, parse_uri
@@ -30,6 +30,7 @@ from softmax.auth import DEFAULT_COGAMES_SERVER
 DEFAULT_SUBMIT_SERVER = "https://api.observatory.softmax-research.net"
 DEFAULT_EPISODE_RUNNER_IMAGE = "ghcr.io/metta-ai/episode-runner:latest"
 RESULTS_URL = "https://www.softmax.com/alignmentleague"
+_METTA_POLICY_CLASS_PREFIX = "metta.agent."
 
 
 @dataclass
@@ -296,6 +297,26 @@ def create_bundle(
         if validated_paths:
             include_with_ancestors = validated_paths + _collect_ancestor_init_files(validated_paths)
             _copy_include_paths_into_bundle(include_with_ancestors, cwd, bundle_root)
+
+        has_embedded_package_root = find_package_source_root(bundle_root, submission_spec.class_path) is not None
+        if (
+            submission_spec.class_path.startswith(_METTA_POLICY_CLASS_PREFIX)
+            and submission_spec.setup_script is None
+            and not has_embedded_package_root
+        ):
+            console.print(
+                "[red]Error:[/red] Build a submission bundle that includes the runtime code your policy imports and "
+                "a setup script before uploading this checkpoint."
+            )
+            console.print(
+                "\n[dim]Generic pattern:[/dim]\n"
+                "[cyan]cogames create-bundle -p <checkpoint-or-policy> -o submission.zip "
+                "-f <runtime-path> ... --setup-script <setup.py>[/cyan]\n"
+                "[cyan]cogames upload -p ./submission.zip -n <policy-name>[/cyan]"
+            )
+            if (cwd / "agent/COGAMES_SUBMISSION.md").is_file():
+                console.print("\n[dim]Metta repo guide:[/dim] agent/COGAMES_SUBMISSION.md")
+            raise typer.Exit(1)
 
         write_submission_policy_spec(bundle_root / POLICY_SPEC_FILENAME, submission_spec)
         _zip_directory_to(bundle_root, output)
