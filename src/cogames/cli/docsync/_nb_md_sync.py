@@ -2,6 +2,7 @@
 Convert notebook to markdown using nbconvert.
 """
 
+import re
 from pathlib import Path
 from typing import TypedDict
 
@@ -58,6 +59,13 @@ def convert_nb_to_md_in_memory(
     # Run preprocessor again on nb to set collapse metadata (nbconvert modifies a copy internally).
     DirectivePreprocessor().preprocess(nb=nb, resources={"notebook_relpath": notebook_relpath})
     md = directive_post_process(md=md, nb=nb)
+    md = md.replace("\r\n", "\n").replace("\r", "\n")
+    md = re.sub(
+        r"^ {4}W\d{4} .*torch/utils/cpp_extension\.py:117\] No CUDA runtime is found, using CUDA_HOME=.*\n?",
+        "",
+        md,
+        flags=re.MULTILINE,
+    )
 
     return md, resources
 
@@ -94,7 +102,7 @@ def convert_nb_to_md(*, nb_path: Path, should_rerun: bool, cogames_root: Path) -
     cogames_root = cogames_root.resolve()
 
     if should_rerun:
-        run_notebook(nb_path=nb_path)
+        run_notebook(nb_path=nb_path, cogames_root=cogames_root)
 
     md, resources = convert_nb_to_md_in_memory(nb_path=nb_path, cogames_root=cogames_root)
 

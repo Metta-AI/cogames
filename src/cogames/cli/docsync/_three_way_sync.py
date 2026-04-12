@@ -9,7 +9,7 @@ import typer
 
 from cogames.cli.docsync._nb_md_sync import convert_nb_to_md, convert_nb_to_md_in_memory
 from cogames.cli.docsync._nb_py_sync import convert_nb_to_py, sync_nb_and_py_by_user_choice
-from cogames.cli.docsync._utils import files_equal, lint_py_file
+from cogames.cli.docsync._utils import files_equal, lint_py_file, notebook_execution_env
 
 
 def get_stem_paths(*, cogames_root: Path) -> list[Path]:
@@ -77,6 +77,7 @@ def is_stem_in_sync_three_way(*, stem_path: Path, should_rerun: bool, cogames_ro
             result = subprocess.run(
                 ["jupyter", "execute", str(tmp_nb_path), "--inplace"],
                 cwd=nb_path.parent,  # Use original working dir for relative paths
+                env=notebook_execution_env(cogames_root=cogames_root),
                 capture_output=True,
                 text=True,
             )

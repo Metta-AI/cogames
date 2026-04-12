@@ -19,7 +19,7 @@ def test_overcogged_cogame_registers_canonical_game_module() -> None:
     assert full_variant.name == "full"
 
 
-def test_importing_cogames_registers_overcogged_without_requiring_metta(tmp_path: Path) -> None:
+def test_importing_cogames_keeps_overcogged_lazy_until_requested(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[3]
     env = os.environ | {
         "PYTHONPATH": os.pathsep.join(
@@ -35,12 +35,17 @@ def test_importing_cogames_registers_overcogged_without_requiring_metta(tmp_path
             sys.executable,
             "-c",
             (
+                "import sys; "
                 "import cogames; "
                 "from cogames.game import get_game; "
+                "assert 'cogames.games.overcogged.game.game' not in sys.modules; "
+                "assert get_game('cogs_vs_clips').name == 'cogs_vs_clips'; "
+                "assert 'cogames.games.overcogged.game.game' not in sys.modules; "
                 "game = get_game('overcogged'); "
                 "assert game.name == 'overcogged'; "
                 "assert [mission.name for mission in game.missions] == ['basic', 'classic']; "
-                "assert game.variant_registry.get('full').name == 'full'"
+                "assert game.variant_registry.get('full').name == 'full'; "
+                "assert 'cogames.games.overcogged.game.game' in sys.modules"
             ),
         ],
         cwd=tmp_path,

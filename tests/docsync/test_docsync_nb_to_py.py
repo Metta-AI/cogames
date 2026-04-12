@@ -1,5 +1,6 @@
 """Tests for `cogames docsync nb-to-py` subcommand."""
 
+import os
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -194,6 +195,36 @@ def test_run_notebook_sets_cwd_to_notebook_parent():
             mock_run.assert_called_once()
             call_kwargs = mock_run.call_args.kwargs
             assert call_kwargs["cwd"] == subdir
+            assert call_kwargs["env"] is None
+
+
+def test_run_notebook_prefers_repo_sources_when_cogames_root_provided():
+    """Test that run_notebook prepends local cogames/mettagrid sources when available."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        repo_root = Path(tmp_dir) / "repo"
+        cogames_root = repo_root / "packages" / "cogames"
+        cogames_src = cogames_root / "src"
+        mettagrid_src = repo_root / "packages" / "mettagrid" / "python" / "src"
+        subdir = cogames_root / "tutorials"
+        subdir.mkdir(parents=True)
+        cogames_src.mkdir(parents=True)
+        mettagrid_src.mkdir(parents=True)
+
+        nb = create_notebook(cells=[new_code_cell("print('hello')")])
+        nb_path = subdir / "test.ipynb"
+        nbformat.write(nb, nb_path)
+
+        with patch("cogames.cli.docsync._utils.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stderr="")
+
+            run_notebook(nb_path=nb_path, cogames_root=cogames_root)
+
+            mock_run.assert_called_once()
+            env = mock_run.call_args.kwargs["env"]
+            assert env is not None
+            assert env["PYTHONPATH"].split(os.pathsep)[:2] == [str(cogames_src.resolve()), str(mettagrid_src.resolve())]
+            assert env["COGAMES_DOCSYNC"] == "1"
+            assert env["CUDA_VISIBLE_DEVICES"] == ""
 
 
 def test_format_py_runs_ruff():

@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.0
 #   kernelspec:
 #     display_name: Python 3
 #     language: python
@@ -82,9 +82,7 @@
 
 # %%
 from cogames.games.cogs_vs_clips.game import NoVibesVariant
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig
-from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_map_builder
-from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Simulator
@@ -92,16 +90,11 @@ from mettagrid.simulator import Simulator
 NUM_AGENTS = 4
 MAX_STEPS = 1000
 
-mission = CvCMission(
-    name="my_mission",
-    description="A simple Cogs vs Clips mission.",
-    map_builder=make_machina1_map_builder(NUM_AGENTS),
-    min_cogs=NUM_AGENTS,
-    max_cogs=NUM_AGENTS,
-    num_cogs=NUM_AGENTS,
-    max_steps=MAX_STEPS,
-    teams={"cogs": TeamConfig(name="cogs", num_agents=NUM_AGENTS)},
-).with_variants([NoVibesVariant()])
+mission = (
+    make_machina1_mission(num_agents=NUM_AGENTS, max_steps=MAX_STEPS)
+    .model_copy(update={"name": "my_mission", "description": "A simple Cogs vs Clips mission."})
+    .with_variants([NoVibesVariant()])
+)
 
 env_cfg = mission.make_env()
 policy_env_info = PolicyEnvInterface.from_mg_cfg(env_cfg)
@@ -122,10 +115,9 @@ print(f"Action space: {policy_env_info.action_space}")
 # | Parameter | What it controls |
 # |-----------|------------------|
 # | `map_builder` | Map layout and size. `make_machina1_map_builder(n)` gives an 88x88 arena. |
-# | `num_cogs` | Number of agents on your team. |
+# | `num_agents` | Number of agents in the mission. |
 # | `max_steps` | Episode length in ticks. |
-# | `teams` | Team definitions (name, agent count, initial wealth). |
-# | `variants` | List of modifiers that change game rules (see below). |
+# # | `variants` | List of modifiers that change game rules (see below). |
 #
 # ### Variants
 #
@@ -163,11 +155,11 @@ game = env_cfg.game
 print("=== Game Config ===")
 print(f"  num_agents:     {game.num_agents}")
 print(f"  max_steps:      {game.max_steps}")
-print(f"  resources:      {game.resource_names}")
+print(f"  resources:      {sorted(game.resource_names)}")
 print(f"  obs window:     {game.obs.height}x{game.obs.width}")
 print(f"  obs tokens:     {game.obs.num_tokens} x {game.obs.token_dim}")
 print(f"  map builder:    {type(game.map_builder).__name__}")
-print(f"  objects:        {list(game.objects)}")
+print(f"  objects:        {sorted(game.objects)}")
 
 actions = game.actions.actions()
 print(f"  actions:        {[a.name for a in actions]}")
@@ -194,10 +186,10 @@ print(f"  actions:        {[a.name for a in actions]}")
 print(f"Observation shape per agent: {policy_env_info.observation_shape}")
 print(f"Egocentric window: {policy_env_info.obs_height}x{policy_env_info.obs_width}")
 print(f"\nObservation features ({len(policy_env_info.obs_features)} total):")
-print(f"{'ID':>4}  {'Name':<30}  {'Normalization':>13}")
-print("-" * 52)
-for feat in policy_env_info.obs_features:
-    print(f"{feat.id:>4}  {feat.name:<30}  {feat.normalization:>13.1f}")
+print(f"{'Name':<30}  {'Normalization':>13}")
+print("-" * 47)
+for feat in sorted(policy_env_info.obs_features, key=lambda feat: feat.name):
+    print(f"{feat.name:<30}  {feat.normalization:>13.1f}")
 
 # %% [markdown]
 # Key features to know:
@@ -212,7 +204,7 @@ for feat in policy_env_info.obs_features:
 
 # %%
 print("Tag mapping (tag value -> object type):")
-for tag_id, tag_name in policy_env_info.tag_id_to_name.items():
+for tag_id, tag_name in sorted(policy_env_info.tag_id_to_name.items()):
     print(f"  {tag_id:>3}: {tag_name}")
 
 # %% [markdown]
