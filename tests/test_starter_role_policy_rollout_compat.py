@@ -4,6 +4,7 @@ import pytest
 
 from cogames.games.cogs_vs_clips.missions.arena import make_basic_mission
 from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
+from cogames.games.cogs_vs_clips.missions.terrain import MapSeedVariant
 from cogames.games.cogs_vs_clips.missions.tutorial import make_tutorial_mission
 from cogames.policy.starter_agent import StarterCogPolicyImpl
 from mettagrid.policy.policy import PolicySpec
@@ -30,10 +31,25 @@ def test_starter_role_policy_resolves_current_cogsguard_tags(mission) -> None:
 
     hub_tag_id = policy_env_info.tags.index("type:hub")
     for role in ROLES:
-        impl = StarterCogPolicyImpl(policy_env_info, agent_id=0, preferred_gear=role)
+        impl = StarterCogPolicyImpl(policy_env_info, agent_id=0, role=role)
         expected_station_tag = policy_env_info.tags.index(f"type:{role}")
-        assert impl._gear_station_tags_by_gear[role] == {expected_station_tag}
+        assert impl._role_station_tags[role] == {expected_station_tag}
         assert hub_tag_id in impl._heart_source_tags
+
+
+def test_starter_policy_withdraws_hearts_on_arena() -> None:
+    env_cfg = make_basic_mission(max_steps=300).with_variants([MapSeedVariant(seed=42)]).make_env()
+    results, _ = run_episode_local(
+        policy_specs=[PolicySpec(class_path="starter")],
+        assignments=[0] * env_cfg.game.num_agents,
+        env=env_cfg,
+        seed=42,
+        max_action_time_ms=10000,
+        render_mode="none",
+        device="cpu",
+    )
+
+    assert results.stats["game"].get("cogs/heart.withdrawn", 0.0) > 0.0
 
 
 @pytest.mark.parametrize(

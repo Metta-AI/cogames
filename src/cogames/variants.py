@@ -136,11 +136,15 @@ class VariantRegistry:
 
     def _topological_order(self) -> list[str]:
         """Compute a valid configuration order: dependencies before dependents."""
-        dep_names: dict[str, set[str]] = {name: set() for name in self._variants}
+        dep_names: dict[str, list[str]] = {name: [] for name in self._variants}
+        seen_dep_names: dict[str, set[str]] = {name: set() for name in self._variants}
         for from_name, to_name, _kind in self._edges:
-            if to_name in dep_names:
-                dep_names[from_name].add(to_name)
+            if to_name in seen_dep_names[from_name]:
+                continue
+            seen_dep_names[from_name].add(to_name)
+            dep_names[from_name].append(to_name)
 
+        variant_names = list(self._variants)
         order: list[str] = []
         visited: set[str] = set()
         visiting: set[str] = set()
@@ -150,13 +154,13 @@ class VariantRegistry:
                 return
             assert name not in visiting, f"Circular dependency detected involving '{name}'"
             visiting.add(name)
-            for dep in dep_names.get(name, set()):
+            for dep in dep_names.get(name, ()):
                 visit(dep)
             visiting.remove(name)
             visited.add(name)
             order.append(name)
 
-        for name in self._variants:
+        for name in variant_names:
             visit(name)
 
         return order

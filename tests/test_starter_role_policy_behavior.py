@@ -23,6 +23,7 @@ def _mock_policy_env_info() -> PolicyEnvInterface:
         "type:silicon_extractor",
         "team:cogs",
         "team:clips",
+        "type:agent",
     ]
     return PolicyEnvInterface(
         obs_features=[],
@@ -56,7 +57,7 @@ def _tag_token(tag_id: int, *, row: int, col: int) -> ObservationToken:
 
 
 def test_inventory_items_ignore_zero_values() -> None:
-    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, preferred_gear="miner")
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, role="miner")
     obs = AgentObservation(
         agent_id=0,
         tokens=[
@@ -70,11 +71,10 @@ def test_inventory_items_ignore_zero_values() -> None:
 
     items = impl._inventory_amounts(obs)
     assert items == {}
-    assert impl._current_gear(items) is None
 
 
 def test_preferred_role_targets_its_station_when_not_equipped() -> None:
-    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, preferred_gear="miner")
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, role="miner")
     state = impl.initial_agent_state()
     obs = AgentObservation(
         agent_id=0,
@@ -96,7 +96,7 @@ def test_preferred_role_targets_its_station_when_not_equipped() -> None:
 
 
 def test_inventory_items_parse_power_suffix_and_non_power_colon_names() -> None:
-    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, preferred_gear=None)
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0)
     obs = AgentObservation(
         agent_id=0,
         tokens=[
@@ -112,7 +112,7 @@ def test_inventory_items_parse_power_suffix_and_non_power_colon_names() -> None:
 
 
 def test_inventory_items_ignore_empty_suffix_tokens() -> None:
-    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, preferred_gear=None)
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0)
     obs = AgentObservation(
         agent_id=0,
         tokens=[
@@ -126,11 +126,20 @@ def test_inventory_items_ignore_empty_suffix_tokens() -> None:
     assert items["miner"] == 1
 
 
+def test_default_roles_cycle_by_agent_id() -> None:
+    policy_env_info = _mock_policy_env_info()
+    assert StarterCogPolicyImpl(policy_env_info, agent_id=0)._role == "miner"
+    assert StarterCogPolicyImpl(policy_env_info, agent_id=1)._role == "aligner"
+    assert StarterCogPolicyImpl(policy_env_info, agent_id=2)._role == "scrambler"
+    assert StarterCogPolicyImpl(policy_env_info, agent_id=3)._role == "scout"
+    assert StarterCogPolicyImpl(policy_env_info, agent_id=4)._role == "miner"
+
+
 def test_aligner_without_heart_targets_hub() -> None:
-    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, preferred_gear=None)
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=1)
     state = impl.initial_agent_state()
     obs = AgentObservation(
-        agent_id=0,
+        agent_id=1,
         tokens=[
             _inv_token(1, "inv:aligner", 1),
             _inv_token(2, "inv:heart", 0),
@@ -143,10 +152,108 @@ def test_aligner_without_heart_targets_hub() -> None:
     assert action.name == "move_south"
 
 
+def test_aligner_with_heart_targets_neutral_junction() -> None:
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=1)
+    state = impl.initial_agent_state()
+    obs = AgentObservation(
+        agent_id=1,
+        tokens=[
+            _inv_token(1, "inv:aligner", 1),
+            _inv_token(2, "inv:heart", 1),
+            _tag_token(1, row=3, col=2),  # neutral junction south
+            _tag_token(1, row=1, col=2),  # enemy junction north
+            _tag_token(11, row=1, col=2),  # team:clips on north junction
+        ],
+    )
+
+    action, _ = impl.step_with_state(obs, state)
+    assert action.name == "move_south"
+
+
+def test_scrambler_with_heart_targets_enemy_junction() -> None:
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=2)
+    state = impl.initial_agent_state()
+    obs = AgentObservation(
+        agent_id=2,
+        tokens=[
+            _inv_token(1, "inv:scrambler", 1),
+            _inv_token(2, "inv:heart", 1),
+            _tag_token(10, row=2, col=2),  # team:cogs on self
+            _tag_token(1, row=1, col=2),  # enemy junction north
+            _tag_token(11, row=1, col=2),  # team:clips on north junction
+            _tag_token(1, row=3, col=2),  # neutral junction south
+        ],
+    )
+
+    action, _ = impl.step_with_state(obs, state)
+    assert action.name == "move_north"
+
+
+def test_miner_with_cargo_targets_friendly_deposit() -> None:
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0)
+    state = impl.initial_agent_state()
+    obs = AgentObservation(
+        agent_id=0,
+        tokens=[
+            _inv_token(1, "inv:miner", 1),
+            _inv_token(2, "inv:carbon", 2),
+            _tag_token(10, row=2, col=2),  # team:cogs on self
+            _tag_token(2, row=1, col=2),  # hub north
+            _tag_token(10, row=1, col=2),  # team:cogs on hub
+            _tag_token(1, row=3, col=2),  # enemy junction south
+            _tag_token(11, row=3, col=2),  # team:clips on junction
+        ],
+    )
+
+    action, _ = impl.step_with_state(obs, state)
+    assert action.name == "move_north"
+
+
+def test_pathing_avoids_visible_agent_blockers() -> None:
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=1)
+    state = impl.initial_agent_state()
+    obs = AgentObservation(
+        agent_id=1,
+        tokens=[
+            _tag_token(12, row=3, col=2),  # type:agent blocker directly south
+            _tag_token(3, row=4, col=3),  # type:aligner station (south-east)
+        ],
+    )
+
+    action, _ = impl.step_with_state(obs, state)
+    assert action.name == "move_east"
+
+
+def test_unreachable_visible_target_falls_back_to_explore() -> None:
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0)
+    state = impl.initial_agent_state()
+    obs = AgentObservation(
+        agent_id=0,
+        tokens=[
+            _inv_token(1, "inv:miner", 1),
+            _tag_token(6, row=0, col=0),  # carbon extractor in the corner
+            _tag_token(12, row=0, col=1),  # blocker
+            _tag_token(12, row=1, col=0),  # blocker
+        ],
+    )
+
+    action, _ = impl.step_with_state(obs, state)
+    assert action.name == "move_east"
+
+
+def test_duplicate_default_roles_start_with_different_wander_priorities() -> None:
+    policy_env_info = _mock_policy_env_info()
+    obs = AgentObservation(agent_id=0, tokens=[])
+    first_action, _ = StarterCogPolicyImpl(policy_env_info, agent_id=0).step_with_state(obs, None)
+    second_action, _ = StarterCogPolicyImpl(policy_env_info, agent_id=4).step_with_state(obs, None)
+    assert first_action.name == "move_east"
+    assert second_action.name == "move_south"
+
+
 def test_cogsguard_tags_resolve_role_station_targets() -> None:
     policy_env_info = PolicyEnvInterface.from_mg_cfg(make_basic_mission().make_env())
     for role in ["miner", "aligner", "scrambler", "scout"]:
-        impl = StarterCogPolicyImpl(policy_env_info, agent_id=0, preferred_gear=role)
+        impl = StarterCogPolicyImpl(policy_env_info, agent_id=0, role=role)
         expected_tag_name = f"type:{role}"
         expected_tag_id = policy_env_info.tags.index(expected_tag_name)
-        assert expected_tag_id in impl._gear_station_tags_by_gear[role]
+        assert expected_tag_id in impl._role_station_tags[role]
