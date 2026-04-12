@@ -24,34 +24,60 @@
 
 <!-- LEADERBOARD_START -->
 ## Research Leaderboard
-_Updated by Director: 2026-03-31 (Session 5)_
+_Updated by Director (offline→online): 2026-04-12 (Session 6)_
+
+### Offline Results (1000 steps unless noted)
 
 | Rank | Reward/agent | Total | Commit | Config | Agents | Steps | Notes |
 |------|-------------|-------|--------|--------|--------|-------|-------|
 | 1 | 0.77 | 2.31 | `97886dd` | 2A1M, cross_role v15 | 3 | 1000 | 12 hearts (7 from make_heart), 11 junctions |
 | 2 | 0.753 | 2.26 | `7493f42` | 3A, machina_llm | 3 | 1000 | Old policy best, 7 junctions |
-| 3 | 0.71 | 2.12 | (session 5) | 2A1M, cross_role (main) | 3 | 1000 | Post PR #18 merge, stale exits 300→25 |
-| 4 | 0.70 | 2.10 | `11008eb` | 2A1M, cross_role+gemma-12b | 3 | 1000 | Faster model = more mining cycles |
-| **5** | **0.42** | **3.36** | (session 4) | **4A4M(scripted)** | **8** | **1000** | **Best 8-agent** (4.2x old 8-agent) |
-| 6 | 0.40 | 3.23 | (session 5) | 4A4M, cross_role | 8 | 1000 | Post-merge; hub awareness helps but not enough |
-| 7 | 1.24 | 4.96 | `6857db1` | 4A, cross_role | 4 | 2000 | Reclaim enemy junctions |
+| 3 | 0.71 | 2.12 | `801a0a2` | 2A1M, cross_role (main) | 3 | 1000 | Post PR #18, stale exits 300→25 |
+| 4 | 0.42 | 3.36 | (session 4) | 4A4M(scripted) | 8 | 1000 | Best 8-agent; scripted miners stable |
+| 5 | 1.24 | 4.96 | `6857db1` | 4A, cross_role | 4 | 2000 | Reclaim enemy junctions |
 
-**Current bottleneck**: PR #18 merged! Hub depletion partially solved. New bottleneck: 8-agent make_heart cycle can't keep up with 4 aligners' heart demand. Scripted miners outperform LLM miners at 8 agents.
-**Next up**: #25 (8-agent scaling: cross_role aligners + scripted miners hybrid) → #24 (make_heart optimization)
+### Online Tournament (beta-cvc, 10k steps, 2+6 cooperative matchmaking)
+
+| Leaderboard rank | Avg score | Matches | Policy | Notes |
+|---|---|---|---|---|
+| **265** / 322 | **3.415** | 20 | `lessandro-fast-llm-v1:v1` | our online best; min 0.00, max 9.31 |
+| 271 / 322 | 3.091 | 25 | `lessandro-machina-paid-v1:v1` | 1 episode at 0.11 with 2520 failed moves |
+| 279 / 322 | 3.014 | 24 | `lessandro-2aligner-llm-v1:v1` | |
+| — | **FAILED** | 0 / 4 | `lessandro-crossrole-v1:v1` | **BackoffLimitExceeded in every qualifying match** — our +37% offline winner never reaches competition |
+| — | FAILED | 0 / 4 | `lessandro-codex-nemotron-27-march:v1` | |
+| — | FAILED | 0 / 4 | `lessandro-machina-retry-v1:v1` | |
+| — | FAILED | 0 / 4 | `lessandro-scripted-v1:v1` | |
+| — | FAILED | 0 / 4 | `lessandro-scripted-v2:v1` | |
+
+**Top of leaderboard**: `dinky:v27` 27.90 · `slanky:v129` 23.92 · `slanky:v142` 23.16 — **8× our best**.
+
+**Current offline ceiling**: 0.77/agent at 3 agents, 1000 steps (cross_role v15).
+**Current online rank**: **265 of 322** in beta-cvc. Gap from #1 is ~8×.
+**Gap diagnosis**: (1) Our best offline policy (`crossrole-v1`) crashes qualifying and is invisible to the leaderboard (→ #28). (2) Offline eval runs 1000 steps but online is 10,000 and scored on cumulative junction-holding, not capture (→ #29). (3) 8-agent self-play — the qualifying format — breaks us: 1200 failed moves/agent, 0 mining, score 0.11 (→ #30). (4) No `change_vibe_*` actions appear in ANY online replay; role switching may not be reaching the env (→ #31). (5) Per-partner score variance dominates our average: 0.00 with weak partners, 11.81 with strong ones (→ #32).
+**Next up**: issue #28 — unblock qualifying so our real best policy actually competes.
 
 **Research tree:**
 ```
-ACTIVE (8-agent optimization):
-  #25 8-Agent Scaling (priority:1) — combine cross_role aligners + scripted miners
-  #24 Balanced Mining (priority:1) — make_heart cycle + element diversity
-  #12 Gear Acquisition (priority:2) — 8-agent gear_up failures
+ONLINE (new, priority:1 — bridge offline→online, created session 6):
+  #28 Qualifying crash (BackoffLimitExceeded) — UNBLOCKER for every other issue
+  #29 10k-step eval + held-per-tick reward — metric alignment
+  #30 8-agent self-play collapse — 1200 failed moves/agent, 0 mining
+  #31 Zero change_vibe_* in replays — role assignment instrumentation
+  #32 Partner robustness — lift 0.00 floor, reduce per-partner variance
 
-OPTIMIZATION:
-  #10 Role Tuning (priority:2) | #20 Coordinated Exploration (priority:2)
+OFFLINE OPTIMIZATION (from prior sessions):
+  #25 8-Agent Scaling (priority:2) — cross_role + scripted miners hybrid
+  #24 Balanced Mining (priority:2) — make_heart cycle + element diversity
+  #12 Gear Acquisition (priority:2)
   #17 LLM Skill Validation (priority:2)
 
-RESEARCH:
-  #19 LLM Code Gen | #21 Intrinsic Motivation | #11 Active Inference (all priority:2)
+EXTERNAL ADVICE:
+  #27 Andre Von Huck aligner-heavy strategy (priority:2)
+  #26 Shweta role-assignment starter (priority:2)
+
+LONG-TERM RESEARCH:
+  #10 Role Tuning | #20 Coordinated Exploration | #19 LLM Code Gen
+  #21 Intrinsic Motivation | #11 Active Inference (all priority:2)
   #22 Social Influence | #23 Meta-Learning (priority:3)
 ```
 <!-- LEADERBOARD_END -->
