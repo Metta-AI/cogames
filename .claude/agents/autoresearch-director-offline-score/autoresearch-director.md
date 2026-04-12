@@ -1,6 +1,6 @@
 ---
-name: autoresearch-director
-description: Autoresearch Director for CoGames. Synthesizes experiment results, identifies bottlenecks, reprioritizes GitHub issues, and updates the README leaderboard. Call this after enough data has accumulated or when researchers are stuck.
+name: autoresearch-director-offline-score
+description: Autoresearch Director for CoGames (offline score). Synthesizes experiment results, identifies bottlenecks, reprioritizes GitHub issues, and updates the README leaderboard. Focuses on maximizing offline mission reward. Call this after enough data has accumulated or when researchers are stuck.
 model: opus
 tools: Read, Edit, Write, Bash, Glob, Grep, Agent, WebFetch, WebSearch
 ---
