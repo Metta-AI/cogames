@@ -8,6 +8,7 @@ import pytest
 
 from cogames.games.cogs_vs_clips.game import GEAR
 from cogames.games.cogs_vs_clips.game.cargo import CargoLimitVariant
+from cogames.games.cogs_vs_clips.game.clear_vibes import ClearVibesVariant
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
 from cogames.games.cogs_vs_clips.game.days import DayConfig, DaysVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
@@ -438,6 +439,26 @@ class TestVibesVariant:
     def test_enables_change_vibe_action(self):
         env = _make_mission([VibesVariant()]).make_env()
         assert env.game.actions.change_vibe.enabled is True
+
+
+class TestClearVibesVariant:
+    def test_sets_on_after_use_handler_on_agents(self):
+        env = _make_mission([ClearVibesVariant()]).make_env()
+        for agent in env.game.agents:
+            assert agent.on_after_use_handler is not None
+
+    def test_on_after_use_handler_has_heart_filter(self):
+        env = _make_mission([ClearVibesVariant()]).make_env()
+        handler = env.game.agents[0].on_after_use_handler
+        assert isinstance(handler, Handler)
+        assert len(handler.filters) == 1
+        assert len(handler.mutations) == 1
+
+    def test_does_not_modify_object_handlers(self):
+        env = _make_mission([ExtractorsVariant(), ClearVibesVariant()]).make_env()
+        for element in ELEMENTS:
+            obj = env.game.objects[f"{element}_extractor"]
+            assert isinstance(obj.on_use_handler, FirstMatch)
 
 
 class TestNoVibesVariant:
