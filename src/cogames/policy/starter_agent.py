@@ -1,11 +1,11 @@
 """
 Sample policy for the CoGames CvC environment.
 
-This starter policy uses simple heuristics:
-- If the agent has no gear, head toward the nearest gear station.
-- If the agent has aligner or scrambler gear, try to get hearts then head to junctions.
-- If the agent has miner gear, head to extractors.
-- If the agent has scout gear, explore in a simple pattern.
+This starter policy keeps one fixed role per agent:
+- miners gather ore and deposit it at friendly territory
+- aligners get hearts and capture neutral junctions
+- scramblers get hearts and neutralize enemy junctions
+- scouts gear up, then explore
 
 Note to users of this policy:
 We don't intend for scripted policies to be the final word on how policies are generated (e.g., we expect the
@@ -18,25 +18,26 @@ This policy should be kept relatively minimalist, without dependencies on intric
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable, Optional
+from collections import deque
+from typing import Iterable
 
 from mettagrid.policy.policy import MultiAgentPolicy, StatefulAgentPolicy, StatefulPolicyImpl
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Action
 from mettagrid.simulator.interface import AgentObservation
 
-GEAR = ("aligner", "scrambler", "miner", "scout")
+STARTER_ROLE_CYCLE = ("miner", "aligner", "scrambler", "scout")
 ELEMENTS = ("carbon", "oxygen", "germanium", "silicon")
 WANDER_DIRECTIONS = ("east", "south", "west", "north")
-WANDER_STEPS = 8
 TEAM_TAG_PREFIX = "team:"
+MOVE_DELTAS = {
+    "north": (-1, 0),
+    "south": (1, 0),
+    "west": (0, -1),
+    "east": (0, 1),
+}
 
-
-@dataclass
-class StarterCogState:
-    wander_direction_index: int = 0
-    wander_steps_remaining: int = WANDER_STEPS
+type StarterCogState = None
 
 
 class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
@@ -44,22 +45,29 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
         self,
         policy_env_info: PolicyEnvInterface,
         agent_id: int,
-        preferred_gear: Optional[str] = None,
+        role: str | None = None,
     ):
-        self._agent_id = agent_id
         self._policy_env_info = policy_env_info
-        self._preferred_gear = preferred_gear
+        self._role = role or STARTER_ROLE_CYCLE[agent_id % len(STARTER_ROLE_CYCLE)]
+        self._explore_direction_start = (
+            STARTER_ROLE_CYCLE.index(self._role) + agent_id // len(STARTER_ROLE_CYCLE)
+        ) % len(WANDER_DIRECTIONS)
 
-        self._action_names = policy_env_info.action_names
-        self._action_name_set = set(self._action_names)
-        self._fallback_action_name = "noop" if "noop" in self._action_name_set else self._action_names[0]
+        action_names = policy_env_info.action_names
+        self._action_name_set = set(action_names)
+        self._fallback_action_name = "noop" if "noop" in self._action_name_set else action_names[0]
         self._center = (policy_env_info.obs_height // 2, policy_env_info.obs_width // 2)
         self._tag_name_to_id = {name: idx for idx, name in enumerate(policy_env_info.tags)}
-        self._gear_station_tags_by_gear = {gear: self._resolve_tag_ids([gear, f"c:{gear}"]) for gear in GEAR}
-        self._gear_station_tags = set().union(*self._gear_station_tags_by_gear.values())
+
+        self._team_tag_ids = {idx for idx, name in enumerate(policy_env_info.tags) if name.startswith(TEAM_TAG_PREFIX)}
+        self._agent_tags = self._resolve_tag_ids(["agent"])
+        self._role_station_tags = {
+            role_name: self._resolve_tag_ids([role_name, f"c:{role_name}"]) for role_name in STARTER_ROLE_CYCLE
+        }
         self._extractor_tags = self._resolve_tag_ids([f"{element}_extractor" for element in ELEMENTS])
         self._junction_tags = self._resolve_tag_ids(["junction"])
         self._heart_source_tags = self._resolve_tag_ids(["hub", "chest"])
+        self._deposit_tags = self._resolve_tag_ids(["hub", "junction"])
 
     def _resolve_tag_ids(self, names: Iterable[str]) -> set[int]:
         tag_ids: set[int] = set()
@@ -87,144 +95,188 @@ class StarterCogPolicyImpl(StatefulPolicyImpl[StarterCogState]):
             item_name, sep, power_str = suffix.rpartition(":p")
             if not sep or not item_name or not power_str.isdigit():
                 item_name = suffix
-                power = 0
+                scale = 1
             else:
-                power = int(power_str)
+                scale = max(int(token.feature.normalization), 1) ** int(power_str)
             value = int(token.value)
             if value <= 0:
                 continue
-            base = max(int(token.feature.normalization), 1)
-            items[item_name] = items.get(item_name, 0) + value * (base**power)
+            items[item_name] = items.get(item_name, 0) + value * scale
         return items
 
-    def _closest_tag_location(self, obs: AgentObservation, tag_ids: set[int]) -> Optional[tuple[int, int]]:
-        if not tag_ids:
-            return None
-        best_location: Optional[tuple[int, int]] = None
-        best_distance = 999
-        for token in obs.tokens:
-            if token.feature.name != "tag":
-                continue
-            if token.value not in tag_ids:
-                continue
-            loc = token.location
-            if loc is None:
-                continue
-            distance = abs(loc[0] - self._center[0]) + abs(loc[1] - self._center[1])
-            if distance < best_distance:
-                best_distance = distance
-                best_location = token.location
-        return best_location
-
-    def _own_team_tag_ids(self, obs: AgentObservation) -> set[int]:
-        team_tag_ids: set[int] = set()
-        for token in obs.tokens:
-            if token.feature.name != "tag" or token.location != self._center:
-                continue
-            tag_name = self._policy_env_info.tags[token.value]
-            if tag_name.startswith(TEAM_TAG_PREFIX):
-                team_tag_ids.add(token.value)
-        return team_tag_ids
-
-    def _closest_friendly_gear_station(
+    def _closest_visible_location(
         self,
-        obs: AgentObservation,
-        gear_tag_ids: set[int],
-    ) -> Optional[tuple[int, int]]:
-        own_team_tag_ids = self._own_team_tag_ids(obs)
-        if not own_team_tag_ids:
-            return self._closest_tag_location(obs, gear_tag_ids)
+        tags_by_location: dict[tuple[int, int], set[int]],
+        include_tag_ids: set[int],
+        *,
+        require_tag_ids: set[int] | None = None,
+        exclude_tag_ids: set[int] | None = None,
+    ) -> tuple[int, int] | None:
+        return min(
+            (
+                location
+                for location, location_tag_ids in tags_by_location.items()
+                if location_tag_ids & include_tag_ids
+                and (require_tag_ids is None or not require_tag_ids or location_tag_ids & require_tag_ids)
+                and (exclude_tag_ids is None or not (location_tag_ids & exclude_tag_ids))
+            ),
+            key=lambda location: (
+                abs(location[0] - self._center[0]) + abs(location[1] - self._center[1]),
+                location[0],
+                location[1],
+            ),
+            default=None,
+        )
 
+    def _action(self, name: str) -> Action:
+        return Action(name=name if name in self._action_name_set else self._fallback_action_name)
+
+    def _explore(self, tags_by_location: dict[tuple[int, int], set[int]]) -> Action:
+        blocked_locations = set(tags_by_location)
+        blocked_locations.discard(self._center)
+        for direction_offset in range(len(WANDER_DIRECTIONS)):
+            direction_index = (self._explore_direction_start + direction_offset) % len(WANDER_DIRECTIONS)
+            direction = WANDER_DIRECTIONS[direction_index]
+            move_delta = MOVE_DELTAS[direction]
+            next_location = (self._center[0] + move_delta[0], self._center[1] + move_delta[1])
+            if (
+                next_location in blocked_locations
+                or not (0 <= next_location[0] < self._policy_env_info.obs_height)
+                or not (0 <= next_location[1] < self._policy_env_info.obs_width)
+            ):
+                continue
+            return self._action(f"move_{direction}")
+        return self._action(self._fallback_action_name)
+
+    def step_with_state(self, obs: AgentObservation, state: StarterCogState) -> tuple[Action, StarterCogState]:
+        """Compute the action for this Cog."""
+        items = self._inventory_amounts(obs)
+
+        # Bucket visible tags by map cell so role logic and pathing can query them cheaply.
         tags_by_location: dict[tuple[int, int], set[int]] = {}
         for token in obs.tokens:
             if token.feature.name != "tag" or token.location is None:
                 continue
             tags_by_location.setdefault(token.location, set()).add(token.value)
 
-        best_location: Optional[tuple[int, int]] = None
-        best_distance = 999
-        for location, location_tag_ids in tags_by_location.items():
-            if not (location_tag_ids & gear_tag_ids):
-                continue
-            if not (location_tag_ids & own_team_tag_ids):
-                continue
-            distance = abs(location[0] - self._center[0]) + abs(location[1] - self._center[1])
-            if distance < best_distance:
-                best_distance = distance
-                best_location = location
-        return best_location
+        own_team_tag_ids = tags_by_location.get(self._center, set()) & self._team_tag_ids
+        enemy_team_tag_ids = (self._team_tag_ids - own_team_tag_ids) or self._team_tag_ids
 
-    def _action(self, name: str) -> Action:
-        if name in self._action_name_set:
-            return Action(name=name)
-        return Action(name=self._fallback_action_name)
+        has_role_gear = items.get(self._role, 0) > 0
+        has_heart = items.get("heart", 0) > 0
+        cargo_amount = sum(items.get(element, 0) for element in ELEMENTS)
+        role_station_tags = self._role_station_tags[self._role]
 
-    def _wander(self, state: StarterCogState) -> tuple[Action, StarterCogState]:
-        if state.wander_steps_remaining <= 0:
-            state.wander_direction_index = (state.wander_direction_index + 1) % len(WANDER_DIRECTIONS)
-            state.wander_steps_remaining = WANDER_STEPS
-        direction = WANDER_DIRECTIONS[state.wander_direction_index]
-        state.wander_steps_remaining -= 1
-        return self._action(f"move_{direction}"), state
+        # Choose one visible target for the fixed role.
+        target_tag_ids: set[int] | None = None
+        require_tag_ids: set[int] | None = None
+        exclude_tag_ids: set[int] | None = None
+        if self._role == "miner":
+            if cargo_amount > 0:
+                target_tag_ids = self._deposit_tags
+                require_tag_ids = own_team_tag_ids
+            elif not has_role_gear:
+                target_tag_ids = role_station_tags
+                require_tag_ids = own_team_tag_ids
+            else:
+                target_tag_ids = self._extractor_tags
+        elif not has_role_gear:
+            target_tag_ids = role_station_tags
+            require_tag_ids = own_team_tag_ids
+        elif self._role != "scout":
+            target_tag_ids = self._heart_source_tags
+            require_tag_ids = own_team_tag_ids
+            if has_heart:
+                target_tag_ids = self._junction_tags
+                require_tag_ids = enemy_team_tag_ids if self._role == "scrambler" else None
+                exclude_tag_ids = self._team_tag_ids if self._role == "aligner" else None
 
-    def _move_toward(self, state: StarterCogState, target: Optional[tuple[int, int]]) -> tuple[Action, StarterCogState]:
-        if target is None:
-            return self._wander(state)
-        delta_row = target[0] - self._center[0]
-        delta_col = target[1] - self._center[1]
+        target_location = (
+            None
+            if target_tag_ids is None
+            else self._closest_visible_location(
+                tags_by_location,
+                target_tag_ids,
+                require_tag_ids=require_tag_ids,
+                exclude_tag_ids=exclude_tag_ids,
+            )
+        )
+
+        # If nothing useful is visible, fall back to deterministic exploration.
+        if target_location is None:
+            return self._explore(tags_by_location), state
+
+        # Step directly onto adjacent targets, otherwise route to an open neighbor cell.
+        delta_row = target_location[0] - self._center[0]
+        delta_col = target_location[1] - self._center[1]
         if delta_row == 0 and delta_col == 0:
             return self._action(self._fallback_action_name), state
-        if abs(delta_row) >= abs(delta_col):
-            direction = "south" if delta_row > 0 else "north"
-        else:
-            direction = "east" if delta_col > 0 else "west"
-        return self._action(f"move_{direction}"), state
 
-    def _current_gear(self, items: dict[str, int]) -> Optional[str]:
-        if self._preferred_gear is not None and items.get(self._preferred_gear, 0) > 0:
-            return self._preferred_gear
-        for gear in GEAR:
-            if items.get(gear, 0) > 0:
-                return gear
-        return None
+        if abs(delta_row) + abs(delta_col) == 1:
+            if abs(delta_row) >= abs(delta_col):
+                direction = "south" if delta_row > 0 else "north"
+            else:
+                direction = "east" if delta_col > 0 else "west"
+            return self._action(f"move_{direction}"), state
 
-    def step_with_state(self, obs: AgentObservation, state: StarterCogState) -> tuple[Action, StarterCogState]:
-        """Compute the action for this Cog."""
-        items = self._inventory_amounts(obs)
-        gear = self._current_gear(items)
-        has_heart = items.get("heart", 0) > 0
+        blocked_locations = set(tags_by_location)
+        blocked_locations.discard(self._center)
+        if not (tags_by_location.get(target_location, set()) & self._agent_tags):
+            blocked_locations.discard(target_location)
+        goal_locations = {
+            (target_location[0] + move_delta[0], target_location[1] + move_delta[1])
+            for move_delta in MOVE_DELTAS.values()
+            if 0 <= target_location[0] + move_delta[0] < self._policy_env_info.obs_height
+            and 0 <= target_location[1] + move_delta[1] < self._policy_env_info.obs_width
+            and (target_location[0] + move_delta[0], target_location[1] + move_delta[1]) not in blocked_locations
+        }
+        if not goal_locations:
+            return self._explore(tags_by_location), state
 
-        if self._preferred_gear is not None and gear != self._preferred_gear:
-            target_tags = self._gear_station_tags_by_gear.get(self._preferred_gear, set())
-        elif gear is None:
-            target_tags = self._gear_station_tags
-        elif gear == "aligner":
-            target_tags = self._junction_tags if has_heart else self._heart_source_tags
-        elif gear == "scrambler":
-            target_tags = self._junction_tags if has_heart else self._heart_source_tags
-        elif gear == "miner":
-            target_tags = self._extractor_tags
-        else:
-            target_tags = set()
+        queue = deque([self._center])
+        visited = {self._center}
+        first_directions: dict[tuple[int, int], str] = {}
+        while queue:
+            current = queue.popleft()
+            delta_row = target_location[0] - current[0]
+            delta_col = target_location[1] - current[1]
+            direction_candidates: list[str] = []
+            if abs(delta_row) >= abs(delta_col):
+                if delta_row != 0:
+                    direction_candidates.append("south" if delta_row > 0 else "north")
+                if delta_col != 0:
+                    direction_candidates.append("east" if delta_col > 0 else "west")
+            else:
+                if delta_col != 0:
+                    direction_candidates.append("east" if delta_col > 0 else "west")
+                if delta_row != 0:
+                    direction_candidates.append("south" if delta_row > 0 else "north")
+            for direction in direction_candidates:
+                move_delta = MOVE_DELTAS[direction]
+                next_location = (current[0] + move_delta[0], current[1] + move_delta[1])
+                if (
+                    next_location in visited
+                    or next_location in blocked_locations
+                    or not (0 <= next_location[0] < self._policy_env_info.obs_height)
+                    or not (0 <= next_location[1] < self._policy_env_info.obs_width)
+                ):
+                    continue
+                visited.add(next_location)
+                first_directions[next_location] = first_directions.get(current, direction)
+                if next_location in goal_locations:
+                    return self._action(f"move_{first_directions[next_location]}"), state
+                queue.append(next_location)
 
-        if target_tags & self._gear_station_tags:
-            target_location = self._closest_friendly_gear_station(obs, target_tags)
-        else:
-            target_location = self._closest_tag_location(obs, target_tags) if target_tags else None
-        return self._move_toward(state, target_location)
+        return self._explore(tags_by_location), state
 
     def initial_agent_state(self) -> StarterCogState:
         """Get the initial state for a new agent."""
-        return StarterCogState(wander_direction_index=self._agent_id % len(WANDER_DIRECTIONS))
+        return None
 
 
-# ============================================================================
-# Policy Wrapper Classes
-# ============================================================================
-
-
-class StarterPolicy(MultiAgentPolicy):
-    short_names = ["starter"]
+class BaseStarterPolicy(MultiAgentPolicy):
+    short_names: list[str]
+    _role: str | None = None
 
     def __init__(self, policy_env_info: PolicyEnvInterface, device: str = "cpu"):
         super().__init__(policy_env_info, device=device)
@@ -233,8 +285,12 @@ class StarterPolicy(MultiAgentPolicy):
     def agent_policy(self, agent_id: int) -> StatefulAgentPolicy[StarterCogState]:
         if agent_id not in self._agent_policies:
             self._agent_policies[agent_id] = StatefulAgentPolicy(
-                StarterCogPolicyImpl(self._policy_env_info, agent_id),
+                StarterCogPolicyImpl(self._policy_env_info, agent_id, role=self._role),
                 self._policy_env_info,
                 agent_id=agent_id,
             )
         return self._agent_policies[agent_id]
+
+
+class StarterPolicy(BaseStarterPolicy):
+    short_names = ["starter"]
