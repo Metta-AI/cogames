@@ -1,331 +1,449 @@
----
-jupyter:
-  jupytext:
-    text_representation:
-      extension: .md
-      format_name: markdown
-      format_version: '1.3'
-      jupytext_version: 1.19.1
-  kernelspec:
-    display_name: Python 3
-    language: python
-    name: python3
----
+# CoGames: Getting Started
 
-# CvC: Game Overview
+Welcome to CoGames! This notebook will get you from zero to training your own agent.
 
-CvC is a cooperative territory-control game where teams of specialized agents capture
-and defend junctions against automated Clips expansion. This notebook covers the game rules,
-shows a sample game in MettaScope, and trains a miner policy from scratch.
+CoGames is built on **MettaGrid**, a grid-world simulation engine. The flagship game mode
+is **Cogs vs Clips** — a cooperative territory-control game where teams of specialized agents
+(Cogs) capture and defend junctions against automated expansion by Clips.
+
+This notebook covers:
+1. Installing cogames and playing the interactive tutorials
+2. How to create an environment and what parameters you can configure
+3. What the observation and action spaces look like
+
+## 1. Install and Play
+
+Install the cogames package:
+
+```bash
+pip install cogames
+```
+
+Then run the two interactive tutorials to learn the game mechanics before writing any code.
+
+### `cogames tutorial play`
+
+This launches a guided walkthrough in MettaScope where you control a single agent.
+It teaches you the basics step by step:
+- Camera controls (scroll/pinch to zoom, drag to pan)
+- Movement and energy (WASD/arrows, battery drains, recharge near Hub)
+- Gear stations (equip a role: Aligner, Scrambler, Miner, Scout)
+- Resources and hearts (extract resources at Extractors, then use the Hub to collect Hearts)
+- Junction control (Aligners capture neutral junctions, Scramblers neutralize enemy ones)
+
+```bash
+cogames tutorial play
+```
+
+### `cogames tutorial cvc`
+
+This is a deeper tutorial focused on the full Cogs vs Clips game loop on a smaller 35x35 arena.
+It walks through multi-phase strategy:
+- Gear up and collect hearts from the Hub
+- Expand from the Hub by capturing nearby junctions
+- Handle Clips pressure as they scramble your junctions
+- Use territory (friendly junctions restore HP and energy)
+- Coordinate roles and maintain the resource-to-heart pipeline
+
+```bash
+cogames tutorial cvc
+```
+
+Once you understand the game, come back here to learn how to build environments
+and train agents programmatically.
+
+## 2. Creating an Environment
+
+A Cogs vs Clips environment is built from a **mission**, which bundles a map, agent count,
+game rules, and **variants** (modifiers that change mechanics).
+
+The mission produces a `MettaGridConfig`, which is passed to a `Simulator` and wrapped
+in a `MettaGridPufferEnv` (a Gymnasium-compatible env).
+
 
 ```python
 %pip install mettagrid cogames pufferlib-core --quiet
 ```
 
-## Game Rules
+    [31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+    cogames-agents 0.0.0.7.post1.dev1796 requires cogames==0.3.68, but you have cogames 0.11.1.post1.dev1265 which is incompatible.
+    cogames-agents 0.0.0.7.post1.dev1796 requires mettagrid==0.2.0.82, but you have mettagrid 0.24.2 which is incompatible.[0m[31m
+    [0m
 
-**Objective**: Hold junctions. Reward per tick = `junctions_held / max_steps`.
+    Note: you may need to restart the kernel to use updated packages.
 
-### The Map
 
-The arena contains:
-- **Hub** — your team's home base, projects friendly territory
-- **Junctions** — capturable nodes that project territory in a radius
-- **Extractors** — resource nodes where Miners gather raw materials
-- **Gear Stations** — equip roles; in CvC, stepping on another station replaces your current role if the hub can pay
-- **Hub** — team base, shared inventory, and heart source
-
-### 4 Roles
-
-| Role | Stats | Ability |
-|-----------|--------------------------------|------------------------------------------|
-| Miner | +40 cargo, 10x extraction | Gathers resources at extractors |
-| Aligner | Heart limit 3 | Captures neutral junctions (1 heart per capture) |
-| Scrambler | +200 HP | Disrupts enemy junctions (1 heart) |
-| Scout | +100 energy, +400 HP | Mobile reconnaissance |
-
-**No single role can succeed alone.**
-
-### Cooperation Loop
-
-1. **Miners** extract resources and deposit them into their team hub inventory
-2. The **Hub** turns pooled resources into hearts and hands them out to cogs
-3. **Aligners** spend hearts to capture neutral junctions → expand territory
-4. **Scramblers** spend hearts to neutralize enemy junctions → push the front line
-5. **Scouts** explore and apply pressure with their high HP and energy
-
-### Clips (Automated Enemy)
-
-Clips expand territory automatically:
-- Neutralize enemy junctions adjacent to Clips territory
-- Capture neutral junctions adjacent to Clips territory
-
-This creates constant pressure — your team must expand faster than Clips consume.
-
-### Territory Effects
-
-**Friendly territory** (near aligned junctions or hub): HP and energy fully restored.
-
-**Outside friendly territory**: −1 HP/tick, energy drained.
-
-## Watch a Game
-
-Before diving into training, watch a game in MettaScope to see the mechanics in action.
 
 ```python
-from IPython.display import HTML, display
-
-iframe_src = "https://metta-ai.github.io/metta/mettascope/mettascope.html"
-
-display(HTML(f'''
-<div>
-    <iframe src="{iframe_src}" width="100%" height="800"
-            style="border: 1px solid #ccc; border-radius: 4px;"></iframe>
-</div>
-'''))
-```
-
-### What You're Seeing
-
-- **Agents** are directional sprites that change appearance based on their equipped gear
-  (miner, aligner, scrambler, scout). Health pips appear above each agent, colored by team.
-- **Junctions** show working/clipped/depleted states as they're captured or neutralized
-- **Extractors** animate through working and depletion stages as miners gather resources
-- **Territory** is shown as a colored overlay radiating from controlled junctions and hubs
-
-The full game requires all four roles cooperating. To keep this notebook short, we'll
-train just the **miner** role below — see the role-specific tutorials at the end for
-the others.
-
-```python
-import torch
-
-import pufferlib.vector as pvector
-from cogames.games.cogs_vs_clips.clip_difficulty import EASY
-from cogames.games.cogs_vs_clips.missions.tutorial import MinerRewardsVariant
-from cogames.games.cogs_vs_clips.mission import CvCMission
-from cogames.games.cogs_vs_clips.sites import make_cvc_machina1_site
-from cogames.games.cogs_vs_clips.cog import CogTeam
-from cogames.games.cogs_vs_clips.variants import NoVibesVariant
-from cogames.policy.tutorial_policy import TutorialPolicyNet
+from cogames.games.cogs_vs_clips.game import NoVibesVariant
+from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
-from mettagrid.envs.early_reset_handler import EarlyResetHandler
-from mettagrid.envs.stats_tracker import StatsTracker
-from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Simulator
-from mettagrid.util.stats_writer import NoopStatsWriter
-from pufferlib import pufferl
-from pufferlib.pufferlib import set_buffers
-```
 
-## 1. Build the environment
-
-We build a miner tutorial mission — 4 agents on a compact Machina1 map with dense reward
-shaping for resource extraction and deposits. Clips are disabled (EASY) so the agents can
-focus on learning to mine.
-
-```python
-SEED = 42
 NUM_AGENTS = 4
 MAX_STEPS = 1000
 
-mission = CvCMission(
-    name="miner_tutorial",
-    description="Learn miner role - resource extraction and deposits.",
-    site=make_cvc_machina1_site(NUM_AGENTS),
-    num_cogs=NUM_AGENTS,
-    max_steps=MAX_STEPS,
-    teams={"cogs": CogTeam(name="cogs", num_agents=NUM_AGENTS)},
-    variants=[EASY, NoVibesVariant(), MinerRewardsVariant()],
+mission = (
+    make_machina1_mission(num_agents=NUM_AGENTS, max_steps=MAX_STEPS)
+    .model_copy(update={"name": "my_mission", "description": "A simple Cogs vs Clips mission."})
+    .with_variants([NoVibesVariant()])
 )
 
 env_cfg = mission.make_env()
-
-
-def make_env(buf=None, seed=None):
-    """Environment factory for PufferLib vectorization."""
-    cfg = env_cfg.model_copy(deep=True)
-    map_builder = cfg.game.map_builder
-    if isinstance(map_builder, MapGen.Config) and seed is not None:
-        map_builder.seed = SEED + seed
-    simulator = Simulator()
-    simulator.add_event_handler(StatsTracker(NoopStatsWriter()))
-    simulator.add_event_handler(EarlyResetHandler())
-    env = MettaGridPufferEnv(simulator, cfg, buf=buf, seed=seed or 0)
-    set_buffers(env, buf)
-    return env
-
-
 policy_env_info = PolicyEnvInterface.from_mg_cfg(env_cfg)
+
+# Create and reset the environment
+simulator = Simulator()
+env = MettaGridPufferEnv(simulator, env_cfg, seed=42)
+obs, infos = env.reset()
+
+print(f"Agents: {env.num_agents}")
+print(f"Max steps: {MAX_STEPS}")
+print(f"Observation shape: {obs.shape}")
+print(f"Action space: {policy_env_info.action_space}")
 ```
 
-## 2. Policy network
+    Agents: 4
+    Max steps: 1000
+    Observation shape: (4, 300, 3)
+    Action space: Discrete(5)
 
-`TutorialPolicyNet` is a CNN + LSTM actor-critic that converts sparse token observations
-into a spatial grid, encodes with convolutions, and outputs action logits + value estimates.
-See `TRAIN_MINER.ipynb` for a layer-by-layer walkthrough, or
-`cogames/policy/tutorial_policy.py` for the source.
+
+### Key Mission Parameters
+
+| Parameter | What it controls |
+|-----------|------------------|
+| `map_builder` | Map layout and size. `make_machina1_map_builder(n)` gives an 88x88 arena. |
+| `num_agents` | Number of agents in the mission. |
+| `max_steps` | Episode length in ticks. |
+# | `variants` | List of modifiers that change game rules (see below). |
+
+### Variants
+
+Variants modify the environment after the base config is built. Stack them to create
+custom training scenarios.
+
+**Role reward shaping** (dense rewards for learning a specific role):
+
+| Variant | Effect |
+|---------|--------|
+| `MinerRewardsVariant()` | Rewards gear pickup, resource extraction, and deposits |
+| `AlignerRewardsVariant()` | Rewards heart management and junction alignment |
+| `ScramblerRewardsVariant()` | Rewards gear pickup and junction scrambling |
+| `ScoutRewardsVariant()` | Rewards gear pickup and exploration/cell visitation |
+
+**Gameplay modifiers**:
+
+| Variant | Effect |
+|---------|--------|
+| `NoVibesVariant()` | Removes vibe actions (simplifies action space) |
+| `EnergizedVariant()` | Max energy capacity so agents never run dry |
+| `DaysVariant(days_config=DARK_SIDE)` | Zero solar energy regeneration |
+| `DaysVariant(days_config=SUPER_CHARGED)` | +2 to all energy regen |
+| `ThickSkinnedVariant()` | No passive HP drain, only in enemy territory |
+| `NoClipsVariant()` | Remove Clips ships and the resulting spread pressure |
+
+### Under the Hood: `MettaGridConfig`
+
+`mission.make_env()` returns a `MettaGridConfig` with a `GameConfig` inside. The game
+config controls everything the simulator needs:
+
 
 ```python
-if torch.cuda.is_available():
-    DEVICE = torch.device("cuda")
-elif torch.backends.mps.is_available():
-    DEVICE = torch.device("mps")
-else:
-    DEVICE = torch.device("cpu")
+game = env_cfg.game
 
-net = TutorialPolicyNet(policy_env_info).to(DEVICE)
-print(f"Device: {DEVICE}, Parameters: {sum(p.numel() for p in net.parameters()):,}")
+print("=== Game Config ===")
+print(f"  num_agents:     {game.num_agents}")
+print(f"  max_steps:      {game.max_steps}")
+print(f"  resources:      {sorted(game.resource_names)}")
+print(f"  obs window:     {game.obs.height}x{game.obs.width}")
+print(f"  obs tokens:     {game.obs.num_tokens} x {game.obs.token_dim}")
+print(f"  map builder:    {type(game.map_builder).__name__}")
+print(f"  objects:        {sorted(game.objects)}")
+
+actions = game.actions.actions()
+print(f"  actions:        {[a.name for a in actions]}")
 ```
 
-## 3. Train
+    === Game Config ===
+      num_agents:     4
+      max_steps:      1000
+      resources:      ['aligner', 'carbon', 'energy', 'germanium', 'heart', 'hp', 'miner', 'oxygen', 'scout', 'scrambler', 'silicon', 'solar']
+      obs window:     13x13
+      obs tokens:     300 x 3
+      map builder:    MapGenConfig
+      objects:        ['c:aligner', 'c:hub', 'c:miner', 'c:scout', 'c:scrambler', 'carbon_extractor', 'clips:ship:0', 'clips:ship:1', 'clips:ship:2', 'clips:ship:3', 'germanium_extractor', 'junction', 'oxygen_extractor', 'silicon_extractor', 'wall']
+      actions:        ['noop', 'move_north', 'move_south', 'move_west', 'move_east']
 
-4 vectorized environments, 1M timesteps (~2-5 min on CPU). The `MinerRewardsVariant` adds
-dense reward shaping for gear pickup, resource extraction, and deposits — so agents learn
-meaningful behavior even at this short training scale.
+
+## 3. Observation Space
+
+Each agent receives a **sparse token observation** every step: a fixed-size buffer of
+3-element tokens `[coordinate, feature_id, value]`, dtype `uint8`.
+
+```
+obs shape per agent: (num_tokens, 3)   # default: (200, 3)
+```
+
+- **`coordinate`**: Packed `(row, col)` in a 13x13 egocentric window centered on the agent.
+  `0xFE` = global (non-spatial) token. `0xFF` = padding (end of valid tokens).
+- **`feature_id`**: Which feature this token describes (see list below).
+- **`value`**: The feature's value (0-255). Inventory amounts > 255 use multiple tokens
+  with `:p1`, `:p2` suffixes — reconstruct as `base + p1*256 + p2*65536`.
+
+The observation is sparse: valid tokens come first, padding fills the rest.
+
 
 ```python
-from IPython.display import clear_output
+print(f"Observation shape per agent: {policy_env_info.observation_shape}")
+print(f"Egocentric window: {policy_env_info.obs_height}x{policy_env_info.obs_width}")
+print(f"\nObservation features ({len(policy_env_info.obs_features)} total):")
+print(f"{'Name':<30}  {'Normalization':>13}")
+print("-" * 47)
+for feat in sorted(policy_env_info.obs_features, key=lambda feat: feat.name):
+    print(f"{feat.name:<30}  {feat.normalization:>13.1f}")
+```
 
-NUM_ENVS = 4
-TOTAL_TIMESTEPS = 1_000_000
-BPTT_HORIZON = 64
+    Observation shape per agent: (300, 3)
+    Egocentric window: 13x13
+    
+    Observation features (70 total):
+    Name                            Normalization
+    -----------------------------------------------
+    agent:group                              10.0
+    agent_id                                255.0
+    aoe_mask                                  3.0
+    episode_completion_pct                  255.0
+    goal                                    100.0
+    inv:aligner                             256.0
+    inv:aligner:p1                          256.0
+    inv:carbon                              256.0
+    inv:carbon:p1                           256.0
+    inv:energy                              256.0
+    inv:energy:p1                           256.0
+    inv:germanium                           256.0
+    inv:germanium:p1                        256.0
+    inv:heart                               256.0
+    inv:heart:p1                            256.0
+    inv:hp                                  256.0
+    inv:hp:p1                               256.0
+    inv:miner                               256.0
+    inv:miner:p1                            256.0
+    inv:oxygen                              256.0
+    inv:oxygen:p1                           256.0
+    inv:scout                               256.0
+    inv:scout:p1                            256.0
+    inv:scrambler                           256.0
+    inv:scrambler:p1                        256.0
+    inv:silicon                             256.0
+    inv:silicon:p1                          256.0
+    inv:solar                               256.0
+    inv:solar:p1                            256.0
+    last_action                              10.0
+    last_action_move                          1.0
+    last_reward                             100.0
+    lp:east                                 255.0
+    lp:north                                255.0
+    lp:south                                255.0
+    lp:west                                 255.0
+    protocol_input:aligner                  100.0
+    protocol_input:carbon                   100.0
+    protocol_input:energy                   100.0
+    protocol_input:germanium                100.0
+    protocol_input:heart                    100.0
+    protocol_input:hp                       100.0
+    protocol_input:miner                    100.0
+    protocol_input:oxygen                   100.0
+    protocol_input:scout                    100.0
+    protocol_input:scrambler                100.0
+    protocol_input:silicon                  100.0
+    protocol_input:solar                    100.0
+    protocol_output:aligner                 100.0
+    protocol_output:carbon                  100.0
+    protocol_output:energy                  100.0
+    protocol_output:germanium               100.0
+    protocol_output:heart                   100.0
+    protocol_output:hp                      100.0
+    protocol_output:miner                   100.0
+    protocol_output:oxygen                  100.0
+    protocol_output:scout                   100.0
+    protocol_output:scrambler               100.0
+    protocol_output:silicon                 100.0
+    protocol_output:solar                   100.0
+    tag                                      10.0
+    team:carbon                             256.0
+    team:carbon:p1                          256.0
+    team:germanium                          256.0
+    team:germanium:p1                       256.0
+    team:oxygen                             256.0
+    team:oxygen:p1                          256.0
+    team:silicon                            256.0
+    team:silicon:p1                         256.0
+    vibe                                    255.0
 
-vecenv = pvector.make(make_env, num_envs=NUM_ENVS, num_workers=1, batch_size=NUM_ENVS, backend=pvector.Serial)
-total_agents = vecenv.num_agents
-BATCH_SIZE = max(4096, total_agents * BPTT_HORIZON)
 
-trainer = pufferl.PuffeRL(
-    dict(
-        env="cogames.games.cogs_vs_clips",
-        device=DEVICE.type,
-        total_timesteps=max(TOTAL_TIMESTEPS, BATCH_SIZE),
-        batch_size=BATCH_SIZE,
-        minibatch_size=min(4096, BATCH_SIZE),
-        bptt_horizon=BPTT_HORIZON,
-        seed=SEED,
-        use_rnn=True,
-        torch_deterministic=True,
-        cpu_offload=False,
-        compile=False,
-        optimizer="adam",
-        learning_rate=0.00092,
-        anneal_lr=True,
-        min_lr_ratio=0.0,
-        adam_beta1=0.95,
-        adam_beta2=0.999,
-        adam_eps=1e-8,
-        precision="float32",
-        gamma=0.995,
-        gae_lambda=0.90,
-        update_epochs=1,
-        clip_coef=0.2,
-        vf_coef=2.0,
-        vf_clip_coef=0.2,
-        max_grad_norm=1.5,
-        ent_coef=0.01,
-        vtrace_rho_clip=1.0,
-        vtrace_c_clip=1.0,
-        prio_alpha=0.8,
-        prio_beta0=0.2,
-        data_dir="./train_dir",
-        checkpoint_interval=50,
-        max_minibatch_size=32768,
-    ),
-    vecenv,
-    net,
+Key features to know:
+- **`tag`** — object type at a cell (wall, junction, extractor, agent, etc.)
+- **`vibe`** — role/resource identity of the object
+- **`agent:group`** — team membership
+- **`aoe_mask`** — territory: 0=neutral, 1=friendly, 2=enemy
+- **`inv:*`** — agent inventory (energy, heart, resources, gear)
+- **`episode_completion_pct`**, **`last_action`**, **`last_reward`** — global agent state
+
+The `tag` feature maps to object types via integer indices:
+
+
+```python
+print("Tag mapping (tag value -> object type):")
+for tag_id, tag_name in sorted(policy_env_info.tag_id_to_name.items()):
+    print(f"  {tag_id:>3}: {tag_name}")
+```
+
+    Tag mapping (tag value -> object type):
+        0: clips:ship:0
+        1: clips:ship:1
+        2: clips:ship:2
+        3: clips:ship:3
+        4: net:clips
+        5: net:cogs
+        6: team:clips
+        7: team:cogs
+        8: type:agent
+        9: type:aligner
+       10: type:carbon_extractor
+       11: type:germanium_extractor
+       12: type:hub
+       13: type:junction
+       14: type:miner
+       15: type:oxygen_extractor
+       16: type:scout
+       17: type:scrambler
+       18: type:ship
+       19: type:silicon_extractor
+       20: type:wall
+
+
+### Converting to a Spatial Grid for CNNs
+
+The raw sparse tokens aren't directly CNN-friendly. `GridObsWrapper` wraps the env
+so that `reset()` and `step()` return dense `(num_agents, C, H, W)` float32 grids
+instead of sparse tokens — directly usable with CNNs.
+
+It handles coordinate decoding (nibble-packed `(y, x)`), padding filtering (`0xFF`),
+global token placement (`0xFE` → grid center), and per-feature normalization.
+
+
+```python
+from mettagrid.envs.grid_obs_wrapper import GridObsWrapper
+
+grid_env = GridObsWrapper(env)
+grid_obs, _ = grid_env.reset()
+
+print(f"Sparse tokens: {obs.shape}  ->  Dense grid: {grid_obs.shape}")
+print(
+    f"  {grid_obs.shape[0]} agents, {grid_obs.shape[1]} feature channels, "
+    f"{grid_obs.shape[2]}x{grid_obs.shape[3]} spatial"
 )
-
-while trainer.global_step < TOTAL_TIMESTEPS:
-    trainer.evaluate()
-    trainer.train()
-    clear_output(wait=True)
-    trainer.print_dashboard()
-    if any((p.grad is not None and not p.grad.isfinite().all()) or not p.isfinite().all() for p in net.parameters()):
-        print(f"Training diverged at step {trainer.global_step}!")
-        break
-
-trainer.close()
-print(f"Training complete. Steps: {trainer.global_step}, Epochs: {trainer.epoch}")
 ```
 
-## 4. Evaluate
+    Sparse tokens: (4, 300, 3)  ->  Dense grid: (4, 70, 13, 13)
+      4 agents, 70 feature channels, 13x13 spatial
 
-Run several episodes with the trained policy and measure performance. Episodes may end
-early if agents die (the `EarlyResetHandler` terminates when all agents are dead), which
-can produce negative rewards on short episodes.
+
+## 4. Action Space
+
+The action space is `Discrete(N)` — each step, every agent picks one integer action.
+
+Actions are split into **primary actions** (movement + noop) and **vibe actions**
+(changing the agent's vibe state). The `NoVibesVariant` used above removes vibe actions
+entirely, leaving only movement.
+
 
 ```python
-NUM_EVAL_EPISODES = 5
+print(f"Primary action space: Discrete({len(policy_env_info.action_names)})")
+print("\nPrimary actions:")
+for i, name in enumerate(policy_env_info.action_names):
+    print(f"  {i}: {name}")
 
-net.eval()
-episode_rewards = []
+if policy_env_info.vibe_action_names:
+    print(f"\nVibe actions ({len(policy_env_info.vibe_action_names)}):")
+    for i, name in enumerate(policy_env_info.vibe_action_names):
+        print(f"  {i}: {name}")
+else:
+    print("\nVibe actions: none (removed by NoVibesVariant)")
 
-for ep in range(NUM_EVAL_EPISODES):
-    eval_env = make_env(seed=1000 + ep)
-    obs, _ = eval_env.reset()
-    num_agents = eval_env.num_agents
-    state = {
-        "lstm_h": torch.zeros(num_agents, 1, net.hidden_size, device=DEVICE),
-        "lstm_c": torch.zeros(num_agents, 1, net.hidden_size, device=DEVICE),
-    }
-    ep_reward = 0.0
-    num_steps = 0
-    for _step in range(MAX_STEPS):
-        obs_tensor = torch.from_numpy(obs).to(DEVICE)
-        with torch.no_grad():
-            logits, _ = net(obs_tensor, state)
-        actions = torch.distributions.Categorical(logits=logits).sample().cpu().numpy()
-        obs, rewards, terms, truncs, infos = eval_env.step(actions)
-        ep_reward += rewards.sum()
-        num_steps += 1
-        if terms.all() or truncs.all():
-            break
-    eval_env.close()
-    episode_rewards.append(ep_reward)
-    print(f"  Episode {ep + 1}: {num_steps} steps, reward {ep_reward:.3f}")
-
-mean_reward = sum(episode_rewards) / len(episode_rewards)
-print(f"\nMean reward over {NUM_EVAL_EPISODES} episodes: {mean_reward:.3f}")
+if policy_env_info.move_energy_cost is not None:
+    print(f"\nMove energy cost: {policy_env_info.move_energy_cost} per step")
 ```
 
-<!-- #region -->
-## Try It Yourself
+    Primary action space: Discrete(5)
+    
+    Primary actions:
+      0: noop
+      1: move_north
+      2: move_south
+      3: move_west
+      4: move_east
+    
+    Vibe actions: none (removed by NoVibesVariant)
+    
+    Move energy cost: 4 per step
 
-**Interactive tutorial** — play the game yourself with a guided walkthrough:
-```bash
-cogames tutorial play
-```
 
-**Watch scripted agents** — see baseline behavior on the Arena map:
-```bash
-cogames play -m arena -p class=baseline
-```
+### How Actions Work
 
-**Role-specific training tutorials** — deep-dive into each role:
-- `TRAIN_MINER.ipynb` — resource extraction and deposits
-- `TRAIN_ALIGNER.ipynb` — junction capture and territory expansion
-- `TRAIN_SCRAMBLER.ipynb` — enemy disruption
-- `TRAIN_SCOUT.ipynb` — reconnaissance and map control
+**Movement** (`move_north`, `move_south`, `move_west`, `move_east`): Moves the agent
+one cell in the given direction. Costs energy. If the agent moves onto a building
+(extractor, gear station, junction, etc.), the building's handler fires — this is how
+agents interact with the world. Moving into a wall or off the map does nothing.
 
-**Build a custom policy** — scaffold a trainable policy class:
-```bash
-cogames tutorial make-policy --trainable
-```
-<!-- #endregion -->
+**Noop**: Do nothing this step. Useful when waiting for cooldowns or conserving energy.
 
-## Upload to the Leaderboard
+**Vibe changes** (`change_vibe_*`): Switch the agent's vibe. Vibes determine how objects
+react to the agent. In Cogs vs Clips, vibes represent resource types and roles — for example,
+an agent must be vibing `heart` to deposit hearts, or vibing `aligner` to capture a junction.
+When using `NoVibesVariant`, these are removed and vibes are handled automatically.
 
-Save the trained weights and submit to the CoGames tournament.
-Run `cogames login` in a terminal first to authenticate.
+### Interaction Model
+
+There are no explicit "use" or "pick up" actions. All interactions happen through
+**movement**: walk onto an object to trigger it. This keeps the action space small and
+forces spatial reasoning — agents must navigate to the right objects.
+
+### Stepping the Environment
+
 
 ```python
-POLICY_NAME = "my-overview-policy"  # Change this to your desired policy name
+import numpy as np
 
-save_path = "./train_dir/overview_policy.pt"
-torch.save(net.state_dict(), save_path)
-print(f"Saved to {save_path}")
+# Take 10 random steps
+for _step in range(10):
+    actions = np.array([grid_env.single_action_space.sample() for _ in range(grid_env.num_agents)])
+    obs, rewards, terminals, truncations, infos = grid_env.step(actions)
 
-!cogames upload -p "class=tutorial,data={save_path}" -n {POLICY_NAME} --skip-validation
+print(f"obs shape:          {obs.shape}")
+print(f"rewards shape:      {rewards.shape}")
+print(f"terminals shape:    {terminals.shape}")
+print(f"truncations shape:  {truncations.shape}")
+print(f"\nRewards after 10 random steps: {rewards}")
+
+grid_env.close()
 ```
+
+    obs shape:          (4, 70, 13, 13)
+    rewards shape:      (4,)
+    terminals shape:    (4,)
+    truncations shape:  (4,)
+    
+    Rewards after 10 random steps: [0. 0. 0. 0.]
+
+
+## Next Steps
+
+Now that you know how the environment works, pick a role and train a specialist:
+
+- `TRAIN_MINER.ipynb` — Train a Miner (resource extraction and deposits)
+- `TRAIN_ALIGNER.ipynb` — Train an Aligner (heart management and junction capture)
+- `TRAIN_SCRAMBLER.ipynb` — Train a Scrambler (junction scrambling)
+- `TRAIN_SCOUT.ipynb` — Train a Scout (exploration and cell visitation)

@@ -1,3 +1,4 @@
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -21,12 +22,36 @@ def lint_py_file(path: Path, /) -> None:
     subprocess.run(["ruff", "format", str(path)], check=True, capture_output=True)
 
 
-def run_notebook(*, nb_path: Path) -> None:
+def notebook_execution_env(*, cogames_root: Path | None = None) -> dict[str, str] | None:
+    """Build an execution env that prefers repo-local cogames/mettagrid sources when available."""
+    if cogames_root is None:
+        return None
+
+    cogames_root = cogames_root.resolve()
+    repo_root = cogames_root.parent.parent
+    cogames_src = cogames_root / "src"
+    mettagrid_src = repo_root / "packages" / "mettagrid" / "python" / "src"
+    if not cogames_src.exists() or not mettagrid_src.exists():
+        return None
+
+    env = os.environ.copy()
+    pythonpath_entries = [str(cogames_src), str(mettagrid_src)]
+    existing_pythonpath = env.get("PYTHONPATH")
+    if existing_pythonpath:
+        pythonpath_entries.append(existing_pythonpath)
+    env["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
+    env["COGAMES_DOCSYNC"] = "1"
+    env["CUDA_VISIBLE_DEVICES"] = ""
+    return env
+
+
+def run_notebook(*, nb_path: Path, cogames_root: Path | None = None) -> None:
     """Execute notebook in place."""
     typer.echo(f"  Executing {nb_path.name}...")
     result = subprocess.run(
         ["jupyter", "execute", nb_path.name, "--inplace"],
         cwd=nb_path.parent,
+        env=notebook_execution_env(cogames_root=cogames_root),
         capture_output=True,
         text=True,
     )

@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.0
 #   kernelspec:
 #     display_name: Python 3
 #     language: python
@@ -36,15 +36,13 @@
 # %pip install mettagrid cogames pufferlib-core --quiet
 
 # %%
+import os
 import torch
 import torch.nn as nn
 from einops import rearrange
 
 import pufferlib.vector as pvector
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig
-from cogames.games.cogs_vs_clips.missions.machina_1 import MACHINA_1_MAP_BUILDER
-from cogames.games.cogs_vs_clips.missions.mission import CvCMission
-from cogames.games.cogs_vs_clips.missions.tutorial import AlignerRewardsVariant
+from cogames.games.cogs_vs_clips.missions.tutorial import AlignerRewardsVariant, make_tutorial_mission
 from mettagrid import MettaGridConfig
 from mettagrid.envs.early_reset_handler import EarlyResetHandler
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
@@ -54,32 +52,35 @@ from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Simulator
 from mettagrid.simulator.replay_log_writer import InMemoryReplayWriter
 from mettagrid.util.stats_writer import NoopStatsWriter
-from pufferlib import pufferl
 from pufferlib.pufferlib import set_buffers
+
+DOCSYNC_MODE = os.environ.get("COGAMES_DOCSYNC") == "1"
 
 # %% [markdown]
 # ## 1. Build the mission and environment config
 #
-# - **Site**: CvC Machina 1 (50x50 training map)
-# - **No clips**: Training without clips pressure
-# - **heart_limit=3**: Aligners can hold 3 hearts at once
-# - **initial_hearts=120**: Team starts with 120 hearts for immediate practice
+# - **Site**: Tutorial map (35x35)
+# - **Tutorial variant**: No clips pressure, tutorial stations, and territory basics
+# - **Aligner rewards**: Dense shaping for collecting hearts and aligning neutral junctions
 # - **1000 max steps** per episode
 
 # %%
 NUM_AGENTS = 4
 MAX_STEPS = 1000
 
-mission = CvCMission(
-    name="aligner_tutorial",
-    description="Learn aligner role - collect hearts, align neutral junctions.",
-    map_builder=MACHINA_1_MAP_BUILDER,
-    min_cogs=1,
-    max_cogs=20,
-    num_cogs=NUM_AGENTS,
-    max_steps=MAX_STEPS,
-    teams={"cogs": TeamConfig(name="cogs", num_agents=NUM_AGENTS)},
-).with_variants([AlignerRewardsVariant()])
+mission = (
+    make_tutorial_mission()
+    .model_copy(
+        update={
+            "name": "aligner_tutorial",
+            "description": "Learn aligner role - collect hearts and align neutral junctions.",
+            "num_agents": NUM_AGENTS,
+            "num_cogs": NUM_AGENTS,
+            "max_steps": MAX_STEPS,
+        }
+    )
+    .with_variants([AlignerRewardsVariant()])
+)
 
 env_cfg: MettaGridConfig = mission.make_env()
 
@@ -184,7 +185,9 @@ def tokens_to_grid(
 # - **Value head**: Linear → scalar value
 
 # %%
-if torch.cuda.is_available():
+if DOCSYNC_MODE:
+    DEVICE = torch.device("cpu")
+elif torch.cuda.is_available():
     DEVICE = torch.device("cuda")
 elif torch.backends.mps.is_available():
     DEVICE = torch.device("mps")
@@ -281,7 +284,7 @@ print(f"\nTotal parameters: {total_params:,}")
 # ## 5. Vectorize environments with PufferLib
 
 # %%
-NUM_ENVS = 4
+NUM_ENVS = 1 if DOCSYNC_MODE else 4
 
 # Serial backend — spawn multiprocessing can't find notebook-defined functions
 vecenv = pvector.make(
@@ -301,10 +304,10 @@ print(f"Agents per env: {total_agents // NUM_ENVS}")
 # ## 6. Configure and run PuffeRL training
 
 # %%
-TOTAL_TIMESTEPS = 10_000_000
 BPTT_HORIZON = 64
-BATCH_SIZE = max(4096, total_agents * BPTT_HORIZON)
-MINIBATCH_SIZE = min(4096, BATCH_SIZE)
+BATCH_SIZE = total_agents * BPTT_HORIZON if DOCSYNC_MODE else max(4096, total_agents * BPTT_HORIZON)
+MINIBATCH_SIZE = BATCH_SIZE if DOCSYNC_MODE else min(4096, BATCH_SIZE)
+TOTAL_TIMESTEPS = BATCH_SIZE if DOCSYNC_MODE else 10_000_000
 
 train_config = dict(
     env="cogames.games.cogs_vs_clips",
@@ -348,31 +351,49 @@ for k, v in train_config.items():
     print(f"  {k}: {v}")
 
 # %%
-trainer = pufferl.PuffeRL(train_config, vecenv, net)
+import contextlib
+import io
+
+if DOCSYNC_MODE:
+    docsync_training_logs = io.StringIO()
+    with contextlib.redirect_stdout(docsync_training_logs), contextlib.redirect_stderr(docsync_training_logs):
+        from pufferlib import pufferl as pufferl_lib
+
+        trainer = pufferl_lib.PuffeRL(train_config, vecenv, net)
+        trainer.evaluate()
+        trainer.train()
+else:
+    from pufferlib import pufferl as pufferl_lib
+
+    trainer = pufferl_lib.PuffeRL(train_config, vecenv, net)
+
 print(f"Model size: {trainer.model_size:,} params")
 print(f"Batch size: {trainer.config['batch_size']}")
 print(f"Total epochs: {trainer.total_epochs}")
 
 # %%
-from IPython.display import clear_output
+if DOCSYNC_MODE:
+    trainer.close()
+    print("Docsync mode ran one quiet training batch.")
+else:
+    from IPython.display import clear_output
 
-while trainer.global_step < train_config["total_timesteps"]:
-    trainer.evaluate()
-    trainer.train()
+    while trainer.global_step < train_config["total_timesteps"]:
+        trainer.evaluate()
+        trainer.train()
 
-    clear_output(wait=True)
-    trainer.print_dashboard()
+        clear_output(wait=True)
+        trainer.print_dashboard()
 
-    has_nan = any(
-        (p.grad is not None and not p.grad.isfinite().all()) or not p.isfinite().all() for p in net.parameters()
-    )
-    if has_nan:
-        print(f"Training diverged at step {trainer.global_step}!")
-        break
+        has_nan = any(
+            (p.grad is not None and not p.grad.isfinite().all()) or not p.isfinite().all() for p in net.parameters()
+        )
+        if has_nan:
+            print(f"Training diverged at step {trainer.global_step}!")
+            break
 
-trainer.close()
+    trainer.close()
 print(f"Training complete. Steps: {trainer.global_step}, Epochs: {trainer.epoch}")
-
 # %%
 save_path = "./train_dir/tutorial_aligner.pt"
 torch.save(net.state_dict(), save_path)
@@ -404,7 +425,7 @@ state = {
 
 net.eval()
 num_steps = 0
-for _step in range(MAX_STEPS):
+for _step in range(min(MAX_STEPS, 128) if DOCSYNC_MODE else MAX_STEPS):
     obs_tensor = torch.from_numpy(obs).to(DEVICE)
     with torch.no_grad():
         logits, _ = net(obs_tensor, state)
@@ -416,31 +437,35 @@ for _step in range(MAX_STEPS):
 
 print(f"Episode finished after {num_steps} steps")
 
-# Get replay data before closing (needs live simulation for episode stats)
-replays = replay_writer.get_completed_replays()
-replay_data = json.dumps(replays[0].get_replay_data())
-render_env.close()
+if DOCSYNC_MODE:
+    render_env.close()
+    print("Skipped MettaScope replay export during docsync.")
+else:
+    # Get replay data before closing (needs live simulation for episode stats)
+    replays = replay_writer.get_completed_replays()
+    replay_data = json.dumps(replays[0].get_replay_data())
+    render_env.close()
 
-# Compress and encode
-compressed = zlib.compress(replay_data.encode("utf-8"))
-b64 = base64.b64encode(compressed).decode("utf-8")
+    # Compress and encode
+    compressed = zlib.compress(replay_data.encode("utf-8"))
+    b64 = base64.b64encode(compressed).decode("utf-8")
 
-# Display MettaScope iframe
-iframe_src = "https://metta-ai.github.io/metta/mettascope/mettascope.html"
-iframe_id = "mettascope_iframe"
+    # Display MettaScope iframe
+    iframe_src = "https://metta-ai.github.io/metta/mettascope/mettascope.html"
+    iframe_id = "mettascope_iframe"
 
-display(
-    HTML(f'''
+    display(
+        HTML(f'''
 <div>
     <iframe id="{iframe_id}" src="{iframe_src}" width="100%" height="800"
             style="border: 1px solid #ccc; border-radius: 4px;"></iframe>
 </div>
 ''')
-)
+    )
 
-b64_escaped = b64.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
-display(
-    Javascript(f"""
+    b64_escaped = b64.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
+    display(
+        Javascript(f"""
 (function() {{
     const iframe = document.getElementById('{iframe_id}');
     const base64Data = '{b64_escaped}';
@@ -458,7 +483,7 @@ display(
     }});
 }})();
 """)
-)
+    )
 
 # %% [markdown]
 # ## 8. Upload to the leaderboard

@@ -1,17 +1,3 @@
----
-jupyter:
-  jupytext:
-    text_representation:
-      extension: .md
-      format_name: markdown
-      format_version: '1.3'
-      jupytext_version: 1.19.1
-  kernelspec:
-    display_name: Python 3
-    language: python
-    name: python3
----
-
 # CoGames Puffer Training - Scrambler Tutorial
 
 This notebook trains a scrambler agent from scratch.
@@ -29,55 +15,66 @@ Scramblers have massively increased HP (+200), making them durable enough
 to survive in enemy territory. They earn large rewards for scrambling
 junctions, denying territory control to opponents.
 
+
 ```python
 %pip install mettagrid cogames pufferlib-core --quiet
 ```
 
+    [31mERROR: pip's dependency resolver does not currently take into account all the packages that are installed. This behaviour is the source of the following dependency conflicts.
+    cogames-agents 0.0.0.7.post1.dev1796 requires cogames==0.3.68, but you have cogames 0.11.1.post1.dev1265 which is incompatible.
+    cogames-agents 0.0.0.7.post1.dev1796 requires mettagrid==0.2.0.82, but you have mettagrid 0.24.2 which is incompatible.[0m[31m
+    [0m
+
+    Note: you may need to restart the kernel to use updated packages.
+
+
+
 ```python
+import os
 import torch
 import torch.nn as nn
 from einops import rearrange
-import pufferlib.vector as pvector
-from pufferlib import pufferl
-from pufferlib.pufferlib import set_buffers
 
+import pufferlib.vector as pvector
+from cogames.games.cogs_vs_clips.missions.tutorial import OverrunVariant, ScramblerRewardsVariant, make_tutorial_mission
 from mettagrid import MettaGridConfig
-from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
 from mettagrid.envs.early_reset_handler import EarlyResetHandler
+from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
 from mettagrid.envs.stats_tracker import StatsTracker
 from mettagrid.mapgen.mapgen import MapGen
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Simulator
 from mettagrid.simulator.replay_log_writer import InMemoryReplayWriter
 from mettagrid.util.stats_writer import NoopStatsWriter
+from pufferlib.pufferlib import set_buffers
 
-from cogames.games.cogs_vs_clips.cog import CogConfig, CogTeam
-from cogames.games.cogs_vs_clips.mission import CvCMission
-from cogames.games.cogs_vs_clips.missions.tutorial import OverrunVariant, ScramblerRewardsVariant
-from cogames.games.cogs_vs_clips.sites import CVC_MACHINA_1
+DOCSYNC_MODE = os.environ.get("COGAMES_DOCSYNC") == "1"
 ```
 
 ## 1. Build the mission and environment config
 
-- **Site**: CvC Machina 1 (50x50 training map)
-- **OverrunVariant**: All junctions start clips-aligned, giving scramblers targets to scramble
-- **initial_hearts=120**: Hearts available for scrambling junctions
-- **heart_limit=3**: Limits heart accumulation to focus on scrambling
+- **Site**: Tutorial map (35x35)
+- **OverrunVariant**: All junctions start clips-aligned and no further clips spread
+- **Scrambler rewards**: Dense shaping for acquiring gear and scrambling junctions
 - **1000 max steps** per episode
+
 
 ```python
 NUM_AGENTS = 4
 MAX_STEPS = 1000
 
-mission = CvCMission(
-    name="scrambler_tutorial",
-    description="Learn scrambler role - scramble enemy junctions.",
-    site=CVC_MACHINA_1,
-    num_cogs=NUM_AGENTS,
-    max_steps=MAX_STEPS,
-    cog=CogConfig(heart_limit=3),
-    teams={"cogs": CogTeam(name="cogs", num_agents=NUM_AGENTS, wealth=3, initial_hearts=120)},
-    variants=[OverrunVariant(), ScramblerRewardsVariant()],
+mission = (
+    make_tutorial_mission()
+    .model_copy(
+        update={
+            "name": "scrambler_tutorial",
+            "description": "Learn scrambler role - scramble enemy junctions.",
+            "num_agents": NUM_AGENTS,
+            "num_cogs": NUM_AGENTS,
+            "max_steps": MAX_STEPS,
+        }
+    )
+    .with_variants([OverrunVariant(), ScramblerRewardsVariant()])
 )
 
 env_cfg: MettaGridConfig = mission.make_env()
@@ -89,12 +86,21 @@ print(f"Events: {list(env_cfg.game.events.keys())}")
 print(f"Teams: {[t for t in env_cfg.game.tags if t.startswith('team:')]}")
 ```
 
+    Map builder: MapGenConfig
+    Max steps: 1000
+    Num agents: 4
+    Events: ['day', 'night']
+    Teams: ['team:cogs', 'team:clips']
+
+
 ## 2. Create a single environment
 
 MettaGridPufferEnv wraps the C++ simulator with PufferLib's PufferEnv interface.
 
+
 ```python
 SEED = 42
+
 
 def make_env(buf=None, seed=None):
     """Environment factory for PufferLib vectorization."""
@@ -124,12 +130,21 @@ print(f"Obs grid: {policy_env_info.obs_height}x{policy_env_info.obs_width}")
 driver_env.close()
 ```
 
+    Observation space: Box(0, 255, (300, 3), uint8)
+    Action space: Discrete(5)
+    Num agents: 4
+    Action names: ['noop', 'move_north', 'move_south', 'move_west', 'move_east']
+    Obs features: 70 features
+    Obs grid: 13x13
+
+
 ## 3. Observation preprocessing
 
 MettaGrid observations are sparse tokens `[B, T, 3]` where each token is `[packed_xy, feature_id, value]`.
 The packed byte encodes grid coordinates as nibbles: `y = byte >> 4, x = byte & 0x0F`.
 
 We scatter these into a dense spatial grid `[B, C, H, W]` so a CNN can process them.
+
 
 ```python
 def tokens_to_grid(
@@ -178,8 +193,11 @@ CNN + LSTM actor-critic:
 - **Action head**: Linear → num_actions logits
 - **Value head**: Linear → scalar value
 
+
 ```python
-if torch.cuda.is_available():
+if DOCSYNC_MODE:
+    DEVICE = torch.device("cpu")
+elif torch.cuda.is_available():
     DEVICE = torch.device("cuda")
 elif torch.backends.mps.is_available():
     DEVICE = torch.device("mps")
@@ -228,7 +246,9 @@ class ScramblerPolicyNet(nn.Module):
         self._action_head = nn.Linear(self.hidden_size, num_actions)
         self._value_head = nn.Linear(self.hidden_size, 1)
 
-    def forward(self, observations: torch.Tensor, state: dict[str, torch.Tensor] | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(
+        self, observations: torch.Tensor, state: dict[str, torch.Tensor] | None = None
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         orig_shape = observations.shape
         if observations.dim() == 4:
             segments, bptt_horizon = orig_shape[0], orig_shape[1]
@@ -271,10 +291,32 @@ total_params = sum(p.numel() for p in net.parameters())
 print(f"\nTotal parameters: {total_params:,}")
 ```
 
+    Device: cpu
+    
+    Architecture:
+    ScramblerPolicyNet(
+      (_cnn): Sequential(
+        (0): Conv2d(70, 64, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+        (1): ReLU()
+        (2): Conv2d(64, 128, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1))
+        (3): ReLU()
+        (4): Flatten(start_dim=1, end_dim=-1)
+      )
+      (_cnn_fc): Linear(in_features=2048, out_features=256, bias=True)
+      (_self_encoder): Linear(in_features=70, out_features=256, bias=True)
+      (_rnn): LSTM(512, 512, batch_first=True)
+      (_action_head): Linear(in_features=512, out_features=5, bias=True)
+      (_value_head): Linear(in_features=512, out_features=1, bias=True)
+    )
+    
+    Total parameters: 2,761,286
+
+
 ## 5. Vectorize environments with PufferLib
 
+
 ```python
-NUM_ENVS = 4
+NUM_ENVS = 1 if DOCSYNC_MODE else 4
 
 vecenv = pvector.make(
     make_env,
@@ -290,13 +332,19 @@ print(f"Total agents across all envs: {total_agents}")
 print(f"Agents per env: {total_agents // NUM_ENVS}")
 ```
 
+    Vectorized envs: 1
+    Total agents across all envs: 4
+    Agents per env: 4
+
+
 ## 6. Configure and run PuffeRL training
 
+
 ```python
-TOTAL_TIMESTEPS = 10_000_000
 BPTT_HORIZON = 64
-BATCH_SIZE = max(4096, total_agents * BPTT_HORIZON)
-MINIBATCH_SIZE = min(4096, BATCH_SIZE)
+BATCH_SIZE = total_agents * BPTT_HORIZON if DOCSYNC_MODE else max(4096, total_agents * BPTT_HORIZON)
+MINIBATCH_SIZE = BATCH_SIZE if DOCSYNC_MODE else min(4096, BATCH_SIZE)
+TOTAL_TIMESTEPS = BATCH_SIZE if DOCSYNC_MODE else 10_000_000
 
 train_config = dict(
     env="cogames.games.cogs_vs_clips",
@@ -340,34 +388,118 @@ for k, v in train_config.items():
     print(f"  {k}: {v}")
 ```
 
+    Training config:
+      env: cogames.games.cogs_vs_clips
+      device: cpu
+      total_timesteps: 256
+      batch_size: 256
+      minibatch_size: 256
+      bptt_horizon: 64
+      seed: 42
+      use_rnn: True
+      torch_deterministic: True
+      cpu_offload: False
+      compile: False
+      optimizer: adam
+      learning_rate: 0.00092
+      anneal_lr: True
+      min_lr_ratio: 0.0
+      adam_beta1: 0.95
+      adam_beta2: 0.999
+      adam_eps: 1e-08
+      precision: float32
+      gamma: 0.995
+      gae_lambda: 0.9
+      update_epochs: 1
+      clip_coef: 0.2
+      vf_coef: 2.0
+      vf_clip_coef: 0.2
+      max_grad_norm: 1.5
+      ent_coef: 0.01
+      vtrace_rho_clip: 1.0
+      vtrace_c_clip: 1.0
+      prio_alpha: 0.8
+      prio_beta0: 0.2
+      data_dir: ./train_dir
+      checkpoint_interval: 50
+      max_minibatch_size: 32768
+
+
+
 ```python
-trainer = pufferl.PuffeRL(train_config, vecenv, net)
+import contextlib
+import io
+
+if DOCSYNC_MODE:
+    docsync_training_logs = io.StringIO()
+    with contextlib.redirect_stdout(docsync_training_logs), contextlib.redirect_stderr(docsync_training_logs):
+        from pufferlib import pufferl as pufferl_lib
+
+        trainer = pufferl_lib.PuffeRL(train_config, vecenv, net)
+        trainer.evaluate()
+        trainer.train()
+else:
+    from pufferlib import pufferl as pufferl_lib
+
+    trainer = pufferl_lib.PuffeRL(train_config, vecenv, net)
+
 print(f"Model size: {trainer.model_size:,} params")
 print(f"Batch size: {trainer.config['batch_size']}")
 print(f"Total epochs: {trainer.total_epochs}")
 ```
 
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+
+
+
+
+<pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+
+
+
+    Model size: 2,761,286 params
+    Batch size: 256
+    Total epochs: 1
+
+
+
 ```python
-from IPython.display import clear_output
+if DOCSYNC_MODE:
+    trainer.close()
+    print("Docsync mode ran one quiet training batch.")
+else:
+    from IPython.display import clear_output
 
-while trainer.global_step < train_config["total_timesteps"]:
-    trainer.evaluate()
-    trainer.train()
+    while trainer.global_step < train_config["total_timesteps"]:
+        trainer.evaluate()
+        trainer.train()
 
-    clear_output(wait=True)
-    trainer.print_dashboard()
+        clear_output(wait=True)
+        trainer.print_dashboard()
 
-    has_nan = any(
-        (p.grad is not None and not p.grad.isfinite().all()) or not p.isfinite().all()
-        for p in net.parameters()
-    )
-    if has_nan:
-        print(f"Training diverged at step {trainer.global_step}!")
-        break
+        has_nan = any(
+            (p.grad is not None and not p.grad.isfinite().all()) or not p.isfinite().all() for p in net.parameters()
+        )
+        if has_nan:
+            print(f"Training diverged at step {trainer.global_step}!")
+            break
 
-trainer.close()
+    trainer.close()
 print(f"Training complete. Steps: {trainer.global_step}, Epochs: {trainer.epoch}")
 ```
+
+    Docsync mode ran one quiet training batch.
+    Training complete. Steps: 256, Epochs: 1
+
+
 
 ```python
 save_path = "./train_dir/tutorial_scrambler.pt"
@@ -375,14 +507,19 @@ torch.save(net.state_dict(), save_path)
 print(f"Saved to {save_path}")
 ```
 
+    Saved to ./train_dir/tutorial_scrambler.pt
+
+
 ## 7. Watch the trained policy in MettaScope
 
 Run the trained network for a full episode and view the replay in the interactive MettaScope viewer.
+
 
 ```python
 import base64
 import json
 import zlib
+
 from IPython.display import HTML, Javascript, display
 
 # Run an episode and capture replay
@@ -399,7 +536,7 @@ state = {
 
 net.eval()
 num_steps = 0
-for _step in range(MAX_STEPS):
+for _step in range(min(MAX_STEPS, 128) if DOCSYNC_MODE else MAX_STEPS):
     obs_tensor = torch.from_numpy(obs).to(DEVICE)
     with torch.no_grad():
         logits, _ = net(obs_tensor, state)
@@ -411,28 +548,35 @@ for _step in range(MAX_STEPS):
 
 print(f"Episode finished after {num_steps} steps")
 
-# Get replay data before closing (needs live simulation for episode stats)
-replays = replay_writer.get_completed_replays()
-replay_data = json.dumps(replays[0].get_replay_data())
-render_env.close()
+if DOCSYNC_MODE:
+    render_env.close()
+    print("Skipped MettaScope replay export during docsync.")
+else:
+    # Get replay data before closing (needs live simulation for episode stats)
+    replays = replay_writer.get_completed_replays()
+    replay_data = json.dumps(replays[0].get_replay_data())
+    render_env.close()
 
-# Compress and encode
-compressed = zlib.compress(replay_data.encode("utf-8"))
-b64 = base64.b64encode(compressed).decode("utf-8")
+    # Compress and encode
+    compressed = zlib.compress(replay_data.encode("utf-8"))
+    b64 = base64.b64encode(compressed).decode("utf-8")
 
-# Display MettaScope iframe
-iframe_src = "https://metta-ai.github.io/metta/mettascope/mettascope.html"
-iframe_id = "mettascope_iframe"
+    # Display MettaScope iframe
+    iframe_src = "https://metta-ai.github.io/metta/mettascope/mettascope.html"
+    iframe_id = "mettascope_iframe"
 
-display(HTML(f'''
+    display(
+        HTML(f'''
 <div>
     <iframe id="{iframe_id}" src="{iframe_src}" width="100%" height="800"
             style="border: 1px solid #ccc; border-radius: 4px;"></iframe>
 </div>
-'''))
+''')
+    )
 
-b64_escaped = b64.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n')
-display(Javascript(f'''
+    b64_escaped = b64.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
+    display(
+        Javascript(f"""
 (function() {{
     const iframe = document.getElementById('{iframe_id}');
     const base64Data = '{b64_escaped}';
@@ -449,8 +593,13 @@ display(Javascript(f'''
         }}
     }});
 }})();
-'''))
+""")
+    )
 ```
+
+    Episode finished after 128 steps
+    Skipped MettaScope replay export during docsync.
+
 
 ## 8. Upload to the leaderboard
 
@@ -459,8 +608,21 @@ Submit the trained weights to the CoGames tournament. This uses the `tutorial` p
 
 Prerequisites: run `cogames login` in a terminal first to authenticate.
 
+
 ```python
 POLICY_NAME = "my-scrambler"  # Change this to your desired policy name
 
 !cogames upload -p "class=tutorial,data={save_path}" -n {POLICY_NAME} --skip-validation
 ```
+
+    Traceback (most recent call last):
+      File "/home/relh/Code/work/metta/.venv/bin/cogames", line 4, in <module>
+        from cogames.main import app
+      File "/home/relh/Code/work/metta/packages/cogames/src/cogames/main.py", line 66, in <module>
+        from cogames.cli.assay import assay_app
+      File "/home/relh/Code/work/metta/packages/cogames/src/cogames/cli/assay.py", line 15, in <module>
+        from cogames.cli.client import TournamentServerClient
+      File "/home/relh/Code/work/metta/packages/cogames/src/cogames/cli/client.py", line 40, in <module>
+        from softmax.auth import load_current_cogames_token
+    ImportError: cannot import name 'load_current_cogames_token' from 'softmax.auth' (/home/relh/Code/work/metta/.venv/lib/python3.12/site-packages/softmax/auth.py)
+

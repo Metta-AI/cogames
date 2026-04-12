@@ -624,3 +624,49 @@ def test_cli_nb_to_md_rejects_non_ipynb():
 
 
 # endregion
+
+
+def test_convert_nb_to_md_normalizes_crlf_stream_output():
+    """Test that markdown export normalizes CRLF output to LF."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+
+        cell = new_code_cell("print('hello')")
+        cell.outputs = [new_output(output_type="stream", name="stderr", text="line1\r\nline2\r\n")]
+
+        nb = create_notebook(cells=[cell])
+        nb_path = tmp_path / "test.ipynb"
+        nbformat.write(nb, nb_path)
+
+        md, _ = convert_nb_to_md_in_memory(nb_path=nb_path, cogames_root=tmp_path)
+
+        assert "\r" not in md
+        assert "line1" in md
+        assert "line2" in md
+
+
+def test_convert_nb_to_md_strips_torch_cuda_runtime_warning():
+    """Test that notebook export drops unstable local CUDA runtime warnings."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir)
+
+        cell = new_code_cell("print('hello')")
+        cell.outputs = [
+            new_output(
+                output_type="stream",
+                name="stderr",
+                text=(
+                    "W0411 15:54:40.451000 1239228 torch/utils/cpp_extension.py:117] "
+                    "No CUDA runtime is found, using CUDA_HOME='/usr/local/cuda-12.8'\n"
+                ),
+            )
+        ]
+
+        nb = create_notebook(cells=[cell])
+        nb_path = tmp_path / "test.ipynb"
+        nbformat.write(nb, nb_path)
+
+        md, _ = convert_nb_to_md_in_memory(nb_path=nb_path, cogames_root=tmp_path)
+
+        assert "No CUDA runtime is found" not in md
+        assert "torch/utils/cpp_extension.py:117" not in md

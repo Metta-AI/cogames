@@ -8,7 +8,13 @@ import jupytext
 import questionary
 import typer
 
-from cogames.cli.docsync._utils import clean_notebook_metadata, lint_py_file, py_nb_content_equal, run_notebook
+from cogames.cli.docsync._utils import (
+    clean_notebook_metadata,
+    get_cogames_root,
+    lint_py_file,
+    py_nb_content_equal,
+    run_notebook,
+)
 
 
 def convert_nb_to_py(*, nb_path: Path, py_path: Path) -> None:
@@ -24,7 +30,7 @@ def convert_py_to_nb(*, py_path: Path, nb_path: Path, should_rerun: bool) -> Non
     jupytext.write(nb, nb_path)
 
     if should_rerun:
-        run_notebook(nb_path=nb_path)
+        run_notebook(nb_path=nb_path, cogames_root=get_cogames_root())
 
     clean_notebook_metadata(nb_path=nb_path)
 

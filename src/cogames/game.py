@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 from typing import Sequence
 
 from cogames.core import CoGameMission, CoGameMissionVariant
@@ -30,12 +31,26 @@ class CoGame:
 
 
 _GAMES: dict[str, "CoGame"] = {}
+_GAME_MODULES: dict[str, str] = {
+    "cogs_vs_clips": "cogames.games.cogs_vs_clips.game.game",
+    "overcogged": "cogames.games.overcogged.game.game",
+}
+
+
+def _ensure_game_loaded(name: str) -> None:
+    if name in _GAMES:
+        return
+    module_name = _GAME_MODULES.get(name)
+    if module_name is not None:
+        importlib.import_module(module_name)
 
 
 def get_game(name: str) -> "CoGame":
     """Get a registered game by name."""
+    _ensure_game_loaded(name)
     if name not in _GAMES:
-        raise ValueError(f"Unknown game '{name}'. Available: {', '.join(_GAMES)}")
+        available = sorted({*_GAME_MODULES, *_GAMES})
+        raise ValueError(f"Unknown game '{name}'. Available: {', '.join(available)}")
     return _GAMES[name]
 
 
