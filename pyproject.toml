@@ -15,8 +15,6 @@ dependencies = [
   "pydantic>=2.11.5",
   "pyyaml>=6.0.2",
   "questionary>=2.0.1",
-  "einops>=0.8.0",
-  "scipy>=1.15.3",
   "typer>=0.19.2",
   "rich>=13.7.0",
   "questionary>=2.1.0",
@@ -36,7 +34,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
-neural = ["pufferlib-core", "torch"]
+neural = ["pufferlib-core", "torch", "einops>=0.8.0", "mettagrid[train]"]
 test = ["pytest", "pytest-xdist", "ruff"]
 
 [project.scripts]
