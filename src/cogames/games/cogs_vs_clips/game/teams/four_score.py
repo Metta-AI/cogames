@@ -10,6 +10,7 @@ from cogames.core import CoGameMissionVariant, Deps
 from cogames.games.cogs_vs_clips.game.clips.clips import NoClipsVariant
 from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
 from cogames.games.cogs_vs_clips.game.teams.team import TeamConfig, TeamVariant
+from cogames.games.cogs_vs_clips.missions.machina_1 import CvCMachina1Variant
 from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from cogames.games.cogs_vs_clips.missions.terrain import CompoundLocation, MachinaTerrainVariant
 from cogames.variants import ResolvedDeps
@@ -17,7 +18,6 @@ from mettagrid.config.game_value import SumGameValue, num_tagged, val, weighted_
 from mettagrid.config.handler_config import Handler, allOf
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.config.mutation import logStatToGame
-from mettagrid.config.reward_config import reward
 from mettagrid.mapgen.scenes.compound import CompoundConfig
 
 TEAM_COLORS = ["red", "blue", "green", "yellow"]
@@ -35,6 +35,7 @@ class FourScoreVariant(CoGameMissionVariant):
     def dependencies(self) -> Deps:
         return Deps(
             required=[
+                CvCMachina1Variant,
                 TeamVariant,
                 NoClipsVariant,
                 MachinaTerrainVariant,
@@ -83,26 +84,14 @@ class FourScoreVariant(CoGameMissionVariant):
         seen_team_names: set[str] = set()
         held_junction_stats: list[SumGameValue] = []
 
-        # Per-team junction rewards and held-tick stats.
+        # Machina-1 already installs the per-team held rewards and team stats.
+        # Four Score only adds the aggregate cross-team stat used for progress.
         for agent in env.game.agents:
             team_name = team_v.team_name(agent.team_id)
             assert team_name is not None, f"agent team_id={agent.team_id} has no team name"
-            held_junction_values = [num_tagged(f"net:{team_name}"), val(-1.0)]
-            held_junctions = SumGameValue(values=held_junction_values)
-            if team_name not in seen_team_names:
-                held_junction_stats.append(held_junctions)
-            agent.rewards["aligned_junction_held"] = reward(
-                held_junction_values,
-                weight=1.0 / mission.max_steps,
-                per_tick=True,
-            )
             if team_name in seen_team_names:
                 continue
-            handler = Handler(
-                name=f"aligned_junction_held_{team_name}",
-                mutations=[logStatToGame(f"{team_name}/aligned.junction.held", source=held_junctions)],
-            )
-            env.game.on_tick = allOf([env.game.on_tick, handler])
+            held_junction_stats.append(SumGameValue(values=[num_tagged(f"net:{team_name}"), val(-1.0)]))
             seen_team_names.add(team_name)
 
         if held_junction_stats:
