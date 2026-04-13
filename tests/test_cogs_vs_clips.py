@@ -6,6 +6,7 @@ from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
 from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
 from cogames.games.cogs_vs_clips.game.game import CvCGame
 from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
+from cogames.games.cogs_vs_clips.game.teams.four_score import FourScoreVariant
 from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
 from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant as JunctionNetVariant
 from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
@@ -39,24 +40,6 @@ def _handler_names(handler) -> set[str]:
     return set()
 
 
-def _normalize_dinky_tag_name(tag_name: str) -> str:
-    if tag_name.startswith("type:"):
-        tag_name = tag_name[5:]
-    first_colon = tag_name.find(":")
-    if 0 <= first_colon < len(tag_name) - 1:
-        tag_name = tag_name[first_colon + 1 :]
-    variant_colon = tag_name.rfind(":")
-    if 0 <= variant_colon < len(tag_name) - 1 and tag_name[variant_colon + 1 :].isdigit():
-        tag_name = tag_name[:variant_colon]
-    return tag_name
-
-
-def _iter_cli_mission_names(game: CvCGame) -> list[str]:
-    names = [mission.full_name() for mission in game.missions]
-    names.extend(f"{mission.name}.{sub_name}" for mission in game.missions for sub_name in mission.sub_missions)
-    return names
-
-
 def test_make_cogs_vs_clips_scenario():
     """Test that make_cogs_vs_clips_scenario creates a valid configuration."""
     config = make_machina1_mission(num_agents=2).make_env()
@@ -66,8 +49,10 @@ def test_make_cogs_vs_clips_scenario():
 def test_resolved_cli_missions_with_passive_hp_and_territory_install_friendly_hp_heal() -> None:
     game = CvCGame()
     audited: dict[str, list[str]] = {}
+    mission_names = [mission.full_name() for mission in game.missions]
+    mission_names.extend(f"{mission.name}.{sub_name}" for mission in game.missions for sub_name in mission.sub_missions)
 
-    for name in _iter_cli_mission_names(game):
+    for name in mission_names:
         env = find_mission(game, name).make_env()
         territory = env.game.territories.get("team_territory")
         presence = sorted(territory.presence) if territory is not None else []
@@ -98,7 +83,16 @@ def test_cvc_helper_defaults_use_8_agents() -> None:
 def test_machina_1_team_station_tags_win_under_dinky_normalization() -> None:
     env = make_machina1_mission(num_agents=8).make_env()
     pei = PolicyEnvInterface.from_mg_cfg(env)
-    normalized_tag_to_id = {_normalize_dinky_tag_name(name): idx for idx, name in enumerate(pei.tags)}
+    normalized_tag_to_id: dict[str, int] = {}
+    for idx, name in enumerate(pei.tags):
+        normalized = name[5:] if name.startswith("type:") else name
+        first_colon = normalized.find(":")
+        if 0 <= first_colon < len(normalized) - 1:
+            normalized = normalized[first_colon + 1 :]
+        variant_colon = normalized.rfind(":")
+        if 0 <= variant_colon < len(normalized) - 1 and normalized[variant_colon + 1 :].isdigit():
+            normalized = normalized[:variant_colon]
+        normalized_tag_to_id[normalized] = idx
     tag_to_id = {name: idx for idx, name in enumerate(pei.tags)}
 
     assert normalized_tag_to_id["aligner"] == tag_to_id["type:aligner"]
@@ -266,6 +260,59 @@ def test_four_score_emits_held_stat_handlers_for_each_team() -> None:
         "aligned_junction_held_cogs_yellow",
         "aligned_junction_held_four_score_avg",
     } <= _handler_names(env.game.on_tick)
+
+
+def test_four_score_does_not_duplicate_team_held_stat_handlers() -> None:
+    env = FourScoreMission(
+        num_agents=4,
+        num_cogs=4,
+        min_cogs=4,
+        max_cogs=4,
+        max_steps=100,
+    ).make_env()
+
+    counts: dict[str, int] = {}
+    stack = [env.game.on_tick]
+    while stack:
+        handler = stack.pop()
+        if handler is None:
+            continue
+        if isinstance(handler, Handler):
+            if handler.name:
+                counts[handler.name] = counts.get(handler.name, 0) + 1
+            continue
+        if isinstance(handler, (FirstMatch, AllOf)):
+            stack.extend(handler.handlers)
+
+    assert counts["aligned_junction_held_cogs_red"] == 1
+    assert counts["aligned_junction_held_cogs_blue"] == 1
+    assert counts["aligned_junction_held_cogs_green"] == 1
+    assert counts["aligned_junction_held_cogs_yellow"] == 1
+    assert counts["aligned_junction_held_four_score_avg"] == 1
+
+
+def test_four_score_without_default_variant_still_installs_machina_held_rewards() -> None:
+    env = (
+        CvCMission(
+            name="four_score_defaultless",
+            description="Four Score without a mission default variant.",
+            map_builder=make_machina1_map_builder(4),
+            num_agents=4,
+            max_steps=100,
+            default_variant=None,
+        )
+        .with_variants([FourScoreVariant()])
+        .make_env()
+    )
+
+    assert {
+        "aligned_junction_held_cogs_red",
+        "aligned_junction_held_cogs_blue",
+        "aligned_junction_held_cogs_green",
+        "aligned_junction_held_cogs_yellow",
+        "aligned_junction_held_four_score_avg",
+    } <= _handler_names(env.game.on_tick)
+    assert all("aligned_junction_held" in agent.rewards for agent in env.game.agents)
 
 
 def test_hub_global_obs_shows_own_team_only():
