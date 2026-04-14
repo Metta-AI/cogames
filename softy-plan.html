@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Softy Policy — Strategy Plan</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&family=Inter:wght@400;500;600&display=swap');
+
+  :root {
+    --cream: #FAF8F0;
+    --ink: #1a1a1a;
+    --muted: #6b6b6b;
+    --accent: #849EBE;
+    --accent-dark: #0e2758;
+    --border: #d4d0c8;
+    --highlight: #fff3cd;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Merriweather', Georgia, serif;
+    background: var(--cream);
+    color: var(--ink);
+    line-height: 1.7;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 3rem 2rem 6rem;
+  }
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+    color: var(--accent-dark);
+    border-bottom: 3px double var(--accent-dark);
+    padding-bottom: 0.75rem;
+  }
+
+  h1 .subtitle {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 300;
+    color: var(--muted);
+    margin-top: 0.25rem;
+    font-style: italic;
+  }
+
+  h2 {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-dark);
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.4rem;
+  }
+
+  h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  p, li { font-size: 0.92rem; margin-bottom: 0.6rem; }
+
+  ul, ol { padding-left: 1.5rem; }
+  li { margin-bottom: 0.4rem; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 1rem 0;
+  }
+
+  th {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid var(--accent-dark);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent-dark);
+  }
+
+  td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  code {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    background: rgba(0,0,0,0.05);
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+    font-size: 0.85em;
+  }
+
+  pre {
+    background: var(--accent-dark);
+    color: #e0e0e0;
+    padding: 1rem 1.25rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    margin: 1rem 0;
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+
+  .callout {
+    background: var(--highlight);
+    border-left: 4px solid #e6a800;
+    padding: 0.75rem 1rem;
+    margin: 1.25rem 0;
+    font-size: 0.9rem;
+    font-style: italic;
+  }
+
+  .safe-notice {
+    background: #d4edda;
+    border-left: 4px solid #28a745;
+    padding: 0.75rem 1rem;
+    margin: 1.25rem 0;
+    font-size: 0.9rem;
+  }
+
+  .role-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+
+  .role-card {
+    border: 1px solid var(--border);
+    padding: 1rem;
+    background: white;
+  }
+
+  .role-card h4 {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--accent-dark);
+    margin-bottom: 0.5rem;
+  }
+
+  .role-card ol { font-size: 0.85rem; padding-left: 1.2rem; }
+  .role-card li { margin-bottom: 0.25rem; }
+
+  .tag {
+    display: inline-block;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 0.1em 0.5em;
+    border-radius: 3px;
+    margin-right: 0.25rem;
+  }
+  .tag-miner { background: #ffeeba; color: #856404; }
+  .tag-scrambler { background: #f8d7da; color: #721c24; }
+  .tag-aligner { background: #d4edda; color: #155724; }
+  .tag-scout { background: #cce5ff; color: #004085; }
+
+  .meta {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-bottom: 2rem;
+  }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<h1>
+  Softy Policy
+  <span class="subtitle">Strategy plan for the Alignment League beta-cvc season</span>
+</h1>
+<p class="meta">April 13, 2026 &mdash; Softmax / Maxwell Starr</p>
+
+<div class="safe-notice">
+  <strong>This is safe.</strong> A policy is just a player &mdash; it receives observations and returns move commands. It cannot modify the game engine, scoring, maps, or other players' submissions. Policies run in sandboxed containers on the tournament server.
+</div>
+
+<h2>Context</h2>
+<p>
+  Softy:v1 was uploaded as a starter policy and scores ~0.19 VOR. The leaderboard top is <strong>dinky:v27 at 27.40</strong>.
+  After a deep analysis of the game engine source code, scoring mechanics, and the most advanced scripted policies in the codebase,
+  this plan describes a rewrite of Softy as a smart, coordinated, multi-role agent.
+</p>
+
+<div class="callout">
+  <strong>Key insight:</strong> Reward = <code>junctions_held / max_steps</code> per tick over 10,000 steps.
+  A junction captured at tick 100 earns 99% of its max value. Speed of territory acquisition is everything.
+</div>
+
+<h2>Game Facts (verified from source)</h2>
+<table>
+  <thead>
+    <tr><th>Parameter</th><th>Value</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Map</td><td>88&times;88, procedural Machina arena</td></tr>
+    <tr><td>Agents</td><td>8 cogs vs automated clips</td></tr>
+    <tr><td>Duration</td><td>10,000 steps</td></tr>
+    <tr><td>Reward</td><td><code>junctions_held / max_steps</code> per tick</td></tr>
+    <tr><td>Heart cost</td><td>7 of each element (C, O, Ge, Si) = 28 total</td></tr>
+    <tr><td>Align</td><td>1 heart + aligner gear (must be within 15 cells of network or 25 of hub)</td></tr>
+    <tr><td>Scramble</td><td>1 heart + scrambler gear</td></tr>
+    <tr><td>Gear cost</td><td>6 resources each (3 primary + 1 of each other)</td></tr>
+    <tr><td>Energy</td><td>20 base, 4/move, solar regen 1&ndash;3/tick</td></tr>
+    <tr><td>HP drain</td><td>&minus;1/tick outside friendly territory</td></tr>
+    <tr><td>Territory AOE</td><td>10-cell radius from hub/junctions &mdash; full heal inside</td></tr>
+    <tr><td>Clips</td><td>Scramble + align every 200 ticks, starting at tick 100</td></tr>
+    <tr><td>Observation</td><td>13&times;13 egocentric, token-based</td></tr>
+    <tr><td>Vibes needed?</td><td><strong>No.</strong> Gear inventory is the requirement.</td></tr>
+  </tbody>
+</table>
+
+<h2>Architecture</h2>
+<p>Single file: <code>~/cogames/softy.py</code> (~800&ndash;1200 lines)</p>
+<ul>
+  <li><strong>SoftyCoordinator</strong> &mdash; shared team state (hub position, stations, junctions, extractors, agent targets)</li>
+  <li><strong>SoftyState</strong> &mdash; per-agent persistent state (position, occupancy map, phase, retry count)</li>
+  <li><strong>SoftyAgentImpl</strong> &mdash; per-agent decision logic with role-specific methods</li>
+  <li><strong>SoftyPolicy</strong> &mdash; entry point, creates coordinator and assigns roles</li>
+</ul>
+
+<h2>Role Assignment</h2>
+<table>
+  <thead>
+    <tr><th>Agent</th><th>Role</th><th>Rationale</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>0</td><td><span class="tag tag-miner">MINER</span></td><td>Rush gear, start resource pipeline (carbon)</td></tr>
+    <tr><td>1</td><td><span class="tag tag-miner">MINER</span></td><td>Rush gear, different resource (oxygen)</td></tr>
+    <tr><td>2</td><td><span class="tag tag-scrambler">SCRAMBLER</span></td><td>Rush gear + heart, counter clips by tick 100</td></tr>
+    <tr><td>3</td><td><span class="tag tag-aligner">ALIGNER</span></td><td>Rush gear + heart, capture first neutral junction</td></tr>
+    <tr><td>4</td><td><span class="tag tag-miner">MINER</span></td><td>Third miner for sustained economy (germanium)</td></tr>
+    <tr><td>5</td><td><span class="tag tag-scrambler">SCRAMBLER</span></td><td>Second scrambler for defense depth</td></tr>
+    <tr><td>6</td><td><span class="tag tag-aligner">ALIGNER</span></td><td>Second aligner for faster expansion</td></tr>
+    <tr><td>7</td><td><span class="tag tag-scout">SCOUT</span></td><td>Discover map, share structure positions</td></tr>
+  </tbody>
+</table>
+<p>3 miners sustain heart production. 2 scramblers counter clips' every-200-tick expansion. 2 aligners capture junctions fast. 1 scout finds everything.</p>
+
+<h2>Role Strategies</h2>
+
+<div class="role-grid">
+  <div class="role-card">
+    <h4><span class="tag tag-miner">Miner</span> Agents 0, 1, 4</h4>
+    <ol>
+      <li>Navigate to miner gear station &rarr; acquire gear (+40 cargo, 10&times; extraction)</li>
+      <li>Mine preferred extractor (diversified by agent)</li>
+      <li>Extract until cargo full or HP low</li>
+      <li>Deposit at nearest cogs-aligned building</li>
+      <li>Repeat; HP check: return to heal if steps-to-safety &gt; HP&minus;10</li>
+    </ol>
+  </div>
+
+  <div class="role-card">
+    <h4><span class="tag tag-scrambler">Scrambler</span> Agents 2, 5</h4>
+    <ol>
+      <li>Rush scrambler gear station (+200 HP)</li>
+      <li>Get heart from hub</li>
+      <li>Find nearest clips junction &rarr; scramble it</li>
+      <li>Report to coordinator (now neutral for aligners)</li>
+      <li>Return for another heart; 300 HP total allows deep pushes</li>
+    </ol>
+  </div>
+
+  <div class="role-card">
+    <h4><span class="tag tag-aligner">Aligner</span> Agents 3, 6</h4>
+    <ol>
+      <li>Rush aligner gear station</li>
+      <li>Get heart from hub</li>
+      <li>Find nearest neutral junction within 15 cells of team network</li>
+      <li>Align it &rarr; report to coordinator</li>
+      <li>Target deconfliction: coordinator assigns different junctions to each aligner</li>
+    </ol>
+  </div>
+
+  <div class="role-card">
+    <h4><span class="tag tag-scout">Scout</span> Agent 7</h4>
+    <ol>
+      <li>Rush scout gear (+100 energy, +400 HP)</li>
+      <li>Frontier-based exploration (BFS to unknown cells)</li>
+      <li>Report all discoveries to coordinator</li>
+      <li>After ~2000 ticks, switch to junction patrol</li>
+    </ol>
+  </div>
+</div>
+
+<h2>Navigation</h2>
+<ul>
+  <li><strong>Position tracking:</strong> Start at (100,100) on 200&times;200 internal grid. Update from <code>last_action</code> each step.</li>
+  <li><strong>BFS pathfinding:</strong> On occupancy grid. Unknown cells = traversable (optimistic). Agent positions = temporary obstacles.</li>
+  <li><strong>Stuck detection:</strong> Track last 4 positions. If oscillating, force random cardinal direction. After 10 stuck ticks, reset target.</li>
+</ul>
+
+<h2>Observation Parsing</h2>
+<p>Each step, parse the 13&times;13 token observation window:</p>
+<ul>
+  <li><strong>Tags</strong> &rarr; identify hub, junctions, extractors, gear stations, walls, agents, team affiliation</li>
+  <li><strong>Inventory</strong> &rarr; energy, HP, heart, carbon, oxygen, germanium, silicon, role gear</li>
+  <li><strong>Globals</strong> &rarr; episode progress, last action, position offsets</li>
+  <li><strong>Coordinator update</strong> &rarr; register any newly visible structures in shared team state</li>
+</ul>
+
+<h2>Implementation Steps</h2>
+<ol>
+  <li><strong>Scaffold + obs parsing</strong> &mdash; classes, token parsing, position tracking</li>
+  <li><strong>Navigation</strong> &mdash; BFS, explore fallback, stuck detection</li>
+  <li><strong>Miner role</strong> &mdash; gear &rarr; mine &rarr; deposit cycle with HP awareness</li>
+  <li><strong>Scrambler + Aligner</strong> &mdash; gear &rarr; heart &rarr; scramble/align with target deconfliction</li>
+  <li><strong>Scout role</strong> &mdash; frontier exploration + discovery reporting + patrol</li>
+  <li><strong>Integration</strong> &mdash; coordinator wiring, deconfliction, junction tracking</li>
+</ol>
+
+<h2>Testing</h2>
+<pre><code># Quick sanity check
+cogames pickup -p "class=softy.SoftyPolicy" --pool random --episodes 1 --steps 300 -c 4
+
+# Full tournament-like test
+cogames pickup -p "class=softy.SoftyPolicy" --pool random --episodes 3 --steps 1000 -m machina_1 -c 8
+
+# Compare vs starter baseline
+cogames pickup -p starter --pool random --episodes 3 --steps 1000 -m machina_1 -c 8
+
+# Upload to leaderboard
+cogames upload -p "class=softy.SoftyPolicy" -f ~/cogames/softy.py -n Softy --season beta-cvc --skip-validation</code></pre>
+
+<h2>Success Criteria</h2>
+<table>
+  <thead>
+    <tr><th>Metric</th><th>Target</th><th>Stretch</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Local VOR (pickup)</td><td>&gt; 5.0</td><td>&gt; 10.0</td></tr>
+    <tr><td>Leaderboard score</td><td>&gt; 15.0 (top 30)</td><td>&gt; 20.0 (top 10)</td></tr>
+    <tr><td>Observable behavior</td><td colspan="2">Agents mine, gear up, craft hearts, capture junctions, counter clips</td></tr>
+  </tbody>
+</table>
+
+<footer>
+  Plan generated from deep analysis of the cogames source code. Policy is sandboxed &mdash; it can only observe and act, never modify the game.
+</footer>
+
+</body>
+</html>
