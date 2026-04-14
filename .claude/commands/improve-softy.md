@@ -6,45 +6,37 @@ Execute one improvement cycle on softy.py. Make exactly ONE change, test it, and
 - Always re-test AFTER the change
 - If VOR improves >= 5%: keep the change and upload via `/upload-softy`
 - If VOR regresses or is neutral: revert the change
-- Log everything to `softy-log.md`
+- Log everything to the knowledge base
+
+## Pre-reads (mandatory)
+1. `knowledge/tactics/priorities.md` — what to work on
+2. `knowledge/experiments/failed.md` — what NOT to try
+3. `knowledge/experiments/hypotheses.md` — available ideas
+4. `knowledge/strategy/current-approach.md` — active strategy
 
 ## Steps
 
-1. Read `softy-log.md` to see what's been tried and the current trajectory.
+1. Read `~/cogames/softy.py` to understand current state.
 
-2. Read `~/cogames/softy.py` to understand current state.
+2. Select the highest-priority change from `knowledge/tactics/priorities.md` that is NOT in `knowledge/experiments/failed.md`.
 
 3. Run baseline:
    ```
    uv run cogames pickup -p "class=softy.SoftyPolicy" --pool random --episodes 5 -m machina_1 -c 8
    ```
 
-4. Identify ONE high-leverage change. Priority areas:
-   - Aligner target selection (frontier expansion value)
-   - Miner efficiency (deposit threshold, element cycling)
-   - Heartless aligner behavior (explore vs wait)
-   - Stuck detection sensitivity
-   - Network expansion strategy (hub radius, net radius)
-   - Role distribution tuning
+4. Implement the change in softy.py.
 
-5. Implement the change in softy.py.
+5. Verify import: `uv run python -c "import softy; print('OK')"`
 
-6. Verify import: `uv run python -c "import softy; print('OK')"`
+6. Re-run benchmark (same command as step 3).
 
-7. Re-run benchmark (same command as step 3).
-
-8. Compare VOR:
+7. Compare VOR:
    - **Improved >= 5%**: Keep change. Run `/upload-softy`.
-   - **Regressed or neutral**: Revert the edit. Note why.
+   - **Regressed or neutral**: Revert the edit.
 
-9. **Log the cycle** — append to `softy-log.md`:
-   ```
-   ### Improve: [date and time]
-   - **Baseline VOR**: X.XX
-   - **Change**: [what and why, with line refs]
-   - **New VOR**: X.XX
-   - **Delta**: +/-X.XX (+/-X%)
-   - **Decision**: KEPT / REVERTED
-   - **Uploaded**: vN (if kept)
-   - **Next recommended**: [what to try next]
-   ```
+8. **Update knowledge base**:
+   - Append result to `knowledge/experiments/log.md`
+   - If KEPT: move hypothesis to `knowledge/experiments/successful.md`, update `knowledge/strategy/current-approach.md`
+   - If REVERTED: move hypothesis to `knowledge/experiments/failed.md` with root cause analysis
+   - Update `knowledge/tactics/priorities.md` with next action

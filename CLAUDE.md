@@ -1,84 +1,67 @@
 # Cogames — Softy Policy Development
 
-## Project
-Building **Softy**, a scripted multi-agent policy for the **Cogs vs Clips** game in the Softmax Alignment League (`beta-cvc` season). The policy competes on a tournament leaderboard against other teams' policies.
+## Current Performance
+- **Softy:v5** | Rank #224 | VOR 6.03 | Target: >15 VOR
+- Top of board: dinky:v27 at 27.21 (4.5x gap)
+- Trajectory: v2(2.16) → v3(3.43) → v4(4.36) → v5(6.03)
+
+## When Resuming, Read These First
+1. **`knowledge/tactics/priorities.md`** — what to work on next
+2. **`knowledge/experiments/failed.md`** — what NOT to try
+3. **`knowledge/strategy/current-approach.md`** — active strategy
+
+## What This Is
+Softy: a scripted multi-agent policy for Cogs vs Clips (Alignment League, beta-cvc season).
+Goal: maximize VOR by capturing and holding **network-connected** junctions.
 
 ## Key Files
-- `softy.py` — The policy implementation (941 lines). Single-file, no external dependencies beyond mettagrid.
-- `softy-plan.html` — Strategy plan with game mechanics, role design, and architecture.
-- `softy-log.md` — Improvement cycle log (append-only). Check this first when resuming.
-- `.claude/commands/` — Slash commands for the improvement workflow.
+- `softy.py` — The policy (941 lines, single file, no external deps beyond mettagrid)
+- `knowledge/` — Persistent knowledge base (see `knowledge/README.md` for index)
+- `.claude/commands/` — 7 slash commands for the improvement workflow
 
-## Architecture
-- **SoftyCoordinator** — Shared team state (hub, junctions, extractors, targets)
-- **SoftyState** — Per-agent persistent state (position, stuck detection, role phase)
-- **SoftyAgentImpl** — Per-agent decision logic with role dispatch
-- **SoftyPolicy** — Entry point, creates coordinator, assigns roles
+## Architecture (4 classes in softy.py)
+- **SoftyCoordinator** — shared team state (hub, junctions, extractors, targets)
+- **SoftyState** — per-agent state (position, stuck detection, role phase)
+- **SoftyAgentImpl** — per-agent decision logic with role dispatch
+- **SoftyPolicy** — entry point, creates coordinator + role assignment (ROLE_CYCLE)
 
 ## Current Role Distribution
-3 miners + 5 aligners (no scrambler/scout — pure alignment is more efficient).
+3 miners + 5 aligners. No scrambler/scout. **Needs scramblers** — see cascade failure risk in `knowledge/mechanics/clips-behavior.md`.
 
-## Commands
-```bash
-# Quick import check
-uv run python -c "import softy; print('OK')"
-
-# Local benchmark (the standard test)
-uv run cogames pickup -p "class=softy.SoftyPolicy" --pool random --episodes 3 -m machina_1 -c 8
-
-# Starter baseline for comparison
-uv run cogames pickup -p starter --pool random --episodes 3 -m machina_1 -c 8
-
-# Upload to leaderboard
-uv run cogames upload -p "class=softy.SoftyPolicy" -f ~/cogames/softy.py -n Softy --season beta-cvc --skip-validation
-
-# Check leaderboard
-uv run cogames leaderboard beta-cvc --policy Softy
-
-# Check submissions
-uv run cogames submissions --season beta-cvc --policy Softy
+## Scoring (critical)
 ```
+reward = (net-connected junctions - 1) / 10000, per tick
+```
+ONLY junctions with `net:cogs` tag count. Network = closure from hub through team junctions within 25 cells. Alignment requires 15 cells from net (or 25 from hub). **Disconnected junctions = zero reward.**
 
 ## Slash Commands
-- `/test-softy` — Benchmark + log results
+- `/test-softy` — Benchmark + log to knowledge base
 - `/audit-softy` — Competitive analysis + identify bottleneck
 - `/improve-softy` — One improvement cycle (baseline → change → test → keep/revert)
 - `/upload-softy` — Upload to leaderboard + log
-- `/loop-softy` — Autonomous improvement loop (orchestrates all above with compaction)
+- `/loop-softy` — Autonomous improvement loop with knowledge + compaction
+- `/research-softy` — Deep-dive specific game mechanic
+- `/status-softy` — Quick check without benchmarks
 
-## Improvement Workflow
-The autonomous loop follows: **audit → improve → upload → compact**. Each cycle:
-1. Read `softy-log.md` for current state (critical for session resilience)
-2. Identify highest-leverage change
-3. Make exactly ONE change
-4. Re-benchmark
-5. If VOR improves >= 5%: keep + upload. Otherwise: revert.
-6. Log results to `softy-log.md`
-7. Compact every 2 cycles to prevent context blowup
+## CLI Commands
+```bash
+uv run python -c "import softy; print('OK')"  # import check
+uv run cogames pickup -p "class=softy.SoftyPolicy" --pool random --episodes 5 -m machina_1 -c 8
+uv run cogames leaderboard beta-cvc --policy Softy
+uv run cogames upload -p "class=softy.SoftyPolicy" -f ~/cogames/softy.py -n Softy --season beta-cvc --skip-validation
+```
 
-**All state lives in `softy-log.md`** — if a session dies, a new one picks up from the log.
+## Game Quick Reference
+| Param | Value |
+|-------|-------|
+| Map | 88x88, ~69 junctions, 10K steps |
+| Clips | 4 ships, scramble+align every 200 ticks from tick 100 |
+| Hearts | 7 each element = 28 total. Hub starts with 24 each + 5 hearts |
+| Align | 1 heart + gear, within 15 of net or 25 of hub |
+| Territory | 10-cell AOE (junctions), 20-cell (hub), +100 HP/tick inside |
+| Energy | 20 base, 4/move, solar 3 day / 1 night (200-tick cycle) |
+| HP | 100 max, starts 50, -1/tick outside territory |
+| **Cascade** | Scrambling one junction disconnects all junctions beyond it |
 
-## Game Facts (from source)
-- Map: 88x88 procedural Machina arena
-- Agents: 8 cogs vs automated clips
-- Duration: 10,000 steps
-- Reward: `junctions_held / max_steps` per tick (speed of capture is everything)
-- Heart cost: 7 of each element (C, O, Ge, Si) = 28 total
-- Align: 1 heart + aligner gear, must be within 15 cells of network or 25 of hub
-- Energy: 20 base, 4/move, solar regen 1-3/tick
-- HP: -1/tick outside friendly territory, full heal inside 10-cell AOE
-- Observation: 13x13 egocentric, token-based
-
-## Current Performance
-Check `softy-log.md` for the latest. As of April 14, 2026:
-- Softy:v5 at rank #224, VOR 6.03 (21 matches on leaderboard)
-- Local VOR: ~0.81 (3 episodes vs random — leaderboard uses competitive matchmaking)
-- Progression: v2(2.16) → v3(3.43) → v4(4.36) → v5(6.03)
-- Target: >10.0 VOR (stretch), >20.0 for top-10
-- Top of leaderboard: dinky:v27 at 27.21
-
-## Known Limitations of softmax.auth
-The installed `softmax-cli` package is behind the cogames code. Missing functions were shimmed locally in `.venv/lib/python3.12/site-packages/softmax/auth.py`. If you reinstall softmax-cli, re-add:
-- `load_current_cogames_token`
-- `DEFAULT_COGAMES_API_SERVER`
-- `load_cogames_user_token`, `save_cogames_active_token`, `fetch_cogames_whoami`, `restore_cogames_user_session`
+## Known Env Limitations
+`softmax-cli` was shimmed locally in `.venv/.../softmax/auth.py`. If reinstalled, re-add: `load_current_cogames_token`, `DEFAULT_COGAMES_API_SERVER`, `load_cogames_user_token`, `save_cogames_active_token`, `fetch_cogames_whoami`, `restore_cogames_user_session`.

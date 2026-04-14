@@ -2,10 +2,7 @@ Upload current softy.py to the Alignment League leaderboard and log the result.
 
 ## Steps
 
-1. Verify import first:
-   ```
-   uv run python -c "import softy; print('OK')"
-   ```
+1. Verify import: `uv run python -c "import softy; print('OK')"`
 
 2. Upload:
    ```
@@ -17,7 +14,7 @@ Upload current softy.py to the Alignment League leaderboard and log the result.
    uv run cogames submissions --season beta-cvc --policy Softy
    ```
 
-4. **Log the upload** — append to `softy-log.md`:
+4. **Log the upload** — append to `knowledge/experiments/log.md`:
    ```
    ### Upload: [date and time]
    - **Version**: Softy:vN
