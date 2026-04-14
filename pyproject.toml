@@ -9,8 +9,8 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 classifiers = ["Programming Language :: Python :: 3", "Programming Language :: Python :: 3.12"]
 dependencies = [
-  "mettagrid==0.25.3",
-  "softmax-cli>=0.1.0",
+  "mettagrid==0.25.4",
+  "softmax-cli==0.25.0",
   "packaging>=24.0.0",
   "pydantic>=2.11.5",
   "pyyaml>=6.0.2",
