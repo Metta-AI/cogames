@@ -35,7 +35,7 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 neural = ["pufferlib-core", "torch", "einops>=0.8.0", "mettagrid[train]"]
-test = ["pytest", "pytest-xdist", "ruff"]
+test = ["cogames[neural]", "pytest", "pytest-xdist", "ruff"]
 
 [project.scripts]
 cogames = "cogames.main:app"
