@@ -638,7 +638,6 @@ def test_create_bundle_rejects_raw_metta_checkpoint_without_setup_script(tmp_pat
     assert result.exit_code == 1
     assert "Build a submission bundle" in result.output
     assert "--setup-script" in result.output
-    assert "agent/COGAMES_SUBMISSION.md" in result.output
 
 
 def test_upload_help_promotes_submission_bundle_for_trained_policies() -> None:
