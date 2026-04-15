@@ -10,7 +10,7 @@ from cogames.core import CoGameMissionVariant, Deps
 from cogames.games.cogs_vs_clips.game.clips.clips import ClipsVariant
 from cogames.games.cogs_vs_clips.game.clips.ship import clips_ship_map_names_in_map_config
 from cogames.games.cogs_vs_clips.game.junction import JunctionVariant
-from cogames.games.cogs_vs_clips.game.teams.hub import CvCHubConfig, TeamHubVariant
+from cogames.games.cogs_vs_clips.game.teams.hub import TeamHubVariant
 from cogames.games.cogs_vs_clips.game.teams.team import TeamVariant
 from mettagrid.config.filter import hasTag, maxDistance, sharedTagPrefix
 from mettagrid.config.handler_config import Handler, updateTarget
@@ -30,11 +30,10 @@ if TYPE_CHECKING:
 def net_materialized_query(team: TeamConfig) -> MaterializedQuery:
     """Build the closure query that computes which junctions are in a team's network."""
     net_tag = f"net:{team.name}"
-    source = getattr(team, "ship_query", lambda: CvCHubConfig.hub_query(team))()
     return materializedQuery(
         net_tag,
         ClosureQuery(
-            source=source,
+            source=team.network_seed_query(),
             candidates=query("type:junction", hasTag(team.team_tag())),
             edge_filters=[maxDistance(max(JUNCTION_ALIGN_DISTANCE, HUB_ALIGN_DISTANCE))],
         ),

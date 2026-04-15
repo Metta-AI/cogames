@@ -64,11 +64,6 @@ def clips_ship_map_names_in_map_config(config: MapBuilderConfig | SceneConfig) -
     return []
 
 
-def count_clips_ships_in_map_config(config: MapBuilderConfig | SceneConfig) -> int:
-    """Count clips ship placements in a map builder config."""
-    return len(clips_ship_map_names_in_map_config(config))
-
-
 def remove_clips_ships_from_map_config(config: AnyMapBuilderConfig | SceneConfig) -> AnyMapBuilderConfig | SceneConfig:
     """Return a copy of *config* with all clips ship placements removed."""
     if isinstance(config, AsciiMapBuilderConfig):
@@ -129,7 +124,7 @@ def set_clips_ships_in_map_config(
         return config.model_copy(deep=True, update={"instance": updated})
 
     if num_ships is None:
-        if count_clips_ships_in_map_config(config) > 0:
+        if clips_ship_map_names_in_map_config(config):
             return config.model_copy(deep=True)
         if isinstance(config, MachinaArenaConfig):
             return add_clips_ships_to_map_config(config, DEFAULT_CLIPS_SHIP_COUNT)
@@ -138,7 +133,7 @@ def set_clips_ships_in_map_config(
     if isinstance(config, AsciiMapBuilderConfig):
         if num_ships == 0:
             return _remove_from_ascii(config)
-        current_ships = count_clips_ships_in_map_config(config)
+        current_ships = len(clips_ship_map_names_in_map_config(config))
         if current_ships == num_ships:
             return config.model_copy(deep=True)
         raise ValueError(

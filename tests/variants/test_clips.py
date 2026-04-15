@@ -6,7 +6,7 @@ from cogames.games.cogs_vs_clips.game import (
     MultiTeamVariant,
     NoClipsVariant,
 )
-from cogames.games.cogs_vs_clips.game.clips.ship import count_clips_ships_in_map_config
+from cogames.games.cogs_vs_clips.game.clips.ship import clips_ship_map_names_in_map_config
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
 from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
 from cogames.games.cogs_vs_clips.game.territory import HUB_ALIGN_DISTANCE, JUNCTION_ALIGN_DISTANCE
@@ -38,7 +38,7 @@ def _sum_max_targets(events: dict) -> int:
 
 def test_clips_event_targets_scale_with_default_clips_ship_count() -> None:
     env = make_machina1_mission().make_env()
-    assert count_clips_ships_in_map_config(env.game.map_builder) == 4
+    assert len(clips_ship_map_names_in_map_config(env.game.map_builder)) == 4
 
     neutral_events = _clips_event_group(env.game.events, "neutral_to_clips")
     scramble_events = _clips_event_group(env.game.events, "cogs_to_neutral")
@@ -67,7 +67,7 @@ def test_clips_event_targets_split_per_corner_ship_count() -> None:
 def test_zero_ship_clips_does_not_register_ship_objects() -> None:
     env = make_machina1_mission().with_variants([ClipsVariant(num_ships=0)]).make_env()
 
-    assert count_clips_ships_in_map_config(env.game.map_builder) == 0
+    assert not clips_ship_map_names_in_map_config(env.game.map_builder)
     assert not any(name.startswith("clips:ship") for name in env.game.objects)
     assert not _clips_event_group(env.game.events, "neutral_to_clips")
     assert not _clips_event_group(env.game.events, "cogs_to_neutral")
@@ -77,7 +77,7 @@ def test_zero_ship_clips_does_not_register_ship_objects() -> None:
 def test_no_clips_variant_removes_ships_and_events() -> None:
     env = make_machina1_mission().with_variants([NoClipsVariant()]).make_env()
 
-    assert count_clips_ships_in_map_config(env.game.map_builder) == 0
+    assert not clips_ship_map_names_in_map_config(env.game.map_builder)
     assert not any(name.startswith("clips:ship") for name in env.game.objects)
     assert not _clips_event_group(env.game.events, "neutral_to_clips")
     assert not _clips_event_group(env.game.events, "cogs_to_neutral")
@@ -117,7 +117,7 @@ def test_no_clips_variant_removes_preseeded_ascii_ships() -> None:
 
     env = base.make_env()
 
-    assert count_clips_ships_in_map_config(env.game.map_builder) == 0
+    assert not clips_ship_map_names_in_map_config(env.game.map_builder)
     assert not any(name.startswith("clips:ship") for name in env.game.objects)
     assert not _clips_event_group(env.game.events, "neutral_to_clips")
     assert not _clips_event_group(env.game.events, "cogs_to_neutral")
@@ -328,14 +328,14 @@ def test_adaptive_clips_balanced_and_burst_encode_mutual_exclusion_in_queries() 
 
 def test_adaptive_clips_zero_ship_and_no_clips_still_remove_events() -> None:
     env = make_machina1_mission().with_variants([ClipsVariant(num_ships=0), AdaptiveClipsVariant()]).make_env()
-    assert count_clips_ships_in_map_config(env.game.map_builder) == 0
+    assert not clips_ship_map_names_in_map_config(env.game.map_builder)
     assert not _clips_event_group(env.game.events, "neutral_to_clips")
     assert not _clips_event_group(env.game.events, "cogs_to_neutral")
 
 
 def test_no_clips_and_adaptive_clips_remove_events() -> None:
     env = make_machina1_mission().with_variants([AdaptiveClipsVariant(), NoClipsVariant()]).make_env()
-    assert count_clips_ships_in_map_config(env.game.map_builder) == 0
+    assert not clips_ship_map_names_in_map_config(env.game.map_builder)
     assert not _clips_event_group(env.game.events, "neutral_to_clips")
     assert not _clips_event_group(env.game.events, "cogs_to_neutral")
 
@@ -350,12 +350,12 @@ def test_split_variants_keeps_clips_defaults_after_no_clips_override() -> None:
     no_clips_variants, _ = split_variants(["clips", "no_clips"])
     no_clips_env = make_machina1_mission().with_variants(no_clips_variants).make_env()
 
-    assert count_clips_ships_in_map_config(no_clips_env.game.map_builder) == 0
+    assert not clips_ship_map_names_in_map_config(no_clips_env.game.map_builder)
 
     clips_variants, _ = split_variants(["clips"])
     clips_env = make_machina1_mission().with_variants(clips_variants).make_env()
 
-    assert count_clips_ships_in_map_config(clips_env.game.map_builder) == 4
+    assert len(clips_ship_map_names_in_map_config(clips_env.game.map_builder)) == 4
 
 
 def test_clips_uses_ship_object_with_junction_territory_range() -> None:
@@ -481,7 +481,7 @@ def test_clips_event_targets_scale_after_multi_team_map_rewrite() -> None:
 
 
 def test_multiteam_variant_does_not_mutate_shared_map_constants() -> None:
-    assert count_clips_ships_in_map_config(MACHINA_1_MAP_BUILDER) == 0
+    assert not clips_ship_map_names_in_map_config(MACHINA_1_MAP_BUILDER)
     mission = CvCMission(
         name="basic",
         description="Constructor variant path should not mutate shared map state",
@@ -493,8 +493,8 @@ def test_multiteam_variant_does_not_mutate_shared_map_constants() -> None:
     ).with_variants([DamageVariant(), ClipsVariant(), MultiTeamVariant(num_teams=2)])
     env = mission.make_env()
 
-    assert count_clips_ships_in_map_config(env.game.map_builder) == 4 * 2
-    assert count_clips_ships_in_map_config(MACHINA_1_MAP_BUILDER) == 0
+    assert len(clips_ship_map_names_in_map_config(env.game.map_builder)) == 4 * 2
+    assert not clips_ship_map_names_in_map_config(MACHINA_1_MAP_BUILDER)
 
 
 def test_scrambler_tutorial_overrun_alignment_still_applies() -> None:
