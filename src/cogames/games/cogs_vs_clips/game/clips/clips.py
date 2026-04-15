@@ -80,7 +80,7 @@ class ClipsConfig(TeamConfig):
     adaptive_dominance_ratio: int = Field(default=2, ge=2)
     adaptive_dominant_targets_per_lane: int = Field(default=3, ge=1)
 
-    def ship_query(self) -> Query:
+    def network_seed_query(self) -> Query:
         return query(typeTag("ship"), hasTag(self.team_tag()))
 
     def events(
@@ -91,8 +91,7 @@ class ClipsConfig(TeamConfig):
         if self.disabled:
             return {}
         ship_map_names = clips_ship_map_names_in_map_config(map_builder)
-        ship_count = len(ship_map_names)
-        if ship_count <= 0:
+        if not ship_map_names:
             return {}
 
         scramble_end = max_steps if self.scramble_end is None else min(self.scramble_end, max_steps)
@@ -214,7 +213,6 @@ class ClipsConfig(TeamConfig):
             *,
             align_key: str,
             scramble_key: str,
-            lane_suffix: str,
             center_query: Query,
             align_timesteps: list[int],
             scramble_timesteps: list[int],
@@ -286,7 +284,6 @@ class ClipsConfig(TeamConfig):
                 add_centered_lane_events(
                     align_key=align_key,
                     scramble_key=scramble_key,
-                    lane_suffix=lane_suffix,
                     center_query=ship_query,
                     align_timesteps=align_timesteps,
                     scramble_timesteps=scramble_timesteps,
@@ -301,7 +298,6 @@ class ClipsConfig(TeamConfig):
                 add_centered_lane_events(
                     align_key=align_key,
                     scramble_key=scramble_key,
-                    lane_suffix=lane_suffix,
                     center_query=enemy_hub_query,
                     align_timesteps=align_timesteps,
                     scramble_timesteps=scramble_timesteps,
@@ -387,21 +383,24 @@ class ClipsVariant(CoGameMissionVariant):
     @override
     def configure(self, deps: ResolvedDeps) -> None:
         team_v = deps.required(TeamVariant)
-        self.clips = self.clips_config.model_copy(deep=True)
-        team_v.teams[self.clips.name] = self.clips
+        clips = self.clips_config.model_copy(deep=True)
+        self.clips = clips
+        team_v.teams[clips.name] = clips
+
+    def require_clips(self) -> ClipsConfig:
+        assert self.clips is not None
+        return self.clips
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
         env.game.map_builder = set_clips_ships_in_map_config(env.game.map_builder, self.num_ships)  # type: ignore[assignment]
+        clips = self.require_clips()
 
-        if self.clips is None or not isinstance(self.clips, ClipsConfig):
-            return
-
-        for name, station in self.clips.ship_stations(env.game.map_builder).items():
+        for name, station in clips.ship_stations(env.game.map_builder).items():
             env.game.objects.setdefault(name, station)
             env.game.render.symbols.setdefault(name, "🚀")
 
-        clips_events = self.clips.events(
+        clips_events = clips.events(
             max_steps=env.game.max_steps,
             map_builder=env.game.map_builder,
         )
@@ -425,13 +424,12 @@ class AdaptiveClipsVariant(CoGameMissionVariant):
 
     @override
     def configure(self, deps: ResolvedDeps) -> None:
-        clips_v = deps.required(ClipsVariant)
-        assert clips_v.clips is not None and isinstance(clips_v.clips, ClipsConfig)
-        clips_v.clips.adaptive_enabled = True
-        clips_v.clips.greedy_expand_from_ships = False
-        clips_v.clips.angry_target_enemy_hub = False
-        clips_v.clips.adaptive_dominance_ratio = self.dominance_ratio
-        clips_v.clips.adaptive_dominant_targets_per_lane = self.dominant_targets_per_lane
+        clips = deps.required(ClipsVariant).require_clips()
+        clips.adaptive_enabled = True
+        clips.greedy_expand_from_ships = False
+        clips.angry_target_enemy_hub = False
+        clips.adaptive_dominance_ratio = self.dominance_ratio
+        clips.adaptive_dominant_targets_per_lane = self.dominant_targets_per_lane
 
 
 class GreedyClipsVariant(CoGameMissionVariant):
@@ -446,10 +444,9 @@ class GreedyClipsVariant(CoGameMissionVariant):
 
     @override
     def configure(self, deps: ResolvedDeps) -> None:
-        clips_v = deps.required(ClipsVariant)
-        assert clips_v.clips is not None and isinstance(clips_v.clips, ClipsConfig)
-        clips_v.clips.greedy_expand_from_ships = True
-        clips_v.clips.scramble_radius = JUNCTION_ALIGN_DISTANCE
+        clips = deps.required(ClipsVariant).require_clips()
+        clips.greedy_expand_from_ships = True
+        clips.scramble_radius = JUNCTION_ALIGN_DISTANCE
 
 
 class AngryClipsVariant(CoGameMissionVariant):
@@ -469,16 +466,15 @@ class AngryClipsVariant(CoGameMissionVariant):
 
     @override
     def configure(self, deps: ResolvedDeps) -> None:
-        clips_v = deps.required(ClipsVariant)
-        assert clips_v.clips is not None and isinstance(clips_v.clips, ClipsConfig)
-        clips_v.clips.angry_target_enemy_hub = True
-        clips_v.clips.greedy_expand_from_ships = False
-        clips_v.clips.scramble_radius = JUNCTION_ALIGN_DISTANCE
-        clips_v.clips.initial_clips_start = self.initial_clips_start
-        clips_v.clips.align_start = self.align_start
-        clips_v.clips.scramble_start = self.scramble_start
-        clips_v.clips.align_interval = self.align_interval
-        clips_v.clips.scramble_interval = self.scramble_interval
+        clips = deps.required(ClipsVariant).require_clips()
+        clips.angry_target_enemy_hub = True
+        clips.greedy_expand_from_ships = False
+        clips.scramble_radius = JUNCTION_ALIGN_DISTANCE
+        clips.initial_clips_start = self.initial_clips_start
+        clips.align_start = self.align_start
+        clips.scramble_start = self.scramble_start
+        clips.align_interval = self.align_interval
+        clips.scramble_interval = self.scramble_interval
 
 
 class NoClipsVariant(CoGameMissionVariant):

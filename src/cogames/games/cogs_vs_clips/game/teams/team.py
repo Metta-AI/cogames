@@ -9,7 +9,9 @@ from pydantic import Field
 from cogames.core import CoGameMissionVariant
 from cogames.variants import ResolvedDeps
 from mettagrid.base_config import Config
+from mettagrid.config.filter import hasTag
 from mettagrid.config.mettagrid_config import AgentConfig, MettaGridConfig
+from mettagrid.config.query import Query, query
 
 if TYPE_CHECKING:
     from cogames.games.cogs_vs_clips.missions.mission import CvCMission
@@ -28,6 +30,9 @@ class TeamConfig(Config):
 
     def net_tag(self) -> str:
         return f"net:{self.name}"
+
+    def network_seed_query(self) -> Query:
+        return query("type:hub", hasTag(self.team_tag()))
 
 
 class TeamVariant(CoGameMissionVariant):

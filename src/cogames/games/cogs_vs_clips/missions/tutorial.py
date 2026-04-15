@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, override
 from pydantic import Field
 
 from cogames.core import CoGameMissionVariant, Deps
-from cogames.games.cogs_vs_clips.game.clips import ClipsConfig, ClipsVariant
+from cogames.games.cogs_vs_clips.game.clips import ClipsVariant
 from cogames.games.cogs_vs_clips.game.damage import DamageVariant
 from cogames.games.cogs_vs_clips.game.days import DaysVariant
 from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
@@ -134,21 +134,18 @@ class OverrunVariant(CoGameMissionVariant):
 
     @override
     def configure(self, deps: ResolvedDeps) -> None:
-        clips_v = deps.required(ClipsVariant)
-        assert clips_v.clips is not None and isinstance(clips_v.clips, ClipsConfig)
+        clips = deps.required(ClipsVariant).require_clips()
         # Disable all clips events — junctions are tagged directly in modify_env.
-        clips_v.clips.disabled = True
+        clips.disabled = True
 
     @override
     def modify_env(self, mission: CvCMission, env: MettaGridConfig) -> None:
-        clips_v = mission.required_variant(ClipsVariant)
-        if clips_v.clips is None:
-            return
+        clips = mission.required_variant(ClipsVariant).require_clips()
         junction = env.game.objects.get("junction")
         if junction is None:
             return
-        junction.tags.append(clips_v.clips.team_tag())
-        junction.tags.append(clips_v.clips.net_tag())
+        junction.tags.append(clips.team_tag())
+        junction.tags.append(clips.net_tag())
 
 
 # TODO: unchecked variant
