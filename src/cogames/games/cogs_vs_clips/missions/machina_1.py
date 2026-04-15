@@ -46,7 +46,6 @@ from mettagrid.config.mutation import logStatToGame
 from mettagrid.config.reward_config import reward
 from mettagrid.mapgen.mapgen import MapGen, MapGenConfig
 from mettagrid.mapgen.scenes.building_distributions import DistributionConfig, DistributionType
-from mettagrid.mapgen.scenes.compound import CompoundConfig
 
 MACHINA_1_MAP_BUILDER = MapGen.Config(
     width=88,
@@ -58,33 +57,17 @@ MACHINA_1_MAP_BUILDER = MapGen.Config(
 )
 
 
-def _cvc_compound_config() -> CompoundConfig:
-    return CompoundConfig(
-        hub_object="empty",
-        corner_bundle="none",
-        cross_bundle="none",
-        cross_distance=7,
-    )
-
-
 def _build_machina1_map_builder(spawn_count: int) -> MapGenConfig:
     map_builder = MACHINA_1_MAP_BUILDER.model_copy(deep=True)
     instance = map_builder.instance
-    assert instance is not None
     assert isinstance(instance, MachinaArenaConfig)
-    existing_building_distributions = instance.building_distributions or {}
-    existing_building_distributions = {
-        k: (DistributionConfig.model_validate(v) if isinstance(v, dict) else v)
-        for k, v in existing_building_distributions.items()
-    }
     return map_builder.model_copy(
         update={
             "instance": instance.model_copy(
                 update={
                     "spawn_count": spawn_count,
-                    "hub": _cvc_compound_config(),
                     "building_distributions": {
-                        **existing_building_distributions,
+                        **(instance.building_distributions or {}),
                         "junction": DistributionConfig(type=DistributionType.POISSON),
                     },
                 }

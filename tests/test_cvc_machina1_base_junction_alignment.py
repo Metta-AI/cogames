@@ -26,6 +26,10 @@ def test_cvc_machina1_site_has_no_home_junction() -> None:
     instance = map_builder.instance
     assert instance is not None
     assert isinstance(instance, MachinaArenaConfig)
+    assert instance.hub.hub_object == "empty"
+    assert instance.hub.corner_bundle == "none"
+    assert instance.hub.cross_bundle == "none"
+    assert instance.hub.cross_distance == 7
     assert instance.map_corner_offset == 1
     assert instance.map_perimeter_placements == []
     assert instance.map_corner_placements == []
