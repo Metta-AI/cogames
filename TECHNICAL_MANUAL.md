@@ -197,7 +197,7 @@ CoGames exposes talk-and-walk as the `talk` mission variant:
 `talk` is the speech-bubble variant of `vibes`, so it preserves vibe identity while swapping the explicit
 `change_vibe_*` action surface out for short nearby speech.
 
-For SDK and cyborg policies, the canonical communication contract is:
+For SDK and higher-level `cogamer`-style policies, the canonical communication contract is:
 
 - send communication with `{"talk": "..."}` or `MacroDirective(talk="...")`
 - read teammate speech from visible agent entities with `label="talking"`
