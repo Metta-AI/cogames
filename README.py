@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.0
+#       jupytext_version: 1.19.1
 #   kernelspec:
 #     display_name: .venv
 #     language: python
@@ -98,13 +98,25 @@
 # </details>
 
 # %% [markdown]
-# ## Step 2: Play Cogs vs Clips
+# ## Step 2: Run your first game
 #
-# Play an easy mission in Cogs vs Clips using:
+# Start with `cogames play`. This is the default command for running a local episode.
+# ```bash
+# cogames play -m arena -p starter -r log -s 300
+# ```
+#
+# If your environment supports GUI rendering and you want the guided onboarding flow, run:
 # ```bash
 # cogames tutorial play
 # ```
-# The game will open in a new window, and the terminal will give you instructions to complete training mission.
+# The tutorial opens a new window, and the terminal gives you instructions for the training mission.
+#
+# Command guide:
+#
+# - `cogames play`: first local run; one episode with GUI, unicode, or log rendering
+# - `cogames scrimmage`: repeat one policy across many episodes
+# - `cogames pickup`: compare one policy against a pool and compute VOR; use this later, not as the default
+#   "play the game" command
 
 # %% [markdown]
 # ## Step 3: Submit a policy to the leaderboard
