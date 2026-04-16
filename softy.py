@@ -17,7 +17,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Iterable
 
-from mettagrid.policy.policy import MultiAgentPolicy, StatefulAgentPolicy, StatefulPolicyImpl
+from mettagrid.policy.policy import AgentPolicy, MultiAgentPolicy, StatefulPolicyImpl
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Action
 from mettagrid.simulator.interface import AgentObservation
@@ -29,10 +29,29 @@ MOVE_DELTAS = {"north": (-1, 0), "south": (1, 0), "west": (0, -1), "east": (0, 1
 DIRECTIONS = ["north", "east", "south", "west"]
 TEAM_TAG_PREFIX = "team:"
 
-# Role distribution for 8 agents — max expansion.
-# 3 miners sustain heart pipeline; 5 aligners rush junctions.
-# No scrambler — pure alignment is 2x more heart-efficient than scramble+align.
-ROLE_CYCLE = ("miner", "miner", "miner", "aligner", "aligner", "aligner", "aligner", "aligner")
+# P200: Role distributions by team size — includes scramblers for territory recapture.
+# Competitive analysis: top policies (dinky/slinky) all use scramblers (30-177 per episode).
+# Without scrambling, once clips takes a junction it's permanently lost.
+# c1/c2: pure aligners — 96% of tournament is c1, teammates handle mining/scrambling.
+# c3+: scramblers come from aligner slots, miners never switch.
+ROLE_DISTRIBUTIONS = {
+    1: ("aligner",),
+    2: ("aligner", "aligner"),
+    3: ("aligner", "aligner", "scrambler"),
+    4: ("miner", "aligner", "aligner", "scrambler"),
+    5: ("miner", "miner", "aligner", "aligner", "scrambler"),
+    6: ("miner", "miner", "aligner", "aligner", "aligner", "scrambler"),
+    7: ("miner", "miner", "aligner", "aligner", "aligner", "aligner", "scrambler"),
+    8: ("miner", "miner", "miner", "aligner", "aligner", "aligner", "aligner", "aligner"),
+}
+
+# Role Switching Constants (tunable by improvement loop)
+SWITCH_HEARTLESS_THRESHOLD = 100  # ticks heartless before aligner → scrambler (was 30, too eager)
+SWITCH_NO_TARGET_THRESHOLD = 80   # ticks with no alignable target → scrambler (was 20, too eager)
+SWITCH_NEUTRAL_AVAILABLE = 1      # neutral junctions visible → scrambler → aligner (switch back fast)
+SWITCH_COOLDOWN = 30              # min ticks between role switches (was 50, faster switch-back)
+SWITCH_ENABLED_MAX_TEAM = 4       # enable dynamic switching at c2-c4 (tournament-relevant sizes)
+SCRAMBLE_LINGER_TICKS = 5         # ticks to stay in AOE after scrambling a junction
 
 # Miner element preference — diversify across 3 elements, silicon covered by fallback.
 MINER_ELEMENT_PREF_IDX = {0: 0, 1: 1, 2: 2}  # carbon, oxygen, germanium; silicon via opportunistic
@@ -42,7 +61,7 @@ ENERGY_MOVE_COST = 4
 STUCK_THRESHOLD = 3  # same position this many times in recent history triggers rotation
 MINER_DEPOSIT_THRESHOLD = 30  # mine more before depositing to reduce travel overhead
 ALIGN_HUB_RADIUS = 25  # junctions within this distance of hub can be aligned
-ALIGN_NET_RADIUS = 15  # junctions within this distance of team network can be aligned
+ALIGN_NET_RADIUS = 20  # P89: expanded from 15 — wider net reach helps frontier junctions
 
 
 # ── Shared Coordinator ────────────────────────────────────────────────────────
@@ -57,6 +76,47 @@ class SoftyCoordinator:
     extractors: dict[tuple[int, int], str] = field(default_factory=dict)
     agent_targets: dict[int, tuple[int, int] | None] = field(default_factory=dict)
     agent_positions: dict[int, tuple[int, int]] = field(default_factory=dict)
+    last_hub_resources: dict[str, int] = field(default_factory=dict)
+    agent_ids: list[int] = field(default_factory=list)
+    # P211: Spatial memory — shared wall map and explored cell tracking
+    walls: set[tuple[int, int]] = field(default_factory=set)
+    explored: set[tuple[int, int]] = field(default_factory=set)
+    _net_cache: set[tuple[int, int]] = field(default_factory=set)
+    _net_cache_tick: int = field(default=-1)
+    _junctions_version: int = field(default=0)
+    # P213: Adaptive team playbook — detect self-pairing at c2
+    cogs_junction_snapshot: int | None = field(default=None)
+    playbook_applied: bool = field(default=False)
+
+    def net_connected_junctions(self) -> set[tuple[int, int]]:
+        """BFS from hub through cogs junctions within 25 cells. Cached by junction version."""
+        if self._net_cache_tick == self._junctions_version:
+            return self._net_cache
+        connected: set[tuple[int, int]] = set()
+        if self.hub_pos is None:
+            self._net_cache = connected
+            self._net_cache_tick = self._junctions_version
+            return connected
+        queue = [self.hub_pos]
+        visited = {self.hub_pos}
+        while queue:
+            pos = queue.pop(0)
+            for jpos, jalign in self.junctions.items():
+                if jalign != "cogs" or jpos in visited:
+                    continue
+                if abs(jpos[0] - pos[0]) + abs(jpos[1] - pos[1]) <= 25:
+                    visited.add(jpos)
+                    connected.add(jpos)
+                    queue.append(jpos)
+        self._net_cache = connected
+        self._net_cache_tick = self._junctions_version
+        return connected
+
+    def bottleneck_element(self) -> str | None:
+        """Return the element with lowest hub inventory, or None if no data."""
+        if not self.last_hub_resources:
+            return None
+        return min(ELEMENTS, key=lambda e: self.last_hub_resources.get(e, 0))
 
     def claim_target(self, agent_id: int, target: tuple[int, int] | None) -> None:
         self.agent_targets[agent_id] = target
@@ -80,7 +140,22 @@ class SoftyCoordinator:
     def nearest_alignable_junction(
         self, pos: tuple[int, int], agent_id: int, blacklist: set[tuple[int, int]] | None = None,
     ) -> tuple[int, int] | None:
-        """Find best neutral junction: balance distance with frontier expansion value."""
+        """Find best alignable NEUTRAL junction using frontier scoring.
+        P104: Pre-compute align range set to avoid redundant BFS (~300x per call)."""
+        # Build the set of all positions that are in align range (BFS once, not per-junction)
+        in_range: set[tuple[int, int]] = set()
+        net = self.net_connected_junctions()
+        for jpos in self.junctions:
+            # Check hub range
+            if self.hub_pos and abs(jpos[0] - self.hub_pos[0]) + abs(jpos[1] - self.hub_pos[1]) <= ALIGN_HUB_RADIUS:
+                in_range.add(jpos)
+                continue
+            # Check net range
+            for cpos in net:
+                if abs(jpos[0] - cpos[0]) + abs(jpos[1] - cpos[1]) <= ALIGN_NET_RADIUS:
+                    in_range.add(jpos)
+                    break
+
         best, best_score = None, float("-inf")
         for jpos, jalign in self.junctions.items():
             if jalign != "neutral":
@@ -89,29 +164,50 @@ class SoftyCoordinator:
                 continue
             if blacklist and jpos in blacklist:
                 continue
-            if not self._in_align_range(jpos):
+            if jpos not in in_range:
                 continue
             dist = abs(jpos[0] - pos[0]) + abs(jpos[1] - pos[1])
-            # Frontier value: count known non-cogs junctions that would become
-            # newly alignable if we capture this one (within 15 cells)
             frontier = 0
             for opos, oalign in self.junctions.items():
                 if opos == jpos or oalign == "cogs":
                     continue
                 if abs(opos[0] - jpos[0]) + abs(opos[1] - jpos[1]) <= ALIGN_NET_RADIUS:
-                    if not self._in_align_range(opos):
+                    if opos not in in_range:
                         frontier += 1
-            # Score: frontier bonus vs distance penalty
             score = frontier * 8.0 - dist
             if score > best_score:
                 best_score = score
                 best = jpos
         return best
 
-    def nearest_enemy_alignable_junction(
+    def nearest_hub_junction(
         self, pos: tuple[int, int], agent_id: int, blacklist: set[tuple[int, int]] | None = None,
     ) -> tuple[int, int] | None:
-        """Find nearest enemy (clips) junction within alignment range."""
+        """P167: For small teams, find closest non-cogs junction within hub range.
+        Pure distance, no frontier scoring — speed over expansion."""
+        if not self.hub_pos:
+            return None
+        best, best_dist = None, float("inf")
+        for jpos, jalign in self.junctions.items():
+            if jalign == "cogs":
+                continue
+            if self.is_claimed(jpos, agent_id):
+                continue
+            if blacklist and jpos in blacklist:
+                continue
+            # Must be within hub alignment range (25 cells)
+            if abs(jpos[0] - self.hub_pos[0]) + abs(jpos[1] - self.hub_pos[1]) > ALIGN_HUB_RADIUS:
+                continue
+            dist = abs(jpos[0] - pos[0]) + abs(jpos[1] - pos[1])
+            if dist < best_dist:
+                best_dist = dist
+                best = jpos
+        return best
+
+    def nearest_enemy_junction(
+        self, pos: tuple[int, int], agent_id: int, blacklist: set[tuple[int, int]] | None = None,
+    ) -> tuple[int, int] | None:
+        """Fallback: find nearest clips junction in align range."""
         best, best_dist = None, float("inf")
         for jpos, jalign in self.junctions.items():
             if jalign != "clips":
@@ -129,16 +225,17 @@ class SoftyCoordinator:
         return best
 
     def _in_align_range(self, jpos: tuple[int, int]) -> bool:
-        """Check if a junction position is within alignment range of hub or cogs network."""
+        """P18: Check alignment range using NET-CONNECTED junctions only.
+        Prevents targeting junctions near disconnected cogs junctions after cascade failure."""
         # Within 25 cells of hub
         if self.hub_pos:
             if abs(jpos[0] - self.hub_pos[0]) + abs(jpos[1] - self.hub_pos[1]) <= ALIGN_HUB_RADIUS:
                 return True
-        # Within 15 cells of any cogs-aligned junction
-        for cpos, calign in self.junctions.items():
-            if calign == "cogs":
-                if abs(jpos[0] - cpos[0]) + abs(jpos[1] - cpos[1]) <= ALIGN_NET_RADIUS:
-                    return True
+        # Within 15 cells of any NET-CONNECTED cogs junction
+        net = self.net_connected_junctions()
+        for cpos in net:
+            if abs(jpos[0] - cpos[0]) + abs(jpos[1] - cpos[1]) <= ALIGN_NET_RADIUS:
+                return True
         return False
 
     def nearest_extractor(self, pos: tuple[int, int], element: str | None, agent_id: int) -> tuple[int, int] | None:
@@ -186,6 +283,16 @@ class SoftyState:
     heartless_ticks: int = 0  # ticks spent without a heart (aligners explore after threshold)
     hub_resources: dict[str, int] = field(default_factory=dict)  # team hub inventory (carbon, oxygen, etc.)
     last_move_succeeded: bool = True  # from last_action_move token
+    # Role switching state
+    last_switch_tick: int = 0
+    switch_count: int = 0
+    role_ticks: int = 0
+    no_target_ticks: int = 0
+    switching_to: str | None = None  # non-None = mid-switch, navigating to gear station
+    # P211: Spatial memory — track move direction for wall detection, frontier for exploration
+    last_move_dir: str | None = None  # direction of last attempted move
+    frontier_target: tuple[int, int] | None = None  # shared coords of current exploration frontier
+    frontier_ticks: int = 0  # ticks navigating toward frontier_target
 
 
 # ── Agent Implementation ─────────────────────────────────────────────────────
@@ -196,12 +303,12 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
         self,
         env: PolicyEnvInterface,
         agent_id: int,
-        role: str,
+        role: str | None,
         coordinator: SoftyCoordinator,
     ):
         self._env = env
         self._id = agent_id
-        self._role = role
+        self._role = role  # None = assign dynamically on first step
         self._coord = coordinator
 
         names = env.action_names
@@ -221,11 +328,57 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
         for s in self._extractor_tags_by_elem.values():
             self._all_extractor_tags |= s
         self._station_tags = {r: self._tags([r, f"c:{r}"]) for r in ("miner", "aligner", "scrambler", "scout")}
+        self._all_station_tags: set[int] = set()
+        for st in self._station_tags.values():
+            self._all_station_tags |= st
         self._deposit_tags = self._tags(["hub", "junction"])
         self._heart_tags = self._tags(["hub", "chest"])
 
         self._preferred_element = ELEMENTS[MINER_ELEMENT_PREF_IDX.get(agent_id, agent_id % len(ELEMENTS))]
-        self._explore_offset = agent_id % len(DIRECTIONS)
+        # P73: Fix sector collision. Was agent_id % 4 → only 4 of 8 sectors used.
+        # With 0, sector_idx = agent_id % 8 → all 8 sectors covered, no overlap.
+        self._explore_offset = 0
+
+    def _assign_role(self) -> None:
+        """P200: Role assignment using ROLE_DISTRIBUTIONS — includes scramblers at all team sizes.
+
+        Competitive analysis: dinky/slinky use scramblers (30-177/episode). Without scrambling,
+        clips junctions are permanently lost. ROLE_DISTRIBUTIONS ensures every team gets at least
+        one scrambler (except c1/c2 where economy can't support it).
+        """
+        team_size = len(self._coord.agent_ids)
+        dist = ROLE_DISTRIBUTIONS.get(team_size, ROLE_DISTRIBUTIONS[8])
+        sorted_ids = sorted(self._coord.agent_ids)
+        idx = sorted_ids.index(self._id) if self._id in sorted_ids else self._id % len(dist)
+        self._role = dist[idx % len(dist)]
+        if self._role == "miner":
+            self._preferred_element = ELEMENTS[idx % len(ELEMENTS)]
+
+    def _should_switch_role(self, tags: dict, inv: dict, s: SoftyState) -> str | None:
+        """P200: Check if agent should switch roles. Returns new role or None.
+
+        Tunable constants allow the improvement loop to optimize switching behavior.
+        dinky/slinky switch 3-38 times per episode — this enables the same capability.
+        """
+        team_size = len(self._coord.agent_ids)
+        if team_size < 3:
+            return None  # c1-c2: pure aligners, never switch — replay data shows switching at c2 adds stuck + scrambling overhead
+        if team_size > SWITCH_ENABLED_MAX_TEAM:
+            return None
+        if s.step_count - s.last_switch_tick < SWITCH_COOLDOWN:
+            return None
+        if self._role == "miner":
+            return None
+        if self._role == "aligner":
+            if s.heartless_ticks > SWITCH_HEARTLESS_THRESHOLD:
+                return "scrambler"
+            if s.no_target_ticks > SWITCH_NO_TARGET_THRESHOLD:
+                return "scrambler"
+        elif self._role == "scrambler":
+            neutral_count = sum(1 for a in self._coord.junctions.values() if a == "neutral")
+            if neutral_count >= SWITCH_NEUTRAL_AVAILABLE:
+                return "aligner"
+        return None
 
     def _tags(self, names: Iterable[str]) -> set[int]:
         ids: set[int] = set()
@@ -238,6 +391,8 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
         return ids
 
     def _act(self, name: str) -> Action:
+        # P211: Track move direction for wall detection on next tick
+        self._pending_move_dir = name[5:] if name.startswith("move_") else None
         return Action(name=name if name in self._action_set else self._noop)
 
     # ── Coordinate Conversion ────────────────────────────────────────────────
@@ -318,6 +473,10 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
 
         s.last_move_succeeded = bool(globs.get("last_action_move", 1))
 
+        # Sync hub resources to coordinator for cross-agent visibility
+        if s.hub_resources:
+            self._coord.last_hub_resources = dict(s.hub_resources)
+
         self._discover(tags, s)
         return tags, inv
 
@@ -343,6 +502,24 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
         if not s.has_hub_offset:
             return
 
+        # P211: Record wall when last move failed — the cell we tried to enter is impassable
+        # Skip if the blocking cell has an agent, junction, hub, extractor, or station
+        # (those are interactive objects, not walls)
+        if not s.last_move_succeeded and s.last_move_dir:
+            delta = MOVE_DELTAS.get(s.last_move_dir)
+            if delta:
+                obs_r = cr + delta[0]
+                obs_c = cc + delta[1]
+                blocked_tags = tags.get((obs_r, obs_c), set())
+                is_interactive = blocked_tags & (
+                    self._agent_tags | self._junction_tags | self._hub_tags
+                    | self._all_extractor_tags | self._heart_tags
+                    | self._all_station_tags
+                )
+                if not is_interactive:
+                    wall_shared = self._to_shared(s.row + delta[0], s.col + delta[1], s)
+                    self._coord.walls.add(wall_shared)
+
         for loc, lt in tags.items():
             # Compute hub-relative (shared) position
             lp_r = s.row + (loc[0] - cr)
@@ -354,11 +531,14 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
 
             if lt & self._junction_tags:
                 if lt & own_team:
-                    self._coord.junctions[sp] = "cogs"
+                    new_align = "cogs"
                 elif lt & (self._team_tags - own_team):
-                    self._coord.junctions[sp] = "clips"
+                    new_align = "clips"
                 else:
-                    self._coord.junctions[sp] = "neutral"
+                    new_align = "neutral"
+                if self._coord.junctions.get(sp) != new_align:
+                    self._coord.junctions[sp] = new_align
+                    self._coord._junctions_version += 1
 
             for elem, etags in self._extractor_tags_by_elem.items():
                 if lt & etags:
@@ -370,6 +550,13 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
 
         # Agent position in shared coords for deconfliction
         self._coord.agent_positions[self._id] = self._to_shared(s.row, s.col, s)
+
+        # P211: Mark visible cells as explored (shared coords)
+        for obs_r in range(self._env.obs_height):
+            for obs_c in range(self._env.obs_width):
+                lp_r = s.row + (obs_r - cr)
+                lp_c = s.col + (obs_c - cc)
+                self._coord.explored.add(self._to_shared(lp_r, lp_c, s))
 
     # ── Navigation ────────────────────────────────────────────────────────────
 
@@ -479,8 +666,10 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
 
         return None
 
-    def _go_absolute(self, target: tuple[int, int], s: SoftyState, tags: dict) -> Action:
-        """Navigate toward an off-screen target using BFS within visible window."""
+    def _go_absolute(self, target: tuple[int, int], s: SoftyState, tags: dict,
+                     fallback_to_wander: bool = True) -> Action | None:
+        """Navigate toward an off-screen target using BFS within visible window.
+        P76: Added fallback_to_wander param to allow _wander to call this without recursion."""
         dr, dc = target[0] - s.row, target[1] - s.col
         h, w = self._env.obs_height, self._env.obs_width
         blocked = set(tags)
@@ -543,37 +732,84 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
         if best_dir_str is not None:
             return self._act(f"move_{best_dir_str}")
 
-        return self._wander(tags, s)
+        if fallback_to_wander:
+            return self._wander(tags, s)
+        return None
 
     def _wander(self, tags: dict[tuple[int, int], set[int]], s: SoftyState) -> Action:
-        """Explore outward from hub toward agent's assigned sector of the map."""
+        """P211+P215: Frontier-seeking exploration with deconfliction, fallback to sector cycling."""
         blocked = set(tags)
         blocked.discard(self._center)
         h, w = self._env.obs_height, self._env.obs_width
 
-        # If we know our position and hub, move away from hub toward our sector
         if s.has_position and s.has_hub_offset and self._coord.hub_pos is not None:
+            agent_shared = self._to_shared(s.row, s.col, s)
+
+            # Use cached frontier target if still valid
+            if (s.frontier_target is not None
+                    and s.frontier_ticks < 15
+                    and s.stuck_count == 0
+                    and s.last_move_succeeded):
+                if agent_shared != s.frontier_target:
+                    s.frontier_ticks += 1
+                    local = self._to_local(s.frontier_target[0], s.frontier_target[1], s)
+                    action = self._go_absolute(local, s, tags, fallback_to_wander=False)
+                    if action is not None:
+                        return action
+                # Reached or stuck — clear
+                s.frontier_target = None
+                s.frontier_ticks = 0
+
+            # Search for nearest unexplored frontier cell (within radius 15)
+            # Deconflict: offset search center by agent index
+            offsets = [(0, 0), (8, 0), (0, 8), (-8, 0), (0, -8), (8, 8), (-8, -8), (8, -8), (-8, 8)]
+            sorted_ids = sorted(self._coord.agent_ids)
+            my_idx = sorted_ids.index(self._id) if self._id in sorted_ids else 0
+            offset = offsets[my_idx % len(offsets)]
+            search_center = (agent_shared[0] + offset[0], agent_shared[1] + offset[1])
+
+            best_frontier = None
+            best_dist = float("inf")
+            for r in range(-15, 16):
+                for c in range(-15, 16):
+                    candidate = (search_center[0] + r, search_center[1] + c)
+                    if candidate in self._coord.explored or candidate in self._coord.walls:
+                        continue
+                    # Must be adjacent to explored (it's a reachable frontier)
+                    is_frontier = False
+                    for dr, dc in MOVE_DELTAS.values():
+                        if (candidate[0] + dr, candidate[1] + dc) in self._coord.explored:
+                            is_frontier = True
+                            break
+                    if not is_frontier:
+                        continue
+                    dist = abs(candidate[0] - agent_shared[0]) + abs(candidate[1] - agent_shared[1])
+                    if dist < best_dist:
+                        best_dist = dist
+                        best_frontier = candidate
+
+            if best_frontier is not None:
+                s.frontier_target = best_frontier
+                s.frontier_ticks = 0
+                local = self._to_local(best_frontier[0], best_frontier[1], s)
+                action = self._go_absolute(local, s, tags, fallback_to_wander=False)
+                if action is not None:
+                    return action
+
+            # Fallback: sector cycling (pre-calibration or all explored)
             sector_angles = [
                 (-1, 0), (-1, 1), (0, 1), (1, 1),
                 (1, 0), (1, -1), (0, -1), (-1, -1),
             ]
-            # Use explore_dir_idx (shifted by stuck handler) mixed with agent id for initial diversity
             sector_idx = (self._id + s.explore_dir_idx) % len(sector_angles)
             dr, dc = sector_angles[sector_idx]
-            # hub_pos is (0,0) in shared coords; sector target within alignment range
             sector_shared = (dr * SECTOR_RADIUS, dc * SECTOR_RADIUS)
-            # Convert to local lp for direction calculation
             sector_local = self._to_local(sector_shared[0], sector_shared[1], s)
+            action = self._go_absolute(sector_local, s, tags, fallback_to_wander=False)
+            if action is not None:
+                return action
 
-            # Prioritize directions that move toward sector target
-            dirs = self._dirs_toward(sector_local[0] - s.row, sector_local[1] - s.col)
-            for d in dirs:
-                delta = MOVE_DELTAS[d]
-                nxt = (self._center[0] + delta[0], self._center[1] + delta[1])
-                if nxt not in blocked and 0 <= nxt[0] < h and 0 <= nxt[1] < w:
-                    return self._act(f"move_{d}")
-
-        # Fallback: use rotational exploration
+        # Final fallback: rotational exploration
         for i in range(len(DIRECTIONS)):
             d = DIRECTIONS[(s.explore_dir_idx + i) % len(DIRECTIONS)]
             delta = MOVE_DELTAS[d]
@@ -630,12 +866,13 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
         if len(s.recent_positions) > 8:
             s.recent_positions.pop(0)
         # Failed move (wall or blocked) is an immediate stuck signal
+        # P73: Use % 8 (not % 4) so stuck rotation covers all 8 sector angles
         if not s.last_move_succeeded:
             s.stuck_count += 2
-            s.explore_dir_idx = (s.explore_dir_idx + 1) % len(DIRECTIONS)
+            s.explore_dir_idx = (s.explore_dir_idx + 1) % 8
         elif len(s.recent_positions) >= 4 and s.recent_positions.count(pos) >= STUCK_THRESHOLD:
             s.stuck_count += 1
-            s.explore_dir_idx = (s.explore_dir_idx + 1) % len(DIRECTIONS)
+            s.explore_dir_idx = (s.explore_dir_idx + 1) % 8
         else:
             s.stuck_count = max(0, s.stuck_count - 1)
 
@@ -693,9 +930,14 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
             return self._go_to_role_station("miner", tags, own, s)
 
         # Phase 2: deposit when cargo is above threshold
+        # P168: In c2 (≤3 agents), deposit at threshold 4 instead of 30.
+        # Hub starts with 6 of each element, needs 7 of ALL FOUR to craft a heart.
+        # Low threshold forces fast bottleneck rotation: 4 carbon → deposit → 4 oxygen → ...
+        # First heart craftable after ~4 trips (~136 ticks) instead of ~500+ with threshold 30.
+        deposit_thresh = 4 if len(self._coord.agent_ids) <= 3 else MINER_DEPOSIT_THRESHOLD
         # On-screen: deposit at nearest visible friendly building (hub or junction)
         # Off-screen: always navigate to hub (junctions might get scrambled during transit)
-        if cargo >= MINER_DEPOSIT_THRESHOLD:
+        if cargo >= deposit_thresh:
             vis = self._closest(tags, self._deposit_tags, require=own)
             if vis is not None:
                 action = self._go_visible(vis, tags)
@@ -705,8 +947,10 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
                 return self._go_to_known(self._coord.hub_pos, tags, s)
             return self._wander(tags, s)
 
-        # Phase 3: mine — prefer assigned element visible, fallback to any visible
-        pref_tags = self._extractor_tags_by_elem.get(self._preferred_element, self._all_extractor_tags)
+        # Phase 3: mine — dynamically prefer the bottleneck element (lowest hub inventory)
+        bottleneck = self._coord.bottleneck_element()
+        pref_elem = bottleneck if bottleneck else self._preferred_element
+        pref_tags = self._extractor_tags_by_elem.get(pref_elem, self._all_extractor_tags)
         vis = self._closest(tags, pref_tags)
         if vis is None:
             vis = self._closest(tags, self._all_extractor_tags)
@@ -717,7 +961,7 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
 
         if s.has_position and s.has_hub_offset:
             shared_pos = self._to_shared(s.row, s.col, s)
-            target = self._coord.nearest_extractor(shared_pos, self._preferred_element, self._id)
+            target = self._coord.nearest_extractor(shared_pos, pref_elem, self._id)
             if target is None:
                 target = self._coord.nearest_extractor(shared_pos, None, self._id)
             if target:
@@ -743,28 +987,41 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
                 s.target_ticks = 0
             s.had_heart_last_step = False
             s.heartless_ticks += 1
-            # Check if hub can craft a heart (needs >= 7 of each element)
-            hub_can_craft = s.hub_resources and all(
-                s.hub_resources.get(e, 0) >= 7 for e in ELEMENTS
-            )
-            if hub_can_craft:
+            # Heartless: explore to discover junctions, periodically check hub for hearts.
+            hub_can_craft = False
+            if s.hub_resources:
+                counts = [s.hub_resources.get(e, 0) for e in ELEMENTS]
+                hub_can_craft = min(counts) >= 7
+            # P167: Small teams check hub more often (every 20 ticks vs 30).
+            # Hearts are scarce in c2 — minimize wait time.
+            hub_interval = 20 if len(self._coord.agent_ids) <= 3 else 30
+            if hub_can_craft or s.heartless_ticks % hub_interval == 5:
                 return self._go_to_heart_source(tags, own, s)
-            # Hub can't craft — explore to discover junctions, check back periodically
-            if (s.heartless_ticks % 30) < 5:
-                return self._go_to_heart_source(tags, own, s)
-            # Cycle through sectors to maximize junction discovery
-            if s.heartless_ticks % 8 == 0:
-                s.explore_dir_idx = (s.explore_dir_idx + 1) % 8
+            # P162: Pre-position toward known junction while heartless (c4+ only).
+            # Replay data (cycle 65): pre-positioning at c2 causes 100-6000+ stuck ticks
+            # because agents navigate to impassable junctions → stuck → hub → repeat.
+            # v29 (no pre-positioning) had 6 stuck ticks vs v37's 100-6142.
+            # Only enable at c4+ where teammates provide enough junction discovery.
+            if len(self._coord.agent_ids) > 3 and s.stuck_count < 3 and s.has_position and s.has_hub_offset:
+                shared_pos = self._to_shared(s.row, s.col, s)
+                target = self._coord.nearest_alignable_junction(shared_pos, self._id, s.failed_junctions)
+                if target is None:
+                    target = self._coord.nearest_enemy_junction(shared_pos, self._id, s.failed_junctions)
+                if target:
+                    self._coord.claim_target(self._id, target)
+                    return self._go_to_known(target, tags, s)
             return self._wander(tags, s)
 
         s.had_heart_last_step = True
         s.heartless_ticks = 0
 
-        # Detect stuck on unalignable junction: if we've been targeting the same
-        # junction for 15+ ticks with heart, it's probably out of range (walls).
+        # P65→P89: Timeout 15→25→35→50. P127 (50→60) REVERTED — locally +5.9%
+        # but tournament regression: v25(60) at 23.40 vs v24(50) at 25.60.
+        # 50 ticks ≈ 20 cells — covers alignment range. 60 ticks wastes time
+        # on junctions scrambled by real opponents during approach.
         if s.last_target_pos is not None:
             s.target_ticks += 1
-            if s.target_ticks > 15:
+            if s.target_ticks > 50:
                 s.failed_junctions.add(s.last_target_pos)
                 s.last_target_pos = None
                 s.target_ticks = 0
@@ -781,23 +1038,35 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
                 if junc_shared != s.last_target_pos:
                     s.last_target_pos = junc_shared
                     s.target_ticks = 0
+                # P48: Write claim for visible junction — deconflicts c2 agents
+                # targeting the same junction when both see it on-screen.
+                self._coord.claim_target(self._id, junc_shared)
+                s.no_target_ticks = 0
                 action = self._go_visible(vis, tags)
                 if action is not None:
                     return action
 
-        # Use coordinator to find nearest ALIGNABLE junction (within range, not blacklisted)
+        # Find best junction to align
         if s.has_position and s.has_hub_offset:
             shared_pos = self._to_shared(s.row, s.col, s)
-            target = self._coord.nearest_alignable_junction(shared_pos, self._id, s.failed_junctions)
+            # P167: c1 uses hub-adjacent targeting (closest, no frontier scoring) —
+            # solo agent needs fast alignment cycles near hub for healing/hearts.
+            # c2+: frontier scoring leverages teammate network expansion.
+            if len(self._coord.agent_ids) <= 1:
+                target = self._coord.nearest_hub_junction(shared_pos, self._id, s.failed_junctions)
+            else:
+                target = self._coord.nearest_alignable_junction(shared_pos, self._id, s.failed_junctions)
             if target is None:
-                target = self._coord.nearest_enemy_alignable_junction(shared_pos, self._id, s.failed_junctions)
+                target = self._coord.nearest_enemy_junction(shared_pos, self._id, s.failed_junctions)
             if target:
                 self._coord.claim_target(self._id, target)
                 if target != s.last_target_pos:
                     s.last_target_pos = target
                     s.target_ticks = 0
+                s.no_target_ticks = 0
                 return self._go_to_known(target, tags, s)
 
+        s.no_target_ticks += 1
         return self._wander(tags, s)
 
     # ── Role: Scrambler ───────────────────────────────────────────────────────
@@ -812,22 +1081,49 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
             return self._go_to_role_station("scrambler", tags, own, s)
 
         if not has_heart:
+            s.heartless_ticks += 1
             return self._go_to_heart_source(tags, own, s)
+        s.heartless_ticks = 0
+
+        # P212: Timeout on scrambler targets — prevents infinite navigation to unreachable junctions
+        # Same pattern as aligner timeout (50 ticks). Blacklists unreachable junctions.
+        if s.last_target_pos is not None:
+            s.target_ticks += 1
+            if s.target_ticks > 50:
+                s.failed_junctions.add(s.last_target_pos)
+                self._coord.claim_target(self._id, None)
+                s.last_target_pos = None
+                s.target_ticks = 0
 
         # Find enemy (clips) junction
         vis = self._closest(tags, self._junction_tags, require=enemy)
         if vis is not None:
-            action = self._go_visible(vis, tags)
-            if action is not None:
-                return action
+            if s.has_hub_offset:
+                junc_shared = self._to_shared(
+                    s.row + (vis[0] - self._center[0]),
+                    s.col + (vis[1] - self._center[1]),
+                    s,
+                )
+                if junc_shared not in s.failed_junctions:
+                    s.last_target_pos = junc_shared
+                    s.target_ticks = 0
+                    s.no_target_ticks = 0
+                    action = self._go_visible(vis, tags)
+                    if action is not None:
+                        return action
 
         if s.has_position and s.has_hub_offset:
             shared_pos = self._to_shared(s.row, s.col, s)
             target = self._coord.nearest_junction(shared_pos, "clips", self._id)
-            if target:
+            if target and target not in s.failed_junctions:
                 self._coord.claim_target(self._id, target)
+                if target != s.last_target_pos:
+                    s.last_target_pos = target
+                    s.target_ticks = 0
+                s.no_target_ticks = 0
                 return self._go_to_known(target, tags, s)
 
+        s.no_target_ticks += 1
         return self._wander(tags, s)
 
     # ── Role: Scout ───────────────────────────────────────────────────────────
@@ -882,10 +1178,48 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
     # ── Main Step ─────────────────────────────────────────────────────────────
 
     def step_with_state(self, obs: AgentObservation, s: SoftyState) -> tuple[Action, SoftyState]:
+        # P211: Save pending move direction before parse (for wall detection)
+        s.last_move_dir = getattr(self, '_pending_move_dir', None)
         tags, inv = self._parse(obs, s)
+
+        # P102: Assign role dynamically on first step (all agents registered by now)
+        if self._role is None:
+            self._assign_role()
 
         self._update_stuck(s)
         s.step_count += 1
+        # P214: Clear junction blacklist periodically — junctions change state over time
+        if s.step_count % 500 == 0:
+            s.failed_junctions.clear()
+        s.role_ticks += 1
+
+        # P200: If mid-switch, continue navigating to gear station
+        # P212: Add timeout — if stuck navigating to station for 100 ticks, cancel switch
+        if s.switching_to is not None:
+            has_new_gear = inv.get(s.switching_to, 0) > 0
+            if has_new_gear:
+                self._role = s.switching_to
+                s.switching_to = None
+                s.last_switch_tick = s.step_count
+                s.switch_count += 1
+                s.role_ticks = 0
+                s.no_target_ticks = 0
+                s.heartless_ticks = 0
+            elif s.step_count - s.last_switch_tick > 100:
+                # Timed out finding gear station — cancel switch, stay in current role
+                s.switching_to = None
+                s.last_switch_tick = s.step_count
+            else:
+                own = tags.get(self._center, set()) & self._team_tags
+                return self._go_to_role_station(s.switching_to, tags, own, s), s
+
+        # P200: Check for dynamic role switch (before role dispatch)
+        new_role = self._should_switch_role(tags, inv, s)
+        if new_role is not None:
+            s.switching_to = new_role
+            s.last_switch_tick = s.step_count  # P212: mark switch start for timeout
+            own = tags.get(self._center, set()) & self._team_tags
+            return self._go_to_role_station(new_role, tags, own, s), s
 
         # Wait for energy regen if too low to move
         if self._low_energy(inv):
@@ -895,17 +1229,31 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
         if self._should_retreat(inv, s):
             return self._retreat(tags, s), s
 
-        # Severely stuck: head to hub to reset
-        if s.stuck_count > 5 and self._coord.hub_pos is not None and s.has_position and s.has_hub_offset:
-            # Aligner stuck near a junction it can't align → blacklist it
+        # Severely stuck — go to hub as waypoint to reset
+        if s.stuck_count > 5 and s.has_position and s.has_hub_offset and self._coord.hub_pos is not None:
             if self._role == "aligner" and s.last_target_pos is not None:
                 s.failed_junctions.add(s.last_target_pos)
                 self._coord.claim_target(self._id, None)
                 s.last_target_pos = None
                 s.target_ticks = 0
             s.stuck_count = 0
-            s.explore_dir_idx = (s.explore_dir_idx + 3) % 8  # shift sector by 135° to explore a different area
+            s.explore_dir_idx = (s.explore_dir_idx + 1) % 8
             return self._go_to_known(self._coord.hub_pos, tags, s), s
+
+        # P213: Adaptive team playbook — detect excess alignment capacity at c2
+        team_size = len(self._coord.agent_ids)
+        if team_size == 2 and s.step_count == 400 and not self._coord.playbook_applied:
+            cogs_count = sum(1 for a in self._coord.junctions.values() if a == "cogs")
+            self._coord.cogs_junction_snapshot = cogs_count
+            if cogs_count >= 12:
+                # High alignment rate — teammate is likely another aligner (Softy or similar)
+                # Switch second agent (higher ID) to scrambler for diversity
+                sorted_ids = sorted(self._coord.agent_ids)
+                if self._id == sorted_ids[-1]:
+                    self._role = "scrambler"
+                    s.switching_to = "scrambler"
+                    s.last_switch_tick = s.step_count
+            self._coord.playbook_applied = True
 
         # Role dispatch
         if self._role == "miner":
@@ -923,6 +1271,26 @@ class SoftyAgentImpl(StatefulPolicyImpl[SoftyState]):
         return SoftyState(explore_dir_idx=self._explore_offset)
 
 
+# ── Torch-Free Agent Wrapper ──────────────────────────────────────────────────
+# mettagrid's StatefulAgentPolicy.step() unconditionally imports torch and wraps
+# calls in torch.no_grad(). The beta-cvc server (compat 0.25) sandbox doesn't
+# install torch, so all qualifying matches fail with ModuleNotFoundError.
+# This wrapper provides identical behavior without the torch dependency.
+
+
+class _SoftyAgentPolicy(AgentPolicy):
+    """Lightweight AgentPolicy that manages SoftyState without torch."""
+
+    def __init__(self, impl: SoftyAgentImpl, policy_env_info: PolicyEnvInterface):
+        super().__init__(policy_env_info)
+        self._impl = impl
+        self._state: SoftyState = impl.initial_agent_state()
+
+    def step(self, obs: AgentObservation) -> Action:
+        action, self._state = self._impl.step_with_state(obs, self._state)
+        return action
+
+
 # ── Top-Level Policy ──────────────────────────────────────────────────────────
 
 class SoftyPolicy(MultiAgentPolicy):
@@ -931,11 +1299,12 @@ class SoftyPolicy(MultiAgentPolicy):
     def __init__(self, policy_env_info: PolicyEnvInterface, device: str = "cpu"):
         super().__init__(policy_env_info, device=device)
         self._coordinator = SoftyCoordinator()
-        self._agents: dict[int, StatefulAgentPolicy[SoftyState]] = {}
+        self._agents: dict[int, _SoftyAgentPolicy] = {}
 
-    def agent_policy(self, agent_id: int) -> StatefulAgentPolicy[SoftyState]:
+    def agent_policy(self, agent_id: int) -> _SoftyAgentPolicy:
         if agent_id not in self._agents:
-            role = ROLE_CYCLE[agent_id % len(ROLE_CYCLE)]
-            impl = SoftyAgentImpl(self._policy_env_info, agent_id, role, self._coordinator)
-            self._agents[agent_id] = StatefulAgentPolicy(impl, self._policy_env_info, agent_id=agent_id)
+            self._coordinator.agent_ids.append(agent_id)
+            # P102: role=None → assigned dynamically on first step based on team size
+            impl = SoftyAgentImpl(self._policy_env_info, agent_id, None, self._coordinator)
+            self._agents[agent_id] = _SoftyAgentPolicy(impl, self._policy_env_info)
         return self._agents[agent_id]
