@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from dataclasses import dataclass
 from typing import Sequence
 
 from cogames.core import CoGameMission, CoGameMissionVariant
@@ -33,8 +34,42 @@ class CoGame:
 _GAMES: dict[str, "CoGame"] = {}
 _GAME_MODULES: dict[str, str] = {
     "cogs_vs_clips": "cogames.games.cogs_vs_clips.game.game",
-    "overcogged": "cogames.games.overcogged.game.game",
 }
+
+
+@dataclass(frozen=True)
+class OptionalGameModule:
+    """Metadata for a standalone game distributed as an optional dependency."""
+
+    module_name: str
+    package_name: str
+    extra_name: str
+
+
+_OPTIONAL_GAME_MODULES: dict[str, OptionalGameModule] = {
+    "overcogged": OptionalGameModule(
+        module_name="overcogged.game.game",
+        package_name="overcogged",
+        extra_name="overcogged",
+    ),
+}
+
+
+def _import_optional_game(name: str) -> bool:
+    optional_game = _OPTIONAL_GAME_MODULES.get(name)
+    if optional_game is None:
+        return False
+
+    try:
+        importlib.import_module(optional_game.module_name)
+    except ModuleNotFoundError as exc:
+        if exc.name == optional_game.package_name:
+            raise ValueError(
+                f"Game '{name}' is not installed. Install it with:\n  pip install cogames[{optional_game.extra_name}]"
+            ) from exc
+        raise
+
+    return True
 
 
 def _ensure_game_loaded(name: str) -> None:
@@ -43,13 +78,15 @@ def _ensure_game_loaded(name: str) -> None:
     module_name = _GAME_MODULES.get(name)
     if module_name is not None:
         importlib.import_module(module_name)
+        return
+    _import_optional_game(name)
 
 
 def get_game(name: str) -> "CoGame":
     """Get a registered game by name."""
     _ensure_game_loaded(name)
     if name not in _GAMES:
-        available = sorted({*_GAME_MODULES, *_GAMES})
+        available = sorted({*_GAME_MODULES, *_OPTIONAL_GAME_MODULES, *_GAMES})
         raise ValueError(f"Unknown game '{name}'. Available: {', '.join(available)}")
     return _GAMES[name]
 
