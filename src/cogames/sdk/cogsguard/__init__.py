@@ -15,6 +15,21 @@ from cogames.sdk.cogsguard.learnings import (
     render_cogsguard_learnings,
     select_cogsguard_learnings,
 )
+from cogames.sdk.cogsguard.llm_contract import (
+    JunctionSnapshot,
+    PlannerDirective,
+    PlannerSkillOption,
+    PlannerSummary,
+    SkillName,
+    SkillStatus,
+    StrategyMode,
+    build_planner_prompt,
+    parse_planner_response,
+    preferred_role_for_skill,
+    render_planner_library,
+    render_skill_options,
+    resource_names,
+)
 from cogames.sdk.cogsguard.progress import CogsguardProgressTracker
 from cogames.sdk.cogsguard.prompt_adapter import CogsguardPromptAdapter
 from cogames.sdk.cogsguard.scenarios import (
