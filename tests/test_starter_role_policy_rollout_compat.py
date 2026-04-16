@@ -52,6 +52,39 @@ def test_starter_policy_withdraws_hearts_on_arena() -> None:
     assert results.stats["game"].get("cogs/heart.withdrawn", 0.0) > 0.0
 
 
+def test_starter_policy_keeps_exploring_on_machina1() -> None:
+    env_cfg = make_machina1_mission(num_agents=8, max_steps=150).make_env()
+    results, _ = run_episode_local(
+        policy_specs=[PolicySpec(class_path="starter")],
+        assignments=[0] * env_cfg.game.num_agents,
+        env=env_cfg,
+        seed=42,
+        max_action_time_ms=10000,
+        render_mode="none",
+        device="cpu",
+    )
+
+    visit_counts = [agent.get("cell.visited", 0.0) for agent in results.stats["agent"]]
+    assert min(visit_counts) > 500, f"starter exploration regressed: visit_counts={visit_counts}"
+    assert sum(visit_counts) > 25000, f"starter exploration regressed: visit_counts={visit_counts}"
+
+
+def test_starter_policy_aligns_junctions_on_machina1() -> None:
+    env_cfg = make_machina1_mission(num_agents=8, max_steps=2000).make_env()
+    results, _ = run_episode_local(
+        policy_specs=[PolicySpec(class_path="starter")],
+        assignments=[0] * env_cfg.game.num_agents,
+        env=env_cfg,
+        seed=42,
+        max_action_time_ms=10000,
+        render_mode="none",
+        device="cpu",
+    )
+
+    aligned_total = sum(agent.get("junction.aligned_by_agent", 0.0) for agent in results.stats["agent"])
+    assert aligned_total > 0, f"starter failed to align any junctions: agent_stats={results.stats['agent']}"
+
+
 @pytest.mark.parametrize(
     ("role", "mission"),
     [
