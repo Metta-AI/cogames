@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from cogames.games.cogs_vs_clips.missions.arena import make_basic_mission
 from cogames.policy.starter_agent import StarterCogPolicyImpl
 from mettagrid.config.id_map import ObservationFeatureSpec
@@ -24,6 +26,7 @@ def _mock_policy_env_info() -> PolicyEnvInterface:
         "team:cogs",
         "team:clips",
         "type:agent",
+        "type:wall",
     ]
     return PolicyEnvInterface(
         obs_features=[],
@@ -56,21 +59,10 @@ def _tag_token(tag_id: int, *, row: int, col: int) -> ObservationToken:
     return ObservationToken(feature=feature, value=tag_id, raw_token=(packed, 100, tag_id))
 
 
-def test_inventory_items_ignore_zero_values() -> None:
-    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, role="miner")
-    obs = AgentObservation(
-        agent_id=0,
-        tokens=[
-            _inv_token(1, "inv:miner", 0),
-            _inv_token(2, "inv:scout", 0),
-            _inv_token(3, "inv:aligner", 0),
-            _inv_token(4, "inv:scrambler", 0),
-            _inv_token(5, "inv:heart", 0),
-        ],
-    )
-
-    items = impl._inventory_amounts(obs)
-    assert items == {}
+def _feature_token(feature_id: int, name: str, value: int, *, row: int = 2, col: int = 2) -> ObservationToken:
+    feature = ObservationFeatureSpec(id=feature_id, name=name, normalization=1.0)
+    packed = PackedCoordinate.pack(row, col)
+    return ObservationToken(feature=feature, value=value, raw_token=(packed, feature_id, value))
 
 
 def test_preferred_role_targets_its_station_when_not_equipped() -> None:
@@ -95,43 +87,12 @@ def test_preferred_role_targets_its_station_when_not_equipped() -> None:
     assert action.name == "move_east"
 
 
-def test_inventory_items_parse_power_suffix_and_non_power_colon_names() -> None:
-    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0)
-    obs = AgentObservation(
-        agent_id=0,
-        tokens=[
-            _inv_token(1, "inv:carbon", 34, normalization=100.0),
-            _inv_token(2, "inv:carbon:p1", 12, normalization=100.0),
-            _inv_token(3, "inv:own:policy", 7, normalization=100.0),
-        ],
-    )
-
-    items = impl._inventory_amounts(obs)
-    assert items["carbon"] == 1234
-    assert items["own:policy"] == 7
-
-
-def test_inventory_items_ignore_empty_suffix_tokens() -> None:
-    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0)
-    obs = AgentObservation(
-        agent_id=0,
-        tokens=[
-            _inv_token(1, "inv:", 5),
-            _inv_token(2, "inv:miner", 1),
-        ],
-    )
-
-    items = impl._inventory_amounts(obs)
-    assert "" not in items
-    assert items["miner"] == 1
-
-
 def test_default_roles_cycle_by_agent_id() -> None:
     policy_env_info = _mock_policy_env_info()
     assert StarterCogPolicyImpl(policy_env_info, agent_id=0)._role == "miner"
     assert StarterCogPolicyImpl(policy_env_info, agent_id=1)._role == "aligner"
-    assert StarterCogPolicyImpl(policy_env_info, agent_id=2)._role == "scrambler"
-    assert StarterCogPolicyImpl(policy_env_info, agent_id=3)._role == "scout"
+    assert StarterCogPolicyImpl(policy_env_info, agent_id=2)._role == "miner"
+    assert StarterCogPolicyImpl(policy_env_info, agent_id=3)._role == "aligner"
     assert StarterCogPolicyImpl(policy_env_info, agent_id=4)._role == "miner"
 
 
@@ -170,8 +131,42 @@ def test_aligner_with_heart_targets_neutral_junction() -> None:
     assert action.name == "move_south"
 
 
+def test_aligner_without_visible_hub_uses_remembered_hub() -> None:
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=1)
+    state = impl.initial_agent_state()
+    state.seen_tags_by_position[(2, 0)] = {2, 10}  # remembered hub on our team
+    obs = AgentObservation(
+        agent_id=1,
+        tokens=[
+            _inv_token(1, "inv:aligner", 1),
+            _inv_token(2, "inv:heart", 0),
+            _tag_token(10, row=2, col=2),  # team:cogs on self
+        ],
+    )
+
+    action, _ = impl.step_with_state(obs, state)
+    assert action.name == "move_south"
+
+
+def test_aligner_with_heart_explores_instead_of_chasing_far_remembered_junction() -> None:
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=1)
+    state = impl.initial_agent_state()
+    state.seen_tags_by_position[(30, 0)] = {1}  # remembered neutral junction far beyond local frontier
+    obs = AgentObservation(
+        agent_id=1,
+        tokens=[
+            _inv_token(1, "inv:aligner", 1),
+            _inv_token(2, "inv:heart", 1),
+            _tag_token(10, row=2, col=2),  # team:cogs on self
+        ],
+    )
+
+    action, _ = impl.step_with_state(obs, state)
+    assert action.name == "move_south"
+
+
 def test_scrambler_with_heart_targets_enemy_junction() -> None:
-    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=2)
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=2, role="scrambler")
     state = impl.initial_agent_state()
     obs = AgentObservation(
         agent_id=2,
@@ -196,7 +191,7 @@ def test_miner_with_cargo_targets_friendly_deposit() -> None:
         agent_id=0,
         tokens=[
             _inv_token(1, "inv:miner", 1),
-            _inv_token(2, "inv:carbon", 2),
+            _inv_token(2, "inv:carbon:p1", 2, normalization=10.0),
             _tag_token(10, row=2, col=2),  # team:cogs on self
             _tag_token(2, row=1, col=2),  # hub north
             _tag_token(10, row=1, col=2),  # team:cogs on hub
@@ -244,10 +239,87 @@ def test_unreachable_visible_target_falls_back_to_explore() -> None:
 def test_duplicate_default_roles_start_with_different_wander_priorities() -> None:
     policy_env_info = _mock_policy_env_info()
     obs = AgentObservation(agent_id=0, tokens=[])
-    first_action, _ = StarterCogPolicyImpl(policy_env_info, agent_id=0).step_with_state(obs, None)
-    second_action, _ = StarterCogPolicyImpl(policy_env_info, agent_id=4).step_with_state(obs, None)
+    first_impl = StarterCogPolicyImpl(policy_env_info, agent_id=0)
+    second_impl = StarterCogPolicyImpl(policy_env_info, agent_id=4)
+    first_action, _ = first_impl.step_with_state(obs, first_impl.initial_agent_state())
+    second_action, _ = second_impl.step_with_state(obs, second_impl.initial_agent_state())
     assert first_action.name == "move_east"
-    assert second_action.name == "move_south"
+    assert second_action.name == "move_west"
+
+
+def test_starter_policy_requires_canonical_move_actions() -> None:
+    policy_env_info = _mock_policy_env_info().model_copy(
+        update={"action_names": ["noop", "move_north", "move_south", "move_west"]}
+    )
+    with pytest.raises(AssertionError, match="Starter policy requires actions"):
+        StarterCogPolicyImpl(policy_env_info, agent_id=0)
+
+
+def test_starter_policy_requires_canonical_tags() -> None:
+    policy_env_info = _mock_policy_env_info().model_copy(
+        update={"tags": [tag for tag in _mock_policy_env_info().tags if tag != "type:wall"]}
+    )
+    with pytest.raises(AssertionError, match="Starter policy requires tags"):
+        StarterCogPolicyImpl(policy_env_info, agent_id=0)
+
+
+def test_explore_persists_heading_instead_of_immediate_backtrack() -> None:
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, role="scout")
+    state = impl.initial_agent_state()
+
+    first_obs = AgentObservation(
+        agent_id=0,
+        tokens=[
+            _inv_token(1, "inv:scout", 1),
+            _tag_token(12, row=1, col=2),  # north blocked
+            _tag_token(12, row=2, col=1),  # west blocked
+            _tag_token(12, row=2, col=3),  # east blocked
+        ],
+    )
+    first_action, state = impl.step_with_state(first_obs, state)
+
+    second_obs = AgentObservation(
+        agent_id=0,
+        tokens=[
+            _inv_token(1, "inv:scout", 1),
+            _feature_token(2, "last_action_move", 1),
+            _tag_token(12, row=2, col=3),  # east blocked
+            _tag_token(12, row=3, col=2),  # south blocked
+        ],
+    )
+    second_action, state = impl.step_with_state(second_obs, state)
+
+    third_obs = AgentObservation(
+        agent_id=0,
+        tokens=[
+            _inv_token(1, "inv:scout", 1),
+            _feature_token(2, "last_action_move", 1),
+            _tag_token(12, row=2, col=1),  # west blocked
+            _tag_token(12, row=3, col=2),  # south blocked
+        ],
+    )
+    third_action, _ = impl.step_with_state(third_obs, state)
+
+    assert first_action.name == "move_south"
+    assert second_action.name == "move_west"
+    assert third_action.name == "move_north"
+
+
+def test_failed_move_into_agent_is_not_remembered_as_wall() -> None:
+    impl = StarterCogPolicyImpl(_mock_policy_env_info(), agent_id=0, role="scout")
+    state = impl.initial_agent_state()
+    state.last_move_direction = "east"
+
+    blocked_obs = AgentObservation(
+        agent_id=0,
+        tokens=[
+            _inv_token(1, "inv:scout", 1),
+            _tag_token(12, row=2, col=3),  # type:agent blocker east
+        ],
+    )
+    _, state = impl.step_with_state(blocked_obs, state)
+
+    assert (0, 1) not in state.blocked
 
 
 def test_cogsguard_tags_resolve_role_station_targets() -> None:
