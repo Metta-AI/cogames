@@ -69,9 +69,9 @@ def _build_mission_specs(
     episodes: int,
     max_steps: int,
 ) -> list[MissionSpec]:
-    from cogames.diagnose import _load_diagnose_missions  # noqa: PLC0415
+    from cogames.diagnose import load_diagnose_missions  # noqa: PLC0415
 
-    missions_objs = _load_diagnose_missions(mission_set_name)
+    missions_objs = load_diagnose_missions(mission_set_name)
     specs: list[MissionSpec] = []
     for mission in missions_objs:
         env_cfg = mission.make_env()

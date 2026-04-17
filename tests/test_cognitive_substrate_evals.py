@@ -60,11 +60,11 @@ def test_cognitive_substrate_missions_defer_map_seed_to_rollout_seed(mission) ->
 
 
 def test_cognitive_substrate_diagnose_sources_load_expected_categories() -> None:
-    aggregate = diagnose_module._load_diagnose_missions("cognitive_substrate_evals")
+    aggregate = diagnose_module.load_diagnose_missions("cognitive_substrate_evals")
     assert {mission.name for mission in aggregate} == {mission.name for mission in EVAL_MISSIONS}
 
     for category, expected_missions in CATEGORY_MISSIONS.items():
-        loaded = diagnose_module._load_diagnose_missions(f"cognitive_substrate_{category}")
+        loaded = diagnose_module.load_diagnose_missions(f"cognitive_substrate_{category}")
         assert {mission.name for mission in loaded} == {mission.name for mission in expected_missions}
 
 
