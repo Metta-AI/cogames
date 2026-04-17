@@ -34,6 +34,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
+overcogged = ["overcogged"]
 neural = ["pufferlib-core", "torch", "einops>=0.8.0", "mettagrid[train]"]
 test = ["cogames[neural]", "pytest", "pytest-xdist", "ruff"]
 
@@ -77,6 +78,7 @@ source = ["cogames"]
 [tool.uv.sources]
 mettagrid = { workspace = true }
 softmax-cli = { workspace = true }
+overcogged = { git = "https://github.com/Metta-AI/overcogged.git" }
 
 [tool.ruff]
 extend = "../../.ruff.toml"

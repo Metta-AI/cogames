@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 import cogames.game as game_module
+from cogames.standalone_games import STANDALONE_GAMES, GitSource, StandaloneGameInstall
 
 
 def test_get_game_imports_optional_standalone_game(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -24,12 +25,12 @@ def test_get_game_imports_optional_standalone_game(tmp_path: Path, monkeypatch: 
     )
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.setitem(
-        game_module._OPTIONAL_GAME_MODULES,
+        STANDALONE_GAMES,
         "standalone_game",
-        game_module.OptionalGameModule(
+        StandaloneGameInstall(
             module_name="standalone_game.registration",
             package_name="standalone_game",
-            extra_name="standalone_game",
+            source=GitSource(git="https://github.com/Metta-AI/standalone-game.git"),
         ),
     )
     game_module._GAMES.pop("standalone_game", None)
@@ -49,12 +50,12 @@ def test_get_game_imports_optional_standalone_game(tmp_path: Path, monkeypatch: 
 def test_get_game_missing_optional_dependency_has_install_hint(monkeypatch: pytest.MonkeyPatch) -> None:
     game_name = "missing_standalone_game"
     monkeypatch.setitem(
-        game_module._OPTIONAL_GAME_MODULES,
+        STANDALONE_GAMES,
         game_name,
-        game_module.OptionalGameModule(
+        StandaloneGameInstall(
             module_name=f"{game_name}.registration",
             package_name=game_name,
-            extra_name=game_name,
+            source=GitSource(git=f"https://github.com/Metta-AI/{game_name}.git"),
         ),
     )
     game_module._GAMES.pop(game_name, None)
@@ -66,8 +67,8 @@ def test_get_game_missing_optional_dependency_has_install_hint(monkeypatch: pyte
 
 
 def test_overcogged_is_declared_as_optional_game_module() -> None:
-    optional_game = game_module._OPTIONAL_GAME_MODULES["overcogged"]
+    standalone_game = STANDALONE_GAMES["overcogged"]
 
-    assert optional_game.module_name == "overcogged.game.game"
-    assert optional_game.package_name == "overcogged"
-    assert optional_game.extra_name == "overcogged"
+    assert standalone_game.module_name == "overcogged.game.game"
+    assert standalone_game.package_name == "overcogged"
+    assert standalone_game.source.git == "https://github.com/Metta-AI/overcogged.git"
