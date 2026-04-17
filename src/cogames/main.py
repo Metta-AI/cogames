@@ -2220,7 +2220,10 @@ def upload_cmd(
 ) -> None:
     _validate_policy_name_or_exit(name)
 
-    season_info = _resolve_season(server, login_server, season)
+    submitting = not no_submit
+    submission_season = season
+    if submitting and submission_season is None:
+        submission_season = _resolve_season(server, login_server).name
 
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
@@ -2228,7 +2231,6 @@ def upload_cmd(
             key, val = _parse_init_kwarg(kv)
             init_kwargs[key] = val
 
-    submitting = not no_submit
     parsed_secret_env: dict[str, str] = {}
     if use_bedrock:
         parsed_secret_env["USE_BEDROCK"] = "true"
@@ -2248,7 +2250,8 @@ def upload_cmd(
         skip_validation=skip_validation,
         init_kwargs=init_kwargs if init_kwargs else None,
         setup_script=setup_script,
-        season=season_info.name if submitting else None,
+        validation_season=submission_season,
+        submission_season=submission_season if submitting else None,
         image=image,
         secret_env=parsed_secret_env if parsed_secret_env else None,
     )
@@ -2260,7 +2263,9 @@ def upload_cmd(
             return
         if result.pools:
             console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
-        _print_async_submission_follow_up(result.name, season_info.name)
+        if submission_season is None:
+            raise AssertionError("submitting upload must resolve a season")
+        _print_async_submission_follow_up(result.name, submission_season)
 
 
 @app.command(
@@ -2491,7 +2496,8 @@ def ship_cmd(
         skip_validation=skip_validation,
         init_kwargs=init_kwargs if init_kwargs else None,
         setup_script=setup_script,
-        season=season_info.name,
+        validation_season=season_info.name,
+        submission_season=season_info.name,
         image=image,
     )
 
