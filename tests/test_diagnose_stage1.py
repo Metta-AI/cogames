@@ -349,7 +349,7 @@ def test_evaluate_stage1_pack_contract_role_specific_pack_defaults() -> None:
 
 
 def test_load_diagnose_missions_role_specific_evals_contains_tutorial_roles() -> None:
-    missions = diagnose_module._load_diagnose_missions("role_specific_evals")
+    missions = diagnose_module.load_diagnose_missions("role_specific_evals")
     mission_names = {mission.name for mission in missions}
 
     assert mission_names == set(_ROLE_SPECIFIC_PROBE_MISSIONS)

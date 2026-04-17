@@ -2527,7 +2527,7 @@ def _load_eval_missions(module_path: str) -> list[CoGameMission]:
     return list(missions)
 
 
-def _load_diagnose_missions(mission_set: str) -> list[CoGameMission]:
+def load_diagnose_missions(mission_set: str) -> list[CoGameMission]:
     if mission_set == "all":
         from cogames.cli.mission import get_all_missions_list  # noqa: PLC0415
         from cogames.games.cogs_vs_clips.evals.cvc_evals import CVC_EVAL_MISSIONS  # noqa: PLC0415
@@ -2632,7 +2632,7 @@ def _build_diagnose_cases(
     respect_cogs_list = cogs is not None
     cases: list[DiagnoseCase] = []
 
-    missions = _load_diagnose_missions(mission_set)
+    missions = load_diagnose_missions(mission_set)
     for mission in missions:
         if not _matches_experiment(mission.name, experiment_filters):
             continue

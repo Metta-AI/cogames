@@ -769,6 +769,15 @@ class StageStats(CLIModel):
     """
 
 
+class SubmitAssayRunRequest(CLIModel):
+    policy_version_id: Annotated[UUID, Field(title="Policy Version Id")]
+    name: Annotated[Optional[str], Field(title="Name")] = None
+    compat_version: Annotated[Optional[str], Field(title="Compat Version")] = None
+    mission_set: Annotated[Optional[str], Field(title="Mission Set")] = "cvc_evals"
+    episodes: Annotated[Optional[int], Field(gt=0, title="Episodes")] = 3
+    max_steps: Annotated[Optional[int], Field(gt=0, title="Max Steps")] = 10000
+
+
 class SubmitRequest(CLIModel):
     policy_version_id: Annotated[UUID, Field(title="Policy Version Id")]
     """
