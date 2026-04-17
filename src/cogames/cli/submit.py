@@ -485,7 +485,8 @@ def upload_policy(
     dry_run: bool = False,
     skip_validation: bool = False,
     setup_script: str | None = None,
-    season: str | None = None,
+    validation_season: str | None = None,
+    submission_season: str | None = None,
     image: str = DEFAULT_EPISODE_RUNNER_IMAGE,
     secret_env: dict[str, str] | None = None,
 ) -> UploadResult | None:
@@ -521,8 +522,8 @@ def upload_policy(
                 "--login-server",
                 login_server,
             ]
-            if season:
-                cmd.extend(["--season", season])
+            if validation_season:
+                cmd.extend(["--season", validation_season])
             if image != DEFAULT_EPISODE_RUNNER_IMAGE:
                 cmd.extend(["--image", image])
             try:
@@ -544,7 +545,7 @@ def upload_policy(
             return None
 
         with client:
-            result = upload_submission(client, zip_path, name, season=season, secret_env=secret_env)
+            result = upload_submission(client, zip_path, name, season=submission_season, secret_env=secret_env)
         if not result:
             console.print("\n[red]Upload failed.[/red]")
             raise typer.Exit(1)
