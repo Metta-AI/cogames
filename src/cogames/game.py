@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import importlib
-from dataclasses import dataclass
 from typing import Sequence
 
 from cogames.core import CoGameMission, CoGameMissionVariant
+from cogames.standalone_games import STANDALONE_GAMES
 from cogames.variants import VariantRegistry
 
 
@@ -37,35 +37,17 @@ _GAME_MODULES: dict[str, str] = {
 }
 
 
-@dataclass(frozen=True)
-class OptionalGameModule:
-    """Metadata for a standalone game distributed as an optional dependency."""
-
-    module_name: str
-    package_name: str
-    extra_name: str
-
-
-_OPTIONAL_GAME_MODULES: dict[str, OptionalGameModule] = {
-    "overcogged": OptionalGameModule(
-        module_name="overcogged.game.game",
-        package_name="overcogged",
-        extra_name="overcogged",
-    ),
-}
-
-
-def _import_optional_game(name: str) -> bool:
-    optional_game = _OPTIONAL_GAME_MODULES.get(name)
-    if optional_game is None:
+def _import_standalone_game(name: str) -> bool:
+    if name not in STANDALONE_GAMES:
         return False
+    standalone_game = STANDALONE_GAMES[name]
 
     try:
-        importlib.import_module(optional_game.module_name)
+        importlib.import_module(standalone_game.module_name)
     except ModuleNotFoundError as exc:
-        if exc.name == optional_game.package_name:
+        if exc.name == standalone_game.package_name:
             raise ValueError(
-                f"Game '{name}' is not installed. Install it with:\n  pip install cogames[{optional_game.extra_name}]"
+                f"Game '{name}' is not installed. Install it with:\n  pip install cogames[{name}]"
             ) from exc
         raise
 
@@ -75,18 +57,17 @@ def _import_optional_game(name: str) -> bool:
 def _ensure_game_loaded(name: str) -> None:
     if name in _GAMES:
         return
-    module_name = _GAME_MODULES.get(name)
-    if module_name is not None:
-        importlib.import_module(module_name)
+    if name in _GAME_MODULES:
+        importlib.import_module(_GAME_MODULES[name])
         return
-    _import_optional_game(name)
+    _import_standalone_game(name)
 
 
 def get_game(name: str) -> "CoGame":
     """Get a registered game by name."""
     _ensure_game_loaded(name)
     if name not in _GAMES:
-        available = sorted({*_GAME_MODULES, *_OPTIONAL_GAME_MODULES, *_GAMES})
+        available = sorted({*_GAME_MODULES, *STANDALONE_GAMES, *_GAMES})
         raise ValueError(f"Unknown game '{name}'. Available: {', '.join(available)}")
     return _GAMES[name]
 
