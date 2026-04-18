@@ -137,6 +137,7 @@ def _player_response_payload() -> dict[str, Any]:
         "user_id": "regular@example.com",
         "user": None,
         "name": "alpha",
+        "is_default": True,
         "created_at": "2026-02-20T12:00:00Z",
         "disabled_at": None,
     }
