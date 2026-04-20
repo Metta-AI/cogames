@@ -88,3 +88,11 @@ def test_tribal_village_manifest_matches_package_shape() -> None:
     assert standalone_game.package_name == "tribal-village"
     assert standalone_game.module_name == "tribal_village_env.recipe"
     assert standalone_game.source.git == "https://github.com/Metta-AI/cogame-tribal_village.git"
+
+
+def test_hungercog_manifest_matches_package_shape() -> None:
+    standalone_game = STANDALONE_GAMES["hungercog"]
+
+    assert standalone_game.package_name == "hungercog"
+    assert standalone_game.module_name == "hungercog.game"
+    assert standalone_game.source.git == "https://github.com/Metta-AI/cogame-hungercog.git"

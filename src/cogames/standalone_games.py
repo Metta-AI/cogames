@@ -27,6 +27,13 @@ STANDALONE_GAMES: dict[str, StandaloneGameInstall] = {
             git="https://github.com/Metta-AI/cogame-diplomacog.git",
         ),
     ),
+    "hungercog": StandaloneGameInstall(
+        module_name="hungercog.game",
+        package_name="hungercog",
+        source=GitSource(
+            git="https://github.com/Metta-AI/cogame-hungercog.git",
+        ),
+    ),
     "overcogged": StandaloneGameInstall(
         module_name="overcogged.game.game",
         package_name="overcogged",
