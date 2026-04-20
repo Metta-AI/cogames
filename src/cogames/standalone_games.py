@@ -20,6 +20,13 @@ class StandaloneGameInstall(BaseModel):
 
 
 STANDALONE_GAMES: dict[str, StandaloneGameInstall] = {
+    "diplomacog": StandaloneGameInstall(
+        module_name="diplomacog.cogame",
+        package_name="diplomacog",
+        source=GitSource(
+            git="https://github.com/Metta-AI/cogame-diplomacog.git",
+        ),
+    ),
     "overcogged": StandaloneGameInstall(
         module_name="overcogged.game.game",
         package_name="overcogged",
