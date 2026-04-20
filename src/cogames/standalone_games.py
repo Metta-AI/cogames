@@ -24,7 +24,7 @@ STANDALONE_GAMES: dict[str, StandaloneGameInstall] = {
         module_name="overcogged.game.game",
         package_name="overcogged",
         source=GitSource(
-            git="https://github.com/Metta-AI/overcogged.git",
+            git="https://github.com/Metta-AI/cogame-overcogged.git",
         ),
     ),
     "tribal-village": StandaloneGameInstall(
