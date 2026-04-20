@@ -66,6 +66,14 @@ def test_get_game_missing_optional_dependency_has_install_hint(monkeypatch: pyte
     assert f"pip install cogames[{game_name}]" in str(exc_info.value)
 
 
+def test_diplomacog_is_declared_as_optional_game_module() -> None:
+    standalone_game = STANDALONE_GAMES["diplomacog"]
+
+    assert standalone_game.module_name == "diplomacog.cogame"
+    assert standalone_game.package_name == "diplomacog"
+    assert standalone_game.source.git == "https://github.com/Metta-AI/cogame-diplomacog.git"
+
+
 def test_overcogged_is_declared_as_optional_game_module() -> None:
     standalone_game = STANDALONE_GAMES["overcogged"]
 

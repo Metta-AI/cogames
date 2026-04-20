@@ -34,6 +34,7 @@ dependencies = [
 dynamic = ["version"]
 
 [project.optional-dependencies]
+diplomacog = ["diplomacog"]
 overcogged = ["overcogged"]
 tribal-village = ["tribal-village"]
 neural = ["pufferlib-core", "torch", "einops>=0.8.0", "mettagrid[train]"]
@@ -79,6 +80,7 @@ source = ["cogames"]
 [tool.uv.sources]
 mettagrid = { workspace = true }
 softmax-cli = { workspace = true }
+diplomacog = { git = "https://github.com/Metta-AI/cogame-diplomacog.git" }
 overcogged = { git = "https://github.com/Metta-AI/cogame-overcogged.git" }
 tribal-village = { git = "https://github.com/Metta-AI/cogame-tribal_village.git" }
 
