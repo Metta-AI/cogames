@@ -79,7 +79,7 @@ source = ["cogames"]
 [tool.uv.sources]
 mettagrid = { workspace = true }
 softmax-cli = { workspace = true }
-overcogged = { git = "https://github.com/Metta-AI/overcogged.git" }
+overcogged = { git = "https://github.com/Metta-AI/cogame-overcogged.git" }
 tribal-village = { git = "https://github.com/Metta-AI/cogame-tribal_village.git" }
 
 [tool.ruff]
