@@ -114,11 +114,6 @@ from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
 # Always add current directory to Python path so optional plugins in the repo are discoverable.
 sys.path.insert(0, ".")
 
-try:  # Optional plugin
-    from tribal_village_env.cogames import register_cli as register_tribal_cli  # type: ignore[import-not-found]
-except ImportError:  # pragma: no cover - plugin optional
-    register_tribal_cli = None
-
 
 logger = logging.getLogger("cogames.main")
 POLICY_NAME_MAX_LENGTH = 64
@@ -247,9 +242,6 @@ tutorial_app = typer.Typer(
     no_args_is_help=True,
     rich_markup_mode="rich",
 )
-
-if register_tribal_cli is not None:
-    register_tribal_cli(app)
 
 
 @app.command(

@@ -35,6 +35,7 @@ dynamic = ["version"]
 
 [project.optional-dependencies]
 overcogged = ["overcogged"]
+tribal-village = ["tribal-village"]
 neural = ["pufferlib-core", "torch", "einops>=0.8.0", "mettagrid[train]"]
 test = ["cogames[neural]", "pytest", "pytest-xdist", "ruff"]
 
@@ -79,6 +80,7 @@ source = ["cogames"]
 mettagrid = { workspace = true }
 softmax-cli = { workspace = true }
 overcogged = { git = "https://github.com/Metta-AI/overcogged.git" }
+tribal-village = { git = "https://github.com/Metta-AI/cogame-tribal_village.git" }
 
 [tool.ruff]
 extend = "../../.ruff.toml"
