@@ -55,4 +55,11 @@ STANDALONE_GAMES: dict[str, StandaloneGameInstall] = {
             git="https://github.com/Metta-AI/cogame-amongcog.git",
         ),
     ),
+    "werecog": StandaloneGameInstall(
+        module_name="werecog.cogame",
+        package_name="werecog",
+        source=GitSource(
+            git="https://github.com/Metta-AI/cogame-werecog.git",
+        ),
+    ),
 }
