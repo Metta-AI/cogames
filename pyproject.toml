@@ -38,6 +38,7 @@ diplomacog = ["diplomacog"]
 hungercog = ["hungercog"]
 overcogged = ["overcogged"]
 tribal-village = ["tribal-village"]
+amongcog = ["amongcog"]
 neural = ["pufferlib-core", "torch", "einops>=0.8.0", "mettagrid[train]"]
 test = ["cogames[neural]", "pytest", "pytest-xdist", "ruff"]
 
@@ -85,6 +86,7 @@ diplomacog = { git = "https://github.com/Metta-AI/cogame-diplomacog.git" }
 hungercog = { git = "https://github.com/Metta-AI/cogame-hungercog.git" }
 overcogged = { git = "https://github.com/Metta-AI/cogame-overcogged.git" }
 tribal-village = { git = "https://github.com/Metta-AI/cogame-tribal_village.git" }
+amongcog = { git = "https://github.com/Metta-AI/cogame-amongcog.git" }
 
 [tool.ruff]
 extend = "../../.ruff.toml"
