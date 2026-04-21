@@ -96,3 +96,11 @@ def test_hungercog_manifest_matches_package_shape() -> None:
     assert standalone_game.package_name == "hungercog"
     assert standalone_game.module_name == "hungercog.game"
     assert standalone_game.source.git == "https://github.com/Metta-AI/cogame-hungercog.git"
+
+
+def test_amongcog_manifest_matches_package_shape() -> None:
+    standalone_game = STANDALONE_GAMES["amongcog"]
+
+    assert standalone_game.package_name == "amongcog"
+    assert standalone_game.module_name == "amongcog.game.game"
+    assert standalone_game.source.git == "https://github.com/Metta-AI/cogame-amongcog.git"
