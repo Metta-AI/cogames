@@ -73,11 +73,11 @@ def apply_variants(
     variants: Sequence[str | CoGameMissionVariant],
     cogs: Optional[int],
 ) -> CoGameMission:
-    """Apply variants and cogs override to a mission."""
+    """Apply variants and cogs selection to a mission."""
     if variants:
         mission = mission.with_variants(variants)
     if cogs is not None:
-        mission = apply_cogs_override(mission, cogs)
+        mission = mission.with_cogs(cogs)
     return mission
 
 
@@ -124,23 +124,6 @@ def _resolve_cli_variants(
         raise ValueError(f"Unknown variant '{name}'.\nAvailable variants: {available}")
 
     return resolved
-
-
-def apply_cogs_override(mission: CoGameMission, cogs: int) -> CoGameMission:
-    updates: dict[str, object] = {}
-    mission_fields = type(mission).model_fields
-    if "num_agents" in mission_fields:
-        updates["num_agents"] = cogs
-    if "num_cogs" in mission_fields:
-        updates["num_cogs"] = cogs
-    map_builder = mission.map_builder.model_copy(deep=True)
-    from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena  # noqa: PLC0415
-
-    arena = find_machina_arena(map_builder)
-    if arena is not None:
-        arena.spawn_count = cogs
-        updates["map_builder"] = map_builder
-    return mission.model_copy(update=updates)
 
 
 def resolve_mission(

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from typing_extensions import Self
+
 from cogames.core import CoGameMission
+from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
 from mettagrid.config.action_config import ActionsConfig, MoveActionConfig, NoopActionConfig
 from mettagrid.config.mettagrid_config import AgentConfig, GameConfig, MettaGridConfig, WallConfig
 from mettagrid.config.obs_config import GlobalObsConfig, ObsConfig
@@ -17,6 +20,13 @@ class CvCMission(CoGameMission):
     @classmethod
     def variant_module_prefixes(cls) -> tuple[str, ...]:
         return ("cogames.games.cogs_vs_clips.",)
+
+    def with_cogs(self, cogs: int) -> Self:
+        map_builder = self.map_builder.model_copy(deep=True)
+        arena = find_machina_arena(map_builder)
+        if arena is not None:
+            arena.spawn_count = cogs
+        return self.model_copy(deep=True, update={"num_cogs": cogs, "num_agents": cogs, "map_builder": map_builder})
 
     def make_base_env(self) -> MettaGridConfig:
         return MettaGridConfig(

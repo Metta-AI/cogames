@@ -152,6 +152,9 @@ class CoGameMission(Config, ABC):
                 copy._base_variants[v] = CoGameMissionVariant.create(v, preferred_modules=preferred_modules)
         return copy
 
+    def with_cogs(self, cogs: int) -> Self:
+        return self.model_copy(deep=True, update={"num_cogs": cogs})
+
     @abstractmethod
     def make_base_env(self) -> MettaGridConfig:
         """Create the initial env config before variants are applied. Subclasses must implement."""

@@ -2611,9 +2611,7 @@ def _cogs_for_mission(mission: CoGameMission, cogs_list: list[int], respect_cogs
 
 
 def _build_diagnose_case(mission: CoGameMission, num_cogs: int, steps: int) -> DiagnoseCase:
-    from cogames.cli.mission import apply_cogs_override  # noqa: PLC0415
-
-    mission_with_cogs = apply_cogs_override(mission, num_cogs)
+    mission_with_cogs = mission.with_cogs(num_cogs)
     env_cfg = mission_with_cogs.make_env()
     env_cfg.game.max_steps = steps
     name = f"{mission.full_name()} (cogs={num_cogs})"
