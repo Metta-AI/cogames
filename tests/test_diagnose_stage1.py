@@ -172,7 +172,7 @@ def test_importing_diagnose_does_not_eagerly_import_cli_mission() -> None:
     assert result.returncode == 0, result.stderr
 
 
-def test_build_diagnose_case_updates_cvc_spawn_count_with_cogs_override() -> None:
+def test_build_diagnose_case_updates_cvc_spawn_count_with_cogs() -> None:
     case = diagnose_module._build_diagnose_case(
         mission=make_machina1_mission(num_agents=8, max_steps=50),
         num_cogs=2,

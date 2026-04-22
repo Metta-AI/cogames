@@ -88,7 +88,7 @@ def test_file_mission_honors_steps_override(tmp_path: Path) -> None:
     assert env_cfg.game.max_steps == 777
 
 
-def test_cogs_override_updates_spawn_count_and_mission_counts() -> None:
+def test_cogs_selection_updates_spawn_count_and_mission_counts() -> None:
     _, env_cfg, mission = get_mission("machina_1", cogs=2)
 
     assert mission is not None
