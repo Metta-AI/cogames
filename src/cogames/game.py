@@ -41,11 +41,12 @@ def _import_standalone_game(name: str) -> bool:
     if name not in STANDALONE_GAMES:
         return False
     standalone_game = STANDALONE_GAMES[name]
+    import_root = standalone_game.module_name.split(".", 1)[0]
 
     try:
         importlib.import_module(standalone_game.module_name)
     except ModuleNotFoundError as exc:
-        if exc.name == standalone_game.package_name:
+        if exc.name in {standalone_game.package_name, import_root}:
             raise ValueError(
                 f"Game '{name}' is not installed. Install it with:\n  pip install cogames[{name}]"
             ) from exc
