@@ -133,19 +133,6 @@ def get_policy_specs_with_proportions(
     raise typer.Exit(1)
 
 
-def _apply_device_override(spec: PolicySpecWithProportion, device: str | None) -> PolicySpecWithProportion:
-    if device is None:
-        return spec
-    init_kwargs = dict(spec.init_kwargs or {})
-    init_kwargs["device"] = device
-    return PolicySpecWithProportion(
-        class_path=spec.class_path,
-        data_path=spec.data_path,
-        proportion=spec.proportion,
-        init_kwargs=init_kwargs,
-    )
-
-
 def parse_policy_spec(spec: str, device: str | None = None) -> PolicySpecWithProportion:
     """Parse a policy CLI option into its components.
 
@@ -184,6 +171,8 @@ def parse_policy_spec(spec: str, device: str | None = None) -> PolicySpecWithPro
             return True
         return parse_uri(value, allow_none=True, default_scheme=None) is not None
 
+    device_kwargs = {"device": device} if device is not None else {}
+
     # For metta:// URIs, we need to handle commas in query strings specially.
     # Split on ",proportion=" to separate the URI from the proportion suffix.
     if spec.startswith("metta://"):
@@ -196,13 +185,12 @@ def parse_policy_spec(spec: str, device: str | None = None) -> PolicySpecWithPro
             fraction = 1.0
 
         policy = policy_spec_from_uri(uri_part.strip(), device=device or "cpu")
-        policy_spec = PolicySpecWithProportion(
+        return PolicySpecWithProportion(
             class_path=policy.class_path,
             data_path=policy.data_path,
             proportion=fraction,
-            init_kwargs=policy.init_kwargs,
+            init_kwargs={**policy.init_kwargs, **device_kwargs},
         )
-        return _apply_device_override(policy_spec, device)
 
     entries = [part.strip() for part in spec.split(",") if part.strip()]
     if not entries:
@@ -218,13 +206,12 @@ def parse_policy_spec(spec: str, device: str | None = None) -> PolicySpecWithPro
                 raise ValueError("Only proportion is supported after a checkpoint URI.")
             fraction = parse_proportion(value)
 
-        policy_spec = PolicySpecWithProportion(
+        return PolicySpecWithProportion(
             class_path=policy.class_path,
             data_path=policy.data_path,
             proportion=fraction,
-            init_kwargs=policy.init_kwargs,
+            init_kwargs={**policy.init_kwargs, **device_kwargs},
         )
-        return _apply_device_override(policy_spec, device)
 
     if "=" not in first:
         if ":" in first:
@@ -289,10 +276,9 @@ def parse_policy_spec(spec: str, device: str | None = None) -> PolicySpecWithPro
     if class_path is None:
         raise ValueError("Policy specification must include class= for key=value format.")
 
-    policy_spec = PolicySpecWithProportion(
+    return PolicySpecWithProportion(
         class_path=class_path,
         data_path=data_path,
         proportion=fraction,
-        init_kwargs=init_kwargs,
+        init_kwargs={**init_kwargs, **device_kwargs},
     )
-    return _apply_device_override(policy_spec, device)

@@ -71,7 +71,7 @@ def test_parse_policy_spec_with_metta_uri_and_proportion():
     assert spec.proportion == 0.25
 
 
-def test_parse_policy_spec_applies_device_override_for_uri(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_parse_policy_spec_applies_device_option_for_uri(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_policy_spec_from_uri(_uri: str, *, device: str = "cpu", remove_downloaded_copy_on_exit: bool = False):
         return policy_module.PolicySpec(class_path="policy", data_path=None, init_kwargs={})
 
