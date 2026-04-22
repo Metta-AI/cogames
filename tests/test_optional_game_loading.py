@@ -66,6 +66,35 @@ def test_get_game_missing_optional_dependency_has_install_hint(monkeypatch: pyte
     assert f"pip install cogames[{game_name}]" in str(exc_info.value)
 
 
+def test_get_game_missing_optional_dependency_has_install_hint_for_module_root_mismatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    game_name = "standalone-game"
+    module_name = "standalone_game.registration"
+    monkeypatch.setitem(
+        STANDALONE_GAMES,
+        game_name,
+        StandaloneGameInstall(
+            module_name=module_name,
+            package_name=game_name,
+            source=GitSource(git="https://github.com/Metta-AI/standalone-game.git"),
+        ),
+    )
+    game_module._GAMES.pop(game_name, None)
+    monkeypatch.setattr(
+        game_module.importlib,
+        "import_module",
+        lambda name: (_ for _ in ()).throw(ModuleNotFoundError(name="standalone_game"))
+        if name == module_name
+        else None,
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        game_module.get_game(game_name)
+
+    assert f"pip install cogames[{game_name}]" in str(exc_info.value)
+
+
 def test_diplomacog_is_declared_as_optional_game_module() -> None:
     standalone_game = STANDALONE_GAMES["diplomacog"]
 
