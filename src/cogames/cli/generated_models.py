@@ -1223,6 +1223,10 @@ class MatchResponse(CLIModel):
     """
     Error message if the match failed
     """
+    error_type: Annotated[Optional[str], Field(title="Error Type")] = None
+    """
+    Error classification if failed
+    """
     episode_id: Annotated[Optional[UUID], Field(title="Episode Id")] = None
     """
     Episode identifier, present if a game was recorded
