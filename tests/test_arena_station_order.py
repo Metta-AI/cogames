@@ -9,6 +9,8 @@ import textwrap
 def _arena_hub_stations_for_hash_seed(hash_seed: str) -> str:
     code = textwrap.dedent(
         """
+        # Registers CvCMission's default "machina_1" variant.
+        import cogsguard.missions.machina_1  # noqa: F401
         from cogsguard.missions.arena import make_basic_mission
         from cogsguard.missions.terrain import find_machina_arena
 

@@ -1,1 +1,0 @@
-"""CoGames packaged game modules."""
