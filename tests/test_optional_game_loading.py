@@ -111,12 +111,12 @@ def test_overcogged_is_declared_as_optional_game_module() -> None:
     assert standalone_game.source.git == "https://github.com/Metta-AI/cogame-overcogged.git"
 
 
-def test_tribal_village_manifest_matches_package_shape() -> None:
-    standalone_game = STANDALONE_GAMES["tribal-village"]
+def test_tribalcog_manifest_matches_package_shape() -> None:
+    standalone_game = STANDALONE_GAMES["tribalcog"]
 
-    assert standalone_game.package_name == "tribal-village"
+    assert standalone_game.package_name == "tribalcog"
     assert standalone_game.module_name == "tribal_village_env.recipe"
-    assert standalone_game.source.git == "https://github.com/Metta-AI/cogame-tribal_village.git"
+    assert standalone_game.source.git == "https://github.com/Metta-AI/cogame-tribal.git"
 
 
 def test_hungercog_manifest_matches_package_shape() -> None:
