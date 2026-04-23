@@ -205,15 +205,14 @@ for feat in sorted(policy_env_info.obs_features, key=lambda feat: feat.name):
     print(f"{feat.name:<30}  {feat.normalization:>13.1f}")
 ```
 
-    Observation shape per agent: (300, 3)
+    Observation shape per agent: (500, 3)
     Egocentric window: 13x13
     
-    Observation features (70 total):
+    Observation features (74 total):
     Name                            Normalization
     -----------------------------------------------
     agent:group                              10.0
     agent_id                                255.0
-    aoe_mask                                  3.0
     episode_completion_pct                  255.0
     goal                                    100.0
     inv:aligner                             256.0
@@ -280,6 +279,11 @@ for feat in sorted(policy_env_info.obs_features, key=lambda feat: feat.name):
     team:oxygen:p1                          256.0
     team:silicon                            256.0
     team:silicon:p1                         256.0
+    territory:east                            9.0
+    territory:here                            3.0
+    territory:north                           9.0
+    territory:south                           9.0
+    territory:west                            9.0
     vibe                                    255.0
 
 
@@ -287,7 +291,7 @@ Key features to know:
 - **`tag`** — object type at a cell (wall, junction, extractor, agent, etc.)
 - **`vibe`** — role/resource identity of the object
 - **`agent:group`** — team membership
-- **`aoe_mask`** — territory: 0=neutral, 1=friendly, 2=enemy
+- **territory observations** — current territory plus sparse boundary transitions; see `mettagrid/docs/territory.md`
 - **`inv:*`** — agent inventory (energy, heart, resources, gear)
 - **`episode_completion_pct`**, **`last_action`**, **`last_reward`** — global agent state
 
