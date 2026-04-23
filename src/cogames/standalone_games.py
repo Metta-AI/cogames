@@ -48,11 +48,11 @@ STANDALONE_GAMES: dict[str, StandaloneGameInstall] = {
             git="https://github.com/Metta-AI/cogame-tribal.git",
         ),
     ),
-    "amongcog": StandaloneGameInstall(
-        module_name="amongcog.game.game",
-        package_name="amongcog",
+    "amongcogs": StandaloneGameInstall(
+        module_name="amongcogs.game.game",
+        package_name="amongcogs",
         source=GitSource(
-            git="https://github.com/Metta-AI/cogame-amongcog.git",
+            git="https://github.com/Metta-AI/cogame-amongcogs.git",
         ),
     ),
     "werecog": StandaloneGameInstall(
