@@ -940,6 +940,7 @@ def test_upload_resolves_season_and_validates(
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr("cogames.cli.submit.subprocess.run", fake_subprocess_run)
+    monkeypatch.setattr("cogames.main.has_display", lambda: False)
 
     runner = CliRunner()
     result = runner.invoke(
@@ -1027,6 +1028,7 @@ def test_upload_skips_validation_when_no_entry_config(
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr("cogames.cli.submit.subprocess.run", fake_subprocess_run)
+    monkeypatch.setattr("cogames.main.has_display", lambda: False)
 
     runner = CliRunner()
     result = runner.invoke(
