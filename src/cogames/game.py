@@ -32,9 +32,6 @@ class CoGame:
 
 
 _GAMES: dict[str, "CoGame"] = {}
-_GAME_MODULES: dict[str, str] = {
-    "cogs_vs_clips": "cogames.games.cogs_vs_clips.game.game",
-}
 
 
 def _import_standalone_game(name: str) -> bool:
@@ -58,9 +55,6 @@ def _import_standalone_game(name: str) -> bool:
 def _ensure_game_loaded(name: str) -> None:
     if name in _GAMES:
         return
-    if name in _GAME_MODULES:
-        importlib.import_module(_GAME_MODULES[name])
-        return
     _import_standalone_game(name)
 
 
@@ -68,7 +62,7 @@ def get_game(name: str) -> "CoGame":
     """Get a registered game by name."""
     _ensure_game_loaded(name)
     if name not in _GAMES:
-        available = sorted({*_GAME_MODULES, *STANDALONE_GAMES, *_GAMES})
+        available = sorted({*STANDALONE_GAMES, *_GAMES})
         raise ValueError(f"Unknown game '{name}'. Available: {', '.join(available)}")
     return _GAMES[name]
 

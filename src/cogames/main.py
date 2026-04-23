@@ -124,15 +124,11 @@ _DOC_DESCRIPTIONS: dict[str, str] = {
     "mission": "Mission briefing for CvC Deployment",
     "technical_manual": "Technical manual for Cogames",
     "scripted_agent": "Scripted agent policy documentation",
-    "evals": "Evaluation missions documentation",
-    "mapgen": "Cogs vs Clips map generation documentation",
 }
 _DOC_RESOURCE_PATHS: dict[str, tuple[str, ...]] = {
     "mission": ("docs", "MISSION.md"),
     "technical_manual": ("docs", "TECHNICAL_MANUAL.md"),
     "scripted_agent": ("docs", "SCRIPTED_AGENT.md"),
-    "evals": ("games", "cogs_vs_clips", "evals", "README.md"),
-    "mapgen": ("games", "cogs_vs_clips", "docs", "cogs_vs_clips_mapgen.md"),
 }
 
 _POLICY_FREE_COMMANDS = {
