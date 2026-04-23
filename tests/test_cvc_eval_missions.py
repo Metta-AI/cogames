@@ -4,11 +4,11 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
-from cogames.games.cogs_vs_clips.evals.cvc_evals import (
+from cogsguard.evals.cvc_evals import (
     CVC_EVAL_COGS,
     CVC_EVAL_MISSIONS,
 )
+
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
 from mettagrid.simulator import Simulator
 

@@ -81,8 +81,8 @@
 # %pip install mettagrid cogames pufferlib-core --quiet
 
 # %%
-from cogames.games.cogs_vs_clips.game import NoVibesVariant
-from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
+from cogsguard.game import NoVibesVariant
+from cogsguard.missions.machina_1 import make_machina1_mission
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface
 from mettagrid.simulator import Simulator

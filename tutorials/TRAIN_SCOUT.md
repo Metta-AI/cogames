@@ -39,7 +39,7 @@ import torch.nn as nn
 from einops import rearrange
 
 import pufferlib.vector as pvector
-from cogames.games.cogs_vs_clips.missions.tutorial import ScoutRewardsVariant, make_tutorial_mission
+from cogsguard.missions.tutorial import ScoutRewardsVariant, make_tutorial_mission
 from mettagrid import MettaGridConfig
 from mettagrid.envs.early_reset_handler import EarlyResetHandler
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
@@ -350,7 +350,7 @@ MINIBATCH_SIZE = BATCH_SIZE if DOCSYNC_MODE else min(4096, BATCH_SIZE)
 TOTAL_TIMESTEPS = BATCH_SIZE if DOCSYNC_MODE else 10_000_000
 
 train_config = dict(
-    env="cogames.games.cogs_vs_clips",
+    env="cogsguard",
     device=DEVICE.type,
     total_timesteps=max(TOTAL_TIMESTEPS, BATCH_SIZE),
     batch_size=BATCH_SIZE,
@@ -392,7 +392,7 @@ for k, v in train_config.items():
 ```
 
     Training config:
-      env: cogames.games.cogs_vs_clips
+      env: cogsguard
       device: cpu
       total_timesteps: 256
       batch_size: 256

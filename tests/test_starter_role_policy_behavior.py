@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import pytest
+from cogsguard.missions.arena import make_basic_mission
 
-from cogames.games.cogs_vs_clips.missions.arena import make_basic_mission
 from cogames.policy.starter_agent import StarterCogPolicyImpl
 from mettagrid.config.id_map import ObservationFeatureSpec
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface

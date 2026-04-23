@@ -10,9 +10,10 @@ import json
 import os
 import sys
 
-from cogames.games.cogs_vs_clips.game.damage import DamageVariant
-from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_map_builder
-from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from cogsguard.game.damage import DamageVariant
+from cogsguard.missions.machina_1 import make_machina1_map_builder
+from cogsguard.missions.mission import CvCMission
+
 from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
 from mettagrid.perf.harness import (
     compare_multiple,

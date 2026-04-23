@@ -1,8 +1,9 @@
 from typing import cast
 
-from cogames.games.cogs_vs_clips.game.territory import JUNCTION_ALIGN_DISTANCE
-from cogames.games.cogs_vs_clips.missions.machina_1 import _build_machina1_map_builder, make_machina1_mission
-from cogames.games.cogs_vs_clips.missions.terrain import MachinaArenaConfig
+from cogsguard.game.territory import JUNCTION_ALIGN_DISTANCE
+from cogsguard.missions.machina_1 import _build_machina1_map_builder, make_machina1_mission
+from cogsguard.missions.terrain import MachinaArenaConfig
+
 from mettagrid.config.tag import typeTag
 from mettagrid.mapgen.mapgen import MapGenConfig
 from mettagrid.mapgen.scenes.building_distributions import DistributionType

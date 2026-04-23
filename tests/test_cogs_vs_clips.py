@@ -1,20 +1,20 @@
 import pytest
+from cogsguard.game.damage import DamageVariant
+from cogsguard.game.elements import ElementsVariant
+from cogsguard.game.energy import EnergyVariant
+from cogsguard.game.game import CvCGame
+from cogsguard.game.teams import TeamConfig, TeamVariant
+from cogsguard.game.teams.four_score import FourScoreVariant
+from cogsguard.game.teams.hub_observations import HubObservationsVariant
+from cogsguard.game.territory import TerritoryVariant as JunctionNetVariant
+from cogsguard.missions.arena import make_arena_map_builder
+from cogsguard.missions.four_score import FourScoreMission
+from cogsguard.missions.machina_1 import make_machina1_map_builder, make_machina1_mission
+from cogsguard.missions.mission import CvCMission
+from cogsguard.missions.terrain import find_machina_arena
+from cogsguard.missions.tutorial import make_tutorial_mission
 
 from cogames.cli.mission import find_mission
-from cogames.games.cogs_vs_clips.game.damage import DamageVariant
-from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
-from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
-from cogames.games.cogs_vs_clips.game.game import CvCGame
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
-from cogames.games.cogs_vs_clips.game.teams.four_score import FourScoreVariant
-from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
-from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant as JunctionNetVariant
-from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
-from cogames.games.cogs_vs_clips.missions.four_score import FourScoreMission
-from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_map_builder, make_machina1_mission
-from cogames.games.cogs_vs_clips.missions.mission import CvCMission
-from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
-from cogames.games.cogs_vs_clips.missions.tutorial import make_tutorial_mission
 from mettagrid.config.game_value import ConstValue, QueryCountValue, SumGameValue
 from mettagrid.config.handler_config import AllOf, FirstMatch, Handler
 from mettagrid.config.mettagrid_config import MettaGridConfig
@@ -161,7 +161,7 @@ def test_tag_mutations_reference_valid_tags():
 
 def test_team_net_tag_uses_type_hub_source():
     """net_materialized_query produces a MaterializedQuery with ClosureQuery source using type:hub."""
-    from cogames.games.cogs_vs_clips.game.territory import net_materialized_query  # noqa: PLC0415
+    from cogsguard.game.territory import net_materialized_query  # noqa: PLC0415
 
     team = TeamConfig()
     assert team.net_tag() == "net:cogs"

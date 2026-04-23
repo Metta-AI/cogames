@@ -238,7 +238,7 @@ def train(
         if "lstm" in lowered or "rnn" in lowered:
             use_rnn = True
 
-    env_name = "cogames.games.cogs_vs_clips"
+    env_name = "cogsguard"
 
     learning_rate = 0.00092
     bptt_horizon = 64 if use_rnn else 1

@@ -15,8 +15,8 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from cogsguard.missions.machina_1 import make_game
 
-from cogames.games.cogs_vs_clips.missions.machina_1 import make_game
 from mettagrid.runner.types import SingleEpisodeJob
 
 

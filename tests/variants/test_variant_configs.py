@@ -5,36 +5,36 @@ is correctly modified.
 """
 
 import pytest
+from cogsguard.game import GEAR
+from cogsguard.game.cargo import CargoLimitVariant
+from cogsguard.game.clear_vibes import ClearVibesVariant
+from cogsguard.game.damage import DamageVariant
+from cogsguard.game.days import DayConfig, DaysVariant
+from cogsguard.game.elements import ElementsVariant
+from cogsguard.game.endless import EndlessVariant
+from cogsguard.game.energy import EnergyVariant
+from cogsguard.game.extractors import ExtractorsVariant
+from cogsguard.game.forced_role_vibes import ForcedRoleVibesVariant
+from cogsguard.game.gear import GearVariant
+from cogsguard.game.gear_stations import GearStationsVariant
+from cogsguard.game.heart import HeartVariant
+from cogsguard.game.junction import JunctionVariant
+from cogsguard.game.roles.aligner import AlignerVariant
+from cogsguard.game.roles.miner import MinerVariant
+from cogsguard.game.roles.scout import ScoutVariant
+from cogsguard.game.roles.scrambler import ScramblerVariant
+from cogsguard.game.solar import SolarVariant
+from cogsguard.game.talk import TalkVariant
+from cogsguard.game.teams import TeamConfig, TeamVariant
+from cogsguard.game.teams.gear_stations import TeamGearStationsVariant
+from cogsguard.game.teams.hub import TeamHubVariant
+from cogsguard.game.teams.hub_observations import HubObservationsVariant
+from cogsguard.game.territory import DamageStrangersVariant, HealTeamVariant, TerritoryVariant
+from cogsguard.game.vibes import NoVibesVariant, VibesVariant
+from cogsguard.missions.arena import make_arena_map_builder
+from cogsguard.missions.machina_1 import CvCMachina1Variant
+from cogsguard.missions.mission import CvCMission
 
-from cogames.games.cogs_vs_clips.game import GEAR
-from cogames.games.cogs_vs_clips.game.cargo import CargoLimitVariant
-from cogames.games.cogs_vs_clips.game.clear_vibes import ClearVibesVariant
-from cogames.games.cogs_vs_clips.game.damage import DamageVariant
-from cogames.games.cogs_vs_clips.game.days import DayConfig, DaysVariant
-from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
-from cogames.games.cogs_vs_clips.game.endless import EndlessVariant
-from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
-from cogames.games.cogs_vs_clips.game.extractors import ExtractorsVariant
-from cogames.games.cogs_vs_clips.game.forced_role_vibes import ForcedRoleVibesVariant
-from cogames.games.cogs_vs_clips.game.gear import GearVariant
-from cogames.games.cogs_vs_clips.game.gear_stations import GearStationsVariant
-from cogames.games.cogs_vs_clips.game.heart import HeartVariant
-from cogames.games.cogs_vs_clips.game.junction import JunctionVariant
-from cogames.games.cogs_vs_clips.game.roles.aligner import AlignerVariant
-from cogames.games.cogs_vs_clips.game.roles.miner import MinerVariant
-from cogames.games.cogs_vs_clips.game.roles.scout import ScoutVariant
-from cogames.games.cogs_vs_clips.game.roles.scrambler import ScramblerVariant
-from cogames.games.cogs_vs_clips.game.solar import SolarVariant
-from cogames.games.cogs_vs_clips.game.talk import TalkVariant
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
-from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStationsVariant
-from cogames.games.cogs_vs_clips.game.teams.hub import TeamHubVariant
-from cogames.games.cogs_vs_clips.game.teams.hub_observations import HubObservationsVariant
-from cogames.games.cogs_vs_clips.game.territory import DamageStrangersVariant, HealTeamVariant, TerritoryVariant
-from cogames.games.cogs_vs_clips.game.vibes import NoVibesVariant, VibesVariant
-from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
-from cogames.games.cogs_vs_clips.missions.machina_1 import CvCMachina1Variant
-from cogames.games.cogs_vs_clips.missions.mission import CvCMission
 from mettagrid.config.filter import GameValueFilter, ResourceFilter
 from mettagrid.config.filter.periodic_filter import PeriodicFilter
 from mettagrid.config.game_value import GameValue, RatioGameValue
@@ -511,7 +511,7 @@ class TestTeamVariant:
 
 class TestRoleVariants:
     def test_miner_adds_junction_deposit_handlers(self):
-        from cogames.games.cogs_vs_clips.game.teams.junction_deposit import JunctionDepositVariant  # noqa: PLC0415
+        from cogsguard.game.teams.junction_deposit import JunctionDepositVariant  # noqa: PLC0415
 
         env = _make_mission([JunctionVariant(), MinerVariant(), JunctionDepositVariant()]).make_env()
         junction = env.game.objects.get("junction")

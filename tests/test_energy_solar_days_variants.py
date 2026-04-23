@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from cogames.games.cogs_vs_clips.game.energy import EnergyVariant
-from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
-from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from cogsguard.game.energy import EnergyVariant
+from cogsguard.missions.machina_1 import make_machina1_mission
+from cogsguard.missions.mission import CvCMission
+
 from cogames.variants import VariantRegistry
 from mettagrid.config.handler_config import AllOf, FirstMatch, Handler
 
-_CVC_VARIANT_MODULES = ("cogames.games.cogs_vs_clips.",)
+_CVC_VARIANT_MODULES = ("cogsguard.",)
 
 
 def _handler_names(handler) -> set[str]:

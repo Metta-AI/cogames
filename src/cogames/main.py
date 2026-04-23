@@ -50,7 +50,7 @@ def _run_metadata_only_cli() -> None:
     @metadata_app.command("mission", hidden=True)
     def _missions_cmd(
         mission_filter: Optional[str] = typer.Argument(None, metavar="MISSION"),
-        game_name: str = typer.Option("cogs_vs_clips", "--game", help="Game whose missions to list."),
+        game_name: str = typer.Option("cogsguard", "--game", help="Game whose missions to list."),
     ) -> None:
         list_missions(mission_filter, game_name=game_name)
 
@@ -59,6 +59,8 @@ def _run_metadata_only_cli() -> None:
 
 
 _run_metadata_only_cli()
+
+from cogsguard.train.curricula import make_rotation
 
 from cogames import pickup as pickup_module
 from cogames import play as play_module
@@ -106,7 +108,6 @@ from cogames.cli.submit import (
 )
 from cogames.device import resolve_training_device
 from cogames.display_detect import has_display
-from cogames.games.cogs_vs_clips.train.curricula import make_rotation
 from cogames.optional_deps import require_neural
 from cogames.seed import seed_rollout_rng
 from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
@@ -287,7 +288,7 @@ def tutorial_cmd(
     console.print("[dim]Initializing Mettascope...[/dim]")
 
     # Load tutorial mission (CvC)
-    from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission  # noqa: PLC0415
+    from cogsguard.missions.machina_1 import make_machina1_mission  # noqa: PLC0415
 
     # Create environment config
     env_cfg = make_machina1_mission(num_agents=1, max_steps=1000).make_env()
@@ -340,7 +341,7 @@ def cvc_tutorial_cmd(
     console.print("[dim]Initializing Mettascope...[/dim]")
 
     # Load CvC tutorial mission
-    from cogames.games.cogs_vs_clips.missions.tutorial import make_tutorial_mission  # noqa: PLC0415
+    from cogsguard.missions.tutorial import make_tutorial_mission  # noqa: PLC0415
 
     env_cfg = make_tutorial_mission().make_env()
     console.print("[dim]Tutorial phases appear in-game. Press Enter or click Next to advance.[/dim]")
@@ -401,7 +402,7 @@ This command has two modes:
 def games_cmd(
     ctx: typer.Context,
     game_name: str = typer.Option(
-        "cogs_vs_clips",
+        "cogsguard",
         "--game",
         help="Game whose missions to list or describe.",
         rich_help_panel="Describe",
@@ -549,7 +550,7 @@ def variants_cmd(
     if dependencies:
         from cogames.game import get_game  # noqa: PLC0415
 
-        print_variant_graph(get_game("cogs_vs_clips"), console)
+        print_variant_graph(get_game("cogsguard"), console)
     else:
         list_variants()
 
@@ -646,10 +647,10 @@ def play_cmd(
     ctx: typer.Context,
     # --- Game Setup ---
     game: str = typer.Option(
-        "cogs_vs_clips",
+        "cogsguard",
         "--game",
         metavar="GAME",
-        help="Game to play (default: cogs_vs_clips).",
+        help="Game to play (default: cogsguard).",
         rich_help_panel="Game Setup",
     ),
     mission: Optional[str] = typer.Option(

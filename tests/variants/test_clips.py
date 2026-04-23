@@ -1,22 +1,23 @@
 """Tests for the clips variant: non-player faction with ships and events."""
 
-from cogames.games.cogs_vs_clips.game import (
+from cogsguard.game import (
     AdaptiveClipsVariant,
     ClipsVariant,
     MultiTeamVariant,
     NoClipsVariant,
 )
-from cogames.games.cogs_vs_clips.game.clips.ship import clips_ship_map_names_in_map_config
-from cogames.games.cogs_vs_clips.game.damage import DamageVariant
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
-from cogames.games.cogs_vs_clips.game.territory import HUB_ALIGN_DISTANCE, JUNCTION_ALIGN_DISTANCE
-from cogames.games.cogs_vs_clips.missions.machina_1 import (
+from cogsguard.game.clips.ship import clips_ship_map_names_in_map_config
+from cogsguard.game.damage import DamageVariant
+from cogsguard.game.teams import TeamConfig, TeamVariant
+from cogsguard.game.territory import HUB_ALIGN_DISTANCE, JUNCTION_ALIGN_DISTANCE
+from cogsguard.missions.machina_1 import (
     MACHINA_1_MAP_BUILDER,
     make_machina1_mission,
 )
-from cogames.games.cogs_vs_clips.missions.mission import CvCMission
-from cogames.games.cogs_vs_clips.missions.tutorial import ScramblerRewardsVariant, make_tutorial_mission
-from cogames.games.cogs_vs_clips.train.cvc_curriculum import split_variants
+from cogsguard.missions.mission import CvCMission
+from cogsguard.missions.tutorial import ScramblerRewardsVariant, make_tutorial_mission
+from cogsguard.train.cvc_curriculum import split_variants
+
 from mettagrid.config.filter import GameValueFilter, NotFilter, OrFilter
 from mettagrid.config.game_value import QueryCountValue, SumGameValue
 from mettagrid.config.query import Query

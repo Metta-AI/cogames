@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import pytest
+from cogsguard.missions.arena import make_basic_mission
+from cogsguard.missions.machina_1 import make_machina1_mission
+from cogsguard.missions.terrain import MapSeedVariant
+from cogsguard.missions.tutorial import make_tutorial_mission
 
-from cogames.games.cogs_vs_clips.missions.arena import make_basic_mission
-from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
-from cogames.games.cogs_vs_clips.missions.terrain import MapSeedVariant
-from cogames.games.cogs_vs_clips.missions.tutorial import make_tutorial_mission
 from cogames.policy.starter_agent import StarterCogPolicyImpl
 from mettagrid.policy.policy import PolicySpec
 from mettagrid.policy.policy_env_interface import PolicyEnvInterface

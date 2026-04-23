@@ -9,8 +9,8 @@ import textwrap
 def _arena_hub_stations_for_hash_seed(hash_seed: str) -> str:
     code = textwrap.dedent(
         """
-        from cogames.games.cogs_vs_clips.missions.arena import make_basic_mission
-        from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
+        from cogsguard.missions.arena import make_basic_mission
+        from cogsguard.missions.terrain import find_machina_arena
 
         env = make_basic_mission(max_steps=10).make_env()
         arena = find_machina_arena(env.game.map_builder)

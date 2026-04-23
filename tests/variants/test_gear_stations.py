@@ -1,14 +1,15 @@
 """Tests for gear station interactions: free gear (default) and costed gear."""
 
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig
-from cogames.games.cogs_vs_clips.missions.machina_1 import GEAR_COSTS
+from cogsguard.game.teams import TeamConfig
+from cogsguard.missions.machina_1 import GEAR_COSTS
 
 from .conftest import StationTestHarness, hub_object
 
 
 def _make_gear_station(team: TeamConfig, gear_type: str, symbol: str, cost: dict[str, int] | None = None):
     """Build a per-team gear station with handlers attached."""
-    from cogames.games.cogs_vs_clips.game.teams.gear_stations import TeamGearStationsVariant  # noqa: PLC0415
+    from cogsguard.game.teams.gear_stations import TeamGearStationsVariant  # noqa: PLC0415
+
     from mettagrid.config.mettagrid_config import GameConfig, MettaGridConfig  # noqa: PLC0415
 
     env = MettaGridConfig(game=GameConfig())

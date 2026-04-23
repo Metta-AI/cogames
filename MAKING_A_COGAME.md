@@ -1,6 +1,6 @@
 # Making a CoGame
 
-This guide is for people who want to build a new game on top of CoGames and MettaGrid. It covers the simulation primitives, how to define game objects and rules, how to wrap everything into a playable mission, and how to write evals. For a complete worked example of a cooperative-competitive game built this way, see `src/cogames/cogs_vs_clips/`.
+This guide is for people who want to build a new game on top of CoGames and MettaGrid. It covers the simulation primitives, how to define game objects and rules, how to wrap everything into a playable mission, and how to write evals. For a complete worked example of a cooperative-competitive game built this way, see `cogsguard/`.
 
 ---
 

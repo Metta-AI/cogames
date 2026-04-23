@@ -7,12 +7,12 @@ specific interaction behaviors.
 Variant-specific station tests live in tests/variants/.
 """
 
+from cogsguard.game import GEAR
+from cogsguard.game.elements import ElementsVariant
+from cogsguard.game.teams import TeamConfig
+from cogsguard.game.teams.hub import CvCHubConfig
 from variants.conftest import StationTestHarness
 
-from cogames.games.cogs_vs_clips.game import GEAR
-from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig
-from cogames.games.cogs_vs_clips.game.teams.hub import CvCHubConfig
 from mettagrid.config.filter import sharedTagPrefix
 from mettagrid.config.handler_config import Handler, updateTarget
 from mettagrid.config.mettagrid_config import (

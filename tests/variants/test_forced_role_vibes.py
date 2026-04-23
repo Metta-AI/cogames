@@ -1,11 +1,11 @@
 """Tests for the ForcedRoleVibesVariant."""
 
-from cogames.games.cogs_vs_clips.game import ForcedRoleVibesVariant
-from cogames.games.cogs_vs_clips.game.damage import DamageVariant
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
-from cogames.games.cogs_vs_clips.game.vibes import VibesVariant
-from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
-from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from cogsguard.game import ForcedRoleVibesVariant
+from cogsguard.game.damage import DamageVariant
+from cogsguard.game.teams import TeamConfig, TeamVariant
+from cogsguard.game.vibes import VibesVariant
+from cogsguard.missions.arena import make_arena_map_builder
+from cogsguard.missions.mission import CvCMission
 
 
 def test_forced_role_vibes_variant_forces_vibe_without_role_id_tokens() -> None:
