@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import pytest
-from typer.testing import CliRunner
-
-import cogames.diagnose as diagnose_module
-from cogames.games.cogs_vs_clips.evals.cognitive_substrate import CATEGORY_MISSIONS, EVAL_MISSIONS
-from cogames.games.cogs_vs_clips.evals.cognitive_substrate.benchmark import (
+from cogsguard.evals.cognitive_substrate import CATEGORY_MISSIONS, EVAL_MISSIONS
+from cogsguard.evals.cognitive_substrate.benchmark import (
     default_benchmark_policy_specs,
     run_local_benchmark,
     scripted_gap_closed,
 )
+from typer.testing import CliRunner
+
+import cogames.diagnose as diagnose_module
 from cogames.main import app
 from mettagrid.map_builder.map_builder import HasSeed
 from mettagrid.policy.policy import PolicySpec

@@ -1,13 +1,13 @@
 """Tests for the milestones_2 reward variant."""
 
 import pytest
+from cogsguard.game.damage import DamageVariant
+from cogsguard.game.teams import TeamConfig, TeamVariant
+from cogsguard.game.territory import TerritoryVariant
+from cogsguard.missions.arena import make_arena_map_builder
+from cogsguard.missions.mission import CvCMission
+from cogsguard.train.reward_variants import apply_reward_variants
 
-from cogames.games.cogs_vs_clips.game.damage import DamageVariant
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
-from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant
-from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
-from cogames.games.cogs_vs_clips.missions.mission import CvCMission
-from cogames.games.cogs_vs_clips.train.reward_variants import apply_reward_variants
 from mettagrid.config.game_value import Scope, StatValue, SumGameValue
 
 

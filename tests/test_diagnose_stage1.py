@@ -6,12 +6,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from cogsguard.missions.machina_1 import make_machina1_mission
+from cogsguard.missions.terrain import find_machina_arena
 from typer.testing import CliRunner
 
 import cogames.diagnose as diagnose_module
 import cogames.main as main_module
-from cogames.games.cogs_vs_clips.missions.machina_1 import make_machina1_mission
-from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
 from mettagrid.simulator.multi_episode.summary import MultiEpisodeRolloutPolicySummary, MultiEpisodeRolloutSummary
 
 runner = CliRunner()

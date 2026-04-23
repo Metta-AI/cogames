@@ -1,7 +1,8 @@
 """Tests for the aligner role variant: junction alignment handlers."""
 
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig
-from cogames.games.cogs_vs_clips.game.territory import net_materialized_query
+from cogsguard.game.teams import TeamConfig
+from cogsguard.game.territory import net_materialized_query
+
 from mettagrid.config.filter import actorHasTag, hasTagPrefix, isNear, isNot
 from mettagrid.config.handler_config import Handler, actorHas, updateActor
 from mettagrid.config.mettagrid_config import GridObjectConfig

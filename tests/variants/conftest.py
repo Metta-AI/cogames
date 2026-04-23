@@ -6,15 +6,16 @@ Provides StationTestHarness for deterministic station interaction testing.
 from dataclasses import dataclass
 from typing import Any
 
-from cogames.games.cogs_vs_clips.game import GEAR
-from cogames.games.cogs_vs_clips.game.elements import ElementsVariant
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig
-from cogames.games.cogs_vs_clips.game.teams.junction import TeamJunctionVariant
-from cogames.games.cogs_vs_clips.game.territory import (
+from cogsguard.game import GEAR
+from cogsguard.game.elements import ElementsVariant
+from cogsguard.game.teams import TeamConfig
+from cogsguard.game.teams.junction import TeamJunctionVariant
+from cogsguard.game.territory import (
     HUB_ALIGN_DISTANCE,
     JUNCTION_ALIGN_DISTANCE,
     net_materialized_query,
 )
+
 from mettagrid.config.filter import anyOf, hasTag, hasTagPrefix, isNear, isNot, sharedTagPrefix
 from mettagrid.config.handler_config import Handler, actorHas, firstMatch, updateActor
 from mettagrid.config.mettagrid_config import (

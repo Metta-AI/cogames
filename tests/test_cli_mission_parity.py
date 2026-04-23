@@ -1,13 +1,13 @@
 from pathlib import Path
 
 import pytest
+from cogsguard.game.clips import AngryClipsVariant, ClipsVariant
+from cogsguard.game.clips.clips import JUNCTION_ALIGN_DISTANCE
+from cogsguard.game.game import CvCGame
+from cogsguard.missions.machina_1 import MachinaOneMission
+from cogsguard.missions.terrain import find_machina_arena
 
 from cogames.cli.mission import find_mission, get_mission, resolve_mission
-from cogames.games.cogs_vs_clips.game.clips import AngryClipsVariant, ClipsVariant
-from cogames.games.cogs_vs_clips.game.clips.clips import JUNCTION_ALIGN_DISTANCE
-from cogames.games.cogs_vs_clips.game.game import CvCGame
-from cogames.games.cogs_vs_clips.missions.machina_1 import MachinaOneMission
-from cogames.games.cogs_vs_clips.missions.terrain import find_machina_arena
 
 
 def test_get_mission_accepts_reward_variants() -> None:

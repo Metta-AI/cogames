@@ -1,6 +1,7 @@
 """Tests for the miner role variant: extractor bonus and cargo capacity."""
 
-from cogames.games.cogs_vs_clips.game.extractors import CvCExtractorConfig, ExtractorsVariant
+from cogsguard.game.extractors import CvCExtractorConfig, ExtractorsVariant
+
 from mettagrid.config.handler_config import Handler, actorHas, firstMatch, withdraw
 
 from .conftest import StationTestHarness

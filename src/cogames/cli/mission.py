@@ -424,7 +424,7 @@ def get_mission_name_and_config(
     ctx: typer.Context,
     mission_arg: Optional[str],
     *,
-    game_name: str = "cogs_vs_clips",
+    game_name: str = "cogsguard",
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
     steps: Optional[int] = None,
@@ -457,7 +457,7 @@ def get_mission_names_and_configs(
     ctx: typer.Context,
     missions_arg: Optional[list[str]],
     *,
-    game_name: str = "cogs_vs_clips",
+    game_name: str = "cogsguard",
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
     steps: Optional[int] = None,
@@ -499,32 +499,32 @@ def get_mission(
     mission_arg: str,
     variants_arg: Optional[list[str]] = None,
     cogs: Optional[int] = None,
-    game_name: str = "cogs_vs_clips",
+    game_name: str = "cogsguard",
 ) -> tuple[str, MettaGridConfig, Optional[CoGameMission]]:
     """Get a specific mission configuration by name."""
     game = get_game(game_name)
     return resolve_mission(game, mission_arg, variants_arg, cogs)
 
 
-def get_all_missions(game_name: str = "cogs_vs_clips") -> list[str]:
+def get_all_missions(game_name: str = "cogsguard") -> list[str]:
     """Get all core mission names (excludes evals)."""
     return get_all_mission_names(get_game(game_name))
 
 
-def get_all_missions_list(game_name: str = "cogs_vs_clips") -> list[CoGameMission]:
+def get_all_missions_list(game_name: str = "cogsguard") -> list[CoGameMission]:
     """Get all core mission objects (excludes evals)."""
     return list(get_game(game_name).missions)
 
 
-def list_missions(mission_filter: Optional[str] = None, game_name: str = "cogs_vs_clips") -> None:
+def list_missions(mission_filter: Optional[str] = None, game_name: str = "cogsguard") -> None:
     print_missions(get_game(game_name), console, mission_filter)
 
 
-def list_evals(game_name: str = "cogs_vs_clips") -> None:
+def list_evals(game_name: str = "cogsguard") -> None:
     print_evals(get_game(game_name), console)
 
 
-def list_variants(game_name: str = "cogs_vs_clips") -> None:
+def list_variants(game_name: str = "cogsguard") -> None:
     print_variants(get_game(game_name), console)
 
 
@@ -534,7 +534,7 @@ def describe_mission(
     mission_cfg: Optional[CoGameMission] = None,
 ) -> None:
     """Print detailed information about a specific mission."""
-    from cogames.games.cogs_vs_clips.missions.terrain import MachinaArena  # noqa: PLC0415
+    from cogsguard.missions.terrain import MachinaArena  # noqa: PLC0415
 
     console.print(f"\n[bold cyan]{mission_name}[/bold cyan]\n")
 

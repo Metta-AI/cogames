@@ -1,9 +1,9 @@
 """Tests that TerritoryVariant assigns territory_controls to hub, junction, and ship."""
 
-from cogames.games.cogs_vs_clips.game.teams import TeamConfig, TeamVariant
-from cogames.games.cogs_vs_clips.game.territory import TerritoryVariant
-from cogames.games.cogs_vs_clips.missions.arena import make_arena_map_builder
-from cogames.games.cogs_vs_clips.missions.mission import CvCMission
+from cogsguard.game.teams import TeamConfig, TeamVariant
+from cogsguard.game.territory import TerritoryVariant
+from cogsguard.missions.arena import make_arena_map_builder
+from cogsguard.missions.mission import CvCMission
 
 
 def _assert_territory_controls(station) -> None:
