@@ -60,8 +60,6 @@ def _run_metadata_only_cli() -> None:
 
 _run_metadata_only_cli()
 
-from cogsguard.train.curricula import make_rotation
-
 from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import verbose
@@ -106,6 +104,7 @@ from cogames.cli.submit import (
     upload_policy,
     validate_bundle_docker,
 )
+from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
 from cogames.display_detect import has_display
 from cogames.optional_deps import require_neural
