@@ -116,7 +116,7 @@ feature IDs for your configuration.
 | `inv:{resource_name}`             | Amount of resource in the object                                                | cogs, chests              | One feature per resource (e.g., `inv:oxygen`, `inv:carbon`, `inv:heart`)        |
 | `protocol_input:{resource_name}`  | Required input resource amount for current protocol                             | hub, extractors           | One feature per resource. Only if `protocol_details_obs` is enabled             |
 | `protocol_output:{resource_name}` | Output resource amount for current protocol                                     | hub, extractors           | One feature per resource. Only if `protocol_details_obs` is enabled             |
-| `aoe_mask`                        | Area-of-effect territory mask                                                   | tiles                     | Optional; enabled via `obs.aoe_mask`                                            |
+| `territory:here`, `territory:*` | Territory label plus sparse boundary edges                                  | self (global) + tiles     | Optional; enabled via `obs.territory`                                           |
 | `last_action_move`                | Whether the agent's location changed on the last step                           | self (global)             | Optional; enabled via `obs.global_obs.last_action_move`                         |
 
 ---
