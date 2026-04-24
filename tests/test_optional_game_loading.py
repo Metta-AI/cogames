@@ -117,6 +117,7 @@ def test_tribalcog_manifest_matches_package_shape() -> None:
     assert standalone_game.package_name == "tribalcog"
     assert standalone_game.module_name == "tribal_village_env.recipe"
     assert standalone_game.source.git == "https://github.com/Metta-AI/cogame-tribal.git"
+    assert standalone_game.source.rev == "7aa556bc9e0d733f30e5e5043d229c4a5ca03ad5"
 
 
 def test_hungercog_manifest_matches_package_shape() -> None:
