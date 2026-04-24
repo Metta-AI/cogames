@@ -82,7 +82,7 @@ overcogged = { git = "https://github.com/Metta-AI/cogame-overcogged.git" }
 tribalcog = { git = "https://github.com/Metta-AI/cogame-tribal.git" }
 amongcogs = { git = "https://github.com/Metta-AI/cogame-amongcogs.git" }
 werecog = { git = "https://github.com/Metta-AI/cogame-werecog.git" }
-cogsguard = { git = "https://github.com/Metta-AI/cogame-cogsguard.git" }
+cogsguard = { git = "https://github.com/Metta-AI/cogame-cogsguard.git", rev = "e088553fdb5753404327a12ba8412412999fa558" }
 
 [tool.ruff]
 extend = "../../.ruff.toml"
