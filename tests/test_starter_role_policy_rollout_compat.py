@@ -19,7 +19,6 @@ ROLE_POLICY_CLASS_PATH = {
     "scout": "cogames.policy.role_policies.ScoutRolePolicy",
 }
 
-
 _CORE_MISSIONS = [make_machina1_mission(), make_basic_mission(), make_tutorial_mission()]
 
 
