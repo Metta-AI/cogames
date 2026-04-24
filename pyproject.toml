@@ -10,7 +10,7 @@ requires-python = ">=3.12,<3.13"
 classifiers = ["Programming Language :: Python :: 3", "Programming Language :: Python :: 3.12"]
 dependencies = [
   "mettagrid==0.26.5",
-  "softmax-cli==0.26.1",
+  "softmax-cli==0.26.2",
   "packaging>=24.0.0",
   "pydantic>=2.11.5",
   "pyyaml>=6.0.2",

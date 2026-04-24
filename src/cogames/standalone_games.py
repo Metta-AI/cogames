@@ -9,6 +9,7 @@ class GitSource(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     git: str
+    rev: str | None = None
 
 
 class StandaloneGameInstall(BaseModel):
@@ -67,6 +68,7 @@ STANDALONE_GAMES: dict[str, StandaloneGameInstall] = {
         package_name="cogsguard",
         source=GitSource(
             git="https://github.com/Metta-AI/cogame-cogsguard.git",
+            rev="e088553fdb5753404327a12ba8412412999fa558",
         ),
     ),
 }
