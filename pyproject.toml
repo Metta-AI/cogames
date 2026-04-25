@@ -41,6 +41,7 @@ tribalcog = ["tribalcog"]
 amongcogs = ["amongcogs"]
 werecog = ["werecog"]
 cogsguard = ["cogsguard"]
+bitworld = ["bitworld"]
 neural = ["pufferlib-core", "torch", "einops>=0.8.0", "mettagrid[train]"]
 test = ["cogames[neural]", "pytest", "pytest-xdist", "ruff"]
 
@@ -83,6 +84,7 @@ tribalcog = { git = "https://github.com/Metta-AI/cogame-tribal.git", rev = "7aa5
 amongcogs = { git = "https://github.com/Metta-AI/cogame-amongcogs.git" }
 werecog = { git = "https://github.com/Metta-AI/cogame-werecog.git" }
 cogsguard = { git = "https://github.com/Metta-AI/cogame-cogsguard.git", rev = "e088553fdb5753404327a12ba8412412999fa558" }
+bitworld = { git = "https://github.com/Metta-AI/bitworld.git", rev = "bbfb288b5892864d2e237c7da6b2c3018ee11ae0" }
 
 [tool.ruff]
 extend = "../../.ruff.toml"
