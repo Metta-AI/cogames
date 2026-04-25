@@ -50,6 +50,7 @@ def evaluate(
     device: Optional[str] = None,
     output_format: Optional[Literal["yaml", "json"]] = None,
     save_replay: Optional[str] = None,
+    game_engine: str = "mettagrid",
 ) -> MissionResultsSummary:
     if not missions:
         raise ValueError("At least one mission must be provided for evaluation.")
@@ -88,6 +89,7 @@ def evaluate(
                 create_replay_dir=save_replay is not None,
                 device=device,
                 on_progress=lambda _episode_idx, _result: progress.update(1),
+                game_engine=game_engine,
             )
 
         mission_results.append(rollout)
