@@ -42,7 +42,7 @@ amongcogs = ["amongcogs"]
 werecog = ["werecog"]
 cogsguard = ["cogsguard"]
 bitworld = ["bitworld"]
-neural = ["pufferlib-core", "torch", "einops>=0.8.0", "mettagrid[train]"]
+neural = ["pufferlib-core==3.0.22", "torch", "einops>=0.8.0", "mettagrid[train]"]
 test = ["cogames[neural]", "pytest", "pytest-xdist", "ruff"]
 
 [project.scripts]
