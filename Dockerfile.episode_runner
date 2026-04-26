@@ -26,7 +26,7 @@ RUN ARCH=$(uname -m) && \
 ENV PATH="/root/.nimby/nim/bin:$PATH"
 
 # Build BitWorld game binaries from source.
-ARG BITWORLD_REF=c99a596
+ARG BITWORLD_REF=c5b3773
 RUN chmod +x /root/.nimby/nim/bin/* && \
     export PATH="/root/.nimby/nim/bin:$PATH" && \
     git clone https://github.com/Metta-AI/BitWorld.git /tmp/bitworld && \
