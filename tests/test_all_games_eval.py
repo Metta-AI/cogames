@@ -32,6 +32,7 @@ def test_mission_run(mission_name: str):
             "--steps",
             str(RUN_SMOKE_TEST_STEPS),
         ],
+        catch_exceptions=False,
     )
 
     if result.exit_code != 0:
@@ -57,6 +58,7 @@ def test_alternate_run_format(mission_name):
             "--steps",
             str(RUN_SMOKE_TEST_STEPS),
         ],
+        catch_exceptions=False,
     )
 
     if result.exit_code != 0:
