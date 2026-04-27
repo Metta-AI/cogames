@@ -346,6 +346,9 @@ def _validation_job_spec(
 
 def _check_results(res: PureSingleEpisodeResult) -> None:
     console.print(f"[dim]Ran for {res.steps} steps[/dim]")
+    if res.steps <= 0:
+        console.print("[yellow]Warning: Policy ran for no steps[/yellow]")
+        raise typer.Exit(1)
     action_counts = {k: v for k, v in res.stats["agent"][0].items() if k.startswith("action.")}
     if not action_counts:
         return

@@ -17,9 +17,10 @@ from pytest_httpserver import HTTPServer
 from typer.testing import CliRunner
 from werkzeug import Response
 
-from cogames.cli.submit import ensure_docker_daemon_access
+from cogames.cli.submit import _check_results, _validation_job_spec, ensure_docker_daemon_access
 from cogames.main import app
 from mettagrid.config.mettagrid_config import MettaGridConfig
+from mettagrid.runner.types import PureSingleEpisodeResult
 from softmax.auth import save_token
 from softmax.token_storage import TokenKind
 
@@ -1257,6 +1258,56 @@ def test_validate_policy_uses_pool_config_game_engine(httpserver: HTTPServer) ->
     assert captured_args.get("preflight_called") is True
     assert captured_args.get("called") is True
     assert captured_args["game_engine"] == "bitworld"
+
+
+def test_validation_job_spec_defaults_to_mettagrid() -> None:
+    cfg = MettaGridConfig()
+
+    job_spec = _validation_job_spec("file:///workspace/policy.zip", cfg.model_dump(mode="json"))
+
+    assert job_spec["game_engine"] == "mettagrid"
+    assert job_spec["assignments"] == [0] * cfg.game.num_agents
+    assert job_spec["env"]["game"]["max_steps"] == 10
+
+
+def test_validation_job_spec_forwards_game_engine() -> None:
+    cfg = MettaGridConfig()
+    cfg.game.num_agents = 5
+    cfg.game.max_steps = 1000
+
+    job_spec = _validation_job_spec(
+        "file:///workspace/policy.zip",
+        cfg.model_dump(mode="json"),
+        game_engine="bitworld",
+    )
+
+    assert job_spec["game_engine"] == "bitworld"
+    assert job_spec["assignments"] == [0, 0, 0, 0, 0]
+    assert job_spec["env"]["game"]["num_agents"] == 5
+    assert job_spec["env"]["game"]["max_steps"] == 10
+
+
+def _single_episode_result(steps: int, agent_stats: dict[str, float]) -> PureSingleEpisodeResult:
+    return PureSingleEpisodeResult(
+        rewards=[0.0],
+        action_timeouts=[0],
+        stats={"game": {}, "agent": [agent_stats]},
+        steps=steps,
+    )
+
+
+def test_check_results_rejects_zero_step_episode() -> None:
+    with pytest.raises(typer.Exit):
+        _check_results(_single_episode_result(0, {}))
+
+
+def test_check_results_accepts_results_without_action_stats() -> None:
+    _check_results(_single_episode_result(10, {}))
+
+
+def test_check_results_rejects_all_noop_actions() -> None:
+    with pytest.raises(typer.Exit):
+        _check_results(_single_episode_result(10, {"action.noop.success": 10}))
 
 
 def test_validate_policy_falls_back_to_non_entry_pool_config(httpserver: HTTPServer) -> None:
