@@ -133,7 +133,7 @@ class MyAgentPolicy(AgentPolicy):
 
 
 class MyTrainablePolicy(MultiAgentPolicy):
-    """A trainable policy that can be used with `cogames train`.
+    """A trainable policy that can be used with `cogames tutorial train`.
 
     This policy:
     - Creates a neural network based on the environment's observation/action spaces
@@ -142,7 +142,7 @@ class MyTrainablePolicy(MultiAgentPolicy):
     - Supports checkpoint save/load via load_policy_data() and save_policy_data()
     """
 
-    # Uncomment to register a shorthand name (e.g., `cogames train -p class=my_trainable`)
+    # Uncomment to register a shorthand name (e.g., `cogames tutorial train -p class=my_trainable`)
     # short_names = ["my_trainable"]
 
     def __init__(

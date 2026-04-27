@@ -284,7 +284,7 @@ def test_upload_command_fails_without_auth(
     # Should show auth error message
     # Note: Currently returns exit code 0 even on auth failure - ideally this would be non-zero
     combined_output = (result.stdout + result.stderr).lower()
-    assert "not authenticated" in combined_output or "cogames login" in combined_output
+    assert "not authenticated" in combined_output or "cogames auth login" in combined_output
 
 
 def _setup_mock_upload_server(

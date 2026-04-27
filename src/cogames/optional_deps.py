@@ -21,7 +21,7 @@ def require_neural(command: str) -> None:
     instead of a raw ImportError traceback.
 
     Args:
-        command: The CLI command name (e.g. ``"cogames train"``) shown in the
+        command: The CLI command name (e.g. ``"cogames tutorial train"``) shown in the
             error message so users know what triggered the check.
     """
     if has_neural():

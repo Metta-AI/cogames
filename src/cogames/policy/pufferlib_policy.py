@@ -2,7 +2,7 @@
 
 This bridges checkpoints produced by PufferLib training (state_dict of
 ``pufferlib.environments.cogames.torch.Policy``) to the CoGames
-`MultiAgentPolicy` interface so they can be used with ``cogames eval`` /
+`MultiAgentPolicy` interface so they can be used with ``cogames run`` /
 ``cogames submit`` without requiring the full PufferLib repo at runtime.
 """
 

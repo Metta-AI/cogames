@@ -17,7 +17,7 @@
 #
 # This notebook replicates the training setup from:
 # ```
-# cogames train -m miner_tutorial -p tutorial
+# cogames tutorial train -m miner_tutorial -p tutorial
 # ```
 #
 # It walks through:
@@ -309,7 +309,7 @@ print(f"Agents per env: {total_agents // NUM_ENVS}")
 # %% [markdown]
 # ## 6. Configure and run PuffeRL training
 #
-# These hyperparameters match what `cogames train` uses in `cogames/train.py`.
+# These hyperparameters match what `cogames tutorial train` uses in `cogames/train.py`.
 
 # %%
 BPTT_HORIZON = 64
@@ -504,7 +504,7 @@ else:
 # Submit the trained weights to the CoGames tournament. This uses the `tutorial` policy class
 # (same architecture as `MinerPolicyNet`) with our saved weights.
 #
-# Prerequisites: run `cogames login` in a terminal first to authenticate.
+# Prerequisites: run `cogames auth login` in a terminal first to authenticate.
 
 # %%
 POLICY_NAME = "my-miner-tutorial"  # Change this to your desired policy name

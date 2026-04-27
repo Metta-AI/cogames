@@ -228,13 +228,28 @@ class TestTournamentCommands:
         assert result.exit_code == 0
         assert "submit" in result.output.lower()
 
-    def test_hidden_alias_games_exists(self) -> None:
-        result = runner.invoke(app, ["games", "--help"])
-        assert result.exit_code == 0
+    def test_legacy_command_aliases_removed(self) -> None:
+        command_names = [cmd.name for cmd in app.registered_commands]
+        assert "games" not in command_names
+        assert "mission" not in command_names
+        assert "eval" not in command_names
+        assert "evaluate" not in command_names
+        assert "make-game" not in command_names
+        assert "make-policy" not in command_names
+        assert "train" not in command_names
+        assert "login" not in command_names
 
-    def test_hidden_alias_mission_exists(self) -> None:
-        result = runner.invoke(app, ["mission", "--help"])
-        assert result.exit_code == 0
+    def test_missions_command_exists(self) -> None:
+        command_names = [cmd.name for cmd in app.registered_commands]
+        assert "missions" in command_names
+
+    def test_run_command_exists(self) -> None:
+        command_names = [cmd.name for cmd in app.registered_commands]
+        assert "run" in command_names
+
+    def test_tutorial_subapp_registered(self) -> None:
+        group_names = [g.name for g in app.registered_groups]
+        assert "tutorial" in group_names
 
     def test_main_help_shows_tournament_commands(self) -> None:
         result = runner.invoke(app, ["--help"])
@@ -619,7 +634,7 @@ class TestAuthBehavior:
             ],
         )
         combined = result.output.lower()
-        assert "not authenticated" in combined or "softmax login" in combined
+        assert "not authenticated" in combined or "cogames auth login" in combined
 
     def test_matches_requires_auth(self, httpserver: HTTPServer) -> None:
         result = runner.invoke(
@@ -633,7 +648,7 @@ class TestAuthBehavior:
             ],
         )
         combined = result.output.lower()
-        assert "not authenticated" in combined or "softmax login" in combined
+        assert "not authenticated" in combined or "cogames auth login" in combined
 
     def test_upload_requires_auth(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
@@ -653,7 +668,7 @@ class TestAuthBehavior:
             ],
         )
         combined = result.output.lower()
-        assert "not authenticated" in combined or "softmax login" in combined
+        assert "not authenticated" in combined or "cogames auth login" in combined
 
     def test_submit_requires_auth(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)
@@ -671,7 +686,7 @@ class TestAuthBehavior:
             ],
         )
         combined = result.output.lower()
-        assert "not authenticated" in combined or "softmax login" in combined
+        assert "not authenticated" in combined or "cogames auth login" in combined
 
     def test_season_list_no_auth_header_sent_for_public_read(
         self,
@@ -706,7 +721,7 @@ class TestAuthBehavior:
                 "http://nonexistent-login-server",
             ],
         )
-        assert "softmax login" in result.output.lower()
+        assert "cogames auth login" in result.output.lower()
 
     def test_matches_sends_auth_header_when_authenticated(self, httpserver: HTTPServer) -> None:
         _setup_read_endpoints(httpserver)

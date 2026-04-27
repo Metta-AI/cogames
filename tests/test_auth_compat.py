@@ -10,10 +10,15 @@ from softmax.token_storage import TokenKind
 runner = CliRunner()
 
 
-def test_login_alias_help_exists() -> None:
-    result = runner.invoke(app, ["login", "--help"])
+def test_legacy_login_alias_removed() -> None:
+    command_names = [cmd.name for cmd in app.registered_commands]
+    assert "login" not in command_names
+
+
+def test_auth_login_help_exists() -> None:
+    result = runner.invoke(app, ["auth", "login", "--help"])
     assert result.exit_code == 0
-    assert "softmax login" in result.output.lower()
+    assert "login" in result.output.lower()
 
 
 def test_auth_subcommands_remain_available() -> None:

@@ -7,7 +7,7 @@ Standard CNN + LSTM architecture with:
 - Actor/Critic heads
 
 Usage:
-    cogames train -m miner_tutorial -p class=tutorial --device auto --steps 100000
+    cogames tutorial train -m miner_tutorial -p class=tutorial --device auto --steps 100000
 """
 
 from __future__ import annotations

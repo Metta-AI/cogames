@@ -185,7 +185,7 @@ HardOreMineMission = OreMineMission(
 ## Training
 
 ```bash
-cogames train \
+cogames tutorial train \
     --mission my_module.OreMineMission \
     --timesteps 2000000
 ```

@@ -1,4 +1,4 @@
-"""Compatibility wrappers for softmax auth commands."""
+"""CoGames authentication commands."""
 
 import importlib
 
@@ -8,7 +8,7 @@ from cogames.cli.player import player_app
 from softmax.auth import DEFAULT_COGAMES_SERVER
 
 auth_app = typer.Typer(
-    help="Compatibility wrappers for softmax auth commands",
+    help="CoGames authentication commands",
     context_settings={"help_option_names": ["-h", "--help"]},
     no_args_is_help=True,
     rich_markup_mode="rich",
@@ -42,7 +42,7 @@ def login_cmd(
         help="Re-authenticate even if already logged in",
     ),
 ) -> None:
-    """Compatibility wrapper for softmax login."""
+    """Log in to CoGames."""
     _softmax_cli().login_cmd(login_server=login_server, no_browser=no_browser, force=force)
 
 
@@ -55,7 +55,7 @@ def logout_cmd(
         help="Authentication server URL",
     ),
 ) -> None:
-    """Compatibility wrapper for softmax logout."""
+    """Log out of CoGames."""
     _softmax_cli().logout_cmd(login_server=login_server)
 
 
@@ -68,7 +68,7 @@ def get_login_url_cmd(
         help="Authentication server URL",
     ),
 ) -> None:
-    """Compatibility wrapper for softmax get-login-url."""
+    """Print the CoGames login URL."""
     _softmax_cli().get_login_url_cmd(login_server=login_server)
 
 
@@ -88,7 +88,7 @@ def status_cmd(
         help="API server URL for /whoami verification.",
     ),
 ) -> None:
-    """Compatibility wrapper for softmax status."""
+    """Show CoGames authentication status."""
     _softmax_cli().status_cmd(login_server=login_server, server=server)
 
 
@@ -101,7 +101,7 @@ def get_token_cmd(
         help="Authentication server URL",
     ),
 ) -> None:
-    """Compatibility wrapper for softmax get-token."""
+    """Print the saved CoGames token."""
     _softmax_cli().get_token_cmd(login_server=login_server)
 
 
@@ -115,5 +115,5 @@ def set_token_cmd(
         help="Authentication server URL",
     ),
 ) -> None:
-    """Compatibility wrapper for softmax set-token."""
+    """Save a CoGames token."""
     _softmax_cli().set_token_cmd(token=token, login_server=login_server)

@@ -488,7 +488,7 @@ else:
 # Submit the trained weights to the CoGames tournament. This uses the `tutorial` policy class
 # (same architecture as `ScramblerPolicyNet`) with our saved weights.
 #
-# Prerequisites: run `cogames login` in a terminal first to authenticate.
+# Prerequisites: run `cogames auth login` in a terminal first to authenticate.
 
 # %%
 POLICY_NAME = "my-scrambler"  # Change this to your desired policy name

@@ -422,13 +422,13 @@ def train(
 
             console.print()
             console.print("To continue training this policy:", style="bold")
-            console.print(f"  [yellow]cogames train {all_missions} -p {policy_arg}[/yellow]")
+            console.print(f"  [yellow]cogames tutorial train {all_missions} -p {policy_arg}[/yellow]")
             console.print()
             console.print("To play with this policy:", style="bold")
             console.print(f"  [yellow]cogames play -m {first_mission} -p {policy_arg}[/yellow]")
             console.print()
             console.print("To evaluate this policy:", style="bold")
-            console.print(f"  [yellow]cogames eval -m {first_mission} -p {policy_arg}[/yellow]")
+            console.print(f"  [yellow]cogames run -m {first_mission} -p {policy_arg}[/yellow]")
         elif checkpoints and training_diverged:
             console.print()
             console.print(f"[yellow]Found {len(checkpoints)} checkpoint(s). The most recent may be corrupted.[/yellow]")

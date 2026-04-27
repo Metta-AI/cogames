@@ -26,7 +26,7 @@ player_app = typer.Typer(
 def _load_user_token_or_exit(*, login_server: str) -> str:
     user_token = load_cogames_user_token(login_server=login_server)
     if user_token is None:
-        console.print("[red]No saved user session found.[/red] Run [cyan]softmax login[/cyan] first.")
+        console.print("[red]No saved user session found.[/red] Run [cyan]cogames auth login[/cyan] first.")
         raise typer.Exit(1)
     return user_token
 
@@ -146,7 +146,7 @@ def logout_player_cmd(
     """Restore the saved user session as the active CoGames session."""
     user_token = restore_cogames_user_session(login_server=login_server)
     if user_token is None:
-        console.print("[red]No saved user session found.[/red] Run [cyan]softmax login[/cyan] first.")
+        console.print("[red]No saved user session found.[/red] Run [cyan]cogames auth login[/cyan] first.")
         raise typer.Exit(1)
 
     api_server = server or (login_server if login_server != DEFAULT_COGAMES_SERVER else None)

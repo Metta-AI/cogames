@@ -1,4 +1,4 @@
-"""Test that 'cogames games' describe command works for all games."""
+"""Test that the missions command describes every registered mission."""
 
 import pytest
 from typer.testing import CliRunner
@@ -12,7 +12,7 @@ runner = CliRunner()
 @pytest.mark.parametrize("mission_name", get_all_missions())
 @pytest.mark.timeout(60)
 def test_mission_describe(mission_name):
-    """Test that 'cogames mission -m <mission_name>' works for all games."""
+    """Test that 'cogames missions -m <mission_name>' works for all games."""
 
     result = runner.invoke(
         app,

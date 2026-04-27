@@ -286,7 +286,7 @@ def print_missions(game: CoGame, con: Console, mission_filter: Optional[str] = N
     con.print("  cogames play --mission [blue]machina_1[/blue]")
     con.print("  cogames play --mission [blue]machina_1.clips[/blue]")
     con.print("  cogames play --mission [blue]machina_1[/blue] --cogs [green]8[/green]")
-    con.print("  cogames train --mission [blue]machina_1[/blue] --cogs [green]4[/green]")
+    con.print("  cogames tutorial train --mission [blue]machina_1[/blue] --cogs [green]4[/green]")
 
 
 def print_evals(game: CoGame, con: Console) -> None:

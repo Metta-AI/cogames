@@ -68,7 +68,7 @@ class TournamentServerClient:
         token = load_current_cogames_token(login_server=login_server)
         if token is None:
             console.print("[red]Error:[/red] Not authenticated.")
-            console.print("Please run: [cyan]softmax login[/cyan]")
+            console.print("Please run: [cyan]cogames auth login[/cyan]")
             return None
 
         return cls(server_url=server_url, token=token, login_server=login_server)

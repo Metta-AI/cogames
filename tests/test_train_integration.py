@@ -140,8 +140,9 @@ def test_make_policy_trainable_and_train(capsys, temp_checkpoint_dir):
 
             normalized_output = " ".join(capsys.readouterr().out.split())
             assert "training_facility_1" not in normalized_output
+            assert "cogames tutorial train -m arena -p class=" in normalized_output
             assert "cogames play -m arena -p class=" in normalized_output
-            assert "cogames eval -m arena -p class=" in normalized_output
+            assert "cogames run -m arena -p class=" in normalized_output
         finally:
             sys.path.remove(str(tmpdir))
 

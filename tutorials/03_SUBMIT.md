@@ -21,7 +21,7 @@ cogames --help
 Authenticate before submitting or checking the leaderboard.
 
 ```bash
-cogames login
+cogames auth login
 ```
 
 ## Step 2 — Build a submission bundle
@@ -92,7 +92,7 @@ cogames submit my_policy_name --season beta-teams-small
 List available seasons:
 
 ```bash
-cogames seasons
+cogames season list
 ```
 
 Note: Scores can take a while to appear after submission.
@@ -114,7 +114,7 @@ cogames leaderboard --season beta-teams-small
 
 ## Troubleshooting
 
-- **Auth errors**: run `cogames login` again.
+- **Auth errors**: run `cogames auth login` again.
 - **Module not found / 1011 during qualifying**: rebuild `submission.zip` with every runtime file and setup step your policy needs.
   `agent/COGAMES_SUBMISSION.md` has a full repo example.
 - **Invalid policy path**: ensure `-p` points to an existing policy, checkpoint, or bundle.

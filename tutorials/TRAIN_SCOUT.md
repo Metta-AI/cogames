@@ -2,7 +2,7 @@
 
 This notebook replicates the training setup from:
 ```
-cogames train -m scout_tutorial -p tutorial
+cogames tutorial train -m scout_tutorial -p tutorial
 ```
 
 It walks through:
@@ -609,7 +609,7 @@ else:
 Submit the trained weights to the CoGames tournament. This uses the `tutorial` policy class
 (same architecture as `ScoutPolicyNet`) with our saved weights.
 
-Prerequisites: run `cogames login` in a terminal first to authenticate.
+Prerequisites: run `cogames auth login` in a terminal first to authenticate.
 
 
 ```python
@@ -628,4 +628,3 @@ POLICY_NAME = "my-scout"  # Change this to your desired policy name
       File "/home/relh/Code/work/metta/packages/cogames/src/cogames/cli/client.py", line 40, in <module>
         from softmax.auth import load_current_cogames_token
     ImportError: cannot import name 'load_current_cogames_token' from 'softmax.auth' (/home/relh/Code/work/metta/.venv/lib/python3.12/site-packages/softmax/auth.py)
-

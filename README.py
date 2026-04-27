@@ -125,7 +125,7 @@
 # 1. Log into the ALB leaderboard with your GitHub account.
 #
 #     ```bash
-#     cogames login
+#     cogames auth login
 #     ```
 #
 # 2. Create, upload, and submit a starter bundle.
@@ -221,7 +221,7 @@
 #
 # ```bash
 # # 1) Login
-# cogames login
+# cogames auth login
 #
 # # 2) Pick a season
 # cogames season list

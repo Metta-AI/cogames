@@ -111,7 +111,7 @@
 # - Play using the saved checkpoint bundle:
 #   `cogames play -m arena -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
 # - Evaluate using the same bundle:
-#   `cogames eval -m arena -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
+#   `cogames run -m arena -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
 #
 # Note: tutorial train writes `model_*.pt` under `./train_dir/<run_id>/`. Use `class=...` + `data=...` to run it.
 #

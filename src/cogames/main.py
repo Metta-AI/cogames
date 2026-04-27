@@ -38,16 +38,14 @@ from rich.table import Table
 
 
 def _run_metadata_only_cli() -> None:
-    if __name__ != "__main__" or len(sys.argv) <= 1 or sys.argv[1] not in {"games", "missions", "mission"}:
+    if __name__ != "__main__" or len(sys.argv) <= 1 or sys.argv[1] != "missions":
         return
 
     from cogames.cli.mission import list_missions  # noqa: PLC0415
 
     metadata_app = typer.Typer(add_help_option=False)
 
-    @metadata_app.command("games", hidden=True)
     @metadata_app.command("missions")
-    @metadata_app.command("mission", hidden=True)
     def _missions_cmd(
         mission_filter: Optional[str] = typer.Argument(None, metavar="MISSION"),
         game_name: str = typer.Option("cogsguard", "--game", help="Game whose missions to list."),
@@ -133,17 +131,15 @@ _DOC_RESOURCE_PATHS: dict[str, tuple[str, ...]] = {
 }
 
 _POLICY_FREE_COMMANDS = {
+    "auth",
     "bitworld",
     "describe",
     "docs",
     "docsync",
     "evals",
-    "games",
     "leaderboard",
-    "login",
     "match-artifacts",
     "matches",
-    "mission",
     "missions",
     "replay",
     "submissions",
@@ -408,9 +404,7 @@ This command has two modes:
   [cyan]cogames missions -m arena --format json[/cyan]             Output as JSON""",
     add_help_option=False,
 )
-@app.command("games", hidden=True)
-@app.command("mission", hidden=True)
-def games_cmd(
+def missions_cmd(
     ctx: typer.Context,
     game_name: str = typer.Option(
         "cogsguard",
@@ -925,7 +919,6 @@ def replay_cmd(
   [cyan]cogames play -m my_mission.yml[/cyan]                                         Use custom mission""",
     add_help_option=False,
 )
-@app.command("make-game", hidden=True)
 def make_mission(
     ctx: typer.Context,
     # --- Mission ---
@@ -1076,14 +1069,14 @@ def make_policy(
     if sum(int(selected) for selected in (trainable, scripted, amongthem)) != 1:
         console.print("[red]Error: Specify exactly one of --trainable, --scripted, or --amongthem[/red]")
         console.print("[dim]Examples:[/dim]")
-        console.print("[dim]  cogames make-policy --trainable -o my_nn_policy.py[/dim]")
-        console.print("[dim]  cogames make-policy --scripted -o my_scripted_policy.py[/dim]")
-        console.print("[dim]  cogames make-policy --amongthem -o amongthem_policy.py[/dim]")
+        console.print("[dim]  cogames tutorial make-policy --trainable -o my_nn_policy.py[/dim]")
+        console.print("[dim]  cogames tutorial make-policy --scripted -o my_scripted_policy.py[/dim]")
+        console.print("[dim]  cogames tutorial make-policy --amongthem -o amongthem_policy.py[/dim]")
         raise typer.Exit(1)
 
     try:
         if trainable:
-            require_neural("cogames make-policy --trainable")
+            require_neural("cogames tutorial make-policy --trainable")
             import cogames.policy.trainable_policy_template as trainable_policy_template  # noqa: PLC0415
 
             template_path = Path(trainable_policy_template.__file__)
@@ -1143,9 +1136,6 @@ def make_policy(
     except Exception as exc:  # pragma: no cover - user input
         console.print(f"[red]Error: {exc}[/red]")
         raise typer.Exit(1) from exc
-
-
-app.command(name="make-policy", hidden=True)(make_policy)
 
 
 @tutorial_app.command(
@@ -1317,7 +1307,7 @@ def train_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    require_neural("cogames train")
+    require_neural("cogames tutorial train")
     from cogames import train as train_module  # noqa: PLC0415
 
     selected_missions = get_mission_names_and_configs(
@@ -1368,9 +1358,6 @@ def train_cmd(
     console.print(f"[green]Training complete. Checkpoints saved to: {checkpoints_path}[/green]")
 
 
-app.command(name="train", hidden=True)(train_cmd)
-
-
 @app.command(
     name="run",
     help="""Evaluate one or more policies on missions.
@@ -1405,8 +1392,6 @@ This command is equivalent to running `cogames run` with a single policy.
 [cyan]cogames scrimmage -m arena -p lstm[/cyan]                          Single policy eval""",
     add_help_option=False,
 )
-@app.command("eval", hidden=True)
-@app.command("evaluate", hidden=True)
 def run_cmd(
     ctx: typer.Context,
     # --- Mission ---
@@ -1787,48 +1772,6 @@ def policies_cmd() -> None:
     table.add_row("custom", "path.to.your.PolicyClass")
 
     console.print(table)
-
-
-@app.command(
-    name="login",
-    help="Compatibility alias for softmax login.",
-    rich_help_panel="Tournament",
-    add_help_option=False,
-)
-def login_cmd(
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
-    no_browser: bool = typer.Option(
-        False,
-        "--no-browser",
-        help="Skip opening browser automatically.",
-        rich_help_panel="Options",
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force",
-        "-f",
-        help="Re-authenticate even if already logged in.",
-        rich_help_panel="Options",
-    ),
-    _help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show this message and exit.",
-        is_eager=True,
-        callback=_help_callback,
-        rich_help_panel="Other",
-    ),
-) -> None:
-    from cogames.cli.auth import login_cmd as auth_login  # noqa: PLC0415
-
-    auth_login(login_server=login_server, no_browser=no_browser, force=force)
 
 
 app.command(
