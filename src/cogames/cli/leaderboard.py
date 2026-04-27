@@ -13,7 +13,7 @@ from rich.table import Table
 from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
-from softmax.auth import DEFAULT_COGAMES_SERVER
+from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
 
 
 def parse_policy_identifier(identifier: str) -> tuple[str, int | None]:
@@ -301,7 +301,8 @@ def leaderboard_cmd(
         raise typer.Exit(1)
     effective_season = season_arg or season
 
-    with TournamentServerClient(server_url=server) as client:
+    token = load_current_cogames_token(login_server=login_server)
+    with TournamentServerClient(server_url=server, token=token, login_server=login_server) as client:
         resolved_season = effective_season or client.get_default_season().name
         with cli_http_errors(f"Season '{resolved_season}'"):
             entries = client.get_leaderboard(resolved_season)
