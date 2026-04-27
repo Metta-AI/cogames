@@ -89,6 +89,7 @@ def test_missions_help_command():
 
     # Check that help text contains expected commands
     output = result.stdout
+    assert "bitworld" in output
     assert "missions" in output
     assert "play" in output
     assert "tutorial" in output

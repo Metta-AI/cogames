@@ -66,6 +66,7 @@ from cogames import verbose
 from cogames.cli.assay import assay_app
 from cogames.cli.auth import auth_app
 from cogames.cli.base import console, emit_json
+from cogames.cli.bitworld import bitworld_app
 from cogames.cli.client import SeasonDetail, TournamentServerClient
 from cogames.cli.episode import episode_app
 from cogames.cli.leaderboard import (
@@ -130,6 +131,7 @@ _DOC_RESOURCE_PATHS: dict[str, tuple[str, ...]] = {
 }
 
 _POLICY_FREE_COMMANDS = {
+    "bitworld",
     "describe",
     "docs",
     "docsync",
@@ -372,6 +374,7 @@ app.add_typer(auth_app, name="auth", rich_help_panel="Tournament")
 app.add_typer(season_app, name="season", rich_help_panel="Tournament")
 app.add_typer(episode_app, name="episode", rich_help_panel="Tournament")
 app.add_typer(assay_app, name="assay", rich_help_panel="Tournament")
+app.add_typer(bitworld_app, name="bitworld", rich_help_panel="BitWorld")
 
 
 def _help_callback(ctx: typer.Context, value: bool) -> None:
