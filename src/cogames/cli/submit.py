@@ -325,7 +325,12 @@ def create_bundle(
     return output
 
 
-def _validation_job_spec(policy_uri: str, config_data: dict[str, Any]) -> dict[str, Any]:
+def _validation_job_spec(
+    policy_uri: str,
+    config_data: dict[str, Any],
+    *,
+    game_engine: str = "mettagrid",
+) -> dict[str, Any]:
     env_cfg = dict(config_data)
     env_cfg["game"] = dict(env_cfg["game"])
     env_cfg["game"]["max_steps"] = 10
@@ -333,6 +338,7 @@ def _validation_job_spec(policy_uri: str, config_data: dict[str, Any]) -> dict[s
         "policy_uris": [policy_uri],
         "assignments": [0] * env_cfg["game"]["num_agents"],
         "env": env_cfg,
+        "game_engine": game_engine,
         "seed": 42,
         "max_action_time_ms": 10000,
     }
@@ -340,7 +346,10 @@ def _validation_job_spec(policy_uri: str, config_data: dict[str, Any]) -> dict[s
 
 def _check_results(res: PureSingleEpisodeResult) -> None:
     console.print(f"[dim]Ran for {res.steps} steps[/dim]")
-    non_noop_actions = sum(v for k, v in res.stats["agent"][0].items() if k.startswith("action.") and ".noop." not in k)
+    action_counts = {k: v for k, v in res.stats["agent"][0].items() if k.startswith("action.")}
+    if not action_counts:
+        return
+    non_noop_actions = sum(v for k, v in action_counts.items() if ".noop." not in k)
     if non_noop_actions == 0:
         console.print("[yellow]Warning: Policy took no actions (all no-ops)[/yellow]")
         raise typer.Exit(1)
@@ -370,7 +379,13 @@ def ensure_docker_daemon_access() -> None:
         raise typer.Exit(1)
 
 
-def validate_bundle_docker(policy_uri: str, config_data: dict[str, Any], image: str) -> None:
+def validate_bundle_docker(
+    policy_uri: str,
+    config_data: dict[str, Any],
+    image: str,
+    *,
+    game_engine: str = "mettagrid",
+) -> None:
     local_path = localize_uri(policy_uri)
     if local_path is None:
         raise ValueError(f"Cannot localize policy URI: {policy_uri}")
@@ -382,7 +397,7 @@ def validate_bundle_docker(policy_uri: str, config_data: dict[str, Any], image: 
         container_policy_uri = f"file:///workspace/policy/{local_path.name}"
         container_mount_target = f"/workspace/policy/{local_path.name}"
 
-    job_spec = _validation_job_spec(container_policy_uri, config_data)
+    job_spec = _validation_job_spec(container_policy_uri, config_data, game_engine=game_engine)
 
     with tempfile.TemporaryDirectory(prefix="cogames_docker_validate_") as workspace:
         spec_path = Path(workspace) / "spec.json"

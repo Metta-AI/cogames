@@ -137,7 +137,11 @@ class _FakeClient:
                 players=[MatchPlayerInfo(policy=policy_version_summary(), num_agents=1, score=10.0)],
             ),
         ]
-        self.pool_config: PoolConfigInfo = PoolConfigInfo(pool_name="pool-a", config={"max_steps": 1000})
+        self.pool_config: PoolConfigInfo = PoolConfigInfo(
+            pool_name="pool-a",
+            game_engine="mettagrid",
+            config={"max_steps": 1000},
+        )
         self.last_leaderboard_season: str | None = None
 
     def __enter__(self) -> _FakeClient:

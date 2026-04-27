@@ -24,7 +24,6 @@ from softmax.auth import save_token
 from softmax.token_storage import TokenKind
 
 _SEASON_ID = "11111111-1111-1111-1111-111111111111"
-_ENTRY_CONFIG_ID = "22222222-2222-2222-2222-222222222222"
 _UPLOAD_ID = "33333333-3333-3333-3333-333333333333"
 
 
@@ -836,8 +835,8 @@ _SEASON_WITH_ENTRY_CONFIG: list[dict[str, Any]] = [
         "leaderboard_pool": "ranked",
         "summary": "",
         "pools": [
-            {"name": "qualifying", "description": "entry pool", "config_id": _ENTRY_CONFIG_ID},
-            {"name": "ranked", "description": "ranked pool", "config_id": None},
+            {"name": "qualifying", "description": "entry pool"},
+            {"name": "ranked", "description": "ranked pool"},
         ],
     }
 ]
@@ -858,7 +857,7 @@ _SEASON_NO_ENTRY_CONFIG: list[dict[str, Any]] = [
         "leaderboard_pool": "ranked",
         "summary": "",
         "pools": [
-            {"name": "ranked", "description": "ranked pool", "config_id": None},
+            {"name": "ranked", "description": "ranked pool"},
         ],
     }
 ]
@@ -879,11 +878,6 @@ def _setup_mock_upload_server_with_season(
         f"/tournament/seasons/{season_summary['name']}",
         method="GET",
     ).respond_with_json(_season_info_from_summary(season_summary))
-
-    httpserver.expect_request(
-        f"/tournament/configs/{_ENTRY_CONFIG_ID}",
-        method="GET",
-    ).respond_with_json(MettaGridConfig().model_dump(mode="json"))
 
     httpserver.expect_request(
         "/stats/policies/submit/presigned-url",
@@ -1079,27 +1073,30 @@ def test_validate_policy_fetches_config_and_runs(
             "leaderboard_pool": "ranked",
             "summary": "",
             "pools": [
-                {"name": "qualifying", "description": "entry pool", "config_id": _ENTRY_CONFIG_ID},
-                {"name": "ranked", "description": "ranked pool", "config_id": None},
+                {"name": "qualifying", "description": "entry pool"},
+                {"name": "ranked", "description": "ranked pool"},
             ],
         }
     )
 
     httpserver.expect_request(
-        f"/tournament/configs/{_ENTRY_CONFIG_ID}",
+        "/tournament/seasons/test-season/pools/qualifying/config",
         method="GET",
-    ).respond_with_json(default_cfg.model_dump(mode="json"))
+    ).respond_with_json(
+        {"pool_name": "qualifying", "game_engine": "mettagrid", "config": default_cfg.model_dump(mode="json")}
+    )
 
     captured_args: dict[str, Any] = {}
 
     def fake_ensure_docker_daemon_access() -> None:
         captured_args["preflight_called"] = True
 
-    def fake_validate_bundle_docker(policy_uri, config_data, image):
+    def fake_validate_bundle_docker(policy_uri, config_data, image, *, game_engine):
         captured_args["called"] = True
         captured_args["policy_uri"] = policy_uri
         captured_args["config_data"] = config_data
         captured_args["image"] = image
+        captured_args["game_engine"] = game_engine
 
     runner = CliRunner()
     with (
@@ -1121,14 +1118,145 @@ def test_validate_policy_fetches_config_and_runs(
 
     assert result.exit_code == 0, f"Validation failed:\n{result.output}"
 
-    # Config endpoint was hit
-    config_requests = [req for req, _ in httpserver.log if "/tournament/configs/" in req.path]
+    config_requests = [req for req, _ in httpserver.log if req.path.endswith("/pools/qualifying/config")]
     assert len(config_requests) == 1
 
     assert captured_args.get("preflight_called") is True
     assert captured_args.get("called") is True
     assert captured_args["policy_uri"] == "class=cogames.policy.starter_agent.StarterPolicy"
     assert captured_args["config_data"]["game"]["num_agents"] == default_cfg.game.num_agents
+    assert captured_args["game_engine"] == "mettagrid"
+
+
+def test_validate_policy_uses_requested_season_ref_for_pool_config(httpserver: HTTPServer) -> None:
+    default_cfg = MettaGridConfig()
+
+    httpserver.expect_request(
+        "/tournament/seasons/test-season:v2",
+        method="GET",
+    ).respond_with_json(
+        {
+            "id": _SEASON_ID,
+            "name": "test-season",
+            "version": 2,
+            "canonical": False,
+            "is_default": False,
+            "status": "in_progress",
+            "display_name": "Test Season",
+            "tournament_type": "freeplay",
+            "created_at": "2026-01-01T00:00:00Z",
+            "public": True,
+            "entrant_count": 1,
+            "active_entrant_count": 1,
+            "match_count": 0,
+            "stage_count": 1,
+            "entry_pool": "qualifying",
+            "leaderboard_pool": "ranked",
+            "summary": "",
+            "pools": [
+                {"name": "qualifying", "description": "entry pool"},
+            ],
+        }
+    )
+
+    httpserver.expect_request(
+        "/tournament/seasons/test-season:v2/pools/qualifying/config",
+        method="GET",
+    ).respond_with_json(
+        {"pool_name": "qualifying", "game_engine": "mettagrid", "config": default_cfg.model_dump(mode="json")}
+    )
+
+    runner = CliRunner()
+    with (
+        patch("cogames.main.ensure_docker_daemon_access", lambda: None),
+        patch("cogames.main.validate_bundle_docker", lambda *_args, **_kwargs: None),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "validate-bundle",
+                "--policy",
+                "class=cogames.policy.starter_agent.StarterPolicy",
+                "--season",
+                "test-season:v2",
+                "--server",
+                httpserver.url_for(""),
+            ],
+        )
+
+    assert result.exit_code == 0, f"Validation failed:\n{result.output}"
+
+
+def test_validate_policy_uses_pool_config_game_engine(httpserver: HTTPServer) -> None:
+    default_cfg = MettaGridConfig()
+
+    httpserver.expect_request(
+        "/tournament/seasons/test-season",
+        method="GET",
+    ).respond_with_json(
+        {
+            "id": _SEASON_ID,
+            "name": "test-season",
+            "version": 1,
+            "canonical": True,
+            "is_default": True,
+            "status": "in_progress",
+            "display_name": "Test Season",
+            "tournament_type": "freeplay",
+            "created_at": "2026-01-01T00:00:00Z",
+            "public": True,
+            "entrant_count": 1,
+            "active_entrant_count": 1,
+            "match_count": 0,
+            "stage_count": 1,
+            "entry_pool": "qualifying",
+            "leaderboard_pool": "ranked",
+            "summary": "",
+            "pools": [
+                {"name": "qualifying", "description": "entry pool"},
+                {"name": "ranked", "description": "ranked pool"},
+            ],
+        }
+    )
+
+    httpserver.expect_request(
+        "/tournament/seasons/test-season/pools/qualifying/config",
+        method="GET",
+    ).respond_with_json(
+        {"pool_name": "qualifying", "game_engine": "bitworld", "config": default_cfg.model_dump(mode="json")}
+    )
+
+    captured_args: dict[str, Any] = {}
+
+    def fake_ensure_docker_daemon_access() -> None:
+        captured_args["preflight_called"] = True
+
+    def fake_validate_bundle_docker(policy_uri, config_data, image, *, game_engine):
+        captured_args["called"] = True
+        captured_args["game_engine"] = game_engine
+
+    runner = CliRunner()
+    with (
+        patch("cogames.main.ensure_docker_daemon_access", fake_ensure_docker_daemon_access),
+        patch("cogames.main.validate_bundle_docker", fake_validate_bundle_docker),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "validate-bundle",
+                "--policy",
+                "class=cogames.policy.starter_agent.StarterPolicy",
+                "--season",
+                "test-season",
+                "--server",
+                httpserver.url_for(""),
+            ],
+        )
+
+    assert result.exit_code == 0, f"Validation failed:\n{result.output}"
+    assert captured_args.get("preflight_called") is True
+    assert captured_args.get("called") is True
+    assert captured_args["game_engine"] == "bitworld"
 
 
 def test_validate_policy_falls_back_to_non_entry_pool_config(httpserver: HTTPServer) -> None:
@@ -1157,28 +1285,36 @@ def test_validate_policy_falls_back_to_non_entry_pool_config(httpserver: HTTPSer
             "leaderboard_pool": "score",
             "summary": "",
             "pools": [
-                {"name": "entry", "description": "entry pool", "config_id": None},
-                {"name": "stage-1", "description": "stage 1", "config_id": _ENTRY_CONFIG_ID},
-                {"name": "score", "description": "score pool", "config_id": None},
+                {"name": "entry", "description": "entry pool"},
+                {"name": "stage-1", "description": "stage 1"},
+                {"name": "score", "description": "score pool"},
             ],
         }
     )
 
     httpserver.expect_request(
-        f"/tournament/configs/{_ENTRY_CONFIG_ID}",
+        "/tournament/seasons/test-season/pools/entry/config",
         method="GET",
-    ).respond_with_json(default_cfg.model_dump(mode="json"))
+    ).respond_with_json({"detail": "Pool config not found"}, status=404)
+
+    httpserver.expect_request(
+        "/tournament/seasons/test-season/pools/stage-1/config",
+        method="GET",
+    ).respond_with_json(
+        {"pool_name": "stage-1", "game_engine": "mettagrid", "config": default_cfg.model_dump(mode="json")}
+    )
 
     captured_args: dict[str, Any] = {}
 
     def fake_ensure_docker_daemon_access() -> None:
         captured_args["preflight_called"] = True
 
-    def fake_validate_bundle_docker(policy_uri, config_data, image):
+    def fake_validate_bundle_docker(policy_uri, config_data, image, *, game_engine):
         captured_args["called"] = True
         captured_args["policy_uri"] = policy_uri
         captured_args["config_data"] = config_data
         captured_args["image"] = image
+        captured_args["game_engine"] = game_engine
 
     runner = CliRunner()
     with (
@@ -1202,6 +1338,7 @@ def test_validate_policy_falls_back_to_non_entry_pool_config(httpserver: HTTPSer
     assert captured_args.get("preflight_called") is True
     assert captured_args.get("called") is True
     assert captured_args["config_data"]["game"]["num_agents"] == default_cfg.game.num_agents
+    assert captured_args["game_engine"] == "mettagrid"
 
 
 def test_validate_policy_exits_early_when_docker_unavailable(httpserver: HTTPServer) -> None:

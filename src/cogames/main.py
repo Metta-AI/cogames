@@ -67,7 +67,7 @@ from cogames.cli.assay import assay_app
 from cogames.cli.auth import auth_app
 from cogames.cli.base import console, emit_json
 from cogames.cli.bitworld import bitworld_app
-from cogames.cli.client import SeasonDetail, TournamentServerClient
+from cogames.cli.client import PoolConfigInfo, SeasonDetail, TournamentServerClient
 from cogames.cli.episode import episode_app
 from cogames.cli.leaderboard import (
     leaderboard_cmd,
@@ -1906,17 +1906,28 @@ def _resolve_season(server: str, login_server: str | None = None, season_name: s
         raise typer.Exit(1) from None
 
 
-def _resolve_validation_config_pool(season_info: SeasonDetail) -> tuple[str, UUID]:
-    entry_pool_info = next((p for p in season_info.pools if p.name == season_info.entry_pool and p.config_id), None)
-    if entry_pool_info is not None:
-        entry_config_id = entry_pool_info.config_id
-        if entry_config_id is not None:
-            return entry_pool_info.name, entry_config_id
-
+def _validation_pool_names(season_info: SeasonDetail) -> list[str]:
+    names: list[str] = []
+    if season_info.entry_pool is not None:
+        names.append(season_info.entry_pool)
     for pool_info in season_info.pools:
-        config_id = pool_info.config_id
-        if config_id is not None:
-            return pool_info.name, config_id
+        if pool_info.name not in names:
+            names.append(pool_info.name)
+    return names
+
+
+def _resolve_validation_pool_config(
+    client: TournamentServerClient,
+    season_ref: str,
+    season_info: SeasonDetail,
+) -> PoolConfigInfo:
+    for pool_name in _validation_pool_names(season_info):
+        try:
+            return client.get_pool_config(season_ref, pool_name)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                continue
+            raise
 
     console.print(f"[red]No playable config found for season '{season_info.name}'[/red]")
     raise typer.Exit(1)
@@ -2058,18 +2069,18 @@ def validate_bundle_cmd(
     ensure_docker_daemon_access()
 
     season_info = _resolve_season(server, login_server, season)
-    pool_name, config_id = _resolve_validation_config_pool(season_info)
 
     if image == DEFAULT_EPISODE_RUNNER_IMAGE and season_info.compat_version is not None:
         image = f"ghcr.io/metta-ai/episode-runner:compat-v{season_info.compat_version}"
 
     auth_token = load_current_cogames_token(login_server=login_server)
+    season_ref = season or season_info.name
     with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
-        config_data = client.get_config(config_id)
+        pool_config = _resolve_validation_pool_config(client, season_ref, season_info)
 
-    validate_bundle_docker(policy, config_data, image)
+    validate_bundle_docker(policy, pool_config.config, image, game_engine=pool_config.game_engine)
 
-    console.print(f"[dim]Validated against pool: {pool_name}[/dim]")
+    console.print(f"[dim]Validated against pool: {pool_config.pool_name} ({pool_config.game_engine})[/dim]")
     console.print("[green]Policy validated successfully[/green]")
     raise typer.Exit(0)
 

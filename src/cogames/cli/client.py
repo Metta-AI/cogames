@@ -6,7 +6,6 @@ from typing import Any, Literal, TypeVar, overload
 import httpx
 from pydantic import TypeAdapter
 
-from cogames.cli._model_base import CLIModel
 from cogames.cli.base import console
 from cogames.cli.generated_models import (
     AssayResultsResponse,
@@ -27,6 +26,7 @@ from cogames.cli.generated_models import (
     PolicyVersionResponse,
     PolicyVersionRow,
     PolicyVersionsResponse,
+    PoolConfigInfo,
     PresignedUploadUrlResponse,
     ScorePoliciesLeaderboardEntry,
     SeasonDetail,
@@ -40,11 +40,6 @@ from cogames.cli.generated_models import (
 from softmax.auth import load_current_cogames_token
 
 T = TypeVar("T")
-
-
-class PoolConfigInfo(CLIModel):
-    pool_name: str
-    config: dict[str, Any]
 
 
 class TournamentServerClient:
@@ -272,14 +267,8 @@ class TournamentServerClient:
         """
         return self._get("/tournament/my-memberships", dict[str, list[str]])
 
-    def get_pool_config(self, season_name: str, pool_name: str) -> PoolConfigInfo | dict[str, Any]:
-        result = self._get(f"/tournament/seasons/{season_name}/pools/{pool_name}/config")
-        if isinstance(result, dict):
-            response_pool_name = result.get("pool_name")
-            response_config = result.get("config")
-            if isinstance(response_pool_name, str) and isinstance(response_config, dict):
-                return PoolConfigInfo(pool_name=response_pool_name, config=response_config)
-        return result
+    def get_pool_config(self, season_name: str, pool_name: str) -> PoolConfigInfo:
+        return self._get(f"/tournament/seasons/{season_name}/pools/{pool_name}/config", PoolConfigInfo)
 
     def get_match(self, match_id: uuid.UUID) -> MatchResponse:
         return self._get(f"/tournament/matches/{match_id}", MatchResponse)

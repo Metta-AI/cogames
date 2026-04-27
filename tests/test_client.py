@@ -13,6 +13,7 @@ from cogames.cli.client import (
     PlayerLoginResponse,
     PlayerResponse,
     PoliciesResponse,
+    PoolConfigInfo,
     ScorePoliciesLeaderboardEntry,
     StageStats,
     TeamTournamentProgress,
@@ -410,11 +411,16 @@ class TestGetStageLeaderboard:
 
 
 class TestGetPoolConfig:
-    def test_request_and_parse(self, httpserver: HTTPServer, client: TournamentServerClient) -> None:
+    def test_request_and_parse_pool_config_info(self, httpserver: HTTPServer, client: TournamentServerClient) -> None:
         config = {"game": {"num_agents": 4}, "map": {"width": 32}}
-        httpserver.expect_request("/tournament/seasons/s1/pools/stage-1/config", method="GET").respond_with_json(config)
+        httpserver.expect_request("/tournament/seasons/s1/pools/stage-1/config", method="GET").respond_with_json(
+            {"pool_name": "stage-1", "game_engine": "bitworld", "config": config}
+        )
         result = client.get_pool_config("s1", "stage-1")
-        assert result == config
+        assert isinstance(result, PoolConfigInfo)
+        assert result.pool_name == "stage-1"
+        assert result.game_engine == "bitworld"
+        assert result.config == config
 
 
 class TestGetMatchArtifacts:
