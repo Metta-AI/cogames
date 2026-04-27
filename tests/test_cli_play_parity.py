@@ -166,6 +166,27 @@ def test_make_policy_examples_use_valid_arena_mission(tmp_path) -> None:
     assert "class=my_trainable_policy.MyTrainablePolicy" in trainable.stdout
     assert "machina_1.basic" not in trainable.stdout
 
+    amongthem_path = tmp_path / "amongthem_policy.py"
+    amongthem = runner.invoke(
+        main_module.app,
+        ["tutorial", "make-policy", "--amongthem", "-o", str(amongthem_path)],
+    )
+
+    assert amongthem.exit_code == 0, amongthem.output
+    assert "Dry-run validation: cogames upload -p class=amongthem_policy.AmongThemPolicy" in amongthem.stdout
+    assert "Ship: cogames ship -p class=amongthem_policy.AmongThemPolicy" in amongthem.stdout
+    assert "Score: cogames leaderboard <season> --policy $USER-amongthem-practice" in amongthem.stdout
+    assert "Walkthrough: cogames docs amongthem_policy" in amongthem.stdout
+
+
+def test_amongthem_policy_walkthrough_is_packaged() -> None:
+    result = runner.invoke(main_module.app, ["docs", "amongthem_policy"])
+
+    assert result.exit_code == 0, result.output
+    assert "AmongThem Policy Practice" in result.stdout
+    assert "cogames tutorial make-policy --amongthem" in result.stdout
+    assert "cogames leaderboard <season>" in result.stdout
+
 
 def test_pickup_uses_arena_as_default_mission(monkeypatch) -> None:
     captured: dict[str, object] = {}

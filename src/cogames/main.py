@@ -119,12 +119,14 @@ logger = logging.getLogger("cogames.main")
 POLICY_NAME_MAX_LENGTH = 64
 _REPO_COGAMES_ROOT = Path(__file__).resolve().parents[2]
 _DOC_DESCRIPTIONS: dict[str, str] = {
+    "amongthem_policy": "AmongThem policy practice walkthrough",
     "readme": "CoGames overview and documentation",
     "mission": "Mission briefing for CvC Deployment",
     "technical_manual": "Technical manual for Cogames",
     "scripted_agent": "Scripted agent policy documentation",
 }
 _DOC_RESOURCE_PATHS: dict[str, tuple[str, ...]] = {
+    "amongthem_policy": ("docs", "AMONGTHEM_POLICY.md"),
     "mission": ("docs", "MISSION.md"),
     "technical_manual": ("docs", "TECHNICAL_MANUAL.md"),
     "scripted_agent": ("docs", "SCRIPTED_AGENT.md"),
@@ -1019,13 +1021,16 @@ def make_mission(
 # TODO: Verify make-policy templates work with CvC game mechanics
 @tutorial_app.command(
     name="make-policy",
-    help="Create a new policy from a template. Requires --trainable or --scripted.",
+    help="Create a new policy from a template. Requires exactly one policy type.",
     rich_help_panel="Tutorial",
     epilog="""[dim]Examples:[/dim]
 
 [cyan]cogames tutorial make-policy -t -o my_nn_policy.py[/cyan]        Trainable (neural network)
 
-[cyan]cogames tutorial make-policy -s -o my_scripted_policy.py[/cyan]  Scripted (rule-based)""",
+[cyan]cogames tutorial make-policy -s -o my_scripted_policy.py[/cyan]  Scripted (rule-based)
+
+[cyan]cogames tutorial make-policy --amongthem -o amongthem_policy.py[/cyan]
+                                                                  AmongThem scripted practice""",
     add_help_option=False,
 )
 def make_policy(
@@ -1040,6 +1045,12 @@ def make_policy(
         False,
         "--scripted",
         help="Create a scripted (rule-based) policy.",
+        rich_help_panel="Policy Type",
+    ),
+    amongthem: bool = typer.Option(
+        False,
+        "--amongthem",
+        help="Create an AmongThem BitWorld scripted practice policy.",
         rich_help_panel="Policy Type",
     ),
     # --- Output ---
@@ -1062,11 +1073,12 @@ def make_policy(
         rich_help_panel="Other",
     ),
 ) -> None:
-    if trainable == scripted:
-        console.print("[red]Error: Specify exactly one of --trainable or --scripted[/red]")
+    if sum(int(selected) for selected in (trainable, scripted, amongthem)) != 1:
+        console.print("[red]Error: Specify exactly one of --trainable, --scripted, or --amongthem[/red]")
         console.print("[dim]Examples:[/dim]")
         console.print("[dim]  cogames make-policy --trainable -o my_nn_policy.py[/dim]")
         console.print("[dim]  cogames make-policy --scripted -o my_scripted_policy.py[/dim]")
+        console.print("[dim]  cogames make-policy --amongthem -o amongthem_policy.py[/dim]")
         raise typer.Exit(1)
 
     try:
@@ -1077,6 +1089,12 @@ def make_policy(
             template_path = Path(trainable_policy_template.__file__)
             policy_class = "MyTrainablePolicy"
             policy_type = "Trainable"
+        elif amongthem:
+            import cogames.policy.amongthem_policy_template as amongthem_policy_template  # noqa: PLC0415
+
+            template_path = Path(amongthem_policy_template.__file__)
+            policy_class = "AmongThemPolicy"
+            policy_type = "AmongThem"
         else:
             # Deferred: imported only to locate its source file as a template.
             import cogames.policy.starter_agent as starter_agent  # noqa: PLC0415
@@ -1107,6 +1125,18 @@ def make_policy(
             console.print(
                 f"[dim]Train with: cogames tutorial train -m arena -p class={dest_path.stem}.{policy_class}[/dim]"
             )
+        elif amongthem:
+            policy_spec = f"class={dest_path.stem}.{policy_class}"
+            console.print(
+                f"[dim]Dry-run validation: cogames upload -p {policy_spec} -f {output} "
+                "-n $USER-amongthem-practice --season <season> --dry-run[/dim]"
+            )
+            console.print(
+                f"[dim]Ship: cogames ship -p {policy_spec} -f {output} "
+                "-n $USER-amongthem-practice --season <season>[/dim]"
+            )
+            console.print("[dim]Score: cogames leaderboard <season> --policy $USER-amongthem-practice[/dim]")
+            console.print("[dim]Walkthrough: cogames docs amongthem_policy[/dim]")
         else:
             console.print(f"[dim]Play with: cogames play -m arena -p class={dest_path.stem}.{policy_class}[/dim]")
 
