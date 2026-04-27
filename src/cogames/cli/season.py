@@ -17,7 +17,7 @@ from cogames.cli.client import (
 from cogames.cli.generated_models import Phase
 from cogames.cli.leaderboard import _format_score, _format_timestamp
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
-from softmax.auth import DEFAULT_COGAMES_SERVER
+from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
 
 LeaderboardEntries = list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]
 LeaderboardType = Literal["policy", "team", "score-policies"]
@@ -30,8 +30,11 @@ LEADERBOARD_TYPE_OPTION = typer.Option(
 
 
 def _get_client(login_server: str, server: str) -> TournamentServerClient:
-    _ = login_server
-    return TournamentServerClient(server_url=server)
+    return TournamentServerClient(
+        server_url=server,
+        token=load_current_cogames_token(login_server=login_server),
+        login_server=login_server,
+    )
 
 
 def _team_label(team: TeamSummary) -> str:

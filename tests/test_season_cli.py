@@ -212,6 +212,29 @@ def fake_client(monkeypatch: pytest.MonkeyPatch) -> _FakeClient:
     return client
 
 
+def test_get_client_uses_login_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_load_current_cogames_token(login_server: str) -> str:
+        captured["token_login_server"] = login_server
+        return "test-token"
+
+    def fake_tournament_server_client(**kwargs: Any) -> str:
+        captured.update(kwargs)
+        return "client"
+
+    monkeypatch.setattr(season, "load_current_cogames_token", fake_load_current_cogames_token)
+    monkeypatch.setattr(season, "TournamentServerClient", fake_tournament_server_client)
+
+    assert season._get_client(login_server="http://login", server="http://server") == "client"
+    assert captured == {
+        "token_login_server": "http://login",
+        "server_url": "http://server",
+        "token": "test-token",
+        "login_server": "http://login",
+    }
+
+
 def test_season_list_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
     season.season_list(json_output=True, login_server="x", server="y")

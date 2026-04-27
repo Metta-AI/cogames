@@ -593,7 +593,13 @@ class TestAuthBehavior:
         data = json.loads(result.output)
         assert len(data) == 1
 
-    def test_season_show_no_auth_header_sent_for_public_read(self, httpserver: HTTPServer) -> None:
+    def test_season_show_no_auth_header_sent_for_public_read(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
         _setup_read_endpoints(httpserver)
         _invoke_with_server(httpserver, "season", "show", "test-season", "--json")
         for req, _ in httpserver.log:
@@ -667,7 +673,13 @@ class TestAuthBehavior:
         combined = result.output.lower()
         assert "not authenticated" in combined or "softmax login" in combined
 
-    def test_season_list_no_auth_header_sent_for_public_read(self, httpserver: HTTPServer) -> None:
+    def test_season_list_no_auth_header_sent_for_public_read(
+        self,
+        httpserver: HTTPServer,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+    ) -> None:
+        monkeypatch.setenv("HOME", str(tmp_path))
         _setup_read_endpoints(httpserver)
         _invoke_with_server(httpserver, "season", "list", "--json")
         for req, _ in httpserver.log:
@@ -918,12 +930,13 @@ def _save_user_token(tmp_path: Path, token: str, login_server: str) -> None:
 
 
 class TestSeasonLookupAuth:
-    """Verify that upload and submit pass (or omit) the auth token when querying seasons.
+    """Verify that season-aware commands pass (or omit) auth when querying seasons.
 
     The _resolve_season helper now loads a saved token via the cogames token helpers and
     forwards it to TournamentServerClient so that private seasons (e.g. 'test-season'
-    used by CI service accounts) are accessible. Public users with no saved token should
-    still be able to resolve public seasons without any auth header.
+    used by CI service accounts) are accessible. The season CLI uses the same token path.
+    Public users with no saved token should still be able to resolve public seasons without
+    any auth header.
     """
 
     def test_upload_sends_token_in_season_lookup_when_token_saved(
@@ -957,7 +970,7 @@ class TestSeasonLookupAuth:
         assert season_reqs, "Expected a request to /tournament/seasons"
         assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
 
-    def test_season_list_sends_no_token_when_saved(
+    def test_season_list_sends_token_when_saved(
         self,
         httpserver: HTTPServer,
         monkeypatch: pytest.MonkeyPatch,
@@ -972,9 +985,9 @@ class TestSeasonLookupAuth:
         assert result.exit_code == 0
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons"]
         assert season_reqs, "Expected a request to /tournament/seasons"
-        assert "X-Auth-Token" not in season_reqs[0].headers
+        assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
 
-    def test_season_show_sends_no_token_when_saved(
+    def test_season_show_sends_token_when_saved(
         self,
         httpserver: HTTPServer,
         monkeypatch: pytest.MonkeyPatch,
@@ -989,7 +1002,7 @@ class TestSeasonLookupAuth:
         assert result.exit_code == 0
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons/test-season"]
         assert season_reqs, "Expected a request to /tournament/seasons/test-season"
-        assert "X-Auth-Token" not in season_reqs[0].headers
+        assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
 
     def test_upload_sends_no_token_in_season_lookup_when_absent(
         self,
