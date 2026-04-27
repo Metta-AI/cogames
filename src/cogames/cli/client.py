@@ -73,6 +73,12 @@ class TournamentServerClient:
 
         return cls(server_url=server_url, token=token, login_server=login_server)
 
+    def _headers(self, headers: dict[str, str] | None = None) -> dict[str, str]:
+        request_headers = dict(headers or {})
+        if self._token:
+            request_headers["X-Auth-Token"] = self._token
+        return request_headers
+
     def _request(
         self,
         method: str,
@@ -81,10 +87,7 @@ class TournamentServerClient:
         timeout: float | None = None,
         **kwargs: Any,
     ) -> T | dict[str, Any]:
-        headers = kwargs.pop("headers", {})
-        if self._token:
-            headers["X-Auth-Token"] = self._token
-
+        headers = self._headers(kwargs.pop("headers", None))
         if timeout is not None:
             kwargs["timeout"] = timeout
 
@@ -269,6 +272,16 @@ class TournamentServerClient:
 
     def get_pool_config(self, season_name: str, pool_name: str) -> PoolConfigInfo:
         return self._get(f"/tournament/seasons/{season_name}/pools/{pool_name}/config", PoolConfigInfo)
+
+    def get_optional_pool_config(self, season_name: str, pool_name: str) -> PoolConfigInfo | None:
+        response = self._http_client.get(
+            f"/tournament/seasons/{season_name}/pools/{pool_name}/config",
+            headers=self._headers(),
+        )
+        if response.status_code == 404:
+            return None
+        response.raise_for_status()
+        return TypeAdapter(PoolConfigInfo).validate_python(response.json())
 
     def get_match(self, match_id: uuid.UUID) -> MatchResponse:
         return self._get(f"/tournament/matches/{match_id}", MatchResponse)

@@ -1952,12 +1952,9 @@ def _resolve_validation_pool_config(
     season_info: SeasonDetail,
 ) -> PoolConfigInfo:
     for pool_name in _validation_pool_names(season_info):
-        try:
-            return client.get_pool_config(season_ref, pool_name)
-        except httpx.HTTPStatusError as e:
-            if e.response.status_code == 404:
-                continue
-            raise
+        pool_config = client.get_optional_pool_config(season_ref, pool_name)
+        if pool_config is not None:
+            return pool_config
 
     console.print(f"[red]No playable config found for season '{season_info.name}'[/red]")
     raise typer.Exit(1)
