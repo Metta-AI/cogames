@@ -20,6 +20,7 @@ from werkzeug import Response
 from cogames.cli.submit import _check_results, _validation_job_spec, ensure_docker_daemon_access
 from cogames.main import app
 from mettagrid.config.mettagrid_config import MettaGridConfig
+from mettagrid.policy.policy import PolicySpec
 from mettagrid.runner.types import PureSingleEpisodeResult
 from softmax.auth import save_token
 from softmax.token_storage import TokenKind
@@ -621,10 +622,10 @@ def test_create_bundle_preserves_bare_policy_name_when_same_named_directory_exis
 
     seen: dict[str, bool] = {"called": False}
 
-    def fake_get_policy_spec(ctx: Any, policy_arg: str, device: str | None = None) -> SimpleNamespace:
+    def fake_get_policy_spec(ctx: Any, policy_arg: str, device: str | None = None) -> PolicySpec:
         seen["called"] = True
         assert policy_arg == "baseline"
-        return SimpleNamespace(class_path="correct.Policy", data_path=None, init_kwargs={})
+        return PolicySpec(class_path="correct.Policy")
 
     monkeypatch.setattr("cogames.cli.submit.get_policy_spec", fake_get_policy_spec)
 

@@ -221,8 +221,9 @@ def train(
 
     resolved_initial_weights = initial_weights_path
 
+    policy_env_interface = PolicyEnvInterface.from_mg_cfg(vecenv.driver_env.env_cfg)
     policy = initialize_or_load_policy(
-        PolicyEnvInterface.from_mg_cfg(vecenv.driver_env.env_cfg),
+        policy_env_interface,
         PolicySpec(
             class_path=policy_class_path,
             data_path=resolved_initial_weights,
@@ -395,6 +396,7 @@ def train(
             spec = SubmissionPolicySpec(
                 class_path=policy_class_path,
                 data_path=final_checkpoint.name,
+                policy_env_interface=policy_env_interface,
             )
             write_submission_policy_spec(run_dir / POLICY_SPEC_FILENAME, spec)
 

@@ -27,11 +27,7 @@ class PolicySpecWithProportion(PolicySpec):
     proportion: float = Field(default=1.0, description="Proportion of total agents to assign to this policy")
 
     def to_policy_spec(self) -> PolicySpec:
-        return PolicySpec(
-            class_path=self.class_path,
-            data_path=self.data_path,
-            init_kwargs=self.init_kwargs,
-        )
+        return PolicySpec.model_validate(self.model_dump(exclude={"proportion"}))
 
 
 def list_checkpoints():

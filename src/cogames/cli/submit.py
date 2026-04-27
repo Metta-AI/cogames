@@ -160,11 +160,7 @@ def _prepare_submission_spec_from_policy(
 
     if init_kwargs:
         merged_kwargs = {**policy_spec.init_kwargs, **init_kwargs}
-        policy_spec = PolicySpec(
-            class_path=policy_spec.class_path,
-            data_path=policy_spec.data_path,
-            init_kwargs=merged_kwargs,
-        )
+        policy_spec = policy_spec.model_copy(update={"init_kwargs": merged_kwargs})
 
     if policy_spec.init_kwargs:
         console.print(f"[dim]Init kwargs: {policy_spec.init_kwargs}[/dim]")
@@ -172,20 +168,11 @@ def _prepare_submission_spec_from_policy(
     files_to_include: list[str] = []
     if policy_spec.data_path:
         data_rel = str(_resolve_path_within_cwd(policy_spec.data_path, cwd))
-        policy_spec = PolicySpec(
-            class_path=policy_spec.class_path,
-            data_path=data_rel,
-            init_kwargs=policy_spec.init_kwargs,
-        )
+        policy_spec = policy_spec.model_copy(update={"data_path": data_rel})
         files_to_include.append(data_rel)
         console.print(f"[dim]Data path: {data_rel}[/dim]")
 
-    submission_spec = SubmissionPolicySpec(
-        class_path=policy_spec.class_path,
-        data_path=policy_spec.data_path,
-        init_kwargs=policy_spec.init_kwargs,
-        setup_script=None,
-    )
+    submission_spec = SubmissionPolicySpec.model_validate(policy_spec.model_dump())
     return submission_spec, files_to_include
 
 
@@ -230,11 +217,11 @@ def create_submission_zip(
     zip_fd, zip_path = tempfile.mkstemp(suffix=".zip", prefix="cogames_submission_")
     os.close(zip_fd)
 
-    submission_spec = SubmissionPolicySpec(
-        class_path=policy_spec.class_path,
-        data_path=policy_spec.data_path,
-        init_kwargs=policy_spec.init_kwargs,
-        setup_script=setup_script,
+    submission_spec = SubmissionPolicySpec.model_validate(
+        {
+            **policy_spec.model_dump(),
+            "setup_script": setup_script,
+        }
     )
 
     all_files: dict[str, Path] = {}
