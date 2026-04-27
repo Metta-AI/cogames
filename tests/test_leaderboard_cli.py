@@ -147,3 +147,27 @@ def test_leaderboard_mine_uses_season_policies_for_filtering(monkeypatch: pytest
     assert client_factory.public_call == ("https://server.example", "test-token", "https://login.example")
     payload = json.loads(str(printed[0]))
     assert [entry["policy"]["id"] for entry in payload] == [str(POLICY_ID_1)]
+
+
+def test_leaderboard_uses_login_token_without_mine_filter(monkeypatch: pytest.MonkeyPatch) -> None:
+    printed = capture_output(monkeypatch, leaderboard.console)
+    public_client = _PublicLeaderboardClient(entries=[])
+    auth_client = _AuthLeaderboardClient(mine_entries=[])
+    client_factory = _LeaderboardClientFactory(public_client=public_client, auth_client=auth_client)
+
+    monkeypatch.setattr(leaderboard, "TournamentServerClient", client_factory)
+    monkeypatch.setattr(leaderboard, "load_current_cogames_token", lambda login_server: "test-token")
+
+    leaderboard.leaderboard_cmd(
+        season_arg="private-season",
+        season=None,
+        policy_filter=None,
+        mine=False,
+        login_server="https://login.example",
+        server="https://server.example",
+        json_output=True,
+    )
+
+    assert client_factory.public_call == ("https://server.example", "test-token", "https://login.example")
+    assert auth_client.called_with is None
+    assert printed == [json.dumps([], indent=2)]
