@@ -2,7 +2,6 @@
 
 import io
 import json
-import os
 import subprocess
 import uuid
 import zipfile
@@ -13,6 +12,7 @@ from unittest.mock import patch
 
 import pytest
 import typer
+from click.testing import Result
 from pytest_httpserver import HTTPServer
 from typer.testing import CliRunner
 from werkzeug import Response
@@ -52,6 +52,10 @@ def _season_info_from_summary(summary: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _invoke_cogames(args: list[str], home: Path, env: dict[str, str] | None = None) -> Result:
+    return CliRunner().invoke(app, args, env={"HOME": str(home), **(env or {})})
+
+
 @pytest.fixture
 def fake_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create a fake HOME directory with a pre-configured auth token."""
@@ -71,10 +75,8 @@ def test_upload_command_sends_correct_requests(
     upload_id = _UPLOAD_ID
     _setup_mock_upload_server(httpserver, upload_id=upload_id)
 
-    # Run the upload command
-    result = subprocess.run(
+    result = _invoke_cogames(
         [
-            "cogames",
             "upload",
             "--policy",
             "class=cogames.policy.starter_agent.StarterPolicy",
@@ -86,17 +88,11 @@ def test_upload_command_sends_correct_requests(
             "http://fake-login-server",
             "--skip-validation",  # Skip isolated validation to speed up test
         ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        env={
-            "HOME": str(fake_home),
-            "PATH": os.environ.get("PATH", ""),
-        },
+        fake_home,
     )
 
-    assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
-    assert "my-test-policy:v1" in result.stdout
+    assert result.exit_code == 0, f"Upload failed:\n{result.output}"
+    assert "my-test-policy:v1" in result.output
 
     # Verify the requests that were made
     # 0: /tournament/seasons, 1: /tournament/seasons/{name}, 2: presigned-url, 3: upload, 4: complete
@@ -121,15 +117,16 @@ def test_upload_bundles_nested_single_file_top_level_module_at_root(
     httpserver: HTTPServer,
     fake_home: Path,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _setup_mock_upload_server(httpserver)
     policy_path = tmp_path / "generated" / "amongthem_policy.py"
     policy_path.parent.mkdir()
     policy_path.write_text("class AmongThemPolicy: pass\n")
 
-    result = subprocess.run(
+    monkeypatch.chdir(tmp_path)
+    result = _invoke_cogames(
         [
-            "cogames",
             "upload",
             "--policy",
             "class=amongthem_policy.AmongThemPolicy",
@@ -144,17 +141,10 @@ def test_upload_bundles_nested_single_file_top_level_module_at_root(
             "--skip-validation",
             "--no-submit",
         ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        cwd=tmp_path,
-        env={
-            "HOME": str(fake_home),
-            "PATH": os.environ.get("PATH", ""),
-        },
+        fake_home,
     )
 
-    assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
     upload_req = next(req for req, _ in httpserver.log if req.path == "/fake-s3-upload")
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
@@ -175,9 +165,8 @@ def test_upload_with_secret_env_sends_secrets_to_server(
     upload_id = _UPLOAD_ID
     _setup_mock_upload_server(httpserver, upload_id=upload_id)
 
-    result = subprocess.run(
+    result = _invoke_cogames(
         [
-            "cogames",
             "upload",
             "--policy",
             "class=cogames.policy.starter_agent.StarterPolicy",
@@ -193,16 +182,10 @@ def test_upload_with_secret_env_sends_secrets_to_server(
             "--secret-env",
             "OTHER_SECRET=other-value",
         ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        env={
-            "HOME": str(fake_home),
-            "PATH": os.environ.get("PATH", ""),
-        },
+        fake_home,
     )
 
-    assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
     complete_req, _ = httpserver.log[4]
     complete_body = complete_req.json
@@ -306,10 +289,9 @@ def test_upload_command_fails_without_auth(
         method="GET",
     ).respond_with_json(_season_info_from_summary(season_summary))
 
-    # Use tmp_path as HOME but don't create any token file
-    result = subprocess.run(
+    # Use tmp_path as HOME but don't create any token file.
+    result = _invoke_cogames(
         [
-            "cogames",
             "upload",
             "--policy",
             "class=cogames.policy.starter_agent.StarterPolicy",
@@ -321,19 +303,10 @@ def test_upload_command_fails_without_auth(
             "http://fake-login-server",
             "--skip-validation",
         ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        env={
-            "HOME": str(tmp_path),
-            "PATH": os.environ.get("PATH", ""),
-        },
+        tmp_path,
     )
 
-    # Should show auth error message
-    # Note: Currently returns exit code 0 even on auth failure - ideally this would be non-zero
-    combined_output = (result.stdout + result.stderr).lower()
-    assert "not authenticated" in combined_output or "cogames auth login" in combined_output
+    assert "not authenticated" in result.output.lower() or "cogames auth login" in result.output.lower()
 
 
 def _setup_mock_upload_server(
@@ -422,9 +395,8 @@ def test_upload_directory_policy(
     (policy_dir / "weights.pt").write_bytes(b"fake weights data")
     (policy_dir / "config.yaml").write_text("learning_rate: 0.001\nbatch_size: 32\n")
 
-    result = subprocess.run(
+    result = _invoke_cogames(
         [
-            "cogames",
             "upload",
             "--policy",
             policy_dir.as_uri(),
@@ -436,16 +408,10 @@ def test_upload_directory_policy(
             "http://fake-login-server",
             "--skip-validation",
         ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        env={
-            "HOME": str(fake_home),
-            "PATH": os.environ.get("PATH", ""),
-        },
+        fake_home,
     )
 
-    assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
     # Verify the uploaded zip contains all files from the directory
     assert len(httpserver.log) == 5
@@ -480,9 +446,8 @@ def test_upload_zip_policy(
         zf.writestr("model.safetensors", b"fake model data")
         zf.writestr("hyperparams.json", json.dumps({"lr": 1e-4, "epochs": 100}))
 
-    result = subprocess.run(
+    result = _invoke_cogames(
         [
-            "cogames",
             "upload",
             "--policy",
             policy_zip.as_uri(),
@@ -494,16 +459,10 @@ def test_upload_zip_policy(
             "http://fake-login-server",
             "--skip-validation",
         ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        env={
-            "HOME": str(fake_home),
-            "PATH": os.environ.get("PATH", ""),
-        },
+        fake_home,
     )
 
-    assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
     # Verify the uploaded zip contains all files
     assert len(httpserver.log) == 5
@@ -523,6 +482,7 @@ def test_upload_zip_policy_with_includes_and_setup_script(
     httpserver: HTTPServer,
     fake_home: Path,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test augmenting an existing zip URI with include-files, setup script, and init kwargs."""
     _setup_mock_upload_server(httpserver)
@@ -544,9 +504,9 @@ def test_upload_zip_policy_with_includes_and_setup_script(
     (extra_pkg / "module.py").write_text("class Extra: pass\n")
     (tmp_path / "setup_script.py").write_text("print('setup')\n")
 
-    result = subprocess.run(
+    monkeypatch.chdir(tmp_path)
+    result = _invoke_cogames(
         [
-            "cogames",
             "upload",
             "--policy",
             policy_zip.as_uri(),
@@ -564,17 +524,10 @@ def test_upload_zip_policy_with_includes_and_setup_script(
             "--init-kwarg",
             "dropout=0.1",
         ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        cwd=tmp_path,
-        env={
-            "HOME": str(fake_home),
-            "PATH": os.environ.get("PATH", ""),
-        },
+        fake_home,
     )
 
-    assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
     assert len(httpserver.log) == 5
     upload_req, _ = httpserver.log[3]
@@ -794,6 +747,7 @@ def test_upload_s3_policy(
     httpserver: HTTPServer,
     fake_home: Path,
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test uploading a policy from an S3 URI."""
     _setup_mock_upload_server(httpserver)
@@ -820,9 +774,9 @@ def test_upload_s3_policy(
         method="GET",
     ).respond_with_data(policy_bytes.read(), content_type="application/zip")
 
-    result = subprocess.run(
+    monkeypatch.delenv("AWS_PROFILE", raising=False)
+    result = _invoke_cogames(
         [
-            "cogames",
             "upload",
             "--policy",
             f"s3://test-bucket/{unique_key}",
@@ -834,19 +788,15 @@ def test_upload_s3_policy(
             "http://fake-login-server",
             "--skip-validation",
         ],
-        capture_output=True,
-        text=True,
-        timeout=60,
+        fake_home,
         env={
-            "HOME": str(fake_home),
-            "PATH": os.environ.get("PATH", ""),
             "AWS_ENDPOINT_URL_S3": httpserver.url_for(""),
             "AWS_ACCESS_KEY_ID": "testing",
             "AWS_SECRET_ACCESS_KEY": "testing",
         },
     )
 
-    assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+    assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
     # Verify: seasons list + season detail + S3 download + 3 upload requests = 6 total
     assert len(httpserver.log) == 6, f"Expected 6 requests, got {len(httpserver.log)}"
@@ -1522,9 +1472,8 @@ def test_upload_rejects_oversized_at_completion(
     policy_dir.mkdir()
     (policy_dir / "policy_spec.json").write_text(json.dumps({"class_path": "my_policies.Agent", "init_kwargs": {}}))
 
-    result = subprocess.run(
+    result = _invoke_cogames(
         [
-            "cogames",
             "upload",
             "--policy",
             policy_dir.as_uri(),
@@ -1536,14 +1485,8 @@ def test_upload_rejects_oversized_at_completion(
             "http://fake-login-server",
             "--skip-validation",
         ],
-        capture_output=True,
-        text=True,
-        timeout=60,
-        env={
-            "HOME": str(fake_home),
-            "PATH": os.environ.get("PATH", ""),
-        },
+        fake_home,
     )
 
-    assert result.returncode != 0
-    assert "Policy too large" in result.stdout or "Policy too large" in result.stderr
+    assert result.exit_code != 0
+    assert "Policy too large" in result.output

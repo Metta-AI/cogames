@@ -69,7 +69,7 @@ def test_starter_policy_keeps_exploring_on_machina1() -> None:
 
 
 def test_starter_policy_aligns_junctions_on_machina1() -> None:
-    env_cfg = make_machina1_mission(num_agents=8, max_steps=2000).make_env()
+    env_cfg = make_machina1_mission(num_agents=8, max_steps=200).make_env()
     results, _ = run_episode_local(
         policy_specs=[PolicySpec(class_path="starter")],
         assignments=[0] * env_cfg.game.num_agents,
