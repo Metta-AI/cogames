@@ -14,6 +14,15 @@ def _make_bitworld_game(root: Path, name: str) -> None:
     (game_dir / f"{name}.nim").write_text("", encoding="utf-8")
 
 
+def _write_quick_run(root: Path) -> None:
+    tools_dir = root / "tools"
+    tools_dir.mkdir()
+    (tools_dir / "quick_run.nim").write_text(
+        "",
+        encoding="utf-8",
+    )
+
+
 def test_discover_games_lists_bitworld_game_folders(tmp_path: Path) -> None:
     _make_bitworld_game(tmp_path, "fancy_cookout")
     _make_bitworld_game(tmp_path, "planet_wars")
@@ -37,7 +46,7 @@ def test_quick_run_args_match_bitworld_launcher_flags(tmp_path: Path) -> None:
         bitworld_cli.QuickRunConfig(
             game="fancy_cookout",
             port=8080,
-            players=4,
+            players=16,
             address="0.0.0.0",
             save_replay=Path("run.bitreplay"),
         ),
@@ -47,7 +56,7 @@ def test_quick_run_args_match_bitworld_launcher_flags(tmp_path: Path) -> None:
         str(tmp_path / "tools" / "quick_run"),
         "fancy_cookout",
         "8080",
-        "--players:4",
+        "--players:16",
         "--address:0.0.0.0",
         "--save-replay:run.bitreplay",
     ]
@@ -57,9 +66,8 @@ def test_quick_run_cmd_delegates_to_installed_bitworld_launcher(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _make_bitworld_game(tmp_path, "fancy_cookout")
-    (tmp_path / "tools").mkdir()
-    (tmp_path / "tools" / "quick_run.nim").write_text("", encoding="utf-8")
+    _make_bitworld_game(tmp_path, "among_them")
+    _write_quick_run(tmp_path)
     calls: list[tuple[list[str], Path]] = []
 
     def fake_run(args: list[str], *, cwd: Path, check: bool) -> subprocess.CompletedProcess[str]:
@@ -71,9 +79,9 @@ def test_quick_run_cmd_delegates_to_installed_bitworld_launcher(
     monkeypatch.setattr(bitworld_cli.subprocess, "run", fake_run)
 
     bitworld_cli.quick_run_cmd(
-        "fancy_cookout",
+        "among_them",
         8080,
-        players=2,
+        players=16,
         address="127.0.0.1",
         save_replay=Path("latest.bitreplay"),
         nim="nim-test",
@@ -84,9 +92,9 @@ def test_quick_run_cmd_delegates_to_installed_bitworld_launcher(
         (
             [
                 str(tmp_path / "tools" / "quick_run"),
-                "fancy_cookout",
+                "among_them",
                 "8080",
-                "--players:2",
+                "--players:16",
                 "--address:127.0.0.1",
                 "--save-replay:latest.bitreplay",
             ],

@@ -48,7 +48,7 @@ class QuickRunConfig(BaseModel):
 
     game: str = Field(min_length=1)
     port: int | None = Field(default=None, ge=1, le=65535)
-    players: int = Field(default=1, ge=1, le=6)
+    players: int = Field(default=1, ge=1)
     address: str = Field(default=DEFAULT_ADDRESS, min_length=1)
     save_replay: Path | None = None
 
@@ -135,7 +135,7 @@ def games_cmd() -> None:
 def quick_run_cmd(
     game: Annotated[str, typer.Argument(help="BitWorld game folder name.")],
     port: Annotated[int | None, typer.Argument(help="Port to bind. If omitted, BitWorld chooses one.")] = None,
-    players: Annotated[int, typer.Option("--players", min=1, max=6, help="Number of local player clients.")] = 1,
+    players: Annotated[int, typer.Option("--players", min=1, help="Number of local player clients.")] = 1,
     address: Annotated[str, typer.Option("--address", help="Server bind address.")] = DEFAULT_ADDRESS,
     save_replay: Annotated[Path | None, typer.Option("--save-replay", help="Path for BitWorld replay output.")] = None,
     nim: Annotated[str, typer.Option("--nim", help="Nim compiler executable.")] = "nim",
