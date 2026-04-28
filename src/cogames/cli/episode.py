@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
-import subprocess
-import tempfile
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -17,6 +14,7 @@ from cogames.cli.client import EpisodeResponse, TournamentServerClient
 from cogames.cli.leaderboard import _format_score, _format_timestamp
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 from cogames.display_detect import has_display
+from cogames.replays import launch_replay_bytes
 
 episode_app = typer.Typer(
     name="episode",
@@ -228,7 +226,7 @@ def episode_show_cmd(
 
 @episode_app.command(
     name="replay",
-    help="Download and replay a game episode in MettaScope.",
+    help="Download and replay a game episode in MettaScope or the BitWorld global client.",
     add_help_option=False,
 )
 def episode_replay_cmd(
@@ -271,7 +269,7 @@ def episode_replay_cmd(
         console.print("[red]No replay available for this episode.[/red]")
         raise typer.Exit(1)
 
-    # Only block when we intend to launch MettaScope; saving to `--output` still works headless.
+    # Only block when we intend to launch a replay viewer; saving to `--output` still works headless.
     if output is None and not has_display():
         console.print("[red]Error: This command requires a GUI display.[/red]")
         raise typer.Exit(1)
@@ -286,31 +284,6 @@ def episode_replay_cmd(
         console.print(f"[green]Replay saved to {output}[/green]")
         return
 
-    _launch_mettascope(replay_data.content, ep.id)
-
-
-def _launch_mettascope(replay_bytes: bytes, episode_id: uuid.UUID) -> None:
-    spec = importlib.util.find_spec("mettagrid")
-    if spec is None or spec.origin is None:
-        console.print("[red]mettagrid package not available; cannot locate MettaScope.[/red]")
-        raise typer.Exit(1)
-
-    package_dir = Path(spec.origin).resolve().parent
-    mettascope_path: Path | None = None
-    for root in (package_dir, *package_dir.parents):
-        candidate = root / "nim" / "mettascope" / "src" / "mettascope.nim"
-        if candidate.exists():
-            mettascope_path = candidate
-            break
-
-    if mettascope_path is None:
-        console.print("[red]MettaScope sources not found.[/red]")
-        raise typer.Exit(1)
-
-    with tempfile.NamedTemporaryFile(suffix=".replay", delete=False, prefix=f"episode-{str(episode_id)[:8]}-") as f:
-        f.write(replay_bytes)
-        replay_path = Path(f.name)
-
-    console.print(f"[cyan]Launching MettaScope to replay episode {str(episode_id)[:8]}...[/cyan]")
-    cmd = ["nim", "r", str(mettascope_path), f"--replay:{replay_path}"]
-    subprocess.run(cmd, check=True)
+    exit_code = launch_replay_bytes(replay_data.content, prefix=f"episode-{str(ep.id)[:8]}-")
+    if exit_code != 0:
+        raise typer.Exit(exit_code)

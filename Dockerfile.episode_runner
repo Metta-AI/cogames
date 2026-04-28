@@ -28,7 +28,7 @@ ENV PATH="/root/.nimby/nim/bin:$PATH"
 # Build native BitWorld server assets used by mettagrid.runner.bitworld_runner.
 # The Python BitWorld package remains an optional Cogames extra; this image
 # only needs the native server binary and static assets.
-ARG BITWORLD_REF=63191512d486fa56c86e7b53893884b67e746fe7
+ARG BITWORLD_REF=7203d529a895e8eabc1eefdc3d2c4252eb2ac6ea
 ARG MUMMY_REF=31ea34f2f6f8aa880ac65bc136373dc06568fcd9
 RUN chmod +x /root/.nimby/nim/bin/* && \
     export PATH="/root/.nimby/nim/bin:$PATH" && \
@@ -38,10 +38,10 @@ RUN chmod +x /root/.nimby/nim/bin/* && \
     git clone https://github.com/Metta-AI/BitWorld.git /tmp/bitworld && \
     cd /tmp/bitworld && git checkout ${BITWORLD_REF} && \
     nimble install -y pixie jsony zippy webby crunchy && \
-    mkdir -p /opt/bitworld/among_them /opt/bitworld/client/data && \
+    mkdir -p /opt/bitworld/among_them /opt/bitworld/clients/data && \
     nim c -d:release --threads:on --mm:orc --path:common -o:/opt/bitworld/among_them/among_them among_them/among_them.nim && \
     cp among_them/*.png among_them/*.aseprite /opt/bitworld/among_them/ && \
-    cp client/data/pallete.png client/data/letters.png client/data/numbers.png /opt/bitworld/client/data/ && \
+    cp clients/data/pallete.png clients/data/letters.png clients/data/numbers.png /opt/bitworld/clients/data/ && \
     rm -rf /tmp/bitworld /tmp/mummy /root/.nimble/pkgs2
 
 # Install Python and create the executor venv with cogames[neural]

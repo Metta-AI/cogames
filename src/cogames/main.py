@@ -11,11 +11,9 @@ suppress_noisy_logs()
 import importlib
 import importlib.metadata
 import importlib.resources
-import importlib.util
 import logging
 import os
 import shutil
-import subprocess
 import sys
 import webbrowser
 from pathlib import Path
@@ -106,6 +104,7 @@ from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
 from cogames.display_detect import has_display
 from cogames.optional_deps import require_neural
+from cogames.replays import ReplayPathRequest, launch_replay_path
 from cogames.seed import seed_rollout_rng
 from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
 
@@ -154,24 +153,6 @@ def _submit_browser_launch_skip_reason() -> str | None:
     if not sys.stdin.isatty():
         return "non-interactive session detected"
     return None
-
-
-def _resolve_mettascope_script() -> Path:
-    spec = importlib.util.find_spec("mettagrid")
-    if spec is None or spec.origin is None:
-        raise FileNotFoundError("mettagrid package is not available; cannot locate MettaScope.")
-
-    package_dir = Path(spec.origin).resolve().parent
-    search_roots = (package_dir, *package_dir.parents)
-
-    for root in search_roots:
-        candidate = root / "nim" / "mettascope" / "src" / "mettascope.nim"
-        if candidate.exists():
-            return candidate
-
-    raise FileNotFoundError(
-        f"MettaScope sources not found relative to installed mettagrid package (searched from {package_dir})."
-    )
 
 
 def _read_docs_readme() -> str:
@@ -858,16 +839,18 @@ def play_cmd(
     rich_help_panel="Play",
     epilog="""[dim]Examples:[/dim]
 
-  [cyan]cogames replay ./replays/game.replay[/cyan]              Replay a saved game
+  [cyan]cogames replay ./replays/game.json.z[/cyan]              Replay Cogs vs Clips in MettaScope
 
-  [cyan]cogames replay ./train_dir/my_run/replay.bin[/cyan]      Replay from training run""",
+  [cyan]cogames replay ./train_dir/my_run/replay.bin[/cyan]      Replay a legacy MettaGrid run
+
+  [cyan]cogames replay ./among_them.bitreplay[/cyan]             Replay BitWorld in the global client""",
     add_help_option=False,
 )
 def replay_cmd(
     replay_path: Path = typer.Argument(  # noqa: B008
         ...,
         metavar="FILE",
-        help="Path to the replay file (.replay or .bin).",
+        help="Path to a MettaGrid replay (.json.z, .replay, .bin) or a BitWorld replay (.bitreplay).",
     ),
     _help: bool = typer.Option(
         False,
@@ -876,6 +859,11 @@ def replay_cmd(
         help="Show this message and exit.",
         is_eager=True,
         callback=_help_callback,
+    ),
+    duration: Optional[float] = typer.Option(
+        None,
+        "--duration",
+        help="Seconds to keep a BitWorld replay server alive. MettaScope replays ignore this option.",
     ),
 ) -> None:
     if not replay_path.exists():
@@ -886,24 +874,9 @@ def replay_cmd(
         console.print("[red]Error: This command requires a GUI display.[/red]")
         raise typer.Exit(1)
 
-    try:
-        mettascope_path = _resolve_mettascope_script()
-    except FileNotFoundError as exc:
-        console.print(f"[red]Error locating MettaScope: {exc}[/red]")
-        raise typer.Exit(1) from exc
-
-    console.print(f"[cyan]Launching MettaScope to replay: {replay_path}[/cyan]")
-
-    try:
-        # Run nim with mettascope and replay argument
-        cmd = ["nim", "r", str(mettascope_path), f"--replay:{replay_path}"]
-        subprocess.run(cmd, check=True)
-    except subprocess.CalledProcessError as exc:
-        console.print(f"[red]Error running MettaScope: {exc}[/red]")
-        raise typer.Exit(1) from exc
-    except FileNotFoundError as exc:
-        console.print("[red]Error: 'nim' command not found. Please ensure Nim is installed and in your PATH.[/red]")
-        raise typer.Exit(1) from exc
+    exit_code = launch_replay_path(ReplayPathRequest(replay_path=replay_path, duration=duration))
+    if exit_code != 0:
+        raise typer.Exit(exit_code)
 
 
 @app.command(

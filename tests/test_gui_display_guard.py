@@ -133,20 +133,37 @@ def test_play_auto_uses_gui_with_display(monkeypatch) -> None:
     assert "Render: gui" in result.stdout
 
 
-def test_replay_requires_display_before_mettascope(monkeypatch, tmp_path: Path) -> None:
+def test_replay_requires_display_before_viewer_launch(monkeypatch, tmp_path: Path) -> None:
     replay_path = tmp_path / "test.replay"
     replay_path.write_text("replay")
     monkeypatch.setattr(main_module, "has_display", lambda: False)
     monkeypatch.setattr(
         main_module,
-        "_resolve_mettascope_script",
-        lambda: (_ for _ in ()).throw(AssertionError("should not resolve mettascope")),
+        "launch_replay_path",
+        lambda _request: (_ for _ in ()).throw(AssertionError("should not launch replay viewer")),
     )
 
     result = runner.invoke(main_module.app, ["replay", str(replay_path)])
 
     assert result.exit_code == 1
     assert "This command requires a GUI display" in result.stdout
+
+
+def test_replay_delegates_to_replay_viewer_contract(monkeypatch, tmp_path: Path) -> None:
+    replay_path = tmp_path / "test.bitreplay"
+    replay_path.write_bytes(b"BITWORLD\x02\x00")
+    launched: list[object] = []
+    monkeypatch.setattr(main_module, "has_display", lambda: True)
+    monkeypatch.setattr(
+        main_module,
+        "launch_replay_path",
+        lambda request: launched.append(request.replay_path) or launched.append(request.duration) or 0,
+    )
+
+    result = runner.invoke(main_module.app, ["replay", str(replay_path), "--duration", "1"])
+
+    assert result.exit_code == 0
+    assert launched == [replay_path, 1.0]
 
 
 class _FakeClient:
@@ -186,11 +203,33 @@ def test_episode_replay_requires_display_before_launch(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         episode_module,
-        "_launch_mettascope",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("should not launch mettascope")),
+        "launch_replay_bytes",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("should not launch replay viewer")),
     )
 
     result = runner.invoke(main_module.app, ["episode", "replay", str(episode_id)])
 
     assert result.exit_code == 1
     assert "This command requires a GUI display" in result.stdout
+
+
+def test_episode_replay_delegates_to_replay_viewer_contract(monkeypatch) -> None:
+    episode_id = uuid.uuid4()
+    launched: list[object] = []
+    monkeypatch.setattr(episode_module, "has_display", lambda: True)
+    monkeypatch.setattr(
+        episode_module,
+        "_get_anon_client",
+        lambda _server: _FakeClient(SimpleNamespace(id=episode_id, replay_url="https://example.com/replay")),
+    )
+    monkeypatch.setattr(episode_module.httpx, "get", lambda *_args, **_kwargs: _FakeHttpResponse(b"BITWORLD\x02\x00"))
+    monkeypatch.setattr(
+        episode_module,
+        "launch_replay_bytes",
+        lambda replay_bytes, *, prefix: launched.append(replay_bytes) or launched.append(prefix) or 0,
+    )
+
+    result = runner.invoke(main_module.app, ["episode", "replay", str(episode_id)])
+
+    assert result.exit_code == 0
+    assert launched == [b"BITWORLD\x02\x00", f"episode-{str(episode_id)[:8]}-"]
