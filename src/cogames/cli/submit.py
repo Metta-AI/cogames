@@ -138,10 +138,17 @@ def _load_submission_spec(bundle_root: Path) -> SubmissionPolicySpec:
     return SubmissionPolicySpec.model_validate_json(spec_path.read_text())
 
 
-def _copy_include_paths_into_bundle(paths: list[Path], cwd: Path, bundle_root: Path) -> None:
+def _bundle_target_for_include(path: Path, bundle_root: Path, class_path: str) -> Path:
+    module_path = class_path.rsplit(".", 1)[0]
+    if "." not in module_path and path.name == f"{module_path}.py":
+        return bundle_root / path.name
+    return bundle_root / path
+
+
+def _copy_include_paths_into_bundle(paths: list[Path], cwd: Path, bundle_root: Path, class_path: str) -> None:
     for path in paths:
         source = cwd / path
-        target = bundle_root / path
+        target = _bundle_target_for_include(path, bundle_root, class_path)
         if source.is_dir():
             _copy_tree_to(source, target)
             continue
@@ -283,7 +290,7 @@ def create_bundle(
 
         if validated_paths:
             include_with_ancestors = validated_paths + _collect_ancestor_init_files(validated_paths)
-            _copy_include_paths_into_bundle(include_with_ancestors, cwd, bundle_root)
+            _copy_include_paths_into_bundle(include_with_ancestors, cwd, bundle_root, submission_spec.class_path)
 
         has_embedded_package_root = find_package_source_root(bundle_root, submission_spec.class_path) is not None
         if (

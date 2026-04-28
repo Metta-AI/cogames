@@ -117,6 +117,55 @@ def test_upload_command_sends_correct_requests(
     assert complete_body["name"] == "my-test-policy"
 
 
+def test_upload_bundles_nested_single_file_top_level_module_at_root(
+    httpserver: HTTPServer,
+    fake_home: Path,
+    tmp_path: Path,
+) -> None:
+    _setup_mock_upload_server(httpserver)
+    policy_path = tmp_path / "generated" / "amongthem_policy.py"
+    policy_path.parent.mkdir()
+    policy_path.write_text("class AmongThemPolicy: pass\n")
+
+    result = subprocess.run(
+        [
+            "cogames",
+            "upload",
+            "--policy",
+            "class=amongthem_policy.AmongThemPolicy",
+            "--include-files",
+            "generated/amongthem_policy.py",
+            "--name",
+            "nested-amongthem-policy",
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "http://fake-login-server",
+            "--skip-validation",
+            "--no-submit",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        cwd=tmp_path,
+        env={
+            "HOME": str(fake_home),
+            "PATH": os.environ.get("PATH", ""),
+        },
+    )
+
+    assert result.returncode == 0, f"Upload failed:\nstdout: {result.stdout}\nstderr: {result.stderr}"
+
+    upload_req = next(req for req, _ in httpserver.log if req.path == "/fake-s3-upload")
+    with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
+        names = set(zf.namelist())
+        assert "policy_spec.json" in names
+        assert "amongthem_policy.py" in names
+        assert "generated/amongthem_policy.py" not in names
+        spec = json.loads(zf.read("policy_spec.json"))
+        assert spec["class_path"] == "amongthem_policy.AmongThemPolicy"
+
+
 def test_upload_with_secret_env_sends_secrets_to_server(
     httpserver: HTTPServer,
     fake_home: Path,
