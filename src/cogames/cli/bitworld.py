@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
-import http.server
 import importlib.resources
 import importlib.util
 import os
 import socket
 import subprocess
-import threading
 import time
 import webbrowser
-from functools import partial
 from pathlib import Path
 from typing import Annotated
 
@@ -26,8 +23,8 @@ BITWORLD_ROOT_ENV = "COGAMES_BITWORLD_ROOT"
 BITREPLAY_MAGIC = b"BITWORLD"
 BITREPLAY_HEADER_PREFIX_BYTES = len(BITREPLAY_MAGIC) + 4
 DEFAULT_ADDRESS = "127.0.0.1"
-DEFAULT_BROWSER_ADDRESS = "localhost"
-DEFAULT_CLIENT_SERVER_ADDRESS = "127.0.0.1"
+DEFAULT_BROWSER_ADDRESS = DEFAULT_ADDRESS
+GLOBAL_CLIENT_ROUTE = "/client/global.html"
 PORT_POLL_SECONDS = 0.1
 PORT_WAIT_SECONDS = 8.0
 STOP_WAIT_SECONDS = 2.0
@@ -172,42 +169,8 @@ def _stop_process(process: subprocess.Popen) -> None:
     process.wait()
 
 
-class _QuietClientHandler(http.server.SimpleHTTPRequestHandler):
-    def log_message(self, format: str, *args: object) -> None:
-        return
-
-
-class BitWorldClientServer:
-    def __init__(self, clients_dir: Path, address: str = DEFAULT_CLIENT_SERVER_ADDRESS) -> None:
-        self._server = http.server.ThreadingHTTPServer(
-            (address, 0),
-            partial(_QuietClientHandler, directory=str(clients_dir)),
-        )
-        self._address = address
-        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
-
-    @property
-    def port(self) -> int:
-        return int(self._server.server_address[1])
-
-    def start(self) -> None:
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._server.shutdown()
-        self._server.server_close()
-        self._thread.join(timeout=STOP_WAIT_SECONDS)
-
-    def global_client_url(self, browser_address: str, game_port: int) -> str:
-        return (
-            f"http://{self._address}:{self.port}/global_client.html?address=ws://{browser_address}:{game_port}/global"
-        )
-
-
-def start_client_server(root: Path) -> BitWorldClientServer:
-    client_server = BitWorldClientServer(root / "clients")
-    client_server.start()
-    return client_server
+def global_client_url(browser_address: str, port: int) -> str:
+    return f"http://{browser_address}:{port}{GLOBAL_CLIENT_ROUTE}"
 
 
 def compile_quick_run(root: Path, nim: str) -> Path:
@@ -256,17 +219,13 @@ def launch_bitworld_replay(config: ReplayConfig, nim: str = "nim") -> int:
     )
     try:
         _wait_for_port(config.address, port, process)
-        client_server = start_client_server(root)
-        try:
-            url = client_server.global_client_url(config.browser_address, port)
-            console.print(f"[cyan]Launching BitWorld replay viewer: {url}[/cyan]")
-            webbrowser.open(url)
-            if config.duration is not None:
-                time.sleep(config.duration)
-                return 0
-            return int(process.wait())
-        finally:
-            client_server.stop()
+        url = global_client_url(config.browser_address, port)
+        console.print(f"[cyan]Launching BitWorld replay viewer: {url}[/cyan]")
+        webbrowser.open(url)
+        if config.duration is not None:
+            time.sleep(config.duration)
+            return 0
+        return int(process.wait())
     finally:
         _stop_process(process)
 

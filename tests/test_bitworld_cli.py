@@ -94,18 +94,19 @@ def test_bitworld_replay_game_parser_reads_game(tmp_path: Path) -> None:
     assert bitworld_cli.bitworld_replay_game_from_file(replay_path) == "among_them"
 
 
+def test_global_client_url_uses_game_server_route() -> None:
+    assert bitworld_cli.global_client_url("127.0.0.1", 59921) == "http://127.0.0.1:59921/client/global.html"
+
+
 def test_launch_bitworld_replay_starts_server_and_global_viewer(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _make_bitworld_game(tmp_path, "planet_wars")
-    (tmp_path / "clients").mkdir()
-    (tmp_path / "clients" / "global_client.html").write_text("", encoding="utf-8")
     replay_path = tmp_path / "match.bitreplay"
     replay_path.write_bytes(_bitworld_replay_bytes("planet_wars"))
     opened_urls: list[str] = []
     popen_calls: list[tuple[list[str], Path]] = []
-    client_server_stopped = False
 
     class FakeProcess:
         returncode: int | None = None
@@ -123,14 +124,6 @@ def test_launch_bitworld_replay_starts_server_and_global_viewer(
         def kill(self) -> None:
             self.returncode = -9
 
-    class FakeClientServer:
-        def global_client_url(self, browser_address: str, game_port: int) -> str:
-            return f"http://127.0.0.1:9000/global_client.html?address=ws://{browser_address}:{game_port}/global"
-
-        def stop(self) -> None:
-            nonlocal client_server_stopped
-            client_server_stopped = True
-
     def fake_popen(args: list[str], *, cwd: Path) -> FakeProcess:
         popen_calls.append((args, cwd))
         return FakeProcess()
@@ -141,7 +134,6 @@ def test_launch_bitworld_replay_starts_server_and_global_viewer(
     monkeypatch.setattr(bitworld_cli, "_wait_for_port", lambda _host, _port, _process: None)
     monkeypatch.setattr(bitworld_cli.subprocess, "Popen", fake_popen)
     monkeypatch.setattr(bitworld_cli.webbrowser, "open", lambda url: opened_urls.append(url))
-    monkeypatch.setattr(bitworld_cli, "start_client_server", lambda _root: FakeClientServer())
 
     exit_code = bitworld_cli.launch_bitworld_replay(bitworld_cli.ReplayConfig(replay_path=replay_path))
 
@@ -157,8 +149,7 @@ def test_launch_bitworld_replay_starts_server_and_global_viewer(
             tmp_path / "planet_wars",
         )
     ]
-    assert opened_urls == ["http://127.0.0.1:9000/global_client.html?address=ws://localhost:4567/global"]
-    assert client_server_stopped
+    assert opened_urls == ["http://127.0.0.1:4567/client/global.html"]
 
 
 def test_quick_run_cmd_delegates_to_installed_bitworld_launcher(
