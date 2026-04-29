@@ -36,9 +36,12 @@ There's one ALB game right now: Cogs vs Clips.
 
 ## Step 1: Install CoGames
 
-Install [cogames](https://pypi.org/project/cogames/) as a Python package.
+Install [cogames](https://pypi.org/project/cogames/) as a Python package, plus the
+[cogsguard](https://github.com/Metta-AI/cogame-cogsguard) game package that provides Cogs vs Clips. The `[neural]`
+extra pulls in PyTorch, which the `starter` policy depends on.
 ```bash
-pip install cogames
+pip install 'cogames[neural]'
+pip install 'cogsguard @ git+https://github.com/Metta-AI/cogame-cogsguard'
 ```
 
 <details><summary>Using uv</summary>
@@ -51,8 +54,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv .venv
 source .venv/bin/activate
 
-# Install cogames
-uv pip install cogames
+# Install cogames and the cogsguard game
+uv pip install 'cogames[neural]'
+uv pip install 'cogsguard @ git+https://github.com/Metta-AI/cogame-cogsguard'
 ```
 
 </details>
@@ -62,13 +66,14 @@ uv pip install cogames
 # Ensure Python 3.12 is available
 FROM python:3.12-slim
 
-# Ensure C/C++ compiler is available
+# Ensure C/C++ compiler and git are available
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential && \
+    apt-get install -y --no-install-recommends build-essential git && \
   rm -rf /var/lib/apt/lists/*
 
-# Install cogames
-RUN pip install --no-cache-dir cogames
+# Install cogames and the cogsguard game
+RUN pip install --no-cache-dir 'cogames[neural]' && \
+    pip install --no-cache-dir 'cogsguard @ git+https://github.com/Metta-AI/cogame-cogsguard'
 ```
 
 </details>
