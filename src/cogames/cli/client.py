@@ -76,7 +76,7 @@ class TournamentServerClient:
     def _headers(self, headers: dict[str, str] | None = None) -> dict[str, str]:
         request_headers = dict(headers or {})
         if self._token:
-            request_headers["X-Auth-Token"] = self._token
+            request_headers["Authorization"] = f"Bearer {self._token}"
         return request_headers
 
     def _request(
@@ -293,12 +293,9 @@ class TournamentServerClient:
         )
 
     def get_match_policy_log(self, match_id: uuid.UUID, policy_version_id: uuid.UUID, agent_idx: int) -> str:
-        headers = {}
-        if self._token:
-            headers["X-Auth-Token"] = self._token
         response = self._http_client.get(
             f"/tournament/matches/{match_id}/{policy_version_id}/policy-logs/{agent_idx}",
-            headers=headers,
+            headers=self._headers(),
         )
         response.raise_for_status()
         return response.text
@@ -394,12 +391,9 @@ class TournamentServerClient:
     def get_match_artifact(
         self, match_id: uuid.UUID, policy_version_id: uuid.UUID, artifact_type: str
     ) -> httpx.Response:
-        headers = {}
-        if self._token:
-            headers["X-Auth-Token"] = self._token
         response = self._http_client.get(
             f"/tournament/matches/{match_id}/{policy_version_id}/artifacts/{artifact_type}",
-            headers=headers,
+            headers=self._headers(),
         )
         response.raise_for_status()
         return response

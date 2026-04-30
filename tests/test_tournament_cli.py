@@ -619,7 +619,7 @@ class TestAuthBehavior:
         _invoke_with_server(httpserver, "season", "show", "test-season", "--json")
         for req, _ in httpserver.log:
             if req.path == "/tournament/seasons/test-season":
-                assert "X-Auth-Token" not in req.headers
+                assert "Authorization" not in req.headers
                 break
 
     def test_submissions_requires_auth(self, httpserver: HTTPServer) -> None:
@@ -699,7 +699,7 @@ class TestAuthBehavior:
         _invoke_with_server(httpserver, "season", "list", "--json")
         for req, _ in httpserver.log:
             if req.path == "/tournament/seasons":
-                assert "X-Auth-Token" not in req.headers
+                assert "Authorization" not in req.headers
                 break
 
     def test_leaderboard_no_auth_header_sent_for_public_read(self, httpserver: HTTPServer) -> None:
@@ -707,7 +707,7 @@ class TestAuthBehavior:
         _invoke_with_server(httpserver, "leaderboard", "--season", "test-season", "--json")
         for req, _ in httpserver.log:
             if req.path == "/tournament/seasons/test-season/leaderboard":
-                assert "X-Auth-Token" not in req.headers
+                assert "Authorization" not in req.headers
                 break
 
     def test_auth_required_error_message_is_actionable(self, httpserver: HTTPServer) -> None:
@@ -749,7 +749,7 @@ class TestAuthBehavior:
 
         for req, _ in httpserver.log:
             if req.path == "/stats/policy-versions":
-                assert req.headers.get("X-Auth-Token") == "fake-token"
+                assert req.headers.get("Authorization") == "Bearer fake-token"
                 break
 
 
@@ -789,7 +789,7 @@ class TestPlayerSessions:
         assert json.loads(result.output)[0]["id"] == "ply_playeralpha"
         player_reqs = [req for req, _ in httpserver.log if req.path == "/players"]
         assert player_reqs, "Expected a request to /players"
-        assert player_reqs[0].headers.get("X-Auth-Token") == "user-token"
+        assert player_reqs[0].headers.get("Authorization") == "Bearer user-token"
 
     def test_player_login_switches_active_session_but_preserves_user_token(
         self,
@@ -825,7 +825,7 @@ class TestPlayerSessions:
         assert load_token(token_kind=TokenKind.COGAMES_USER, server=login_server) == "user-token"
         login_reqs = [req for req, _ in httpserver.log if req.path == "/players/ply_playeralpha/login"]
         assert login_reqs, "Expected a request to /players/ply_playeralpha/login"
-        assert login_reqs[0].headers.get("X-Auth-Token") == "user-token"
+        assert login_reqs[0].headers.get("Authorization") == "Bearer user-token"
 
     def test_player_logout_restores_user_session(
         self,
@@ -983,7 +983,7 @@ class TestSeasonLookupAuth:
 
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons"]
         assert season_reqs, "Expected a request to /tournament/seasons"
-        assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
+        assert season_reqs[0].headers.get("Authorization") == "Bearer service-token-xyz"
 
     def test_season_list_sends_token_when_saved(
         self,
@@ -1000,7 +1000,7 @@ class TestSeasonLookupAuth:
         assert result.exit_code == 0
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons"]
         assert season_reqs, "Expected a request to /tournament/seasons"
-        assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
+        assert season_reqs[0].headers.get("Authorization") == "Bearer service-token-xyz"
 
     def test_season_show_sends_token_when_saved(
         self,
@@ -1017,7 +1017,7 @@ class TestSeasonLookupAuth:
         assert result.exit_code == 0
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons/test-season"]
         assert season_reqs, "Expected a request to /tournament/seasons/test-season"
-        assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
+        assert season_reqs[0].headers.get("Authorization") == "Bearer service-token-xyz"
 
     def test_upload_sends_no_token_in_season_lookup_when_absent(
         self,
@@ -1048,7 +1048,7 @@ class TestSeasonLookupAuth:
 
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons"]
         assert season_reqs, "Expected a request to /tournament/seasons"
-        assert "X-Auth-Token" not in season_reqs[0].headers
+        assert "Authorization" not in season_reqs[0].headers
 
     def test_submit_sends_token_in_season_lookup_when_token_saved(
         self,
@@ -1100,7 +1100,7 @@ class TestSeasonLookupAuth:
         assert result.exit_code == 0
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons/test-season"]
         assert season_reqs, "Expected a request to /tournament/seasons/test-season"
-        assert season_reqs[0].headers.get("X-Auth-Token") == "service-token-xyz"
+        assert season_reqs[0].headers.get("Authorization") == "Bearer service-token-xyz"
 
     def test_submit_sends_no_token_in_season_lookup_when_absent(
         self,
@@ -1128,7 +1128,7 @@ class TestSeasonLookupAuth:
 
         season_reqs = [req for req, _ in httpserver.log if req.path == "/tournament/seasons/test-season"]
         assert season_reqs, "Expected a request to /tournament/seasons/test-season"
-        assert "X-Auth-Token" not in season_reqs[0].headers
+        assert "Authorization" not in season_reqs[0].headers
 
 
 class TestSubmitProfileLaunch:
