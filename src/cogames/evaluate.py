@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 from collections import defaultdict
+from collections.abc import Sequence
 from typing import Literal, Optional, TypeAlias
 
 import numpy as np
@@ -15,7 +16,7 @@ from rich.console import Console
 from rich.table import Table
 
 from metta_alo.scoring import allocate_counts, validate_proportions
-from mettagrid import MettaGridConfig
+from mettagrid.config.env_config import EnvConfig
 from mettagrid.policy.policy import PolicySpec
 from mettagrid.runner.rollout import run_multi_episode_rollout
 from mettagrid.simulator.multi_episode.rollout import MultiEpisodeRolloutResult
@@ -41,7 +42,7 @@ class RawMissionEvaluationResult(BaseModel):
 
 def evaluate(
     console: Console,
-    missions: list[tuple[str, MettaGridConfig]],
+    missions: Sequence[tuple[str, EnvConfig]],
     policy_specs: list[PolicySpec],
     proportions: list[float],
     episodes: int,
@@ -50,7 +51,7 @@ def evaluate(
     device: Optional[str] = None,
     output_format: Optional[Literal["yaml", "json"]] = None,
     save_replay: Optional[str] = None,
-    game_engine: str = "mettagrid",
+    game_engine: str | None = None,
 ) -> MissionResultsSummary:
     if not missions:
         raise ValueError("At least one mission must be provided for evaluation.")
@@ -72,7 +73,7 @@ def evaluate(
     mission_results: list[MultiEpisodeRolloutResult] = []
     all_replay_paths: list[str] = []
     for mission_name, env_cfg in missions:
-        counts = allocate_counts(env_cfg.game.num_agents, proportions)
+        counts = allocate_counts(env_cfg.num_agents, proportions)
         assignments = [i for i, c in enumerate(counts) for _ in range(c)]
 
         progress_label = f"Simulating ({mission_name})"

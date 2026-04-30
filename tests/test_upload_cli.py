@@ -1271,20 +1271,24 @@ def test_validation_job_spec_defaults_to_mettagrid() -> None:
 
 
 def test_validation_job_spec_forwards_game_engine() -> None:
-    cfg = MettaGridConfig()
-    cfg.game.num_agents = 5
-    cfg.game.max_steps = 1000
+    bw_cfg = {
+        "game_engine": "bitworld",
+        "game_name": "among_them",
+        "num_players": 5,
+        "max_ticks": 1000,
+        "seed": 0,
+    }
 
     job_spec = _validation_job_spec(
         "file:///workspace/policy.zip",
-        cfg.model_dump(mode="json"),
+        bw_cfg,
         game_engine="bitworld",
     )
 
     assert job_spec["game_engine"] == "bitworld"
     assert job_spec["assignments"] == [0, 0, 0, 0, 0]
-    assert job_spec["env"]["game"]["num_agents"] == 5
-    assert job_spec["env"]["game"]["max_steps"] == 10
+    assert job_spec["env"]["num_players"] == 5
+    assert job_spec["env"]["max_ticks"] == 10
 
 
 def _single_episode_result(steps: int, agent_stats: dict[str, float]) -> PureSingleEpisodeResult:

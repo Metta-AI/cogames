@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import shutil
@@ -325,16 +326,20 @@ def _validation_job_spec(
     *,
     game_engine: str = "mettagrid",
 ) -> dict[str, Any]:
-    env_cfg = dict(config_data)
-    env_cfg["game"] = dict(env_cfg["game"])
-    env_cfg["game"]["max_steps"] = 10
+    env_cfg = copy.deepcopy(config_data)
+    env_cfg["game_engine"] = game_engine
+    from mettagrid.config.any_env_config import resolve_env_config_type  # noqa: PLC0415
+
+    env_type = resolve_env_config_type(env_cfg)
+    env_type.set_max_steps(env_cfg, 10)
+    num_agents = env_type.get_num_agents(env_cfg)
     return {
         "policy_uris": [policy_uri],
-        "assignments": [0] * env_cfg["game"]["num_agents"],
+        "assignments": [0] * num_agents,
         "env": env_cfg,
-        "game_engine": game_engine,
         "seed": 42,
         "max_action_time_ms": 10000,
+        "game_engine": game_engine,
     }
 
 
