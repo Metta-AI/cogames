@@ -176,8 +176,13 @@ Example command names:
 
 - **Name pattern**: `change_vibe_{vibe_name}`
 - **Vibes**: Depends on configuration (e.g., `happy`, `sad`, `angry`, etc.)
-- **Description**: Change your current vibe to the specified vibe. Vibes can be used for communication, and also impacts
-  environmental interactions.
+- **Description**: Change your current vibe to the specified vibe. Vibes are a generic signaling channel: an agent's
+  current vibe is observable as a token on its grid cell to anyone who can see it. Whether vibes have any *gameplay*
+  effect (e.g. triggering combat via `attack.vibes`, mutating other entities via `clear_vibes`) is determined by the
+  specific game and its active variant set, not by the action itself. **In default Cogs vs Clips (`machina_1`), vibes
+  have no gameplay coupling — they are pure signaling. Role identity in CvC is determined by gear inventory items
+  (`miner` / `aligner` / `scrambler` / `scout`), not by the agent's vibe attribute, even though some vibe names overlap
+  with gear names.**
 
 Example command names:
 
