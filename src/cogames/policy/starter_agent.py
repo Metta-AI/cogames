@@ -467,3 +467,4 @@ class BaseStarterPolicy(MultiAgentPolicy):
 
 class StarterPolicy(BaseStarterPolicy):
     short_names = ["starter"]
+    pass
