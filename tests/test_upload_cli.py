@@ -99,7 +99,7 @@ def test_upload_command_sends_correct_requests(
     assert len(httpserver.log) == 5, f"Expected 5 requests, got {len(httpserver.log)}"
 
     presign_req, _ = httpserver.log[2]
-    assert presign_req.headers.get("Authorization") == "Bearer test-token-12345"
+    assert presign_req.headers.get("X-Auth-Token") == "test-token-12345"
 
     upload_req, _ = httpserver.log[3]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
