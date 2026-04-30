@@ -84,7 +84,7 @@ tribalcog = { git = "https://github.com/Metta-AI/cogame-tribal.git", rev = "7aa5
 amongcogs = { git = "https://github.com/Metta-AI/cogame-amongcogs.git" }
 werecog = { git = "https://github.com/Metta-AI/cogame-werecog.git" }
 cogsguard = { git = "https://github.com/Metta-AI/cogame-cogsguard.git", rev = "e088553fdb5753404327a12ba8412412999fa558" }
-bitworld = { git = "https://github.com/Metta-AI/bitworld.git", rev = "7203d529a895e8eabc1eefdc3d2c4252eb2ac6ea" }
+bitworld = { git = "https://github.com/Metta-AI/bitworld.git", rev = "b3deff78d92579d8c83d7df8a064a2222fd87778" }
 
 [tool.ruff]
 extend = "../../.ruff.toml"
