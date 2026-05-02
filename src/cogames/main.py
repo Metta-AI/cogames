@@ -47,7 +47,7 @@ def _run_metadata_only_cli() -> None:
 
     @metadata_app.command("missions")
     def _missions_cmd(
-        mission_filter: Optional[str] = typer.Argument(None, metavar="MISSION"),
+        mission_filter: Optional[str] = typer.Argument(None, metavar="FILTER"),
         game_name: str = typer.Option("cogsguard", "--game", help="Game whose missions to list."),
     ) -> None:
         list_missions(mission_filter, game_name=game_name)
@@ -1018,12 +1018,11 @@ def make_mission(
     rich_help_panel="Tutorial",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames tutorial make-policy -t -o my_nn_policy.py[/cyan]        Trainable (neural network)
+[cyan]cogames tutorial make-policy --trainable -o my_nn_policy.py[/cyan]        Trainable (neural network)
 
-[cyan]cogames tutorial make-policy -s -o my_scripted_policy.py[/cyan]  Scripted (rule-based)
+[cyan]cogames tutorial make-policy --scripted -o my_scripted_policy.py[/cyan]   Scripted (rule-based)
 
-[cyan]cogames tutorial make-policy --amongthem -o amongthem_policy.py[/cyan]
-                                                                  AmongThem scripted practice""",
+[cyan]cogames tutorial make-policy --amongthem -o amongthem_policy.py[/cyan]    AmongThem scripted practice""",
     add_help_option=False,
 )
 def make_policy(
@@ -2510,7 +2509,7 @@ def docs_cmd(
     doc_name: Optional[str] = typer.Argument(
         None,
         metavar="DOC",
-        help="Document name (readme, mission, technical_manual, scripted_agent, evals, mapgen).",
+        help=f"Document name ({', '.join(sorted(_DOC_DESCRIPTIONS.keys()))}).",
     ),
     _help: bool = typer.Option(
         False,
