@@ -620,9 +620,9 @@ def replay_cmd(
     rich_help_panel="Tutorial",
     epilog="""[dim]Examples:[/dim]
 
-[cyan]cogames tutorial make-policy -t -o my_nn_policy.py[/cyan]        Trainable (neural network)
+[cyan]cogames tutorial make-policy --trainable -o my_nn_policy.py[/cyan]        Trainable (neural network)
 
-[cyan]cogames tutorial make-policy -s -o my_scripted_policy.py[/cyan]  Scripted (rule-based)
+[cyan]cogames tutorial make-policy --scripted -o my_scripted_policy.py[/cyan]  Scripted (rule-based)
 
 [cyan]cogames tutorial make-policy --amongthem -o amongthem_policy.py[/cyan]
                                                                   AmongThem scripted practice""",
@@ -2112,7 +2112,7 @@ def docs_cmd(
     doc_name: Optional[str] = typer.Argument(
         None,
         metavar="DOC",
-        help="Document name (readme, mission, technical_manual, scripted_agent, evals, mapgen).",
+        help=f"Document name ({', '.join(sorted(_DOC_DESCRIPTIONS))}).",
     ),
     _help: bool = typer.Option(
         False,
