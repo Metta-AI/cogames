@@ -1970,7 +1970,7 @@ cogames [COMMAND] --help
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> Train a policy on one or more missions.                                                                           
 
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Requires the ``neural`` extra (PyTorch + PufferLib).</span>                                                              
- <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Install with: ``pip install cogames``.</span>                                                                            
+ <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Install with: ``pip install cogames[neural]``.</span>                                                                            
 
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">By default, our 'lstm' policy architecture is used. You can select a different architecture</span>                       
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">(like 'stateless' or 'baseline'), or define your own implementing the MultiAgentPolicy</span>                            

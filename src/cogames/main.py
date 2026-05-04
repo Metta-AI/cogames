@@ -745,7 +745,7 @@ def make_policy(
     help="""Train a policy on one or more missions.
 
 Requires the ``neural`` extra (PyTorch + PufferLib).
-Install with: ``pip install cogames[neural]``.
+Install with: ``pip install cogames\\[neural]``.
 
 By default, our 'lstm' policy architecture is used. You can select a different architecture
 (like 'stateless' or 'baseline'), or define your own implementing the MultiAgentPolicy
