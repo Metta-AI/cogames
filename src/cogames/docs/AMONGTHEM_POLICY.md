@@ -17,13 +17,14 @@ that will run in the tournament worker, uploading it, and checking whether it sc
 cogames tutorial make-policy --amongthem -o amongthem_policy.py
 ```
 
-Edit `AmongThemPolicy._choose_actions()` in the generated file. The template receives raw BitWorld observations and must
-write integer action indices from the BitWorld trainable action set into `raw_actions`.
+Edit `AmongThemPolicy._choose_actions()` in the generated file. The template receives raw BitWorld observations and
+must return an `np.ndarray` of integer action indices from the BitWorld trainable action set; the parent
+`step_batch()` writes those into `raw_actions`.
 
 ## 2. Log in and pick a season
 
 ```bash
-cogames login
+cogames auth login
 cogames season list
 cogames season show <season>
 ```

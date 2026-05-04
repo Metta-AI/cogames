@@ -40,7 +40,7 @@ Expected terminal output (example):
 Training on mission: arena
 ...progress logs...
 Training complete. Checkpoints saved to: ./train_dir
-Checkpoint saved to: ./train_dir/<run_id>/model_000001.pt
+Final checkpoint: ./train_dir/<run_id>/model_000001.pt
 ```
 
 Replace `<run_id>` with your actual run ID from your training output.
