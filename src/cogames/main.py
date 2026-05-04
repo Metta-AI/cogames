@@ -122,15 +122,8 @@ def _submit_browser_launch_skip_reason() -> str | None:
 
 
 def _read_docs_readme() -> str:
-    try:
-        metadata = importlib.metadata.metadata("cogames")
-    except importlib.metadata.PackageNotFoundError:
-        metadata = None
-    if metadata is not None:
-        description = metadata.get("Description")
-        if description:
-            return description
-    return (_REPO_COGAMES_ROOT / "README.md").read_text()
+    readme_path = _REPO_COGAMES_ROOT / "README.md"
+    return readme_path.read_text() if readme_path.exists() else importlib.metadata.metadata("cogames")["Description"]
 
 
 def _read_packaged_doc(doc_name: str) -> str:
@@ -2160,7 +2153,7 @@ def docs_cmd(
 
     try:
         content = _read_doc_text(doc_name)
-        console.print(content)
+        console.print(content, markup=False)
     except Exception as exc:
         console.print(f"[red]Error reading document: {exc}[/red]")
         raise typer.Exit(1) from exc

@@ -38,3 +38,10 @@ def test_docs_mission_command() -> None:
     assert result.exit_code == 0, f"Command failed:\n{result.output}"
     mission_title = next(line for line in (package_root / "MISSION.md").read_text().splitlines() if line.strip())
     assert mission_title in result.output
+
+
+def test_docs_readme_prints_raw_markdown() -> None:
+    result = runner.invoke(app, ["docs", "readme"])
+
+    assert result.exit_code == 0, f"Command failed:\n{result.output}"
+    assert "[cogames](https://pypi.org/project/cogames/)" in result.output
