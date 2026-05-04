@@ -178,6 +178,18 @@ def test_make_policy_examples_use_valid_arena_mission(tmp_path) -> None:
     assert "Walkthrough: cogames docs amongthem_policy" in amongthem.stdout
 
 
+def test_make_policy_rejects_unimportable_output_stem(tmp_path) -> None:
+    output_path = tmp_path / "my-scripted-policy.py"
+    result = runner.invoke(
+        main_module.app,
+        ["tutorial", "make-policy", "--scripted", "-o", str(output_path)],
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "is not importable as a Python module" in result.stdout
+    assert not output_path.exists()
+
+
 def test_amongthem_policy_walkthrough_is_packaged() -> None:
     result = runner.invoke(main_module.app, ["docs", "amongthem_policy"])
 

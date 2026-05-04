@@ -11,6 +11,7 @@ suppress_noisy_logs()
 import importlib
 import importlib.metadata
 import importlib.resources
+import keyword
 import logging
 import os
 import shutil
@@ -158,6 +159,16 @@ def _validate_policy_name_or_exit(name: str) -> None:
         raise typer.Exit(1)
     if len(name) > POLICY_NAME_MAX_LENGTH:
         console.print(f"[red]Policy name must be at most {POLICY_NAME_MAX_LENGTH} characters[/red]")
+        raise typer.Exit(1)
+
+
+def _validate_policy_module_name_or_exit(path: Path) -> None:
+    module_name = path.stem
+    if not module_name.isidentifier() or keyword.iskeyword(module_name):
+        console.print(
+            f"[red]Output filename stem '{module_name}' is not importable as a Python module. "
+            "Use letters, numbers, and underscores, and do not start with a number.[/red]"
+        )
         raise typer.Exit(1)
 
 
@@ -703,6 +714,7 @@ def make_policy(
             raise typer.Exit(1)
 
         dest_path = Path.cwd() / output
+        _validate_policy_module_name_or_exit(dest_path)
 
         if dest_path.exists():
             console.print(f"[yellow]Warning: {dest_path} already exists. Overwriting...[/yellow]")
