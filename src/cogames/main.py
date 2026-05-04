@@ -378,7 +378,7 @@ def play_cmd(
         "--mission",
         "-m",
         metavar="MISSION",
-        help="Mission to play (run [bold]cogames missions[/bold] to list).",
+        help="Mission to play, or a path to a mission config file.",
         rich_help_panel="Game Setup",
     ),
     variant: Optional[list[str]] = typer.Option(  # noqa: B008

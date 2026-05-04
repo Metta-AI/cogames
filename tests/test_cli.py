@@ -21,6 +21,15 @@ def test_help_command():
     assert "tutorial" in output
 
 
+def test_play_help_does_not_reference_removed_missions_command() -> None:
+    result = runner.invoke(app, ["play", "--help"])
+
+    assert result.exit_code == 0, f"Command failed:\n{result.output}"
+    assert "cogames missions" not in result.output
+    assert "mission config" in result.output
+    assert "file" in result.output
+
+
 def test_docs_mission_command() -> None:
     """Test that `cogames docs mission` prints the packaged mission briefing."""
     package_root = Path(__file__).resolve().parents[1]

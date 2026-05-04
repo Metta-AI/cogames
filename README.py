@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.19.1
+#       jupytext_version: 1.19.0
 #   kernelspec:
 #     display_name: .venv
 #     language: python
@@ -266,7 +266,7 @@
 #
 # To specify a `MISSION`, you can:
 #
-# - Use a mission name from the registry given by `cogames missions` (e.g. `training_facility_1`).
+# - Use a built-in mission name (e.g. `training_facility_1`).
 # - Use a path to a mission configuration file (e.g. `path/to/mission.yaml`).
 #
 # To specify a `POLICY`, use one of two formats:

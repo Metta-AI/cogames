@@ -26,18 +26,18 @@
 #
 
 # %% [markdown]
-# Optional: list missions to choose a different training target:
-#
-# ```bash
-# cogames missions
-# ```
-#
-
-# %% [markdown]
 # Optional: confirm the CLI is available:
 #
 # ```bash
 # cogames --help
+# ```
+#
+
+# %% [markdown]
+# Optional: choose a different built-in training target by passing `--mission` / `-m`.
+#
+# ```bash
+# cogames tutorial train -m training_facility_1 -p class=lstm --steps 2000
 # ```
 #
 

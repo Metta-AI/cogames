@@ -282,7 +282,6 @@ def print_missions(game: CoGame, con: Console, mission_filter: Optional[str] = N
     con.print("\nCogs:")
     con.print("  • [green]--cogs N[/green] or [green]-c N[/green]")
     con.print("\n[bold green]Examples:[/bold green]")
-    con.print("  cogames missions")
     con.print("  cogames play --mission [blue]machina_1[/blue]")
     con.print("  cogames play --mission [blue]machina_1.clips[/blue]")
     con.print("  cogames play --mission [blue]machina_1[/blue] --cogs [green]8[/green]")
@@ -445,7 +444,7 @@ def get_mission_name_and_config(
                 console.print(f"[red]{error_msg}[/red]")
             else:
                 console.print(f"[red]Mission '{mission_arg}' not found.[/red]")
-                console.print("[dim]Run: cogames missions to list options.[/dim]\n")
+                console.print("[dim]Use a known mission name or pass a mission config file path.[/dim]\n")
             raise typer.Exit(1) from e
     print_missions(get_game(game_name), console)
     console.print("\n" + ctx.get_usage())
@@ -487,7 +486,7 @@ def get_mission_names_and_configs(
             return deduped
         except ValueError as e:
             console.print(f"[red]{e}[/red]")
-            console.print("[dim]Run: cogames missions to list options.[/dim]\n")
+            console.print("[dim]Use known mission names, wildcard patterns, or mission config file paths.[/dim]\n")
             raise typer.Exit(1) from e
     print_missions(get_game(game_name), console)
     console.print("\n" + ctx.get_usage())

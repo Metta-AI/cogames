@@ -9,17 +9,17 @@ This notebook walks through `cogames tutorial train` with short, beginner-friend
 - If `cogames` is not found, activate `.venv` and retry.
 
 
-Optional: list missions to choose a different training target:
-
-```bash
-cogames missions
-```
-
-
 Optional: confirm the CLI is available:
 
 ```bash
 cogames --help
+```
+
+
+Optional: choose a different built-in training target by passing `--mission` / `-m`.
+
+```bash
+cogames tutorial train -m training_facility_1 -p class=lstm --steps 2000
 ```
 
 
@@ -86,3 +86,4 @@ Final checkpoint: ./train_dir/<run_id>/model_000001.pt
   `cogames run -m arena -p class=lstm,data=./train_dir/<run_id>/model_000001.pt`
 
 Note: tutorial train writes `model_*.pt` under `./train_dir/<run_id>/`. Use `class=...` + `data=...` to run it.
+

@@ -240,7 +240,7 @@ See [POLICY_SECRETS.md](POLICY_SECRETS.md) for details on how secrets are stored
 
 To specify a `MISSION`, you can:
 
-- Use a mission name from the registry given by `cogames missions` (e.g. `training_facility_1`).
+- Use a built-in mission name (e.g. `training_facility_1`).
 - Use a path to a mission configuration file (e.g. `path/to/mission.yaml`).
 
 To specify a `POLICY`, use one of two formats:
@@ -305,7 +305,7 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Game Setup ────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--game</span>             <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">GAME   </span>  Game to play (default: cogsguard). <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: cogsguard]</span>                             <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--mission</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">MISSION</span>  Mission to play (run <span style="font-weight: bold">cogames missions</span> to list).                                     <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--mission</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-m</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">MISSION</span>  Mission to play, or a path to a mission config file.                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--variant</span>  <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-v</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">VARIANT</span>  Apply variant modifier (repeatable).                                                <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span> <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--cogs</span>     <span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-c</span>      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">N      </span>  Number of cogs/agents. <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">[default: (from mission)]</span>                                    <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
@@ -777,7 +777,7 @@ cogames [COMMAND] --help
 
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"><span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╭─ Arguments ─────────────────────────────────────────────────────────────────────────────────────────────────────╮</span>
-<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>   doc_name      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">DOC</span>  Document name (readme, mission, technical_manual, scripted_agent, evals, mapgen).          <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
+<span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>   doc_name      <span style="color: #808000; text-decoration-color: #808000; font-weight: bold">DOC</span>  Document name (amongthem_policy, mission, readme, scripted_agent, technical_manual).       <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">│</span>
 <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</span>
 </pre>
 
@@ -2750,8 +2750,8 @@ cogames [COMMAND] --help
 
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">                                                                                                                   
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Examples:</span>                                                                                                         
- <span style="color: #008080; text-decoration-color: #008080">cogames tutorial make-policy </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-t</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> my_nn_policy.py</span>        Trainable (neural network)                              
- <span style="color: #008080; text-decoration-color: #008080">cogames tutorial make-policy </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-s</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> my_scripted_policy.py</span>  Scripted (rule-based)                                   
+ <span style="color: #008080; text-decoration-color: #008080">cogames tutorial make-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--trainable</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> my_nn_policy.py</span>        Trainable (neural network)                     
+ <span style="color: #008080; text-decoration-color: #008080">cogames tutorial make-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--scripted</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> my_scripted_policy.py</span>  Scripted (rule-based)                           
  <span style="color: #008080; text-decoration-color: #008080">cogames tutorial make-policy </span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">--amongthem</span><span style="color: #008080; text-decoration-color: #008080"> </span><span style="color: #008000; text-decoration-color: #008000; font-weight: bold">-o</span><span style="color: #008080; text-decoration-color: #008080"> amongthem_policy.py</span>                                                   
  AmongThem scripted practice                                                                                       
 
@@ -2778,7 +2778,7 @@ cogames [COMMAND] --help
 <pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"> Train a policy on one or more missions.                                                                           
 
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Requires the ``neural`` extra (PyTorch + PufferLib).</span>                                                              
- <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Install with: ``pip install cogames[neural]``.</span>                                                                            
+ <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">Install with: ``pip install cogames[neural]``.</span>                                                                    
 
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">By default, our 'lstm' policy architecture is used. You can select a different architecture</span>                       
  <span style="color: #7f7f7f; text-decoration-color: #7f7f7f">(like 'stateless' or 'baseline'), or define your own implementing the MultiAgentPolicy</span>                            
