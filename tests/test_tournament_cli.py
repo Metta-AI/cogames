@@ -239,10 +239,6 @@ class TestTournamentCommands:
         assert "train" not in command_names
         assert "login" not in command_names
 
-    def test_missions_command_exists(self) -> None:
-        command_names = [cmd.name for cmd in app.registered_commands]
-        assert "missions" in command_names
-
     def test_run_command_exists(self) -> None:
         command_names = [cmd.name for cmd in app.registered_commands]
         assert "run" in command_names

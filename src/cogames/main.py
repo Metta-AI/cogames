@@ -25,7 +25,6 @@ from uuid import UUID
 
 import httpx
 import typer
-import yaml  # type: ignore[import]
 from click.core import ParameterSource
 from packaging.version import Version
 from rich import box
@@ -34,34 +33,12 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
 
-
-def _run_metadata_only_cli() -> None:
-    if __name__ != "__main__" or len(sys.argv) <= 1 or sys.argv[1] != "missions":
-        return
-
-    from cogames.cli.mission import list_missions  # noqa: PLC0415
-
-    metadata_app = typer.Typer(add_help_option=False)
-
-    @metadata_app.command("missions")
-    def _missions_cmd(
-        mission_filter: Optional[str] = typer.Argument(None, metavar="MISSION"),
-        game_name: str = typer.Option("cogsguard", "--game", help="Game whose missions to list."),
-    ) -> None:
-        list_missions(mission_filter, game_name=game_name)
-
-    metadata_app(prog_name="cogames", standalone_mode=False, args=sys.argv[1:])
-    raise SystemExit(0)
-
-
-_run_metadata_only_cli()
-
 from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import verbose
 from cogames.cli.assay import assay_app
 from cogames.cli.auth import auth_app
-from cogames.cli.base import console, emit_json
+from cogames.cli.base import console
 from cogames.cli.bitworld import bitworld_app
 from cogames.cli.client import PoolConfigInfo, SeasonDetail, TournamentServerClient
 from cogames.cli.episode import episode_app
@@ -72,15 +49,8 @@ from cogames.cli.leaderboard import (
 )
 from cogames.cli.matches import match_artifacts_cmd, matches_cmd
 from cogames.cli.mission import (
-    describe_mission,
     get_mission_name_and_config,
     get_mission_names_and_configs,
-    list_evals,
-    list_missions,
-    list_variants,
-    print_mission_dependencies,
-    print_variant_graph,
-    save_mission_config,
 )
 from cogames.cli.policy import (
     _translate_error,
@@ -132,17 +102,13 @@ _DOC_RESOURCE_PATHS: dict[str, tuple[str, ...]] = {
 _POLICY_FREE_COMMANDS = {
     "auth",
     "bitworld",
-    "describe",
     "docs",
     "docsync",
-    "evals",
     "leaderboard",
     "match-artifacts",
     "matches",
-    "missions",
     "replay",
     "submissions",
-    "variants",
     "version",
 }
 
@@ -361,236 +327,6 @@ def _help_callback(ctx: typer.Context, value: bool) -> None:
     if value:
         console.print(ctx.get_help())
         raise typer.Exit()
-
-
-@app.command(
-    name="missions",
-    help="""List available missions.
-
-This command has two modes:
-
-[bold]1. List missions:[/bold] Run with no arguments to see all available missions.
-
-[bold]2. Describe a mission:[/bold] Use -m to describe a specific mission. Only in this mode do \
---cogs, --variant, --format, and --save have any effect.""",
-    rich_help_panel="Missions",
-    epilog="""[dim]Examples:[/dim]
-
-  [cyan]cogames missions[/cyan]                                    List all missions
-
-  [cyan]cogames missions -m machina_1[/cyan]                       Describe a mission
-
-  [cyan]cogames missions -m machina_1 -v talk[/cyan]               Describe talk-variant config
-
-  [cyan]cogames missions -m arena --format json[/cyan]             Output as JSON""",
-    add_help_option=False,
-)
-def missions_cmd(
-    ctx: typer.Context,
-    game_name: str = typer.Option(
-        "cogsguard",
-        "--game",
-        help="Game whose missions to list or describe.",
-        rich_help_panel="Describe",
-    ),
-    # --- List ---
-    site: Optional[str] = typer.Argument(
-        None,
-        metavar="FILTER",
-        help="Filter missions by name.",
-    ),
-    # --- Describe (requires -m) ---
-    mission: Optional[str] = typer.Option(
-        None,
-        "--mission",
-        "-m",
-        metavar="MISSION",
-        help="Mission to describe.",
-        rich_help_panel="Describe",
-    ),
-    cogs: Optional[int] = typer.Option(
-        None,
-        "--cogs",
-        "-c",
-        help="Override agent count (requires -m).",
-        rich_help_panel="Describe",
-    ),
-    variant: Optional[list[str]] = typer.Option(  # noqa: B008
-        None,
-        "--variant",
-        "-v",
-        metavar="VARIANT",
-        help="Apply variant (requires -m, repeatable).",
-        rich_help_panel="Describe",
-    ),
-    format_: Optional[Literal["yaml", "json"]] = typer.Option(
-        None,
-        "--format",
-        help="Output format (requires -m).",
-        rich_help_panel="Describe",
-    ),
-    save: Optional[Path] = typer.Option(  # noqa: B008
-        None,
-        "--save",
-        "-s",
-        metavar="PATH",
-        help="Save config to file (requires -m).",
-        rich_help_panel="Describe",
-    ),
-    # --- Dependencies ---
-    dependencies: bool = typer.Option(
-        False,
-        "--dependencies",
-        help="Show variant dependencies for each mission.",
-    ),
-    # --- Debug ---
-    print_cvc_config: bool = typer.Option(
-        False,
-        "--print-cvc-config",
-        help="Print CVC mission config (requires -m).",
-        hidden=True,
-    ),
-    print_mg_config: bool = typer.Option(
-        False,
-        "--print-mg-config",
-        help="Print MettaGrid config (requires -m).",
-        hidden=True,
-    ),
-    # --- Help ---
-    _help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show this message and exit.",
-        is_eager=True,
-        callback=_help_callback,
-        rich_help_panel="Other",
-    ),
-) -> None:
-    if mission is None:
-        if dependencies:
-            from cogames.game import get_game  # noqa: PLC0415
-
-            print_mission_dependencies(get_game(game_name), console)
-        else:
-            list_missions(site, game_name=game_name)
-        return
-
-    try:
-        resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(
-            ctx,
-            mission,
-            game_name=game_name,
-            variants_arg=variant,
-            cogs=cogs,
-        )
-    except typer.Exit as exc:
-        if exc.exit_code != 1:
-            raise
-        return
-
-    if print_cvc_config or print_mg_config:
-        try:
-            verbose.print_configs(console, env_cfg, mission_cfg, print_cvc_config, print_mg_config)
-        except Exception as exc:
-            console.print(f"[red]Error printing config: {exc}[/red]")
-            raise typer.Exit(1) from exc
-
-    if save is not None:
-        try:
-            save_mission_config(env_cfg, save)
-            console.print(f"[green]Mission configuration saved to: {save}[/green]")
-        except ValueError as exc:  # pragma: no cover - user input
-            console.print(f"[red]Error saving configuration: {exc}[/red]")
-            raise typer.Exit(1) from exc
-        return
-
-    if format_ is not None:
-        try:
-            data = env_cfg.model_dump(mode="json")
-            if format_ == "json":
-                emit_json(data)
-            else:
-                console.print(yaml.safe_dump(data, sort_keys=False))
-        except Exception as exc:  # pragma: no cover - serialization errors
-            console.print(f"[red]Error formatting configuration: {exc}[/red]")
-            raise typer.Exit(1) from exc
-        return
-
-    try:
-        describe_mission(resolved_mission, env_cfg, mission_cfg)
-    except ValueError as exc:  # pragma: no cover - user input
-        console.print(f"[red]Error: {exc}[/red]")
-        raise typer.Exit(1) from exc
-
-
-@app.command("evals", help="List all eval missions.", rich_help_panel="Missions")
-def evals_cmd() -> None:
-    list_evals()
-
-
-@app.command("variants", help="List all available mission variants.", rich_help_panel="Missions")
-def variants_cmd(
-    dependencies: bool = typer.Option(False, "--dependencies", help="Print the variant dependency graph."),
-) -> None:
-    if dependencies:
-        from cogames.game import get_game  # noqa: PLC0415
-
-        print_variant_graph(get_game("cogsguard"), console)
-    else:
-        list_variants()
-
-
-@app.command(
-    name="describe",
-    help="Describe a mission and its configuration.",
-    rich_help_panel="Missions",
-    epilog="""[dim]Examples:[/dim]
-
-  [cyan]cogames describe arena[/cyan]                       Describe mission
-
-  [cyan]cogames describe arena -c 4 -v talk[/cyan]          With 4 cogs and talk enabled""",
-    add_help_option=False,
-)
-def describe_cmd(
-    ctx: typer.Context,
-    mission: str = typer.Argument(
-        ...,
-        metavar="MISSION",
-        help="Mission name (e.g., arena).",
-    ),
-    cogs: Optional[int] = typer.Option(
-        None,
-        "--cogs",
-        "-c",
-        help="Number of cogs (agents).",
-        rich_help_panel="Configuration",
-    ),
-    variant: Optional[list[str]] = typer.Option(  # noqa: B008
-        None,
-        "--variant",
-        "-v",
-        metavar="VARIANT",
-        help="Apply variant (repeatable).",
-        rich_help_panel="Configuration",
-    ),
-    _help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show this message and exit.",
-        is_eager=True,
-        callback=_help_callback,
-        rich_help_panel="Other",
-    ),
-) -> None:
-    resolved_mission, env_cfg, mission_cfg = get_mission_name_and_config(
-        ctx,
-        mission,
-        variants_arg=variant,
-        cogs=cogs,
-    )
-    describe_mission(resolved_mission, env_cfg, mission_cfg)
 
 
 @app.command(
@@ -877,111 +613,6 @@ def replay_cmd(
     exit_code = launch_replay_path(ReplayPathRequest(replay_path=replay_path, duration=duration))
     if exit_code != 0:
         raise typer.Exit(exit_code)
-
-
-@app.command(
-    name="make-mission",
-    help="Create a custom mission from a base template.",
-    rich_help_panel="Missions",
-    epilog="""[dim]Examples:[/dim]
-
-  [cyan]cogames make-mission -m hello_world -c 8 -o my_mission.yml[/cyan]             8 cogs
-
-  [cyan]cogames make-mission -m arena --width 64 --height 64 -o big.yml[/cyan]        64x64 map
-
-  [cyan]cogames play -m my_mission.yml[/cyan]                                         Use custom mission""",
-    add_help_option=False,
-)
-def make_mission(
-    ctx: typer.Context,
-    # --- Mission ---
-    base_mission: Optional[str] = typer.Option(
-        None,
-        "--mission",
-        "-m",
-        metavar="MISSION",
-        help="Base mission to start from.",
-        rich_help_panel="Mission",
-    ),
-    # --- Customization ---
-    cogs: Optional[int] = typer.Option(
-        None,
-        "--cogs",
-        "-c",
-        help="Number of cogs (agents).",
-        min=1,
-        rich_help_panel="Customization",
-    ),
-    width: Optional[int] = typer.Option(
-        None,
-        "--width",
-        help="Map width.",
-        min=1,
-        rich_help_panel="Customization",
-    ),
-    height: Optional[int] = typer.Option(
-        None,
-        "--height",
-        help="Map height.",
-        min=1,
-        rich_help_panel="Customization",
-    ),
-    # --- Output ---
-    output: Optional[Path] = typer.Option(  # noqa: B008
-        None,
-        "--output",
-        "-o",
-        metavar="PATH",
-        help="Output file path (.yml or .json).",
-        rich_help_panel="Output",
-    ),
-    # --- Help ---
-    _help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show this message and exit.",
-        is_eager=True,
-        callback=_help_callback,
-        rich_help_panel="Other",
-    ),
-) -> None:
-    try:
-        from mettagrid.simulator import Simulator  # noqa: PLC0415
-
-        resolved_mission, env_cfg, _ = get_mission_name_and_config(ctx, base_mission)
-
-        # Update map dimensions if explicitly provided and supported
-        if width is not None:
-            if not hasattr(env_cfg.game.map_builder, "width"):
-                console.print("[yellow]Warning: Map builder does not support custom width. Ignoring --width.[/yellow]")
-            else:
-                env_cfg.game.map_builder.width = width  # type: ignore[attr-defined]
-
-        if height is not None:
-            if not hasattr(env_cfg.game.map_builder, "height"):
-                console.print(
-                    "[yellow]Warning: Map builder does not support custom height. Ignoring --height.[/yellow]"
-                )
-            else:
-                env_cfg.game.map_builder.height = height  # type: ignore[attr-defined]
-
-        if cogs is not None:
-            env_cfg.game.num_agents = cogs
-
-        # Validate the environment configuration
-
-        _ = Simulator().new_simulation(env_cfg)
-
-        if output:
-            save_mission_config(env_cfg, output)
-            console.print(f"[green]Modified {resolved_mission} configuration saved to: {output}[/green]")
-        else:
-            console.print("\n[yellow]To save this configuration, use the --output option.[/yellow]")
-
-    except Exception as exc:  # pragma: no cover - user input
-        console.print(f"[red]Error: {exc}[/red]")
-        raise typer.Exit(1) from exc
 
 
 # TODO: Verify make-policy templates work with CvC game mechanics

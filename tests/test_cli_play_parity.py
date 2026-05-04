@@ -127,7 +127,6 @@ def test_pickup_forwards_steps_without_posthoc_override(monkeypatch) -> None:
 @pytest.mark.parametrize(
     ("args", "expected"),
     [
-        (["describe", "--help"], "cogames describe arena"),
         (["play", "--help"], "cogames play -m arena"),
         (["tutorial", "train", "--help"], "cogames tutorial train -m arena"),
         (["run", "--help"], "cogames run -m arena -p lstm"),
