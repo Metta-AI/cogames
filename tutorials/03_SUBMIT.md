@@ -60,7 +60,7 @@ Use the policy or checkpoint path, plus any extra runtime files or setup your po
 cogames create-bundle -p <policy-or-checkpoint> -o submission.zip [-f <extra-path> ...] [--setup-script <setup.py>]
 ```
 
-If your policy needs extra runtime files or setup, include them here. `agent/COGAMES_SUBMISSION.md` has a full repo example.
+If your policy needs extra runtime files or setup, include them with `-f` and `--setup-script`.
 
 
 ## Step 3 — Upload the bundle
@@ -115,7 +115,6 @@ cogames leaderboard --season beta-teams-small
 ## Troubleshooting
 
 - **Auth errors**: run `cogames auth login` again.
-- **Module not found / 1011 during qualifying**: rebuild `submission.zip` with every runtime file and setup step your policy needs.
-  `agent/COGAMES_SUBMISSION.md` has a full repo example.
+- **Module not found / 1011 during qualifying**: rebuild `submission.zip` with every runtime file and setup step your policy needs (`-f` and `--setup-script`).
 - **Invalid policy path**: ensure `-p` points to an existing policy, checkpoint, or bundle.
 - **Local vs S3 checkpoints**: local training saves files under `./train_dir/`. Cloud training may require downloading or referencing the S3 bundle.
