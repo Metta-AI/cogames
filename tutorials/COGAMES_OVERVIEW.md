@@ -114,7 +114,7 @@ print(f"Action space: {policy_env_info.action_space}")
 
 | Parameter | What it controls |
 |-----------|------------------|
-| `map_builder` | Map layout and size. `make_machina1_map_builder(n)` gives an 88x88 arena. |
+| `map_builder` | Map layout and size. `cogsguard.missions.machina_1.make_machina1_map_builder(n)` gives an 88x88 arena. |
 | `num_agents` | Number of agents in the mission. |
 | `max_steps` | Episode length in ticks. |
 # | `variants` | List of modifiers that change game rules (see below). |
