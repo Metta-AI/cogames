@@ -21,7 +21,6 @@ from typing import TYPE_CHECKING, Literal, Optional, cast
 
 if TYPE_CHECKING:
     import torch
-from uuid import UUID
 
 import httpx
 import typer
@@ -66,7 +65,7 @@ from cogames.cli.submit import (
     DEFAULT_SUBMIT_SERVER,
     create_bundle,
     ensure_docker_daemon_access,
-    observatory_profile_url,
+    observatory_home_url,
     upload_policy,
     validate_bundle_docker,
 )
@@ -165,16 +164,15 @@ def _validate_policy_name_or_exit(name: str) -> None:
 def _print_async_submission_follow_up(
     policy_name: str,
     season_name: str,
-    policy_version_id: UUID,
     login_server_url: str,
 ) -> None:
-    profile_url = observatory_profile_url(policy_version_id, login_server_url=login_server_url)
+    observatory_url = observatory_home_url(login_server_url=login_server_url)
     browser_skip_reason = _submit_browser_launch_skip_reason()
     if browser_skip_reason is None:
-        webbrowser.open(profile_url)
+        webbrowser.open(observatory_url)
     else:
         console.print(f"[dim]Browser launch skipped: {browser_skip_reason}[/dim]")
-    console.print(f"[dim]Profile:[/dim] {profile_url}")
+    console.print(f"[dim]Observatory:[/dim] {observatory_url}")
     console.print("[dim]Evaluation runs asynchronously. Check status with:[/dim]")
     console.print(f"[dim]  cogames submissions --season {season_name} --policy {policy_name}[/dim]")
     console.print(f"[dim]  cogames leaderboard {season_name} --policy {policy_name}[/dim]")
@@ -1852,7 +1850,7 @@ def upload_cmd(
             console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
         if submission_season is None:
             raise AssertionError("submitting upload must resolve a season")
-        _print_async_submission_follow_up(result.name, submission_season, result.policy_version_id, login_server)
+        _print_async_submission_follow_up(result.name, submission_season, login_server)
 
 
 @app.command(
@@ -1948,13 +1946,13 @@ def submit_cmd(
     console.print(f"\n[bold green]Submitted to season '{season_name}'[/bold green]")
     if result.pools:
         console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
-    profile_url = observatory_profile_url(pv.id, login_server_url=login_server)
+    observatory_url = observatory_home_url(login_server_url=login_server)
     browser_skip_reason = _submit_browser_launch_skip_reason()
     if browser_skip_reason is None:
-        webbrowser.open(profile_url)
+        webbrowser.open(observatory_url)
     else:
         console.print(f"[dim]Browser launch skipped: {browser_skip_reason}[/dim]")
-    console.print(f"[dim]Profile:[/dim] {profile_url}")
+    console.print(f"[dim]Observatory:[/dim] {observatory_url}")
     console.print(f"[dim]CLI:[/dim] cogames leaderboard --season {season_name}")
 
 
@@ -2094,7 +2092,7 @@ def ship_cmd(
     if result.pools:
         console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
 
-    _print_async_submission_follow_up(result.name, season_info.name, result.policy_version_id, login_server)
+    _print_async_submission_follow_up(result.name, season_info.name, login_server)
 
 
 @app.command(

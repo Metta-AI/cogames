@@ -14,7 +14,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlencode, urlsplit, urlunsplit
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 import typer
@@ -42,7 +42,7 @@ class UploadResult:
     pools: list[str] | None = None
 
 
-def observatory_profile_url(policy_version_id: uuid.UUID, *, login_server_url: str) -> str:
+def observatory_home_url(*, login_server_url: str) -> str:
     parsed = urlsplit(login_server_url)
     hostname = (parsed.hostname or "").removeprefix("api.")
     if parsed.port is None:
@@ -60,8 +60,8 @@ def observatory_profile_url(policy_version_id: uuid.UUID, *, login_server_url: s
         (
             parsed.scheme,
             netloc,
-            f"{browser_path}/observatory/profile",
-            urlencode({"policyVersionId": str(policy_version_id)}),
+            f"{browser_path}/observatory/home",
+            "",
             "",
         )
     )
