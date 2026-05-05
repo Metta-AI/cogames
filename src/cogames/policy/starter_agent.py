@@ -38,7 +38,7 @@ MOVE_DELTAS = {
     "west": (0, -1),
     "east": (0, 1),
 }
-type Coordinate = tuple[int, int]
+Coordinate = tuple[int, int]
 
 
 @dataclass

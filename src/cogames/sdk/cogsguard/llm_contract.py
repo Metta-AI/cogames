@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from enum import Enum
-from typing import Literal, Sequence
+from typing import Literal, Sequence, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -227,7 +227,10 @@ def _extract_first_json_object(text: str) -> dict | None:
     return None
 
 
-def _extract_enum_value[E: Enum](text: str, enum_type: type[E]) -> E | None:
+E = TypeVar("E", bound=Enum)
+
+
+def _extract_enum_value(text: str, enum_type: type[E]) -> E | None:
     for member in enum_type:
         if member.value in text:
             return member
