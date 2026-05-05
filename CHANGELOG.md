@@ -1,5 +1,50 @@
 # Changelog
 
+## May 5, 2026
+
+**Among Them / BitWorld Integration**
+
+- BitWorld episodes now run through the native server with real policy loading, reward collection, and server-side config
+- Added BitWorld replay viewer (`cogames bitworld replay`, `cogames episode replay`) with format auto-detection
+- Added `cogames bitworld quick-run` without a hardcoded player cap — forwards to the installed BitWorld launcher
+- Added the NotTooDumb bot as an Among Them policy
+- Added `cogames tutorial make-policy --amongthem` template and `cogames docs amongthem_policy` walkthrough
+- Policy submissions now bundle environment metadata so the runner can validate observation/action contracts directly
+- BitWorld remains an optional dependency (`cogames[bitworld]`) — base installs are unaffected
+
+**CLI Changes (Breaking)**
+
+- Removed `cogames missions`, `cogames evals`, `cogames variants`, `cogames describe`, and `cogames make-mission` commands (mission infrastructure is retained internally for `play`/`train`/`run`)
+- Removed old hidden aliases: `cogames login`, `cogames train`, `cogames eval`, `cogames games`, top-level `cogames make-policy`
+- Current commands: `cogames auth login`, `cogames tutorial train`, `cogames run`, `cogames tutorial make-policy`, `cogames season list`
+
+**Tournament & Season Improvements**
+
+- Authenticated leaderboard requests — logged-in users can see private/internal seasons
+- Season CLI loads login token for private season access
+- Pool config endpoint for season pools (game engine + env config) used by validation dry-runs
+- Restored `PoolInfo.config_id` in season responses (regression from pool-config addition)
+- Submission validation now uses the pool's `game_engine` instead of guessing
+- Post-submit browser opens Observatory home instead of profile page
+- `cogames validate-policy` rejects filenames that cannot be imported as Python modules
+
+**Platform**
+
+- Python requirement lowered from 3.12 to 3.11 (PEP 695 syntax replaced with 3.11-compatible equivalents)
+- BitWorld env config is now first-class with a discriminated union (`EnvConfig` / `BitWorldEnvConfig` / `AnyEnvConfig`)
+- Decoupled Gridworks mission routes from CogsGuard internals — routes now use the CoGames registry API
+- CI test suite trimmed ~50% for cogames package (subprocess launches → in-process CliRunner)
+
+**Documentation**
+
+- Regenerated README CLI reference to include `auth`, `season`, `episode`, `assay`, and `bitworld` subgroups
+- Fixed `cogames[neural]` install rendering in tutorial help (Rich was stripping the bracket)
+- Removed dead `agent/COGAMES_SUBMISSION.md` references from submit tutorial
+- Fixed `cogames docs readme` rendering to show raw Markdown links
+- Updated all docs/help text to stop referencing removed mission commands
+- Updated `cogames play --help` to use starter policy instead of `class=baseline`
+- Fixed `change_vibe` technical manual description to clarify vibes are signaling-only in machina_1
+
 ## Jan 26, 2026
 
 **CogsGuard is the New Default Game**
