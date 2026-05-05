@@ -40,8 +40,8 @@ RUN chmod +x /root/.nimby/nim/bin/* && \
     nimble install -y pixie jsony zippy webby crunchy && \
     mkdir -p /opt/bitworld/among_them /opt/bitworld/clients/data && \
     nim c -d:release --threads:on --mm:orc --path:common -o:/opt/bitworld/among_them/among_them among_them/among_them.nim && \
-    cp among_them/*.png among_them/*.aseprite /opt/bitworld/among_them/ && \
-    cp clients/data/pallete.png clients/data/letters.png clients/data/numbers.png /opt/bitworld/clients/data/ && \
+    cp among_them/*.png among_them/*.aseprite among_them/*.json /opt/bitworld/among_them/ && \
+    cp clients/data/*.png /opt/bitworld/clients/data/ && \
     rm -rf /tmp/bitworld /tmp/mummy /root/.nimble/pkgs2
 
 # Install Python and create the executor venv with cogames[neural]
