@@ -143,6 +143,16 @@ def test_help_examples_use_valid_arena_mission(args: list[str], expected: str) -
     assert "arena.battle" not in normalized_stdout
 
 
+def test_play_help_uses_working_starter_policy() -> None:
+    result = runner.invoke(main_module.app, ["play", "--help"])
+    normalized_stdout = _normalize_cli_text(result.stdout)
+
+    assert result.exit_code == 0, result.output
+    assert "cogames play -m arena -c 4 -p starter" in normalized_stdout
+    assert "baseline" not in normalized_stdout
+    assert "cogames missions" not in normalized_stdout
+
+
 def test_make_policy_examples_use_valid_arena_mission(tmp_path) -> None:
     scripted_path = tmp_path / "my_scripted_policy.py"
     scripted = runner.invoke(

@@ -25,9 +25,13 @@ def test_play_help_does_not_reference_removed_missions_command() -> None:
     result = runner.invoke(app, ["play", "--help"])
 
     assert result.exit_code == 0, f"Command failed:\n{result.output}"
-    assert "cogames missions" not in result.output
-    assert "mission config" in result.output
-    assert "file" in result.output
+    output = " ".join(result.output.split())
+    assert "cogames missions" not in output
+    assert "path to a mission" in output
+    assert "mission config" in output
+    assert "file" in output
+    assert "starter" in output
+    assert "baseline" not in output
 
 
 def test_docs_mission_command() -> None:

@@ -339,7 +339,7 @@ def _help_callback(ctx: typer.Context, value: bool) -> None:
 This runs a single episode of the game using one or more policies.
 
 By default, the policy is 'noop', so agents won't move unless manually controlled.
-To see agents move by themselves, use `--policy class=random` or `--policy class=baseline`.
+To see agents move by themselves, use `--policy starter` or `--policy class=random`.
 
 Multiple -p flags assign one policy per team (in team order).
 
@@ -353,9 +353,9 @@ Log mode is non-interactive and doesn't support manual control.
 
 [cyan]cogames play -m arena -p class=random[/cyan]                  Random policy
 
-[cyan]cogames play -m arena -c 4 -p class=baseline[/cyan]           Baseline, 4 cogs
+[cyan]cogames play -m arena -c 4 -p starter[/cyan]                  Starter policy, 4 cogs
 
-[cyan]cogames play -m four_score -p nlanky -p baseline -p random -p noop[/cyan]
+[cyan]cogames play -m four_score -p nlanky -p starter -p random -p noop[/cyan]
                                                                  One policy per team
 
 [cyan]cogames play -m four_score -p nlanky:1 -p random:2[/cyan]     Mixed teams (cycling pattern)
@@ -1364,7 +1364,7 @@ def version_cmd() -> None:
 
   [cyan]cogames play -m arena -p class=random[/cyan]     Use random policy
 
-  [cyan]cogames play -m arena -p class=baseline[/cyan]   Use baseline policy""",
+  [cyan]cogames play -m arena -p starter[/cyan]          Use starter policy""",
 )
 def policies_cmd() -> None:
     from mettagrid.policy.policy_registry import get_policy_registry  # noqa: PLC0415
