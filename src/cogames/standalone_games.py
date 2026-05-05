@@ -47,7 +47,6 @@ STANDALONE_GAMES: dict[str, StandaloneGameInstall] = {
         package_name="tribalcog",
         source=GitSource(
             git="https://github.com/Metta-AI/cogame-tribal.git",
-            rev="7aa556bc9e0d733f30e5e5043d229c4a5ca03ad5",
         ),
     ),
     "amongcogs": StandaloneGameInstall(
@@ -69,7 +68,6 @@ STANDALONE_GAMES: dict[str, StandaloneGameInstall] = {
         package_name="cogsguard",
         source=GitSource(
             git="https://github.com/Metta-AI/cogame-cogsguard.git",
-            rev="e088553fdb5753404327a12ba8412412999fa558",
         ),
     ),
 }

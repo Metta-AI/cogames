@@ -6,8 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "cogames"
 description = "Multi-agent cooperative games"
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
-classifiers = ["Programming Language :: Python :: 3", "Programming Language :: Python :: 3.12"]
+requires-python = ">=3.11,<3.13"
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
 dependencies = [
   "mettagrid==0.26.13",
   "softmax-cli==0.26.5",
@@ -80,11 +84,11 @@ softmax-cli = { workspace = true }
 diplomacog = { git = "https://github.com/Metta-AI/cogame-diplomacog.git" }
 hungercog = { git = "https://github.com/Metta-AI/cogame-hungercog.git" }
 overcogged = { git = "https://github.com/Metta-AI/cogame-overcogged.git" }
-tribalcog = { git = "https://github.com/Metta-AI/cogame-tribal.git", rev = "7aa556bc9e0d733f30e5e5043d229c4a5ca03ad5" }
+tribalcog = { git = "https://github.com/Metta-AI/cogame-tribal.git" }
 amongcogs = { git = "https://github.com/Metta-AI/cogame-amongcogs.git" }
 werecog = { git = "https://github.com/Metta-AI/cogame-werecog.git" }
-cogsguard = { git = "https://github.com/Metta-AI/cogame-cogsguard.git", rev = "e088553fdb5753404327a12ba8412412999fa558" }
-bitworld = { git = "https://github.com/Metta-AI/bitworld.git", rev = "b3deff78d92579d8c83d7df8a064a2222fd87778" }
+cogsguard = { git = "https://github.com/Metta-AI/cogame-cogsguard.git" }
+bitworld = { git = "https://github.com/Metta-AI/bitworld.git", subdirectory = "extras" }
 
 [tool.ruff]
 extend = "../../.ruff.toml"
