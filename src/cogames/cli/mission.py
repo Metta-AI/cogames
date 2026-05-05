@@ -90,7 +90,7 @@ def _resolve_mission_scoped_variant(mission: CoGameMission, name: str) -> CoGame
     return None
 
 
-def _resolve_cli_variants(
+def resolve_mission_variants(
     game: CoGame,
     mission: CoGameMission,
     variants_arg: Optional[list[str]],
@@ -146,7 +146,7 @@ def resolve_mission(
         raise ValueError(f"Unsupported file format: {path.suffix}")
 
     mission = find_mission(game, mission_arg, include_evals=True)
-    requested_variants = _resolve_cli_variants(game, mission, variants_arg)
+    requested_variants = resolve_mission_variants(game, mission, variants_arg)
     mission = apply_variants(mission, requested_variants, cogs)
     return mission.full_name(), mission.make_env(), mission
 
