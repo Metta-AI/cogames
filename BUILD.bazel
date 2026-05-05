@@ -1,0 +1,70 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+
+# Local source for cogames + metta_alo. Tests pick up local edits via these
+# targets; the venv's wheel-installed copies are builds of the same source
+# tree and serve consumers outside the cogames target itself.
+#
+# BUILD targets live above the python source tree to keep wheels clean —
+# see common/BUILD.bazel for the rationale.
+
+py_library(
+    name = "metta_alo",
+    srcs = glob(["src/metta_alo/**/*.py"]),
+    data = glob(["src/metta_alo/py.typed"], allow_empty = True),
+    imports = ["src"],  # so `import metta_alo` resolves
+    visibility = ["//visibility:public"],
+    deps = [
+        "@pyenv//:pydantic",
+    ],
+)
+
+py_library(
+    name = "cogames",
+    srcs = glob(["src/cogames/**/*.py"]),
+    data = glob(
+        [
+            "src/cogames/assets/**/*",
+            "src/cogames/docs/*.md",
+            "src/cogames/games/cogs_vs_clips/docs/*.md",
+            "src/cogames/games/cogs_vs_clips/evals/*.md",
+            "src/cogames/maps/*.map",
+            "src/cogames/maps/**/*.map",
+            "src/cogames/py.typed",
+        ],
+        allow_empty = True,
+    ),
+    imports = ["src"],  # so `import cogames` resolves
+    visibility = ["//visibility:public"],
+    deps = [
+        ":metta_alo",
+        "//packages/softmax-cli:softmax",
+        # Mirrors packages/cogames/pyproject.toml [project.dependencies]
+        # (mettagrid + softmax-cli are workspace-internal; the rest are external).
+        "@pyenv//:mettagrid",
+        "@pyenv//:packaging",
+        "@pyenv//:pydantic",
+        "@pyenv//:pyyaml",
+        "@pyenv//:questionary",
+        "@pyenv//:typer",
+        "@pyenv//:rich",
+        "@pyenv//:fastapi",
+        "@pyenv//:uvicorn",
+        "@pyenv//:httpx",
+        "@pyenv//:anthropic",
+        "@pyenv//:openai",
+        "@pyenv//:nbstripout",
+        "@pyenv//:nbconvert",
+        "@pyenv//:jupytext",
+        "@pyenv//:ipykernel",
+        "@pyenv//:pytest_httpserver",
+    ],
+)
+
+py_binary(
+    name = "cogames_bin",
+    srcs = ["src/cogames/main.py"],
+    main = "src/cogames/main.py",
+    imports = ["src"],
+    visibility = ["//visibility:public"],
+    deps = [":cogames"],
+)

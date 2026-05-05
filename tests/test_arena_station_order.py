@@ -22,6 +22,12 @@ def _arena_hub_stations_for_hash_seed(hash_seed: str) -> str:
     )
     env = os.environ.copy()
     env["PYTHONHASHSEED"] = hash_seed
+    # Under Bazel's sandbox, the test process's sys.path is constructed from
+    # runfiles; the spawned subprocess only inherits PYTHONPATH from env.
+    # Forward it so `import cogsguard.*` resolves the same way the parent
+    # process resolves it. Outside Bazel this is a no-op (sys.path is the
+    # same in parent and child since they share the same site-packages).
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
     return subprocess.run(
         [sys.executable, "-c", code],
         check=True,
