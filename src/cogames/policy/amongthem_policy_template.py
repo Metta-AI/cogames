@@ -52,7 +52,7 @@ class AmongThemAgentPolicy(AgentPolicy):
 class AmongThemPolicy(MultiAgentPolicy):
     """Small starting point for an AmongThem scripted policy.
 
-    The BitWorld runner passes raw pixel or state observations to step_batch().
+    The BitWorld runner passes raw pixel or sprite_player observations to step_batch().
     Replace _choose_actions() with your game logic; keep returning integer
     indices in the BitWorld trainable action set.
     """
@@ -88,8 +88,8 @@ class AmongThemPolicy(MultiAgentPolicy):
         flat_observations = raw_observations.reshape(batch_size, -1)
 
         # This deliberately reads a tiny observation signal so the template works
-        # for both pixel and state-observation seasons. Replace it with real
-        # AmongThem state extraction or pixel logic.
+        # for both pixel and sprite_player-observation seasons. Replace it with
+        # real AmongThem sprite_player extraction or pixel logic.
         observation_signal = flat_observations[:, 0].astype(np.int64)
         agent_offsets = np.arange(batch_size, dtype=np.int64)
         cycle_indices = ((self._tick // self._hold_ticks) + agent_offsets + observation_signal) % len(ACTION_CYCLE)

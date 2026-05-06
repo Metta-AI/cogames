@@ -6,7 +6,7 @@ that will run in the tournament worker, uploading it, and checking whether it sc
 ## Current status
 
 - Can do: play and train AmongThem inside the Metta repo through the BitWorld integration.
-- Can do: run AmongThem through the native PufferLib path with pixel observations or state observations.
+- Can do: run AmongThem through the native PufferLib path with pixel or sprite_player observations.
 - Can do: validate, upload, submit, and inspect policies through the CoGames CLI once an AmongThem season exists.
 - Still external to this local walkthrough: creating the weekly AmongThem season, choosing the season name, and waiting
   for asynchronous tournament matches to finish.
