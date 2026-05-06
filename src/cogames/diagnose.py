@@ -787,26 +787,6 @@ def build_run_state(
     )
 
 
-def _policy_episode_rewards(summary: MultiEpisodeRolloutSummary, policy_index: int = 0) -> list[float]:
-    rewards: list[float] = []
-    for episode_rewards in summary.per_episode_per_policy_avg_rewards.values():
-        if policy_index >= len(episode_rewards):
-            continue
-        reward = episode_rewards[policy_index]
-        if reward is not None:
-            rewards.append(float(reward))
-    return rewards
-
-
-def _variance(values: list[float]) -> float:
-    if not values:
-        return 0.0
-    if len(values) == 1:
-        return 0.0
-    mean = sum(values) / len(values)
-    return sum((value - mean) ** 2 for value in values) / (len(values) - 1)
-
-
 def mission_metrics_from_summary(
     *,
     mission_name: str,
@@ -815,17 +795,25 @@ def mission_metrics_from_summary(
 ) -> Stage1MissionMetrics:
     policy_summary = summary.policy_summaries[policy_index]
     avg_agent_metrics = policy_summary.avg_agent_metrics
-    rewards = _policy_episode_rewards(summary, policy_index)
+    rewards = [
+        float(reward)
+        for episode_rewards in summary.per_episode_per_policy_avg_rewards.values()
+        if (reward := episode_rewards[policy_index]) is not None
+    ]
 
     non_zero_episode_count = sum(1 for reward in rewards if reward != 0.0)
     non_zero_episode_pct = (non_zero_episode_count / len(rewards) * 100.0) if rewards else 0.0
 
     denom = max(summary.episodes * max(policy_summary.agent_count, 1), 1)
     timeout_rate = policy_summary.action_timeouts / denom
+    reward_mean = _safe_mean(rewards)
+    reward_variance = (
+        sum((reward - reward_mean) ** 2 for reward in rewards) / (len(rewards) - 1) if len(rewards) > 1 else 0.0
+    )
 
     return Stage1MissionMetrics(
         mission_name=mission_name,
-        reward_variance=_variance(rewards),
+        reward_variance=reward_variance,
         non_zero_episode_pct=non_zero_episode_pct,
         timeout_rate=timeout_rate,
         mean_move_success=float(avg_agent_metrics.get("action.move.success", 0.0)),
@@ -1029,16 +1017,23 @@ def stage2_mission_metrics_from_summary(
 ) -> Stage2MissionMetrics:
     policy_summary = summary.policy_summaries[policy_index]
     avg_agent_metrics = policy_summary.avg_agent_metrics
-    rewards = _policy_episode_rewards(summary, policy_index)
+    rewards = [
+        float(reward)
+        for episode_rewards in summary.per_episode_per_policy_avg_rewards.values()
+        if (reward := episode_rewards[policy_index]) is not None
+    ]
     non_zero_episode_count = sum(1 for reward in rewards if reward != 0.0)
     non_zero_episode_pct = (non_zero_episode_count / len(rewards) * 100.0) if rewards else 0.0
     denom = max(summary.episodes * max(policy_summary.agent_count, 1), 1)
     timeout_rate = policy_summary.action_timeouts / denom
     policy_reward_mean = _safe_mean(rewards)
+    reward_variance = (
+        sum((reward - policy_reward_mean) ** 2 for reward in rewards) / (len(rewards) - 1) if len(rewards) > 1 else 0.0
+    )
     return Stage2MissionMetrics(
         mission_name=mission_name,
         policy_reward_mean=policy_reward_mean,
-        reward_variance=_variance(rewards),
+        reward_variance=reward_variance,
         non_zero_episode_pct=non_zero_episode_pct,
         timeout_rate=timeout_rate,
         mean_move_success=float(avg_agent_metrics.get("action.move.success", 0.0)),
