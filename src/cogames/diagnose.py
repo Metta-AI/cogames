@@ -2587,30 +2587,6 @@ def load_diagnose_missions(mission_set: str) -> list[CoGameMission]:
     raise ValueError(f"Unknown mission set: {mission_set}")
 
 
-def _matches_experiment(mission_name: str, experiment_filters: set[str]) -> bool:
-    if not experiment_filters:
-        return True
-    if mission_name in experiment_filters:
-        return True
-    suffix = f".{mission_name}"
-    return any(name.endswith(suffix) for name in experiment_filters)
-
-
-def _cogs_for_mission(mission: CoGameMission, cogs_list: list[int], respect_cogs_list: bool) -> list[int]:
-    fixed_cogs = getattr(mission, "num_cogs", None)
-    if fixed_cogs is not None:
-        if respect_cogs_list and fixed_cogs not in cogs_list:
-            return []
-        return [fixed_cogs]
-    min_cogs = getattr(mission, "min_cogs", None)
-    max_cogs = getattr(mission, "max_cogs", None)
-    return [
-        num_cogs
-        for num_cogs in cogs_list
-        if (min_cogs is None or num_cogs >= min_cogs) and (max_cogs is None or num_cogs <= max_cogs)
-    ]
-
-
 def _build_diagnose_case(mission: CoGameMission, num_cogs: int, steps: int) -> DiagnoseCase:
     mission_with_cogs = mission.with_cogs(num_cogs)
     env_cfg = mission_with_cogs.make_env()
@@ -2633,9 +2609,19 @@ def _build_diagnose_cases(
 
     missions = load_diagnose_missions(mission_set)
     for mission in missions:
-        if not _matches_experiment(mission.name, experiment_filters):
+        if experiment_filters and mission.name not in experiment_filters:
+            suffix = f".{mission.name}"
+            if not any(name.endswith(suffix) for name in experiment_filters):
+                continue
+
+        if mission.num_cogs is not None:
+            mission_cogs = [mission.num_cogs] if not respect_cogs_list or mission.num_cogs in cogs_list else []
+        else:
+            mission_cogs = [num_cogs for num_cogs in cogs_list if mission.min_cogs <= num_cogs <= mission.max_cogs]
+        if not mission_cogs:
             continue
-        for num_cogs in _cogs_for_mission(mission, cogs_list, respect_cogs_list):
+
+        for num_cogs in mission_cogs:
             cases.append(_build_diagnose_case(mission, num_cogs, steps))
 
     return cases
