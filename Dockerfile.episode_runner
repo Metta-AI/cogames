@@ -37,7 +37,7 @@ RUN chmod +x /root/.nimby/nim/bin/* && \
     nimble install -y && \
     git clone https://github.com/Metta-AI/BitWorld.git /tmp/bitworld && \
     cd /tmp/bitworld && git checkout ${BITWORLD_REF} && \
-    nimble install -y pixie jsony zippy webby crunchy && \
+    nimble install -y --depsOnly && \
     mkdir -p /opt/bitworld/among_them /opt/bitworld/clients/data && \
     nim c -d:release --threads:on --mm:orc --path:common -o:/opt/bitworld/among_them/among_them among_them/among_them.nim && \
     cp among_them/*.png among_them/*.aseprite among_them/*.json /opt/bitworld/among_them/ && \
