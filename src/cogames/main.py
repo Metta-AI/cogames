@@ -70,6 +70,7 @@ from cogames.cli.submit import (
     upload_policy,
     validate_bundle_docker,
 )
+from cogames.coworld.cli import app as coworld_app
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
 from cogames.display_detect import has_display
@@ -322,6 +323,7 @@ app.add_typer(season_app, name="season", rich_help_panel="Tournament")
 app.add_typer(episode_app, name="episode", rich_help_panel="Tournament")
 app.add_typer(assay_app, name="assay", rich_help_panel="Tournament")
 app.add_typer(bitworld_app, name="bitworld", rich_help_panel="BitWorld")
+app.add_typer(coworld_app, name="coworld", rich_help_panel="Coworld")
 
 
 def _help_callback(ctx: typer.Context, value: bool) -> None:

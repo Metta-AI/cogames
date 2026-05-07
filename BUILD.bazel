@@ -24,6 +24,9 @@ py_library(
     data = glob(
         [
             "src/cogames/assets/**/*",
+            "src/cogames/coworld/*.json",
+            "src/cogames/coworld/*.md",
+            "src/cogames/coworld/examples/**/*",
             "src/cogames/docs/*.md",
             "src/cogames/games/cogs_vs_clips/docs/*.md",
             "src/cogames/games/cogs_vs_clips/evals/*.md",
@@ -50,6 +53,9 @@ py_library(
         "@pyenv//:fastapi",
         "@pyenv//:uvicorn",
         "@pyenv//:httpx",
+        "@pyenv//:jsonschema",
+        "@pyenv//:referencing",
+        "@pyenv//:websockets",
         "@pyenv//:anthropic",
         "@pyenv//:openai",
         "@pyenv//:nbstripout",
