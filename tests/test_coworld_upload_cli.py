@@ -10,9 +10,12 @@ import pytest
 from pytest_httpserver import HTTPServer
 from typer.testing import CliRunner
 
+from cogames.coworld.schema_validation import JsonObject
 from cogames.coworld.upload import (
     _docker_archive_client_hash,
     _local_image_client_hash,
+    _manifest_doc_paths,
+    _manifest_with_inlined_docs,
     upload_coworld,
 )
 from cogames.main import app
@@ -115,6 +118,8 @@ def test_upload_coworld_posts_standalone_manifest(
     uploaded_manifest = upload_req.get_json()["manifest"]
     assert uploaded_manifest["game"]["runnable"]["image"] == softmax_image_uri
     assert uploaded_manifest["player"][0]["image"] == softmax_image_uri
+    assert uploaded_manifest["game"]["protocols"]["player"] == "# Player Protocol\n"
+    assert uploaded_manifest["game"]["protocols"]["global"] == "# Global Protocol\n"
 
 
 def test_upload_coworld_command_certifies_before_uploading(
@@ -225,6 +230,116 @@ def _expected_archive_hash(config: bytes, layers: list[bytes]) -> str:
 
 def _sha256_digest(content: bytes) -> str:
     return f"sha256:{hashlib.sha256(content).hexdigest()}"
+
+
+def test_manifest_doc_paths_collects_local_paths() -> None:
+    manifest: dict[str, object] = {
+        "game": {
+            "name": "test",
+            "version": "1.0",
+            "protocols": {
+                "player": "docs/player.md",
+                "global": "https://example.com/global.md",
+            },
+            "docs": {
+                "readme": "README.md",
+                "pages": [
+                    {"id": "setup", "title": "Setup", "content": "docs/setup.md"},
+                    {"id": "ext", "title": "External", "content": "https://example.com/ext.md"},
+                ],
+            },
+        },
+    }
+    paths = _manifest_doc_paths(manifest)
+    assert (["game", "protocols", "player"], "docs/player.md") in paths
+    assert (["game", "docs", "readme"], "README.md") in paths
+    assert (["game", "docs", "pages", 0, "content"], "docs/setup.md") in paths
+    assert len(paths) == 3
+
+
+def test_manifest_with_inlined_docs_reads_file_content(tmp_path: Path) -> None:
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "player.md").write_text("# Player Protocol\n\nConnect via websocket.\n")
+    (docs_dir / "global.md").write_text("# Global Protocol\n")
+    (tmp_path / "README.md").write_text("# My Game\n\n![arch](https://example.com/arch.png)\n")
+
+    manifest: dict[str, object] = {
+        "game": {
+            "name": "test-game",
+            "version": "2.0",
+            "protocols": {
+                "player": "docs/player.md",
+                "global": "docs/global.md",
+            },
+            "docs": {
+                "readme": "README.md",
+            },
+        },
+    }
+
+    result = _manifest_with_inlined_docs(manifest, tmp_path)
+    game = cast(JsonObject, result["game"])
+    protocols = cast(JsonObject, game["protocols"])
+    docs = cast(JsonObject, game["docs"])
+
+    assert protocols["player"] == "# Player Protocol\n\nConnect via websocket.\n"
+    assert protocols["global"] == "# Global Protocol\n"
+    assert docs["readme"] == "# My Game\n\n![arch](https://example.com/arch.png)\n"
+
+
+def test_manifest_with_inlined_docs_reads_file_uris(tmp_path: Path) -> None:
+    protocol_path = tmp_path / "player.md"
+    protocol_path.write_text("# Player Protocol\n")
+    manifest: dict[str, object] = {
+        "game": {
+            "name": "test-game",
+            "version": "1.0",
+            "protocols": {
+                "player": protocol_path.as_uri(),
+                "global": "https://example.com/global.md",
+            },
+        },
+    }
+
+    result = _manifest_with_inlined_docs(manifest, tmp_path / "unused")
+    game = cast(JsonObject, result["game"])
+    protocols = cast(JsonObject, game["protocols"])
+
+    assert protocols["player"] == "# Player Protocol\n"
+    assert protocols["global"] == "https://example.com/global.md"
+
+
+def test_manifest_with_inlined_docs_skips_urls() -> None:
+    manifest: dict[str, object] = {
+        "game": {
+            "name": "test-game",
+            "version": "1.0",
+            "protocols": {
+                "player": "https://example.com/player.md",
+                "global": "https://example.com/global.md",
+            },
+        },
+    }
+
+    result = _manifest_with_inlined_docs(manifest, Path("/nonexistent"))
+
+    assert result is manifest
+
+
+def test_manifest_with_inlined_docs_requires_local_files(tmp_path: Path) -> None:
+    manifest: dict[str, object] = {
+        "game": {
+            "name": "test-game",
+            "version": "1.0",
+            "docs": {
+                "readme": "README.md",
+            },
+        },
+    }
+
+    with pytest.raises(FileNotFoundError):
+        _manifest_with_inlined_docs(manifest, tmp_path)
 
 
 def _write_manifest(tmp_path: Path) -> Path:

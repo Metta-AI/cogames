@@ -121,6 +121,10 @@
         },
         "protocols": {
           "$ref": "#/$defs/GameProtocolDocs"
+        },
+        "docs": {
+          "description": "Documentation bundle for this coworld. Paths are local pre-upload, inlined as markdown content in the uploaded manifest.",
+          "$ref": "#/$defs/CoworldDocs"
         }
       }
     },
@@ -315,6 +319,44 @@
           "minLength": 1
         },
         "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "CoworldDocs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "readme": {
+          "description": "Main README markdown file. Local file path pre-upload; inlined as markdown content in the uploaded manifest.",
+          "type": "string",
+          "minLength": 1
+        },
+        "pages": {
+          "description": "Additional documentation pages.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DocPage"
+          }
+        }
+      }
+    },
+    "DocPage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "title", "content"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content": {
+          "description": "Markdown content. Local file path pre-upload; inlined as markdown in the uploaded manifest.",
           "type": "string",
           "minLength": 1
         }

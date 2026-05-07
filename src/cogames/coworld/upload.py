@@ -17,7 +17,7 @@ import typer
 from pydantic import BaseModel
 
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
-from cogames.coworld.certifier import certify_coworld, load_coworld_package
+from cogames.coworld.certifier import certify_coworld, load_coworld_package, resolve_manifest_uri
 from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
 
 RUNNABLE_LIST_SECTIONS = ("player", "grader", "reporter", "commissioner", "diagnoser", "optimizer")
@@ -139,6 +139,7 @@ def upload_coworld(
 
     with CoworldUploadClient.from_login(server_url=server, login_server=login_server) as client:
         upload_manifest = _manifest_with_softmax_images(client, package.manifest)
+        upload_manifest = _manifest_with_inlined_docs(upload_manifest, package.manifest_path.parent)
         response = client.upload_manifest(upload_manifest)
 
     return CoworldUploadResult(
@@ -294,3 +295,63 @@ def _push_container_image(source_image: str, push_info: EcrPushInfo) -> None:
 def _image_upload_name(image: str) -> str:
     name = image.rsplit("/", 1)[-1].split("@", 1)[0].split(":", 1)[0]
     return name or "coworld-image"
+
+
+# --- Documentation inlining ---
+
+
+def _is_url(path: str) -> bool:
+    return path.startswith("https://")
+
+
+def _manifest_doc_paths(manifest: dict[str, object]) -> list[tuple[list[str | int], str]]:
+    """Return (json_path, value) pairs for all local doc path fields in the manifest."""
+    paths: list[tuple[list[str | int], str]] = []
+    game = manifest.get("game")
+    if not isinstance(game, dict):
+        return paths
+
+    protocols = game.get("protocols")
+    if isinstance(protocols, dict):
+        for key in ("player", "global"):
+            val = protocols.get(key)
+            if isinstance(val, str) and not _is_url(val):
+                paths.append((["game", "protocols", key], val))
+
+    docs = game.get("docs")
+    if isinstance(docs, dict):
+        readme = docs.get("readme")
+        if isinstance(readme, str) and not _is_url(readme):
+            paths.append((["game", "docs", "readme"], readme))
+        pages = docs.get("pages")
+        if isinstance(pages, list):
+            for i, page in enumerate(pages):
+                if isinstance(page, dict):
+                    page_content = page.get("content")
+                    if isinstance(page_content, str) and not _is_url(page_content):
+                        paths.append((["game", "docs", "pages", i, "content"], page_content))
+
+    return paths
+
+
+def _manifest_with_inlined_docs(
+    manifest: dict[str, object],
+    manifest_dir: Path,
+) -> dict[str, object]:
+    """Read local markdown files referenced in the manifest and inline their content."""
+    doc_paths = _manifest_doc_paths(manifest)
+    if not doc_paths:
+        return manifest
+
+    upload_manifest = copy.deepcopy(manifest)
+
+    for json_path, local_path in doc_paths:
+        file_path = resolve_manifest_uri(manifest_dir, local_path)
+        content = file_path.read_text(encoding="utf-8")
+
+        target: Any = upload_manifest
+        for key in json_path[:-1]:
+            target = target[key]
+        target[json_path[-1]] = content
+
+    return upload_manifest
