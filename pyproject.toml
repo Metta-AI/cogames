@@ -13,7 +13,7 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-  "mettagrid==0.26.17",
+  "mettagrid==0.26.19",
   "softmax-cli==0.26.7",
   "packaging>=24.0.0",
   "pydantic>=2.11.5",
@@ -89,8 +89,8 @@ testpaths = ["tests"]
 source = ["cogames"]
 
 [tool.uv.sources]
-mettagrid = { workspace = true }
-softmax-cli = { workspace = true }
+mettagrid = {git = "https://github.com/Metta-AI/mettagrid.git"}
+softmax-cli = {git = "https://github.com/Metta-AI/softmax-cli.git"}
 diplomacog = { git = "https://github.com/Metta-AI/cogame-diplomacog.git" }
 hungercog = { git = "https://github.com/Metta-AI/cogame-hungercog.git" }
 overcogged = { git = "https://github.com/Metta-AI/cogame-overcogged.git" }
