@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import secrets
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -9,20 +7,18 @@ from urllib.parse import unquote, urlparse
 
 from cogames.coworld.episode_runner import (
     EpisodeArtifacts,
-    EpisodeRunSpec,
     PlayerLaunchSpec,
     RunnableLaunchSpec,
     assert_docker_image_reachable,
-    run_cogame_episode,
+    run_coworld_episode,
 )
 from cogames.coworld.schema_validation import (
     JsonObject,
     JsonSchema,
     load_json_object,
-    validate_coworld_manifest,
-    validate_episode_request,
     validate_json_schema,
 )
+from cogames.coworld.types import CoworldEpisodeJobSpec, CoworldManifest, CoworldPlayerSpec
 
 
 @dataclass(frozen=True)
@@ -34,8 +30,7 @@ class CogameProtocolDocs:
 @dataclass(frozen=True)
 class CoworldPackage:
     manifest_path: Path
-    manifest: JsonObject
-    certification: JsonObject
+    manifest: CoworldManifest
     cogame: RunnableLaunchSpec
     config_schema: JsonSchema
     results_schema: JsonSchema
@@ -62,20 +57,18 @@ def resolve_manifest_uri(base_dir: Path, manifest_uri: str) -> Path:
 def load_coworld_package(manifest_path: Path) -> CoworldPackage:
     manifest_path = manifest_path.resolve()
     manifest = load_json_object(manifest_path)
-    validate_coworld_manifest(manifest)
-
-    game = cast(JsonObject, manifest["game"])
-    certification = cast(JsonObject, manifest["certification"])
-    protocols = cast(JsonObject, game["protocols"])
+    typed_manifest = CoworldManifest.model_validate(manifest)
 
     package = CoworldPackage(
         manifest_path=manifest_path,
-        manifest=manifest,
-        certification=certification,
-        cogame=RunnableLaunchSpec.from_runnable(cast(JsonObject, game["runnable"])),
-        config_schema=cast(JsonSchema, game["config_schema"]),
-        results_schema=cast(JsonSchema, game["results_schema"]),
-        protocols=CogameProtocolDocs(player=cast(str, protocols["player"]), global_=cast(str, protocols["global"])),
+        manifest=typed_manifest,
+        cogame=RunnableLaunchSpec.from_model(typed_manifest.game.runnable),
+        config_schema=typed_manifest.game.config_schema,
+        results_schema=typed_manifest.game.results_schema,
+        protocols=CogameProtocolDocs(
+            player=typed_manifest.game.protocols.player,
+            global_=typed_manifest.game.protocols.global_,
+        ),
     )
     validate_certification_references(package)
     validate_referenced_files(package)
@@ -84,7 +77,7 @@ def load_coworld_package(manifest_path: Path) -> CoworldPackage:
 
 def validate_certification_references(package: CoworldPackage) -> None:
     _certification_variant(package)
-    _certification_player_launch_specs(package)
+    _certification_player_specs(package)
 
 
 def validate_referenced_files(package: CoworldPackage) -> None:
@@ -99,46 +92,33 @@ def validate_image_references(package: CoworldPackage) -> None:
 
 
 def build_game_config(package: CoworldPackage, tokens: list[str]) -> JsonObject:
-    game_config = dict(cast(JsonObject, _certification_variant(package)["game_config"]))
+    game_config = dict(_certification_variant(package).game_config)
     game_config["tokens"] = tokens
     validate_json_schema(game_config, package.config_schema)
-    return game_config
+    return cast(JsonObject, game_config)
 
 
 def build_episode_request(package: CoworldPackage, artifacts: EpisodeArtifacts) -> JsonObject:
     episode_request: JsonObject = {
-        "game_config": dict(cast(JsonObject, _certification_variant(package)["game_config"])),
-        "players": [
-            _episode_request_player(player_spec) for player_spec in _certification_player_launch_specs(package)
-        ],
+        key: cast(object, value)
+        for key, value in CoworldEpisodeJobSpec(
+            manifest=package.manifest,
+            game_config=dict(_certification_variant(package).game_config),
+            players=_certification_player_specs(package),
+        )
+        .model_dump(by_alias=True, exclude_defaults=True)
+        .items()
     }
-    episode_request["results_uri"] = artifacts.results_path.as_uri()
-    episode_request["replay_uri"] = artifacts.replay_path.as_uri()
-    episode_request["logs_uri"] = artifacts.logs_dir.as_uri()
-    validate_episode_request(episode_request)
     return episode_request
 
 
 def build_player_launch_specs(episode_request: JsonObject) -> list[PlayerLaunchSpec]:
-    validate_episode_request(episode_request)
-    players = cast(list[object], episode_request["players"])
-    return [PlayerLaunchSpec.from_episode_player(cast(JsonObject, player)) for player in players]
+    job_spec = build_coworld_episode_job_spec(episode_request)
+    return [PlayerLaunchSpec.from_model(player) for player in job_spec.players]
 
 
-def build_episode_run_spec(
-    package: CoworldPackage,
-    episode_request: JsonObject,
-    tokens: list[str],
-    artifacts: EpisodeArtifacts,
-    timeout_seconds: float,
-) -> EpisodeRunSpec:
-    return EpisodeRunSpec(
-        cogame=package.cogame,
-        players=build_player_launch_specs(episode_request),
-        tokens=tokens,
-        artifacts=artifacts,
-        timeout_seconds=timeout_seconds,
-    )
+def build_coworld_episode_job_spec(episode_request: JsonObject) -> CoworldEpisodeJobSpec:
+    return CoworldEpisodeJobSpec.model_validate(episode_request)
 
 
 def load_results(package: CoworldPackage, artifacts: EpisodeArtifacts) -> JsonObject:
@@ -156,12 +136,13 @@ def certify_coworld(
     package = load_coworld_package(manifest_path)
     validate_image_references(package)
     artifacts = EpisodeArtifacts.create(workspace)
-    tokens = [secrets.token_urlsafe(16) for _ in cast(list[object], package.certification["players"])]
-    game_config = build_game_config(package, tokens)
-    artifacts.config_path.write_text(json.dumps(game_config, indent=2))
-
     episode_request = build_episode_request(package, artifacts)
-    run_cogame_episode(build_episode_run_spec(package, episode_request, tokens, artifacts, timeout_seconds))
+    run_coworld_episode(
+        build_coworld_episode_job_spec(episode_request),
+        artifacts,
+        timeout_seconds=timeout_seconds,
+        verify_replay=True,
+    )
 
     results = load_results(package, artifacts)
     if not artifacts.replay_path.exists():
@@ -191,68 +172,45 @@ def _image_references(package: CoworldPackage) -> list[tuple[str, str]]:
     references = [("Cogame runnable.image", package.cogame.image)]
     references.extend(
         (f"Certification players[{slot}].image", player.image)
-        for slot, player in enumerate(_certification_player_launch_specs(package))
+        for slot, player in enumerate(_certification_player_specs(package))
     )
     for section in ("player", "grader", "reporter", "commissioner", "diagnoser", "optimizer"):
-        if section in package.manifest:
-            references.extend(
-                (f"Coworld {section}[{index}].image", cast(str, runnable["image"]))
-                for index, runnable in enumerate(cast(list[JsonObject], package.manifest[section]))
-            )
+        references.extend(
+            (f"Coworld {section}[{index}].image", runnable.image)
+            for index, runnable in enumerate(getattr(package.manifest, section))
+        )
     return list(dict.fromkeys(references))
 
 
-def _certification_player_launch_specs(package: CoworldPackage) -> list[PlayerLaunchSpec]:
+def _certification_player_specs(package: CoworldPackage) -> list[CoworldPlayerSpec]:
     declared_players = _manifest_items_by_id(package, "player")
-    players = cast(list[object], package.certification["players"])
-    specs: list[PlayerLaunchSpec] = []
-    for slot, raw_player in enumerate(players):
-        certification_player = cast(JsonObject, raw_player)
-        player_id = cast(str, certification_player["player_id"])
+    players = package.manifest.certification.players
+    specs: list[CoworldPlayerSpec] = []
+    for slot, certification_player in enumerate(players):
+        player_id = certification_player.player_id
         if player_id not in declared_players:
             raise ValueError(f"unknown certification player_id for slot {slot}: {player_id!r}")
         declared_player = declared_players[player_id]
-        episode_player: JsonObject = _episode_request_runnable(declared_player)
-        if "initial_params" in certification_player:
-            episode_player["initial_params"] = certification_player["initial_params"]
-        specs.append(PlayerLaunchSpec.from_episode_player(episode_player))
+        episode_player = CoworldPlayerSpec.model_validate(declared_player.model_dump())
+        if certification_player.initial_params:
+            episode_player = episode_player.model_copy(update={"initial_params": certification_player.initial_params})
+        specs.append(episode_player)
     return specs
 
 
-def _certification_variant(package: CoworldPackage) -> JsonObject:
+def _certification_variant(package: CoworldPackage):
     variants = _manifest_items_by_id(package, "variants")
-    variant_id = cast(str, package.certification["variant_id"])
+    variant_id = package.manifest.certification.variant_id
     if variant_id not in variants:
         raise ValueError(f"unknown certification variant_id: {variant_id!r}")
     return variants[variant_id]
 
 
-def _manifest_items_by_id(package: CoworldPackage, section: str) -> dict[str, JsonObject]:
-    items = cast(list[JsonObject], package.manifest[section])
-    items_by_id: dict[str, JsonObject] = {}
+def _manifest_items_by_id(package: CoworldPackage, section: str):
+    items = getattr(package.manifest, section)
+    items_by_id = {}
     for item in items:
-        item_id = cast(str, item["id"])
-        if item_id in items_by_id:
-            raise ValueError(f"duplicate {section} id: {item_id!r}")
-        items_by_id[item_id] = item
+        if item.id in items_by_id:
+            raise ValueError(f"duplicate {section} id: {item.id!r}")
+        items_by_id[item.id] = item
     return items_by_id
-
-
-def _episode_request_player(player_spec: PlayerLaunchSpec) -> JsonObject:
-    player: JsonObject = {"image": player_spec.image}
-    if player_spec.run:
-        player["run"] = list(player_spec.run)
-    if player_spec.env:
-        player["env"] = dict(player_spec.env)
-    if player_spec.initial_params:
-        player["initial_params"] = dict(player_spec.initial_params)
-    return player
-
-
-def _episode_request_runnable(runnable: JsonObject) -> JsonObject:
-    episode_runnable: JsonObject = {"image": cast(str, runnable["image"])}
-    if "run" in runnable:
-        episode_runnable["run"] = cast(list[str], runnable["run"])
-    if "env" in runnable:
-        episode_runnable["env"] = cast(JsonObject, runnable["env"])
-    return episode_runnable

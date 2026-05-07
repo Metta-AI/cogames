@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import json
 import secrets
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Mapping, cast
+from typing import Callable, Mapping
 from urllib.parse import urlencode
 
 from cogames.coworld.certifier import (
     CoworldPackage,
+    build_coworld_episode_job_spec,
     build_episode_request,
-    build_game_config,
     build_player_launch_specs,
     load_coworld_package,
     load_results,
@@ -28,6 +27,8 @@ from cogames.coworld.episode_runner import (
     _tail,
     _wait_for_health,
     assert_docker_image_reachable,
+    generate_tokens,
+    write_coworld_game_config,
 )
 from cogames.coworld.schema_validation import JsonObject
 
@@ -70,10 +71,10 @@ def play_coworld(
     package = load_coworld_package(manifest_path)
     assert_docker_image_reachable(package.cogame.image, label="Cogame runnable.image")
     artifacts = EpisodeArtifacts.create(workspace, prefix="coworld-play-")
-    tokens = [secrets.token_urlsafe(16) for _ in cast(list[object], package.certification["players"])]
-    game_config = build_game_config(package, tokens)
-    artifacts.config_path.write_text(json.dumps(game_config, indent=2))
     episode_request = build_episode_request(package, artifacts)
+    job_spec = build_coworld_episode_job_spec(episode_request)
+    tokens = generate_tokens(len(job_spec.players))
+    write_coworld_game_config(job_spec, artifacts, tokens)
     players = build_player_launch_specs(episode_request)
     game_port = _free_local_port()
     session = PlaySession(

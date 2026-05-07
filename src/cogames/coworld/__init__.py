@@ -3,8 +3,8 @@
 from cogames.coworld.certifier import (
     CertificationResult,
     CoworldPackage,
+    build_coworld_episode_job_spec,
     build_episode_request,
-    build_episode_run_spec,
     build_game_config,
     build_player_launch_specs,
     certify_coworld,
@@ -20,6 +20,7 @@ from cogames.coworld.episode_runner import (
     PlayerLaunchSpec,
     assert_docker_image_reachable,
     run_cogame_episode,
+    run_coworld_episode,
 )
 from cogames.coworld.play import (
     PlayLinks,
@@ -30,10 +31,14 @@ from cogames.coworld.play import (
     play_coworld,
     replay_coworld,
 )
+from cogames.coworld.types import CoworldEpisodeJobSpec, CoworldPlayerSpec, CoworldRunnableSpec
 
 __all__ = [
     "CertificationResult",
     "CoworldPackage",
+    "CoworldEpisodeJobSpec",
+    "CoworldPlayerSpec",
+    "CoworldRunnableSpec",
     "EpisodeArtifacts",
     "EpisodeRunSpec",
     "PlayerLaunchSpec",
@@ -42,8 +47,8 @@ __all__ = [
     "PlaySession",
     "ReplaySession",
     "assert_docker_image_reachable",
+    "build_coworld_episode_job_spec",
     "build_episode_request",
-    "build_episode_run_spec",
     "build_game_config",
     "build_player_launch_specs",
     "build_play_links",
@@ -54,6 +59,7 @@ __all__ = [
     "replay_coworld",
     "resolve_manifest_uri",
     "run_cogame_episode",
+    "run_coworld_episode",
     "validate_image_references",
     "validate_referenced_files",
 ]

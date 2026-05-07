@@ -167,7 +167,10 @@ def upload_coworld(
     certify_coworld(package.manifest_path, timeout_seconds=timeout_seconds)
 
     with CoworldUploadClient.from_login(server_url=server, login_server=login_server) as client:
-        upload_manifest = _manifest_with_softmax_images(client, package.manifest)
+        upload_manifest = _manifest_with_softmax_images(
+            client,
+            package.manifest.model_dump(by_alias=True, exclude_none=True),
+        )
         upload_manifest = _manifest_with_inlined_docs(upload_manifest, package.manifest_path.parent)
         response = client.upload_manifest(upload_manifest)
 

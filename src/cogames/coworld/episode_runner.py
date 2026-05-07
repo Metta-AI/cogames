@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import gzip
+import json
 import secrets
 import socket
 import subprocess
@@ -15,6 +17,9 @@ from urllib.parse import urlencode
 import httpx
 import websockets
 from websockets.exceptions import InvalidHandshake, InvalidStatus
+
+from cogames.coworld.schema_validation import validate_json_schema
+from cogames.coworld.types import CoworldEpisodeJobSpec, CoworldPlayerSpec, CoworldRunnableSpec
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = Path(__file__).resolve().parents[5]
@@ -50,6 +55,9 @@ class EpisodeArtifacts:
             game_stderr_path=logs_dir / "game.stderr.log",
         )
 
+    def policy_log_path(self, slot: int) -> Path:
+        return self.logs_dir / f"policy_agent_{slot}.txt"
+
 
 @dataclass(frozen=True)
 class EpisodeRunSpec:
@@ -76,6 +84,10 @@ class RunnableLaunchSpec:
             env = cast(Mapping[str, str], runnable["env"])
         return cls(image=cast(str, runnable["image"]), run=run, env=env)
 
+    @classmethod
+    def from_model(cls, runnable: CoworldRunnableSpec) -> RunnableLaunchSpec:
+        return cls(image=runnable.image, run=tuple(runnable.run), env=runnable.env)
+
 
 @dataclass(frozen=True)
 class PlayerLaunchSpec(RunnableLaunchSpec):
@@ -92,6 +104,16 @@ class PlayerLaunchSpec(RunnableLaunchSpec):
             run=runnable.run,
             env=runnable.env,
             initial_params=initial_params,
+        )
+
+    @classmethod
+    def from_model(cls, player: CoworldPlayerSpec) -> PlayerLaunchSpec:
+        runnable = RunnableLaunchSpec.from_model(player)
+        return cls(
+            image=runnable.image,
+            run=runnable.run,
+            env=runnable.env,
+            initial_params=player.initial_params,
         )
 
 
@@ -111,7 +133,48 @@ def assert_docker_image_reachable(image: str, *, label: str = "Docker image") ->
     )
 
 
-def run_cogame_episode(spec: EpisodeRunSpec) -> None:
+def run_coworld_episode(
+    job: CoworldEpisodeJobSpec,
+    artifacts: EpisodeArtifacts,
+    *,
+    timeout_seconds: float,
+    verify_replay: bool = False,
+) -> None:
+    tokens = generate_tokens(len(job.players))
+    write_coworld_game_config(job, artifacts, tokens)
+
+    run_spec = EpisodeRunSpec(
+        cogame=RunnableLaunchSpec.from_model(job.game_runnable),
+        players=[PlayerLaunchSpec.from_model(player) for player in job.players],
+        tokens=tokens,
+        artifacts=artifacts,
+        timeout_seconds=timeout_seconds,
+    )
+    run_cogame_episode(run_spec, verify_replay=verify_replay)
+
+    results = json.loads(artifacts.results_path.read_text(encoding="utf-8"))
+    validate_json_schema(results, job.results_schema)
+
+
+def generate_tokens(player_count: int) -> list[str]:
+    return [secrets.token_urlsafe(16) for _ in range(player_count)]
+
+
+def write_coworld_game_config(job: CoworldEpisodeJobSpec, artifacts: EpisodeArtifacts, tokens: list[str]) -> None:
+    game_config = dict(job.game_config)
+    game_config["tokens"] = tokens
+    validate_json_schema(game_config, job.config_schema)
+    artifacts.config_path.write_text(json.dumps(game_config, indent=2), encoding="utf-8")
+
+
+def compress_replay(artifacts: EpisodeArtifacts) -> Path:
+    compressed_path = artifacts.workspace / "replay.json.z"
+    with artifacts.replay_path.open("rb") as src, gzip.open(compressed_path, "wb") as dst:
+        dst.write(src.read())
+    return compressed_path
+
+
+def run_cogame_episode(spec: EpisodeRunSpec, *, verify_replay: bool = True) -> None:
     port = _free_local_port()
     run_id = secrets.token_hex(8)
     game_container = f"coworld-cert-game-{run_id}"
@@ -158,10 +221,8 @@ def run_cogame_episode(spec: EpisodeRunSpec) -> None:
                 container_name = f"coworld-cert-player-{run_id}-{slot}"
                 engine_ws_url = _player_container_ws_url(port, slot, spec.tokens[slot], player)
                 player_containers.append(container_name)
-                player_stdout_path = spec.artifacts.logs_dir / f"player_{slot}.stdout.log"
-                player_stderr_path = spec.artifacts.logs_dir / f"player_{slot}.stderr.log"
-                player_stdout = stack.enter_context(player_stdout_path.open("w"))
-                player_stderr = stack.enter_context(player_stderr_path.open("w"))
+                player_log_path = spec.artifacts.policy_log_path(slot)
+                player_log = stack.enter_context(player_log_path.open("w"))
                 player_processes.append(
                     (
                         subprocess.Popen(
@@ -178,11 +239,11 @@ def run_cogame_episode(spec: EpisodeRunSpec) -> None:
                                 f"COGAMES_ENGINE_WS_URL={engine_ws_url}",
                                 *_image_command(player),
                             ],
-                            stdout=player_stdout,
-                            stderr=player_stderr,
+                            stdout=player_log,
+                            stderr=subprocess.STDOUT,
                             text=True,
                         ),
-                        player_stderr_path,
+                        player_log_path,
                     )
                 )
 
@@ -191,6 +252,9 @@ def run_cogame_episode(spec: EpisodeRunSpec) -> None:
 
             for player_process, player_stderr_path in player_processes:
                 _wait_for_player_exit(player_process, player_stderr_path)
+
+            if not verify_replay:
+                return
 
             replay_port = _free_local_port()
             replay_process = subprocess.Popen(

@@ -5,12 +5,13 @@ import importlib.util
 import json
 import subprocess
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 from fastapi.testclient import TestClient
-from jsonschema.exceptions import ValidationError
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
+from pydantic import ValidationError as PydanticValidationError
 from starlette.websockets import WebSocketDisconnect
 
 from cogames.coworld.certifier import (
@@ -31,7 +32,7 @@ from cogames.coworld.episode_runner import (
     assert_docker_image_reachable,
 )
 from cogames.coworld.play import ReplaySession, build_play_links, replay_coworld
-from cogames.coworld.schema_validation import JsonObject, validate_episode_request
+from cogames.coworld.types import CoworldEpisodeJobSpec, CoworldManifest
 
 
 def test_resolve_manifest_uri_relative_to_coworld_manifest(tmp_path: Path) -> None:
@@ -48,10 +49,8 @@ def test_load_coworld_package_validates_inline_game_manifest(tmp_path: Path) -> 
     coworld_manifest_path = _write_package_files(tmp_path)
 
     package = load_coworld_package(coworld_manifest_path)
-    manifest = cast(dict[str, Any], package.manifest)
-
     assert package.manifest_path == coworld_manifest_path.resolve()
-    assert manifest["game"]["name"] == "unit-test-game"
+    assert package.manifest.game.name == "unit-test-game"
 
 
 def test_load_coworld_package_requires_protocol_doc_files(tmp_path: Path) -> None:
@@ -84,7 +83,7 @@ def test_load_coworld_package_rejects_invalid_certification_player_entry(tmp_pat
         },
     )
 
-    with pytest.raises(ValidationError, match="'player_id' is a required property"):
+    with pytest.raises(PydanticValidationError, match="player_id"):
         load_coworld_package(coworld_manifest_path)
 
 
@@ -97,7 +96,7 @@ def test_load_coworld_package_rejects_invalid_initial_params(tmp_path: Path) -> 
         },
     )
 
-    with pytest.raises(ValidationError, match="is not of type"):
+    with pytest.raises(PydanticValidationError, match="initial_params"):
         load_coworld_package(coworld_manifest_path)
 
 
@@ -171,7 +170,7 @@ def test_assert_docker_image_reachable_rejects_missing_image(monkeypatch: pytest
 def test_build_game_config_validates_after_tokens_are_injected_via_json_schema(tmp_path: Path) -> None:
     package = _write_package(tmp_path, config_schema_required=["tokens", "missing"])
 
-    with pytest.raises(ValidationError):
+    with pytest.raises(JsonSchemaValidationError):
         build_game_config(package, ["token-0"])
 
 
@@ -186,16 +185,17 @@ def test_load_results_validates_against_cogame_results_schema(tmp_path: Path) ->
     artifacts = EpisodeArtifacts.create(tmp_path / "cert")
     artifacts.results_path.write_text(json.dumps({"winner": 0}))
 
-    with pytest.raises(ValidationError, match="'scores' is a required property"):
+    with pytest.raises(JsonSchemaValidationError, match="'scores' is a required property"):
         load_results(package, artifacts)
 
 
-def test_build_episode_request_adds_artifact_destinations(tmp_path: Path) -> None:
+def test_build_episode_request_matches_runner_spec_shape(tmp_path: Path) -> None:
     package = _write_package(tmp_path)
     artifacts = EpisodeArtifacts.create(tmp_path / "cert")
 
     episode_request = build_episode_request(package, artifacts)
 
+    assert CoworldManifest.model_validate(episode_request["manifest"]) == package.manifest
     assert episode_request["game_config"] == {"difficulty": "easy"}
     assert episode_request["players"] == [
         {
@@ -204,19 +204,19 @@ def test_build_episode_request_adds_artifact_destinations(tmp_path: Path) -> Non
             "env": {"PLAYER_MODE": "test"},
         }
     ]
-    assert episode_request["results_uri"] == artifacts.results_path.as_uri()
-    assert episode_request["replay_uri"] == artifacts.replay_path.as_uri()
-    assert episode_request["logs_uri"] == artifacts.logs_dir.as_uri()
+    assert "results_uri" not in episode_request
+    assert "replay_uri" not in episode_request
+    assert "logs_uri" not in episode_request
 
 
 def test_episode_request_allows_no_runner_managed_players() -> None:
     episode_request = {
+        "manifest": _coworld_manifest(),
         "game_config": {"difficulty": "easy"},
         "players": [],
-        "results_uri": "file:///tmp/results.json",
     }
 
-    validate_episode_request(episode_request)
+    CoworldEpisodeJobSpec.model_validate(episode_request)
     assert build_player_launch_specs(episode_request) == []
 
 
@@ -343,16 +343,12 @@ def test_runnable_run_overrides_docker_entrypoint(tmp_path: Path, monkeypatch: p
 def test_example_coworld_manifest_validates() -> None:
     package = load_coworld_package(_example_root() / "coworld_manifest.json")
     config = build_game_config(package, ["token-0", "token-1"])
-    manifest = cast(dict[str, Any], package.manifest)
-
     assert package.cogame.image == "coworld-paintarena:latest"
     assert package.cogame.run == ("python", "/app/game/server.py")
-    assert manifest["game"]["protocols"] == {
-        "player": "game/docs/player_protocol_spec.md",
-        "global": "game/docs/global_protocol_spec.md",
-    }
-    assert manifest["player"][0]["image"] == "coworld-paintarena:latest"
-    assert manifest["player"][0]["run"] == ["python", "/app/player/player.py"]
+    assert package.manifest.game.protocols.player == "game/docs/player_protocol_spec.md"
+    assert package.manifest.game.protocols.global_ == "game/docs/global_protocol_spec.md"
+    assert package.manifest.player[0].image == "coworld-paintarena:latest"
+    assert package.manifest.player[0].run == ["python", "/app/player/player.py"]
     assert config["tokens"] == ["token-0", "token-1"]
 
 
@@ -398,17 +394,13 @@ def test_cogs_vs_clips_coworld_manifest_validates() -> None:
     package = load_coworld_package(_cogs_vs_clips_root() / "coworld_manifest.json")
     config = build_game_config(package, ["token-0", "token-1"])
 
-    game = cast(JsonObject, package.manifest["game"])
-    assert game["name"] == "cogs_vs_clips"
+    assert package.manifest.game.name == "cogs_vs_clips"
     assert package.cogame.image == "coworld-cogs-vs-clips-game:latest"
     assert package.cogame.run == ("python", "/app/server.py")
-    assert game["protocols"] == {
-        "player": "game/docs/player_protocol_spec.md",
-        "global": "game/docs/global_protocol_spec.md",
-    }
-    players = cast(list[JsonObject], package.manifest["player"])
-    assert players[0]["image"] == "coworld-cogs-vs-clips-noop-player:latest"
-    assert players[0]["run"] == ["python", "/app/player.py"]
+    assert package.manifest.game.protocols.player == "game/docs/player_protocol_spec.md"
+    assert package.manifest.game.protocols.global_ == "game/docs/global_protocol_spec.md"
+    assert package.manifest.player[0].image == "coworld-cogs-vs-clips-noop-player:latest"
+    assert package.manifest.player[0].run == ["python", "/app/player.py"]
     assert config == {
         "mission": "cogsguard",
         "max_steps": 3,

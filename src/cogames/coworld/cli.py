@@ -7,7 +7,9 @@ import typer
 
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 from cogames.coworld.certifier import certify_coworld
+from cogames.coworld.episode_runner import EpisodeArtifacts, run_coworld_episode
 from cogames.coworld.play import PlaySession, ReplaySession, play_coworld, replay_coworld
+from cogames.coworld.types import CoworldEpisodeJobSpec
 from cogames.coworld.upload import upload_coworld_cmd, upload_policy_cmd
 from softmax.auth import DEFAULT_COGAMES_SERVER
 
@@ -82,6 +84,24 @@ def upload_policy(
         server=server,
         login_server=login_server,
     )
+
+
+@app.command("run-episode")
+def run_episode(
+    spec_path: Annotated[Path, typer.Argument(help="Path to a CoworldEpisodeJobSpec JSON file.")],
+    output_dir: Annotated[Path, typer.Option("--output-dir", "-o", help="Directory for episode artifacts.")] = Path(
+        "./coworld-episode-results"
+    ),
+    timeout_seconds: Annotated[float, typer.Option("--timeout-seconds", min=1.0)] = 3600.0,
+    verify_replay: Annotated[bool, typer.Option("--verify-replay/--no-verify-replay")] = False,
+) -> None:
+    spec = CoworldEpisodeJobSpec.model_validate_json(spec_path.read_text(encoding="utf-8"))
+    artifacts = EpisodeArtifacts.create(output_dir.resolve(), prefix="coworld-run-")
+    run_coworld_episode(spec, artifacts, timeout_seconds=timeout_seconds, verify_replay=verify_replay)
+    typer.echo(f"Artifacts: {artifacts.workspace}")
+    typer.echo(f"Results: {artifacts.results_path}")
+    typer.echo(f"Replay: {artifacts.replay_path}")
+    typer.echo(f"Logs: {artifacts.logs_dir}")
 
 
 @app.command("replay")
