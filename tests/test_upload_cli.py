@@ -95,8 +95,9 @@ def test_upload_command_sends_correct_requests(
     assert "my-test-policy:v1" in result.output
 
     # Verify the requests that were made
-    # 0: /tournament/seasons, 1: /tournament/seasons/{name}, 2: presigned-url, 3: upload, 4: complete
-    assert len(httpserver.log) == 5, f"Expected 5 requests, got {len(httpserver.log)}"
+    # 0: /tournament/seasons, 1: /tournament/seasons/{name}, 2: presigned-url,
+    # 3: upload, 4: complete, 5: submit-to-season
+    assert len(httpserver.log) == 6, f"Expected 6 requests, got {len(httpserver.log)}"
 
     presign_req, _ = httpserver.log[2]
     assert presign_req.headers.get("X-Auth-Token") == "test-token-12345"
@@ -111,6 +112,11 @@ def test_upload_command_sends_correct_requests(
     complete_body = complete_req.json
     assert complete_body["upload_id"] == upload_id
     assert complete_body["name"] == "my-test-policy"
+    assert "season" not in complete_body
+
+    submit_req, _ = httpserver.log[5]
+    assert submit_req.path == "/tournament/seasons/test-season/submissions"
+    assert submit_req.json == {"policy_version_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"}
 
 
 def test_upload_bundles_nested_single_file_top_level_module_at_root(
@@ -373,6 +379,10 @@ def _setup_mock_upload_server(
         "/stats/policies/submit/complete",
         method="POST",
     ).respond_with_handler(handle_complete)
+    httpserver.expect_request(
+        "/tournament/seasons/test-season/submissions",
+        method="POST",
+    ).respond_with_json({"pools": ["competition"]})
 
 
 def test_upload_directory_policy(
@@ -414,7 +424,7 @@ def test_upload_directory_policy(
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
     # Verify the uploaded zip contains all files from the directory
-    assert len(httpserver.log) == 5
+    assert len(httpserver.log) == 6
     upload_req, _ = httpserver.log[3]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
@@ -465,7 +475,7 @@ def test_upload_zip_policy(
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
     # Verify the uploaded zip contains all files
-    assert len(httpserver.log) == 5
+    assert len(httpserver.log) == 6
     upload_req, _ = httpserver.log[3]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
@@ -529,7 +539,7 @@ def test_upload_zip_policy_with_includes_and_setup_script(
 
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
-    assert len(httpserver.log) == 5
+    assert len(httpserver.log) == 6
     upload_req, _ = httpserver.log[3]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         names = set(zf.namelist())
@@ -798,8 +808,8 @@ def test_upload_s3_policy(
 
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
-    # Verify: seasons list + season detail + S3 download + 3 upload requests = 6 total
-    assert len(httpserver.log) == 6, f"Expected 6 requests, got {len(httpserver.log)}"
+    # Verify: seasons list + season detail + S3 download + 3 upload requests + submit = 7 total
+    assert len(httpserver.log) == 7, f"Expected 7 requests, got {len(httpserver.log)}"
 
     # Third request should be the S3 GetObject (after seasons list + season detail)
     s3_req, _ = httpserver.log[2]
@@ -913,6 +923,10 @@ def _setup_mock_upload_server_with_season(
         "/stats/policies/submit/complete",
         method="POST",
     ).respond_with_handler(handle_complete)
+    httpserver.expect_request(
+        f"/tournament/seasons/{season_summary['name']}/submissions",
+        method="POST",
+    ).respond_with_json({"pools": ["qualifying"]})
 
 
 def test_upload_resolves_season_and_validates(
@@ -957,8 +971,8 @@ def test_upload_resolves_season_and_validates(
     assert captured.get("called") is True
     assert "validate-bundle" in captured["cmd"]
 
-    # seasons list + season detail + presigned-url + s3 upload + complete = 5 requests
-    assert len(httpserver.log) == 5
+    # seasons list + season detail + presigned-url + s3 upload + complete + submit = 6 requests
+    assert len(httpserver.log) == 6
 
 
 def test_upload_returns_nonzero_when_validation_fails(
