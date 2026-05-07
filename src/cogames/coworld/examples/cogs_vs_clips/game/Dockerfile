@@ -43,10 +43,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN pip install --no-cache-dir \
     fastapi==0.115.5 \
     uvicorn[standard]==0.34.2 \
-    mettagrid==0.26.13 \
+    mettagrid==0.26.17 \
     "cogsguard @ git+https://github.com/Metta-AI/cogame-cogsguard.git@3be7e391505a513d801318904b50ef15eed9644f"
 
 WORKDIR /app
+COPY packages/mettagrid/python/src/mettagrid/runner/live_episode.py /tmp/live_episode.py
+RUN python - <<'PY'
+from pathlib import Path
+import shutil
+
+import mettagrid
+
+runner_dir = Path(mettagrid.__file__).parent / "runner"
+shutil.copyfile("/tmp/live_episode.py", runner_dir / "live_episode.py")
+PY
 COPY --from=mettascope-builder /mettascope/dist /app/mettascope
 COPY packages/cogames/src/cogames/coworld/examples/cogs_vs_clips/game/clients /app/clients
 COPY packages/cogames/src/cogames/coworld/examples/cogs_vs_clips/game/server.py /app/server.py

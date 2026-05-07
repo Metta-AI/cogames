@@ -5,7 +5,7 @@ import json
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import uvicorn
@@ -16,8 +16,7 @@ from fastapi.staticfiles import StaticFiles
 
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.map_builder.map_builder import HasSeed
-from mettagrid.policy.policy_env_interface import PolicyEnvInterface
-from mettagrid.simulator import Simulator
+from mettagrid.runner.live_episode import LiveMettaGridEpisode, TickMode
 from mettagrid.util.grid_object_formatter import format_grid_object
 
 CLIENTS_DIR = Path(__file__).parent / "clients"
@@ -100,169 +99,57 @@ class CogsVsClipsGame:
     ):
         self.mission_name = config["mission"]
         self.tokens = config["tokens"]
-        self.max_steps = config["max_steps"]
-        self.seed = config["seed"]
-        self.step_seconds = config["step_seconds"]
-        self.results_path = results_path
-        self.replay_path = replay_path
-        self.request_shutdown = request_shutdown
-        self.players: dict[int, WebSocket] = {}
-        self.play_task: asyncio.Task[None] | None = None
-        self.done = False
-        self.paused = False
-        self.start_deadline: float | None = None
+        max_steps = config["max_steps"]
+        seed = config["seed"]
 
-        env = make_env(self.mission_name, num_agents=len(self.tokens), max_steps=self.max_steps, seed=self.seed)
-        self.simulator = Simulator()
-        self.sim = self.simulator.new_simulation(env, seed=self.seed)
-        self.policy_env = PolicyEnvInterface.from_mg_cfg(self.sim.config)
-        self.action_names = self.sim.action_names
-        self.noop_action_index = self.action_names.index("noop")
-        self.latest_action_indices = [self.noop_action_index] * len(self.tokens)
+        env = make_env(self.mission_name, num_agents=len(self.tokens), max_steps=max_steps, seed=seed)
+        self.episode = LiveMettaGridEpisode.from_env(
+            env,
+            seed=seed,
+            tokens=self.tokens,
+            max_steps=max_steps,
+            step_seconds=config["step_seconds"],
+            message_context={"mission": self.mission_name},
+            start_grace_seconds=START_GRACE_SECONDS,
+            disconnect_exception_types=(RuntimeError, WebSocketDisconnect),
+            request_shutdown=request_shutdown,
+        )
+        self.episode.configure_artifacts(
+            results_path=results_path,
+            replay_path=replay_path,
+            results_builder=self.results,
+        )
+        self.sim = self.episode.sim
         (
             self.initial_replay,
             self.capacity_names,
             self.resource_to_capacity_id,
         ) = build_initial_replay(self.sim)
-        self.replay_events: list[dict[str, Any]] = [self.global_baseline_message()]
-
-    async def connect_player(self, slot: int, websocket: WebSocket) -> None:
-        self.players[slot] = websocket
-        if self.play_task is None:
-            if len(self.players) == len(self.tokens):
-                self.play_task = asyncio.create_task(self.play())
-            elif self.start_deadline is None:
-                self.start_deadline = asyncio.get_running_loop().time() + START_GRACE_SECONDS
-                self.play_task = asyncio.create_task(self._play_after_grace())
-
-    async def _play_after_grace(self) -> None:
-        while len(self.players) < len(self.tokens):
-            assert self.start_deadline is not None
-            delay = self.start_deadline - asyncio.get_running_loop().time()
-            if delay <= 0:
-                break
-            await asyncio.sleep(min(delay, 0.05))
-        await self.play()
-
-    def set_latest_action(self, slot: int, message: dict[str, Any]) -> None:
-        if "action_index" in message:
-            raw_action = message["action_index"]
-        elif "action_name" in message:
-            raw_action = message["action_name"]
-        elif "action" in message:
-            raw_action = message["action"]
-        else:
-            raw_action = self.noop_action_index
-
-        if isinstance(raw_action, str):
-            if raw_action in self.action_names:
-                action_index = self.action_names.index(raw_action)
-            else:
-                action_index = self.noop_action_index
-        else:
-            action_index = int(raw_action)
-
-        if action_index < 0 or action_index >= len(self.action_names):
-            action_index = self.noop_action_index
-        self.latest_action_indices[slot] = action_index
+        self.episode.configure_replay_events(
+            baseline_builder=self.global_baseline_message,
+            step_builder=self.global_delta_message,
+        )
 
     def handle_global_message(self, message: dict[str, Any]) -> None:
-        if message.get("type") == "action":
+        message_type = message["type"]
+        if message_type == "action":
             agent_id = int(message["agent_id"])
             if 0 <= agent_id < len(self.tokens):
-                self.set_latest_action(agent_id, message)
+                self.episode.set_policy_action(agent_id, message, connection_id="global")
             return
-
-        if message.get("type") != "control":
+        if message_type != "control":
             return
-        command = str(message.get("command", "")).lower()
+        command = str(message["command"]).lower()
         if command in {"play", "resume", "start"}:
-            self.paused = False
+            self.episode.paused = False
         elif command in {"pause", "stop"}:
-            self.paused = True
+            self.episode.paused = True
         elif command == "speed":
             speed = float(message["speed"])
             if speed > 0:
-                self.step_seconds = 1.0 / speed
+                self.episode.step_seconds = 1.0 / speed
         elif command == "step":
-            self.paused = False
-
-    async def play(self) -> None:
-        while self.sim.current_step < self.max_steps and not self.sim.is_done():
-            if self.paused:
-                await asyncio.sleep(0.05)
-                continue
-            await self._send_player_steps()
-            await asyncio.sleep(self.step_seconds)
-            self._apply_actions()
-            self.sim.step()
-            self.replay_events.append(self.global_delta_message())
-
-        self.done = True
-        results = self.results()
-        self.results_path.write_text(json.dumps(results))
-        if self.replay_path is not None:
-            self.replay_path.write_text(json.dumps({"events": self.replay_events, "results": results}))
-        await self._send_final()
-        await asyncio.sleep(0.2)
-        self.request_shutdown()
-
-    async def _send_player_steps(self) -> None:
-        await self._send_to_players({slot: self.player_message(slot) for slot in self.players})
-
-    async def _send_final(self) -> None:
-        final_message = {**self.snapshot(), "type": "final"}
-        await self._send_to_players({slot: final_message for slot in self.players})
-
-    async def _send_to_players(self, messages: dict[int, dict[str, Any]]) -> None:
-        players = tuple(self.players.items())
-        results = await asyncio.gather(
-            *(websocket.send_json(messages[slot]) for slot, websocket in players), return_exceptions=True
-        )
-        for (slot, websocket), result in zip(players, results, strict=True):
-            if isinstance(result, (RuntimeError, WebSocketDisconnect)):
-                self.disconnect_player(slot, websocket)
-            elif isinstance(result, Exception):
-                raise result
-
-    def disconnect_player(self, slot: int, websocket: WebSocket) -> None:
-        if slot in self.players and self.players[slot] is websocket:
-            del self.players[slot]
-
-    def _apply_actions(self) -> None:
-        for slot, action_index in enumerate(self.latest_action_indices):
-            self.sim.agent(slot).set_action(self.action_names[action_index])
-
-    def player_message(self, slot: int) -> dict[str, Any]:
-        return {
-            "type": "step",
-            "mission": self.mission_name,
-            "slot": slot,
-            "step": self.sim.current_step,
-            "observation": self.sim._c_sim.observations()[slot].tolist(),
-            "action_names": self.action_names,
-        }
-
-    def player_config(self, slot: int) -> dict[str, Any]:
-        return {
-            "type": "player_config",
-            "mission": self.mission_name,
-            "slot": slot,
-            "num_agents": len(self.tokens),
-            "action_names": self.action_names,
-            "observation_shape": list(self.policy_env.observation_shape),
-            "observation": {
-                "width": self.policy_env.obs_width,
-                "height": self.policy_env.obs_height,
-                "features": [
-                    {"id": feature.id, "name": feature.name, "normalization": feature.normalization}
-                    for feature in self.policy_env.obs_features
-                ],
-                "tags": self.policy_env.tags,
-                "global_location": 254,
-                "empty_location": 255,
-            },
-        }
+            self.episode.paused = False
 
     def global_assign_message(self) -> dict[str, Any]:
         return {
@@ -292,7 +179,7 @@ class CogsVsClipsGame:
             "protocol": GLOBAL_PROTOCOL,
             **build_step_replay(
                 self.sim,
-                self.latest_action_indices,
+                self.episode.latest_action_indices,
                 self.capacity_names,
                 self.resource_to_capacity_id,
                 ignored_object_types,
@@ -301,28 +188,16 @@ class CogsVsClipsGame:
         }
 
     def snapshot(self) -> dict[str, Any]:
-        return {
-            "type": "state",
-            "mission": self.mission_name,
-            "step": self.sim.current_step,
-            "done": self.done,
-            "paused": self.paused,
-            "step_seconds": self.step_seconds,
-            "scores": self.scores(),
-            "num_agents": len(self.tokens),
-            "connected_players": len(self.players),
-            "action_names": self.action_names,
-            "protocol": GLOBAL_PROTOCOL,
-        }
+        return {**self.episode.snapshot(), "global_protocol": GLOBAL_PROTOCOL}
 
     def global_status(self) -> dict[str, Any]:
         return {
             "mission": self.mission_name,
-            "done": self.done,
+            "done": self.episode.done,
             "scores": self.scores(),
             "num_agents": len(self.tokens),
-            "connected_players": len(self.players),
-            "action_names": self.action_names,
+            "connected_players": len(self.episode.connections),
+            "action_names": self.episode.action_names,
             "protocol": GLOBAL_PROTOCOL,
         }
 
@@ -404,8 +279,8 @@ def create_app(
         await websocket.send_json(game.global_hello_message())
         await websocket.send_json(game.global_assign_message())
         await websocket.send_json(game.global_baseline_message())
-        while not game.done:
-            await asyncio.sleep(game.step_seconds)
+        while not game.episode.done:
+            await asyncio.sleep(game.episode.step_seconds)
             await websocket.send_json(game.global_delta_message())
         await websocket.send_json(
             {
@@ -426,11 +301,22 @@ def create_app(
         await websocket.send_json(game.snapshot())
         async for command in websocket.iter_json():
             if command["command"] == "pause":
-                game.paused = True
+                game.episode.paused = True
             elif command["command"] == "resume":
-                game.paused = False
+                game.episode.paused = False
             elif command["command"] == "step_seconds":
-                game.step_seconds = float(command["step_seconds"])
+                game.episode.step_seconds = float(command["step_seconds"])
+            elif command["command"] == "tick_mode":
+                tick_mode = command["tick_mode"]
+                if tick_mode not in {"fixed", "tick_when_act"}:
+                    raise ValueError(f"Unknown tick_mode: {tick_mode}")
+                game.episode.tick_mode = cast(TickMode, tick_mode)
+            elif command["command"] == "human_action_timeout_seconds":
+                game.episode.human_action_timeout_seconds = float(command["human_action_timeout_seconds"])
+            elif command["command"] == "takeover":
+                game.episode.takeover(int(command["slot"]), str(command["connection_id"]))
+            elif command["command"] == "release_takeover":
+                game.episode.release_takeover(int(command["slot"]), command.get("connection_id"))
             await websocket.send_json(game.snapshot())
 
     @app.websocket("/player")
@@ -446,13 +332,12 @@ def create_app(
             return
 
         await websocket.accept()
-        await websocket.send_json(game.player_config(slot))
-        await game.connect_player(slot, websocket)
+        connection_id = await game.episode.connect_player(slot, websocket)
         async for message in websocket.iter_json():
-            if game.done:
+            if game.episode.done:
                 break
-            game.set_latest_action(slot, message)
-        game.disconnect_player(slot, websocket)
+            await game.episode.handle_player_message(connection_id, message)
+        game.episode.disconnect_player(connection_id)
 
     return app
 

@@ -3,7 +3,10 @@
 <style>
   body { font-family: system-ui, sans-serif; margin: 24px; }
   button { background: white; border: 1px solid #999; border-radius: 4px; padding: 8px 10px; }
-  input { vertical-align: middle; }
+  input, select { vertical-align: middle; }
+  #slots { display: grid; gap: 8px; margin: 14px 0; max-width: 960px; }
+  .slot { border: 1px solid #ddd; padding: 10px; }
+  .connection { align-items: center; display: flex; gap: 8px; margin-top: 6px; }
   pre { background: #f5f5f5; padding: 12px; width: min(960px, 100%); white-space: pre-wrap; }
 </style>
 <h1>Cogs vs Clips Admin</h1>
@@ -15,6 +18,20 @@
   <input id="stepSeconds" min="0.01" step="0.01" type="number" value="0.05" />
 </label>
 <button id="applySpeed" type="button">Apply</button>
+<label>
+  Tick mode
+  <select id="tickMode">
+    <option value="fixed">Fixed</option>
+    <option value="tick_when_act">Tick when act</option>
+  </select>
+</label>
+<button id="applyTickMode" type="button">Apply</button>
+<label>
+  Human timeout
+  <input id="humanTimeout" min="0.01" step="0.1" type="number" value="5" />
+</label>
+<button id="applyHumanTimeout" type="button">Apply</button>
+<div id="slots"></div>
 <pre id="latest"></pre>
 <script>
   const websocketUrl = new URL(window.location.href);
@@ -23,7 +40,50 @@
   const status = document.getElementById("status");
   const latest = document.getElementById("latest");
   const stepSeconds = document.getElementById("stepSeconds");
+  const tickMode = document.getElementById("tickMode");
+  const humanTimeout = document.getElementById("humanTimeout");
+  const slots = document.getElementById("slots");
   const socket = new WebSocket(websocketUrl);
+
+  function send(command) {
+    if (socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify(command));
+  }
+
+  function drawSlots(message) {
+    slots.replaceChildren(...(message.slots || []).map((slot) => {
+      const section = document.createElement("section");
+      section.className = "slot";
+      const title = document.createElement("strong");
+      title.textContent = `Slot ${slot.slot + 1} - ${slot.control_state.control_mode}`;
+      section.append(title);
+      for (const connection of slot.connections || []) {
+        const row = document.createElement("div");
+        row.className = "connection";
+        const label = document.createElement("code");
+        label.textContent = connection.connection_id;
+        const takeover = document.createElement("button");
+        takeover.type = "button";
+        takeover.textContent = "Take over";
+        takeover.onclick = () => send({
+          command: "takeover",
+          slot: slot.slot,
+          connection_id: connection.connection_id,
+        });
+        const release = document.createElement("button");
+        release.type = "button";
+        release.textContent = "Release";
+        release.onclick = () => send({
+          command: "release_takeover",
+          slot: slot.slot,
+          connection_id: connection.connection_id,
+        });
+        row.append(label, takeover, release);
+        section.append(row);
+      }
+      return section;
+    }));
+  }
 
   socket.onopen = () => { status.textContent = "Connected"; };
   socket.onmessage = (event) => {
@@ -31,12 +91,21 @@
     latest.textContent = JSON.stringify(message, null, 2);
     status.textContent = message.paused ? "Paused" : `Step ${message.step}`;
     stepSeconds.value = message.step_seconds;
+    tickMode.value = message.tick_mode;
+    humanTimeout.value = message.human_action_timeout_seconds;
+    drawSlots(message);
   };
   socket.onclose = () => { status.textContent = "Disconnected"; };
 
-  document.getElementById("pause").onclick = () => socket.send(JSON.stringify({ command: "pause" }));
-  document.getElementById("resume").onclick = () => socket.send(JSON.stringify({ command: "resume" }));
+  document.getElementById("pause").onclick = () => send({ command: "pause" });
+  document.getElementById("resume").onclick = () => send({ command: "resume" });
   document.getElementById("applySpeed").onclick = () => {
-    socket.send(JSON.stringify({ command: "step_seconds", step_seconds: Number(stepSeconds.value) }));
+    send({ command: "step_seconds", step_seconds: Number(stepSeconds.value) });
+  };
+  document.getElementById("applyTickMode").onclick = () => {
+    send({ command: "tick_mode", tick_mode: tickMode.value });
+  };
+  document.getElementById("applyHumanTimeout").onclick = () => {
+    send({ command: "human_action_timeout_seconds", human_action_timeout_seconds: Number(humanTimeout.value) });
   };
 </script>

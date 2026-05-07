@@ -76,12 +76,15 @@
   },
   "player": [
     {
-      "id": "noop-player",
-      "name": "Noop Player",
+      "id": "starter-policy-player",
+      "name": "Starter Policy Player",
       "type": "player",
-      "image": "coworld-cogs-vs-clips-noop-player:latest",
-      "run": ["python", "/app/player.py"],
-      "description": "Minimal certification player that connects to Cogs vs Clips and submits noop actions."
+      "image": "coworld-mettagrid-policy-player:latest",
+      "run": ["python", "/app/coworld_policy_player.py"],
+      "env": {
+        "COGAMES_POLICY_URI": "metta://policy/cogames.policy.starter_agent.StarterPolicy"
+      },
+      "description": "Cogs vs Clips MettaGrid policy player running the starter policy over coworld.player.v1."
     }
   ],
   "variants": [
@@ -112,10 +115,10 @@
     "variant_id": "cogsguard-smoke",
     "players": [
       {
-        "player_id": "noop-player"
+        "player_id": "starter-policy-player"
       },
       {
-        "player_id": "noop-player"
+        "player_id": "starter-policy-player"
       }
     ]
   }

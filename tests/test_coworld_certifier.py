@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import importlib.util
 import json
 import subprocess
@@ -399,8 +398,12 @@ def test_cogs_vs_clips_coworld_manifest_validates() -> None:
     assert package.cogame.run == ("python", "/app/server.py")
     assert package.manifest.game.protocols.player == "game/docs/player_protocol_spec.md"
     assert package.manifest.game.protocols.global_ == "game/docs/global_protocol_spec.md"
-    assert package.manifest.player[0].image == "coworld-cogs-vs-clips-noop-player:latest"
-    assert package.manifest.player[0].run == ["python", "/app/player.py"]
+    assert package.manifest.player[0].id == "starter-policy-player"
+    assert package.manifest.player[0].image == "coworld-mettagrid-policy-player:latest"
+    assert package.manifest.player[0].run == ["python", "/app/coworld_policy_player.py"]
+    assert package.manifest.player[0].env == {
+        "COGAMES_POLICY_URI": "metta://policy/cogames.policy.starter_agent.StarterPolicy"
+    }
     assert config == {
         "mission": "cogsguard",
         "max_steps": 3,
@@ -438,17 +441,6 @@ def test_cogs_vs_clips_player_websocket_rejects_missing_query_params(
             pass
 
     assert exc_info.value.code == 1008
-
-
-def test_cogs_vs_clips_send_to_players_disconnects_failed_websocket() -> None:
-    server_module = _load_cogs_vs_clips_server_module()
-    game = server_module.CogsVsClipsGame.__new__(server_module.CogsVsClipsGame)
-    websocket = DisconnectingWebSocket()
-    game.players = {0: websocket}
-
-    asyncio.run(game._send_to_players({0: {"type": "step"}}))
-
-    assert game.players == {}
 
 
 def test_cogs_vs_clips_global_baseline_includes_walls_and_agents(tmp_path: Path) -> None:
@@ -668,8 +660,3 @@ def _load_cogs_vs_clips_server_module():
     server_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(server_module)
     return server_module
-
-
-class DisconnectingWebSocket:
-    async def send_json(self, message: dict[str, object]) -> None:
-        raise WebSocketDisconnect(code=1006)

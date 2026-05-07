@@ -33,6 +33,8 @@
   <section id="obs"></section>
   <aside>
     <h2 id="identity">Player</h2>
+    <button id="takeover" type="button">Take over</button>
+    <button id="release" type="button">Release</button>
     <div id="actions"></div>
     <pre id="latest"></pre>
   </aside>
@@ -44,6 +46,8 @@
   const status = document.getElementById("status");
   const identity = document.getElementById("identity");
   const actions = document.getElementById("actions");
+  const takeover = document.getElementById("takeover");
+  const release = document.getElementById("release");
   const latest = document.getElementById("latest");
   const obs = document.getElementById("obs");
 
@@ -61,7 +65,7 @@
     obs.style.gridTemplateColumns = `repeat(${message.observation.width}, minmax(0, 1fr))`;
     drawCells(new Map());
     drawActions(actionNames);
-    status.textContent = `Waiting for players (${message.num_agents} cogs)`;
+    updateStatus(message.control_state, null);
   }
 
   function drawActions(names) {
@@ -146,27 +150,42 @@
 
   function sendAction(index) {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ action_index: index }));
+    socket.send(JSON.stringify({ type: "action", action_index: index }));
   }
 
-  function handleStep(message) {
+  function updateStatus(controlState, step) {
+    const mode = controlState && controlState.control_mode === "human" ? "Human" : "Policy";
+    status.textContent = step == null ? `${mode} control` : `Step ${step} - ${mode} control`;
+  }
+
+  function handleObservation(message) {
     const cells = tokenCells(message.observation);
     drawCells(cells);
-    status.textContent = `Step ${message.step}`;
+    updateStatus(message.control_state, message.step);
     latest.textContent = JSON.stringify({
       slot: message.slot,
       step: message.step,
+      control_state: message.control_state,
       global_features: cells.globalFeatures,
       actions: actionNames,
     }, null, 2);
   }
+
+  takeover.onclick = () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({ type: "takeover" }));
+  };
+  release.onclick = () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({ type: "release_takeover" }));
+  };
 
   socket = new WebSocket(websocketUrl);
   socket.onopen = () => { status.textContent = "Connected"; };
   socket.onmessage = (event) => {
     const message = JSON.parse(event.data);
     if (message.type === "player_config") configure(message);
-    if (message.type === "step") handleStep(message);
+    if (message.type === "observation") handleObservation(message);
     if (message.type === "final") {
       done = true;
       status.textContent = `Done after ${message.step} steps`;
