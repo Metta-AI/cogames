@@ -29,6 +29,10 @@ def validate_coworld_manifest(instance: object) -> None:
     validate_repo_schema(instance, COWORLD_SCHEMA_PATH)
 
 
+def coworld_manifest_validation_errors(instance: object) -> list[str]:
+    return repo_schema_validation_errors(instance, COWORLD_SCHEMA_PATH)
+
+
 def validate_episode_request(instance: object) -> None:
     validate_repo_schema(instance, EPISODE_SCHEMA_PATH)
 
@@ -45,6 +49,16 @@ def validate_repo_schema(instance: object, schema_path: Path) -> None:
         registry=registry,
         format_checker=FormatChecker(),
     ).validate(instance)
+
+
+def repo_schema_validation_errors(instance: object, schema_path: Path) -> list[str]:
+    schemas, registry = _schema_registry()
+    validator = Draft202012Validator(
+        schemas[schema_path],
+        registry=registry,
+        format_checker=FormatChecker(),
+    )
+    return [error.message for error in validator.iter_errors(cast(Any, instance))]
 
 
 @cache

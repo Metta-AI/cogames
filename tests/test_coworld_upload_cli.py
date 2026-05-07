@@ -93,10 +93,11 @@ def test_upload_coworld_posts_standalone_manifest(
         headers={"X-Auth-Token": "token"},
     ).respond_with_json(
         {
-            "upload_id": "00000000-0000-0000-0000-000000000001",
+            "id": "cow_00000000-0000-0000-0000-000000000001",
             "name": "unit-test-game",
             "version": "0.1.0",
             "manifest": _manifest_with_image(softmax_image_uri),
+            "manifest_hash": "sha256:manifest-hash",
             "size_bytes": 1234,
         }
     )
@@ -109,7 +110,8 @@ def test_upload_coworld_posts_standalone_manifest(
 
     assert result.name == "unit-test-game"
     assert result.version == "0.1.0"
-    assert result.manifest["game"]["runnable"]["image"] == softmax_image_uri
+    assert result.id == "cow_00000000-0000-0000-0000-000000000001"
+    assert result.manifest_hash == "sha256:manifest-hash"
     assert certification_calls == [(manifest_path.resolve(), 60.0)]
     assert pushed_images == [
         ("unit-test-runtime:latest", "123456789012.dkr.ecr.us-east-1.amazonaws.com/cogames/user/unit-test-runtime:v1")
@@ -154,10 +156,11 @@ def test_upload_coworld_command_certifies_before_uploading(
     )
     httpserver.expect_request("/v2/coworlds/upload", method="POST").respond_with_json(
         {
-            "upload_id": "00000000-0000-0000-0000-000000000002",
+            "id": "cow_00000000-0000-0000-0000-000000000002",
             "name": "unit-test-game",
             "version": "0.1.0",
             "manifest": _manifest_with_image(softmax_image_uri),
+            "manifest_hash": "sha256:manifest-hash",
             "size_bytes": 1234,
         }
     )
@@ -177,6 +180,8 @@ def test_upload_coworld_command_certifies_before_uploading(
 
     assert result.exit_code == 0, result.output
     assert "Upload complete: unit-test-game:0.1.0" in result.output
+    assert "Coworld: cow_00000000-0000-0000-0000-000000000002" in result.output
+    assert "Manifest hash: sha256:manifest-hash" in result.output
     assert certification_calls == [(manifest_path.resolve(), 60.0)]
 
 

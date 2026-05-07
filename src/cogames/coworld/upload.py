@@ -24,10 +24,11 @@ RUNNABLE_LIST_SECTIONS = ("player", "grader", "reporter", "commissioner", "diagn
 
 
 class CoworldUploadResponse(BaseModel):
-    upload_id: str
+    id: str
     name: str
     version: str
     manifest: dict[str, Any]
+    manifest_hash: str
     size_bytes: int
 
 
@@ -74,9 +75,10 @@ class ImageUploadResponse(BaseModel):
 
 @dataclass(frozen=True)
 class CoworldUploadResult:
+    id: str
     name: str
     version: str
-    manifest: dict[str, Any]
+    manifest_hash: str
     size_bytes: int
 
 
@@ -170,9 +172,10 @@ def upload_coworld(
         response = client.upload_manifest(upload_manifest)
 
     return CoworldUploadResult(
+        id=response.id,
         name=response.name,
         version=response.version,
-        manifest=response.manifest,
+        manifest_hash=response.manifest_hash,
         size_bytes=response.size_bytes,
     )
 
@@ -190,6 +193,8 @@ def upload_coworld_cmd(
         timeout_seconds=timeout_seconds,
     )
     typer.echo(f"Upload complete: {result.name}:{result.version}")
+    typer.echo(f"Coworld: {result.id}")
+    typer.echo(f"Manifest hash: {result.manifest_hash}")
     typer.echo(f"Size: {result.size_bytes} bytes")
 
 
