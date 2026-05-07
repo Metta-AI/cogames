@@ -176,10 +176,15 @@ def certify_coworld(
 
 
 def _referenced_file_paths(package: CoworldPackage) -> list[tuple[str, Path]]:
-    return [
-        ("Cogame protocols.player", resolve_manifest_uri(package.manifest_path.parent, package.protocols.player)),
-        ("Cogame protocols.global", resolve_manifest_uri(package.manifest_path.parent, package.protocols.global_)),
-    ]
+    paths: list[tuple[str, Path]] = []
+    for label, uri in (
+        ("Cogame protocols.player", package.protocols.player),
+        ("Cogame protocols.global", package.protocols.global_),
+    ):
+        if urlparse(uri).scheme and urlparse(uri).scheme != "file":
+            continue
+        paths.append((label, resolve_manifest_uri(package.manifest_path.parent, uri)))
+    return paths
 
 
 def _image_references(package: CoworldPackage) -> list[tuple[str, str]]:

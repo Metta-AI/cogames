@@ -5,8 +5,11 @@ from typing import Annotated
 
 import typer
 
+from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 from cogames.coworld.certifier import certify_coworld
 from cogames.coworld.play import PlaySession, ReplaySession, play_coworld, replay_coworld
+from cogames.coworld.upload import upload_coworld_cmd
+from softmax.auth import DEFAULT_COGAMES_SERVER
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
 
@@ -38,6 +41,24 @@ def play(
     typer.echo(f"Results: {result.session.artifacts.results_path}")
     typer.echo(f"Replay: {result.session.artifacts.replay_path}")
     typer.echo(f"Logs: {result.session.artifacts.logs_dir}")
+
+
+@app.command("upload-coworld")
+def upload_coworld(
+    manifest_path: Annotated[Path, typer.Argument(help="Path to coworld_manifest.json.")],
+    server: Annotated[str, typer.Option("--server", help="Observatory API server URL.")] = DEFAULT_SUBMIT_SERVER,
+    login_server: Annotated[
+        str,
+        typer.Option("--login-server", help="Authentication server URL."),
+    ] = DEFAULT_COGAMES_SERVER,
+    timeout_seconds: Annotated[float, typer.Option("--timeout-seconds", min=1.0)] = 60.0,
+) -> None:
+    upload_coworld_cmd(
+        manifest_path,
+        server=server,
+        login_server=login_server,
+        timeout_seconds=timeout_seconds,
+    )
 
 
 @app.command("replay")

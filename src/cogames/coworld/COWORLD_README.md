@@ -149,3 +149,25 @@ Operational details:
 Certification validates the Coworld manifest, checks referenced files and images, verifies the Cogame serves its player
 and global browser clients in rollout mode, verifies the Cogame serves its replay browser client in replay mode, runs one
 smoke episode through Docker, and verifies the produced results and replay artifacts.
+
+## Upload
+
+To certify and upload a Coworld manifest to Observatory:
+
+```bash
+uv run cogames coworld upload-coworld path/to/coworld_manifest.json
+```
+
+The command validates the manifest, runs certification, uploads every runnable image through Observatory's
+`/v2/container_images/upload` flow, rewrites runnable image references to returned Softmax digest image URIs, and uploads
+the resulting standalone JSON manifest through `/v2/coworlds/upload`.
+
+Upload does not bundle schemas, docs, or other package files. The manifest is the uploaded artifact. Documentation and
+other supporting references should be publicly accessible links. The current uploader does not validate those links.
+
+The uploader derives an optional client hash from the local image archive's config and layer content, uses it to skip
+re-uploading images Observatory already has, and records ECR's digest as the executable image identity:
+
+```bash
+docker build -t my-coworld-runtime:latest .
+```
