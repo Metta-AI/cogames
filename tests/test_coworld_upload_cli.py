@@ -180,6 +180,69 @@ def test_upload_coworld_command_certifies_before_uploading(
     assert certification_calls == [(manifest_path.resolve(), 60.0)]
 
 
+def test_upload_policy_command_creates_docker_image_policy(
+    httpserver: HTTPServer,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    softmax_image_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/cogames/user/unit-test-policy@sha256:digest"
+
+    monkeypatch.setattr("cogames.coworld.upload.load_current_cogames_token", lambda *, login_server: "token")
+    monkeypatch.setattr("cogames.coworld.upload._local_image_client_hash", lambda image: "sha256:client-hash")
+    monkeypatch.setattr("cogames.coworld.upload._push_container_image", lambda source_image, push_info: None)
+    httpserver.expect_request(
+        "/v2/container_images/upload",
+        method="POST",
+        headers={"X-Auth-Token": "token"},
+        json={"name": "unit-test-policy", "client_hash": "sha256:client-hash"},
+    ).respond_with_json(
+        {
+            "image": {
+                "id": "img_00000000-0000-0000-0000-000000000030",
+                "name": "unit-test-policy",
+                "version": 1,
+                "client_hash": "sha256:client-hash",
+                "status": "ready",
+                "image_uri": softmax_image_uri,
+                "image_digest": "sha256:digest",
+            },
+            "pre_signed_info": None,
+        }
+    )
+    httpserver.expect_request(
+        "/stats/policies/docker-img/complete",
+        method="POST",
+        headers={"X-Auth-Token": "token"},
+        json={
+            "name": "paintbot",
+            "container_image_id": "img_00000000-0000-0000-0000-000000000030",
+        },
+    ).respond_with_json(
+        {
+            "id": "00000000-0000-0000-0000-000000000031",
+            "name": "paintbot",
+            "version": 1,
+        }
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "coworld",
+            "upload-policy",
+            "unit-test-policy:latest",
+            "--name",
+            "paintbot",
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "https://softmax.test/api",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Upload complete: paintbot:v1" in result.output
+
+
 def test_local_image_client_hash_uses_docker_archive_content(monkeypatch: pytest.MonkeyPatch) -> None:
     archive = _docker_archive(config=b'{"cmd":["python","game.py"]}', layers=[b"layer-one", b"layer-two"])
 

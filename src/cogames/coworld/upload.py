@@ -31,6 +31,14 @@ class CoworldUploadResponse(BaseModel):
     size_bytes: int
 
 
+class PolicyVersionResponse(BaseModel):
+    id: str
+    name: str
+    version: int
+    pools: list[str] | None = None
+    submit_error: str | None = None
+
+
 class AwsCredentials(BaseModel):
     access_key_id: str
     secret_access_key: str
@@ -126,6 +134,25 @@ class CoworldUploadClient:
         response.raise_for_status()
         return ContainerImageResponse.model_validate(response.json())
 
+    def complete_docker_image_policy(
+        self,
+        *,
+        name: str,
+        container_image_id: str,
+        run: list[str] | None,
+    ) -> PolicyVersionResponse:
+        payload: dict[str, Any] = {"name": name, "container_image_id": container_image_id}
+        if run:
+            payload["run"] = run
+        response = self._http_client.post(
+            "/stats/policies/docker-img/complete",
+            headers=self._headers(),
+            json=payload,
+            timeout=120.0,
+        )
+        response.raise_for_status()
+        return PolicyVersionResponse.model_validate(response.json())
+
 
 def upload_coworld(
     manifest_path: Path,
@@ -164,6 +191,24 @@ def upload_coworld_cmd(
     )
     typer.echo(f"Upload complete: {result.name}:{result.version}")
     typer.echo(f"Size: {result.size_bytes} bytes")
+
+
+def upload_policy_cmd(
+    image: str,
+    name: str,
+    *,
+    run: list[str] | None = None,
+    server: str = DEFAULT_SUBMIT_SERVER,
+    login_server: str = DEFAULT_COGAMES_SERVER,
+) -> None:
+    with CoworldUploadClient.from_login(server_url=server, login_server=login_server) as client:
+        uploaded_image = _upload_container_image(client, image)
+        result = client.complete_docker_image_policy(
+            name=name,
+            container_image_id=uploaded_image.id,
+            run=run,
+        )
+    typer.echo(f"Upload complete: {result.name}:v{result.version}")
 
 
 def _manifest_with_softmax_images(client: CoworldUploadClient, manifest: dict[str, object]) -> dict[str, object]:

@@ -8,7 +8,7 @@ import typer
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 from cogames.coworld.certifier import certify_coworld
 from cogames.coworld.play import PlaySession, ReplaySession, play_coworld, replay_coworld
-from cogames.coworld.upload import upload_coworld_cmd
+from cogames.coworld.upload import upload_coworld_cmd, upload_policy_cmd
 from softmax.auth import DEFAULT_COGAMES_SERVER
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
@@ -58,6 +58,29 @@ def upload_coworld(
         server=server,
         login_server=login_server,
         timeout_seconds=timeout_seconds,
+    )
+
+
+@app.command("upload-policy")
+def upload_policy(
+    image: Annotated[str, typer.Argument(help="Local Docker image to upload as a CoWorld policy.")],
+    name: Annotated[str, typer.Option("--name", "-n", help="Policy name.")],
+    run: Annotated[
+        list[str] | None,
+        typer.Option("--run", help="Command argv for images that contain multiple Coworld roles."),
+    ] = None,
+    server: Annotated[str, typer.Option("--server", help="Observatory API server URL.")] = DEFAULT_SUBMIT_SERVER,
+    login_server: Annotated[
+        str,
+        typer.Option("--login-server", help="Authentication server URL."),
+    ] = DEFAULT_COGAMES_SERVER,
+) -> None:
+    upload_policy_cmd(
+        image,
+        name,
+        run=run,
+        server=server,
+        login_server=login_server,
     )
 
 
