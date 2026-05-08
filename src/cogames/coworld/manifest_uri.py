@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gzip
 import json
 import tempfile
 from contextlib import contextmanager
@@ -11,6 +12,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
 from cogames.coworld.schema_validation import JsonObject
+from mettagrid.util.file import read as read_data
 
 
 class RemoteCoworldManifestResponse(BaseModel):
@@ -40,16 +42,24 @@ def materialized_manifest_path(manifest_uri: str, *, server: str | None = None) 
 def materialized_replay_path(replay_uri: str) -> Iterator[Path]:
     parsed = urlparse(replay_uri)
     if parsed.scheme == "file":
-        yield Path(unquote(parsed.path)).resolve()
+        with _materialized_local_replay_path(Path(unquote(parsed.path)).resolve()) as replay_path:
+            yield replay_path
         return
     if parsed.scheme in ("http", "https"):
         with tempfile.TemporaryDirectory(prefix="coworld-replay-") as temp_dir:
-            replay_path = Path(temp_dir) / "replay.json.z"
-            replay_path.write_bytes(_download_bytes(replay_uri))
+            replay_path = Path(temp_dir) / _materialized_replay_name(parsed.path)
+            replay_path.write_bytes(_decode_replay_bytes(parsed.path, _download_bytes(replay_uri)))
+            yield replay_path
+        return
+    if parsed.scheme == "s3":
+        with tempfile.TemporaryDirectory(prefix="coworld-replay-") as temp_dir:
+            replay_path = Path(temp_dir) / _materialized_replay_name(parsed.path)
+            replay_path.write_bytes(_decode_replay_bytes(parsed.path, read_data(replay_uri)))
             yield replay_path
         return
 
-    yield Path(replay_uri).resolve()
+    with _materialized_local_replay_path(Path(replay_uri).resolve()) as replay_path:
+        yield replay_path
 
 
 def _resolve_manifest_uri(manifest_uri: str, *, server: str | None = None) -> str:
@@ -71,6 +81,33 @@ def _download_bytes(uri: str) -> bytes:
     response = httpx.get(uri, follow_redirects=True, timeout=60.0)
     response.raise_for_status()
     return response.content
+
+
+def _is_compressed_replay(path: str) -> bool:
+    return path.endswith((".json.z", ".json.gz"))
+
+
+def _materialized_replay_name(path: str) -> str:
+    if _is_compressed_replay(path):
+        return "replay.json"
+    return Path(unquote(path)).name or "replay.json"
+
+
+def _decode_replay_bytes(path: str, data: bytes) -> bytes:
+    if _is_compressed_replay(path):
+        return gzip.decompress(data)
+    return data
+
+
+@contextmanager
+def _materialized_local_replay_path(replay_path: Path) -> Iterator[Path]:
+    if not _is_compressed_replay(replay_path.name):
+        yield replay_path
+        return
+    with tempfile.TemporaryDirectory(prefix="coworld-replay-") as temp_dir:
+        materialized_path = Path(temp_dir) / "replay.json"
+        materialized_path.write_bytes(gzip.decompress(replay_path.read_bytes()))
+        yield materialized_path
 
 
 def _download_manifest(manifest_uri: str) -> JsonObject:
