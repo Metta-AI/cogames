@@ -3,16 +3,54 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
+from urllib.request import Request, urlopen
 
 import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 
-from cogames.coworld.runner.io import post_data, read_data
-
 CLIENTS_DIR = Path(__file__).parent / "clients"
+
+
+def read_data(uri: str) -> bytes:
+    parsed = urlparse(uri)
+    if parsed.scheme in ("http", "https"):
+        with urlopen(uri, timeout=30) as response:
+            return response.read()
+    if parsed.scheme == "file":
+        return Path(unquote(parsed.path)).read_bytes()
+    if parsed.scheme == "":
+        return Path(uri).read_bytes()
+    raise ValueError(f"Unsupported URI for read_data: {uri}")
+
+
+def post_data(uri: str, data: bytes | str, *, content_type: str) -> None:
+    if isinstance(data, str):
+        data = data.encode()
+
+    parsed = urlparse(uri)
+    if parsed.scheme in ("http", "https"):
+        request = Request(uri, data=data, method="POST")
+        request.add_header("Content-Type", content_type)
+        with urlopen(request, timeout=60):
+            return
+    if parsed.scheme == "file":
+        path = Path(unquote(parsed.path))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return
+    if parsed.scheme == "":
+        path = Path(uri)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        return
+    raise ValueError(f"Unsupported URI for post_data: {uri}")
+
+
 REPLAY_MODE = "COGAME_LOAD_REPLAY_URI" in os.environ
 if REPLAY_MODE:
     REPLAY_DATA = json.loads(read_data(os.environ["COGAME_LOAD_REPLAY_URI"]))
@@ -31,6 +69,7 @@ WIDTH = CONFIG["width"]
 HEIGHT = CONFIG["height"]
 MAX_TICKS = CONFIG["max_ticks"]
 TICK_RATE = CONFIG["tick_rate"]
+PLAYER_CONNECT_TIMEOUT_SECONDS = float(CONFIG.get("player_connect_timeout_seconds", 180))
 DIRECTIONS = {
     "up": (0, -1),
     "down": (0, 1),
@@ -39,7 +78,18 @@ DIRECTIONS = {
     "stay": (0, 0),
 }
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    timeout_task = asyncio.create_task(_start_after_player_connect_timeout()) if TOKENS else None
+    yield
+    if timeout_task is not None:
+        timeout_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await timeout_task
+
+
+app = FastAPI(lifespan=lifespan)
 server: uvicorn.Server
 
 
@@ -145,8 +195,19 @@ async def player(websocket: WebSocket) -> None:
         state.started = True
         asyncio.create_task(_play_game())
 
-    async for message in websocket.iter_json():
-        state.actions[slot] = _direction(message)
+    try:
+        async for message in websocket.iter_json():
+            state.actions[slot] = _direction(message)
+    finally:
+        if state.players.get(slot) is websocket:
+            del state.players[slot]
+
+
+async def _start_after_player_connect_timeout() -> None:
+    await asyncio.sleep(PLAYER_CONNECT_TIMEOUT_SECONDS)
+    if not state.started and not state.done:
+        state.started = True
+        asyncio.create_task(_play_game())
 
 
 async def _play_game() -> None:

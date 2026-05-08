@@ -3,8 +3,10 @@ from __future__ import annotations
 import importlib.util
 import json
 import subprocess
+import time
 from pathlib import Path
-from typing import cast
+from types import SimpleNamespace
+from typing import Any, cast
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -404,6 +406,86 @@ def test_paintarena_snapshots_are_independent(tmp_path: Path, monkeypatch: pytes
     assert second_snapshot["tile_owners"][0] == 0
     assert second_snapshot["tile_owners"][-1] == 1
     assert second_snapshot["scores"] == [1, 1]
+
+
+def test_paintarena_starts_after_player_connect_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    results_path = tmp_path / "results.json"
+    replay_path = tmp_path / "replay.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "tokens": ["token-0", "token-1"],
+                "players": [{"name": "Sweep Painter 1"}, {"name": "Sweep Painter 2"}],
+                "width": 12,
+                "height": 8,
+                "max_ticks": 1,
+                "tick_rate": 100,
+                "player_connect_timeout_seconds": 0.01,
+            }
+        )
+    )
+    monkeypatch.setenv(CONFIG_ENV_VAR, config_path.as_uri())
+    monkeypatch.setenv(RESULTS_ENV_VAR, results_path.as_uri())
+    monkeypatch.setenv(REPLAY_SAVE_ENV_VAR, replay_path.as_uri())
+    monkeypatch.delenv(REPLAY_LOAD_ENV_VAR, raising=False)
+
+    spec = importlib.util.spec_from_file_location("paintarena_timeout_test", _example_root() / "game" / "server.py")
+    assert spec is not None
+    assert spec.loader is not None
+    server_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(server_module)
+    server_module_typed = cast(Any, server_module)
+    server_module_typed.server = SimpleNamespace(should_exit=False)
+
+    with TestClient(server_module_typed.app):
+        deadline = time.monotonic() + 1
+        while not results_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+    assert json.loads(results_path.read_text()) == {"scores": [1.0, 1.0], "painted_tiles": [1, 1], "ticks": 1}
+    assert json.loads(replay_path.read_text())["frames"][0]["started"] is True
+
+
+def test_paintarena_disconnected_player_noops_after_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    config_path = tmp_path / "config.json"
+    results_path = tmp_path / "results.json"
+    replay_path = tmp_path / "replay.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "tokens": ["token-0", "token-1"],
+                "players": [{"name": "Sweep Painter 1"}, {"name": "Sweep Painter 2"}],
+                "width": 12,
+                "height": 8,
+                "max_ticks": 1,
+                "tick_rate": 100,
+                "player_connect_timeout_seconds": 0.05,
+            }
+        )
+    )
+    monkeypatch.setenv(CONFIG_ENV_VAR, config_path.as_uri())
+    monkeypatch.setenv(RESULTS_ENV_VAR, results_path.as_uri())
+    monkeypatch.setenv(REPLAY_SAVE_ENV_VAR, replay_path.as_uri())
+    monkeypatch.delenv(REPLAY_LOAD_ENV_VAR, raising=False)
+
+    spec = importlib.util.spec_from_file_location("paintarena_disconnect_test", _example_root() / "game" / "server.py")
+    assert spec is not None
+    assert spec.loader is not None
+    server_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(server_module)
+    server_module_typed = cast(Any, server_module)
+    server_module_typed.server = SimpleNamespace(should_exit=False)
+
+    with TestClient(server_module_typed.app) as client:
+        with client.websocket_connect("/player?slot=0&token=token-0") as websocket:
+            assert websocket.receive_json()["slot"] == 0
+        deadline = time.monotonic() + 1
+        while not results_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.01)
+
+    assert json.loads(results_path.read_text()) == {"scores": [1.0, 1.0], "painted_tiles": [1, 1], "ticks": 1}
+    assert json.loads(replay_path.read_text())["frames"][0]["started"] is True
 
 
 def test_cogs_vs_clips_coworld_manifest_validates() -> None:

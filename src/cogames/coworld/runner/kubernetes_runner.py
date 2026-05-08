@@ -131,7 +131,7 @@ def _run_kubernetes_episode(
 
     try:
         _create_game_service(core_v1, namespace, service_name, job_id, owner_references)
-        _wait_for_health(timeout_seconds=timeout_seconds)
+        _wait_for_health(core_v1, namespace, pod_name, timeout_seconds=timeout_seconds)
         if players:
             _require_http_ok(_player_client_url(0, tokens[0], players[0]))
             asyncio.run(_require_bad_player_rejected(f"ws://127.0.0.1:{GAME_PORT}/player?slot=0&token=bad"))
@@ -244,10 +244,11 @@ def _create_player_pod(
     core_v1.create_namespaced_pod(namespace=namespace, body=pod)
 
 
-def _wait_for_health(*, timeout_seconds: float) -> None:
+def _wait_for_health(core_v1, namespace: str, pod_name: str, *, timeout_seconds: float) -> None:
     deadline = time.monotonic() + timeout_seconds
     url = f"http://127.0.0.1:{GAME_PORT}/healthz"
     while time.monotonic() < deadline:
+        _raise_if_game_terminated(core_v1, namespace, pod_name)
         try:
             response = httpx.get(url, timeout=1.0)
             if response.status_code == 200:
