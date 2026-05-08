@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import cast
 from urllib.parse import unquote, urlparse
 
+from cogames.coworld.manifest_validation import game_config_with_tokens, validate_coworld_manifest_game_configs
 from cogames.coworld.runner.runner import (
     EpisodeArtifacts,
     PlayerLaunchSpec,
@@ -18,7 +19,7 @@ from cogames.coworld.schema_validation import (
     load_json_object,
     validate_json_schema,
 )
-from cogames.coworld.types import CoworldEpisodeJobSpec, CoworldManifest, CoworldPlayerSpec
+from cogames.coworld.types import CoworldEpisodeJobSpec, CoworldManifest, CoworldPlayerSpec, coworld_manifest_schema
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,9 @@ def resolve_manifest_uri(base_dir: Path, manifest_uri: str) -> Path:
 def load_coworld_package(manifest_path: Path) -> CoworldPackage:
     manifest_path = manifest_path.resolve()
     manifest = load_json_object(manifest_path)
+    validate_json_schema(manifest, coworld_manifest_schema())
     typed_manifest = CoworldManifest.model_validate(manifest)
+    validate_coworld_manifest_game_configs(typed_manifest)
 
     package = CoworldPackage(
         manifest_path=manifest_path,
@@ -91,10 +94,9 @@ def validate_image_references(package: CoworldPackage) -> None:
 
 
 def build_game_config(package: CoworldPackage, tokens: list[str]) -> JsonObject:
-    game_config = dict(package.manifest.certification.game_config)
-    game_config["tokens"] = tokens
+    game_config = game_config_with_tokens(package.manifest.certification.game_config, tokens)
     validate_json_schema(game_config, package.config_schema)
-    return cast(JsonObject, game_config)
+    return game_config
 
 
 def build_episode_request(package: CoworldPackage, artifacts: EpisodeArtifacts) -> JsonObject:

@@ -119,9 +119,12 @@ _Contract to be specified._
 
 ### Variants
 
-A graph of game configurations, each of which adheres to the game's config schema. It factorizes the game into mechanics,
-so walking the tree generates experience targeted at learning different aspects of the game independently for training
-purposes.
+A graph of token-free game configurations. Variants factorize the game into mechanics, so walking the tree generates
+experience targeted at learning different aspects of the game independently for training purposes.
+
+Each `variants[].game_config` is author-owned game data and must omit runner-managed `tokens`. Certification validates
+each variant by injecting dummy tokens of the exact fixed length declared by `game.config_schema.properties.tokens`, then
+checking the derived playable config against the game's config schema.
 
 ## Play
 
@@ -151,6 +154,9 @@ Operational details:
 Certification validates the Coworld manifest, checks referenced files and images, verifies the Cogame serves its player
 and global browser clients in rollout mode, verifies the Cogame serves its replay browser client in replay mode, runs one
 smoke episode through Docker, and verifies the produced results and replay artifacts.
+
+Manifest validation requires `game.config_schema` to define `tokens` as a required string array with equal `minItems` and
+`maxItems`. The certification fixture's player count must match that fixed token count.
 
 ## Upload
 

@@ -22,10 +22,11 @@ The `game` object contains:
 - `protocols.player`: documentation for the player websocket protocol,
 - `protocols.global`: documentation for the global websocket protocol.
 
-The `config_schema` must require `tokens`, an array of runner-managed player tokens. The array may be empty for games
-that allow browser players to join normally without runner-managed policy slots. Games with fixed player counts may
-define stricter cardinality in their own config schema. The `results_schema` must require `scores`, one scalar score per
-player slot, and may define additional game-specific result fields.
+The `config_schema` must require `tokens`, an array of runner-managed player tokens. `tokens` must declare an exact
+fixed length with equal `minItems` and `maxItems`; that length is the Cogame's runner-managed player count. Author-owned
+game configs such as certification fixtures and Coworld variants must omit `tokens`. The runner injects generated tokens
+when it derives the concrete runtime config. The `results_schema` must require `scores`, one scalar score per player
+slot, and may define additional game-specific result fields.
 
 ## Container Contract
 
@@ -98,9 +99,8 @@ player-supplied connection metadata as untrusted.
 
 1. The runner receives episode config containing `game_config`, `players`, and artifact output URIs.
 2. The runner generates a random string token for each player slot.
-3. The runner writes game config JSON matching the manifest's `config_schema` to a file, replacing/inserting
-   `tokens` with the generated token array. The token array may be empty when the episode has no runner-managed
-   players.
+3. The runner writes game config JSON matching the manifest's `config_schema` to a file, inserting `tokens` with the
+   generated token array.
 4. The runner starts the game engine container and supplies:
    - `COGAME_CONFIG_PATH`: path to the config JSON file,
    - `COGAME_RESULTS_PATH`: path where the game writes final results,

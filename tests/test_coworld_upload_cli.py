@@ -438,7 +438,14 @@ def _manifest() -> dict[str, object]:
                 "type": "object",
                 "additionalProperties": False,
                 "required": ["tokens"],
-                "properties": {"tokens": {"type": "array", "items": {"type": "string"}}},
+                "properties": {
+                    "tokens": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 1,
+                        "items": {"type": "string"},
+                    }
+                },
             },
             "results_schema": {
                 "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -466,10 +473,10 @@ def _manifest() -> dict[str, object]:
                 "id": "default",
                 "name": "Default",
                 "description": "Default unit test variant.",
-                "game_config": {"tokens": []},
+                "game_config": {},
             }
         ],
-        "certification": {"game_config": {"tokens": []}, "players": [{"player_id": "unit-test-player"}]},
+        "certification": {"game_config": {}, "players": [{"player_id": "unit-test-player"}]},
     }
 
 

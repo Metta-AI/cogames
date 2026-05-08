@@ -10,7 +10,6 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 from fastapi.testclient import TestClient
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
-from pydantic import ValidationError as PydanticValidationError
 from starlette.websockets import WebSocketDisconnect
 
 from cogames.coworld.certifier import (
@@ -82,7 +81,7 @@ def test_load_coworld_package_rejects_invalid_certification_player_entry(tmp_pat
         },
     )
 
-    with pytest.raises(PydanticValidationError, match="player_id"):
+    with pytest.raises(JsonSchemaValidationError, match="player_id"):
         load_coworld_package(coworld_manifest_path)
 
 
@@ -95,7 +94,7 @@ def test_load_coworld_package_rejects_extra_certification_player_fields(tmp_path
         },
     )
 
-    with pytest.raises(PydanticValidationError, match="Extra inputs are not permitted"):
+    with pytest.raises(JsonSchemaValidationError, match="Additional properties are not allowed"):
         load_coworld_package(coworld_manifest_path)
 
 
@@ -154,16 +153,48 @@ def test_assert_docker_image_reachable_rejects_missing_image(monkeypatch: pytest
 
 
 def test_build_game_config_validates_after_tokens_are_injected_via_json_schema(tmp_path: Path) -> None:
-    package = _write_package(tmp_path, config_schema_required=["tokens", "missing"])
-
     with pytest.raises(JsonSchemaValidationError):
-        build_game_config(package, ["token-0"])
+        _write_package(tmp_path, config_schema_required=["tokens", "missing"])
 
 
-def test_build_game_config_allows_empty_tokens_when_game_schema_does(tmp_path: Path) -> None:
+def test_build_game_config_rejects_wrong_token_count(tmp_path: Path) -> None:
     package = _write_package(tmp_path)
 
-    assert build_game_config(package, [])["tokens"] == []
+    with pytest.raises(JsonSchemaValidationError):
+        build_game_config(package, [])
+
+
+def test_load_coworld_package_requires_fixed_token_count(tmp_path: Path) -> None:
+    coworld_manifest_path = _write_package_files(tmp_path)
+    manifest = json.loads(coworld_manifest_path.read_text())
+    del manifest["game"]["config_schema"]["properties"]["tokens"]["maxItems"]
+    coworld_manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match="equal minItems and maxItems"):
+        load_coworld_package(coworld_manifest_path)
+
+
+def test_load_coworld_package_rejects_tokens_in_variant_game_config(tmp_path: Path) -> None:
+    coworld_manifest_path = _write_package_files(tmp_path)
+    manifest = json.loads(coworld_manifest_path.read_text())
+    manifest["variants"][0]["game_config"]["tokens"] = ["token-0"]
+    coworld_manifest_path.write_text(json.dumps(manifest))
+
+    with pytest.raises(ValueError, match="must not include runner-managed tokens"):
+        load_coworld_package(coworld_manifest_path)
+
+
+def test_load_coworld_package_requires_certification_player_count_to_match_tokens(tmp_path: Path) -> None:
+    coworld_manifest_path = _write_package_files(
+        tmp_path,
+        certification={
+            "game_config": {"difficulty": "easy"},
+            "players": [{"player_id": "unit-test-player"}, {"player_id": "unit-test-player"}],
+        },
+    )
+
+    with pytest.raises(ValueError, match="certification.players must match"):
+        load_coworld_package(coworld_manifest_path)
 
 
 def test_load_results_validates_against_cogame_results_schema(tmp_path: Path) -> None:
@@ -607,7 +638,8 @@ def _game_manifest(*, config_schema_required: list[str] | None = None) -> dict[s
             "properties": {
                 "tokens": {
                     "type": "array",
-                    "minItems": 0,
+                    "minItems": 1,
+                    "maxItems": 1,
                     "items": {"type": "string", "minLength": 1},
                 },
                 "difficulty": {"type": "string"},
