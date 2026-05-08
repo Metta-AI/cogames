@@ -19,6 +19,7 @@ from cogames.coworld.upload import (
     CoworldListEntry,
     CoworldUploadClient,
     CoworldUploadResponse,
+    download_coworld_cmd,
     upload_coworld_cmd,
     upload_policy_cmd,
 )
@@ -145,6 +146,21 @@ def upload_coworld(
         server=server,
         login_server=login_server,
         timeout_seconds=timeout_seconds,
+    )
+
+
+@app.command("download")
+def download(
+    coworld_id: Annotated[str, typer.Argument(help="Coworld ID to download.")],
+    output_dir: Annotated[Path, typer.Option("--output-dir", "-o", help="Directory for downloaded files.")] = Path(
+        "./coworld-download"
+    ),
+    server: Annotated[str, typer.Option("--server", help="Observatory API server URL.")] = DEFAULT_SUBMIT_SERVER,
+) -> None:
+    download_coworld_cmd(
+        coworld_id,
+        output_dir,
+        server=server,
     )
 
 

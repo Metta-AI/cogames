@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import subprocess
 import tarfile
 import tempfile
@@ -20,6 +21,8 @@ from pydantic import BaseModel
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 from cogames.coworld.certifier import certify_coworld, load_coworld_package, resolve_manifest_uri
 from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
+
+_LOCAL_TAG_SEPARATOR_RE = re.compile(r"[^a-z0-9._-]+")
 
 
 class CoworldUploadResponse(BaseModel):
@@ -269,6 +272,60 @@ def upload_policy_cmd(
     typer.echo(f"Upload complete: {result.name}:v{result.version}")
 
 
+def download_coworld(
+    coworld_id: str,
+    *,
+    server: str = DEFAULT_SUBMIT_SERVER,
+) -> CoworldUploadResponse:
+    with httpx.Client(base_url=server, timeout=30.0) as http_client:
+        response = http_client.get(f"/v2/coworlds/{coworld_id}", timeout=120.0)
+    response.raise_for_status()
+    return CoworldUploadResponse.model_validate(response.json())
+
+
+def download_coworld_cmd(
+    coworld_id: str,
+    output_dir: Path,
+    *,
+    server: str = DEFAULT_SUBMIT_SERVER,
+) -> None:
+    coworld = download_coworld(coworld_id, server=server)
+
+    image_tags = _local_image_tags(coworld)
+    for public_image_uri, local_tag in image_tags.items():
+        subprocess.run(["docker", "pull", public_image_uri], check=True)
+        subprocess.run(["docker", "tag", public_image_uri, local_tag], check=True)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    manifest = _manifest_with_local_images(coworld.manifest, image_tags)
+    manifest_path = output_dir / "coworld_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    image_map_path = output_dir / "coworld_images.json"
+    image_map_path.write_text(
+        json.dumps(
+            {
+                "coworld_id": coworld.id,
+                "name": coworld.name,
+                "version": coworld.version,
+                "images": [
+                    {
+                        "public_image_uri": public_image_uri,
+                        "local_image": local_tag,
+                    }
+                    for public_image_uri, local_tag in image_tags.items()
+                ],
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    typer.echo(f"Downloaded Coworld: {coworld.name}:{coworld.version}")
+    typer.echo(f"Manifest: {manifest_path}")
+    typer.echo(f"Images: {image_map_path}")
+
+
 def _manifest_with_softmax_image_ids(client: CoworldUploadClient, manifest: dict[str, object]) -> dict[str, object]:
     upload_manifest = copy.deepcopy(manifest)
     replacements = {
@@ -294,6 +351,36 @@ def _manifest_image_fields(value: object) -> list[dict[str, Any]]:
         for item in value.values():
             fields.extend(_manifest_image_fields(item))
     return fields
+
+
+def _local_image_tags(coworld: CoworldUploadResponse) -> dict[str, str]:
+    images = sorted({runnable["image"] for runnable in _manifest_image_fields(coworld.manifest)})
+    return {
+        image: _local_image_tag(coworld.id, coworld.name, coworld.version, index) for index, image in enumerate(images)
+    }
+
+
+def _local_image_tag(coworld_id: str, coworld_name: str, coworld_version: str, index: int) -> str:
+    coworld = _slug_for_local_image(coworld_id, "coworld")
+    name = _slug_for_local_image(coworld_name, "coworld")
+    version = _slug_for_local_image(coworld_version, "version")
+    return f"coworld/{coworld}/{name}-{version}-{index}:downloaded"
+
+
+def _slug_for_local_image(value: str, fallback: str) -> str:
+    slug = _LOCAL_TAG_SEPARATOR_RE.sub("-", value.lower()).strip("._-")
+    return slug or fallback
+
+
+def _manifest_with_local_images(
+    manifest: dict[str, Any],
+    image_tags: dict[str, str],
+) -> dict[str, Any]:
+    local_manifest = copy.deepcopy(manifest)
+    for runnable in _manifest_image_fields(local_manifest):
+        image = runnable["image"]
+        runnable["image"] = image_tags[image]
+    return local_manifest
 
 
 def _upload_container_image(client: CoworldUploadClient, image: str) -> ContainerImageResponse:

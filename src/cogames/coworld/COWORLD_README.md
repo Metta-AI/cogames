@@ -197,3 +197,14 @@ docker build --platform=linux/amd64 -t my-coworld-runtime:latest .
 
 Production Coworld jobs run on linux/amd64 Kubernetes nodes. Build local images for `linux/amd64` before uploading,
 especially from Apple Silicon machines.
+
+## Download
+
+To download a published Coworld manifest and retag its public images for local development:
+
+```bash
+uv run cogames coworld download cow_...
+```
+
+The command fetches the public manifest, pulls each referenced public image, writes a local `coworld_manifest.json`, and
+writes `coworld_images.json` with the public-to-local image tag mapping.

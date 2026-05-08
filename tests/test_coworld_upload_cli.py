@@ -14,6 +14,7 @@ from cogames.coworld.schema_validation import JsonObject
 from cogames.coworld.upload import (
     _docker_archive_client_hash,
     _local_image_client_hash,
+    _local_image_tag,
     _manifest_doc_paths,
     _manifest_with_inlined_docs,
     upload_coworld,
@@ -464,6 +465,70 @@ def test_coworld_images_command_shows_uploaded_image(httpserver: HTTPServer, mon
 
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["name"] == "unit-test-runtime"
+
+
+def test_download_coworld_command_writes_local_package(
+    tmp_path: Path,
+    httpserver: HTTPServer,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    public_image_uri = "public.ecr.aws/softmax/cogames@sha256:public-digest"
+    output_dir = tmp_path / "downloaded"
+    docker_calls: list[list[str]] = []
+
+    def fake_run(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        docker_calls.append(command)
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr("cogames.coworld.upload.subprocess.run", fake_run)
+    httpserver.expect_request(
+        "/v2/coworlds/cow_00000000-0000-0000-0000-000000000040",
+        method="GET",
+    ).respond_with_json(
+        {
+            "id": "cow_00000000-0000-0000-0000-000000000040",
+            "name": "unit-test-game",
+            "version": "0.1.0",
+            "manifest": _manifest_with_image(public_image_uri),
+            "manifest_hash": "sha256:manifest-hash",
+            "size_bytes": 1234,
+        }
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "coworld",
+            "download",
+            "cow_00000000-0000-0000-0000-000000000040",
+            "--output-dir",
+            str(output_dir),
+            "--server",
+            httpserver.url_for(""),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    local_image = "coworld/cow_00000000-0000-0000-0000-000000000040/unit-test-game-0.1.0-0:downloaded"
+    assert docker_calls == [
+        ["docker", "pull", public_image_uri],
+        ["docker", "tag", public_image_uri, local_image],
+    ]
+    manifest = json.loads((output_dir / "coworld_manifest.json").read_text())
+    assert manifest["game"]["runnable"]["image"] == local_image
+    assert manifest["player"][0]["image"] == local_image
+    image_map = json.loads((output_dir / "coworld_images.json").read_text())
+    assert image_map["images"] == [{"public_image_uri": public_image_uri, "local_image": local_image}]
+    assert "Downloaded Coworld: unit-test-game:0.1.0" in result.output
+
+
+def test_downloaded_image_tags_include_coworld_id() -> None:
+    assert _local_image_tag("cow_00000000-0000-0000-0000-000000000041", "unit-test-game", "0.1.0", 0) == (
+        "coworld/cow_00000000-0000-0000-0000-000000000041/unit-test-game-0.1.0-0:downloaded"
+    )
+    assert _local_image_tag("cow_00000000-0000-0000-0000-000000000042", "unit-test-game", "0.1.0", 0) == (
+        "coworld/cow_00000000-0000-0000-0000-000000000042/unit-test-game-0.1.0-0:downloaded"
+    )
 
 
 def test_local_image_client_hash_uses_docker_archive_content(monkeypatch: pytest.MonkeyPatch) -> None:
