@@ -196,13 +196,13 @@ class CogsVsClipsGame:
         snapshot["slots"] = [
             {
                 **slot_state,
-                "player_client_url": self.player_client_url(int(slot_state["slot"])),
+                "takeover_url": self.takeover_url(int(slot_state["slot"])),
             }
             for slot_state in snapshot["slots"]
         ]
         return snapshot
 
-    def player_client_url(self, slot: int) -> str:
+    def takeover_url(self, slot: int) -> str:
         return f"/player?{urlencode({'slot': slot, 'token': self.tokens[slot], 'takeover': 1})}"
 
     def global_status(self) -> dict[str, Any]:
@@ -313,7 +313,23 @@ def create_app(
     @app.websocket("/admin")
     async def admin(websocket: WebSocket) -> None:
         await websocket.accept()
-        await websocket.send_json(game.admin_snapshot())
+        send_lock = asyncio.Lock()
+        sender = asyncio.create_task(_send_admin_snapshots(websocket, send_lock))
+        receiver = asyncio.create_task(_drain_admin_commands(websocket, send_lock))
+        done, pending = await asyncio.wait({sender, receiver}, return_when=asyncio.FIRST_COMPLETED)
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+        for task in done:
+            task.result()
+
+    async def _send_admin_snapshots(websocket: WebSocket, send_lock: asyncio.Lock) -> None:
+        while not game.episode.done:
+            await _send_admin_snapshot(websocket, send_lock)
+            await asyncio.sleep(0.25)
+        await _send_admin_snapshot(websocket, send_lock)
+
+    async def _drain_admin_commands(websocket: WebSocket, send_lock: asyncio.Lock) -> None:
         async for command in websocket.iter_json():
             if command["command"] == "pause":
                 game.episode.paused = True
@@ -328,10 +344,12 @@ def create_app(
                 game.episode.tick_mode = cast(TickMode, tick_mode)
             elif command["command"] == "human_action_timeout_seconds":
                 game.episode.human_action_timeout_seconds = float(command["human_action_timeout_seconds"])
-            elif command["command"] == "takeover":
-                game.episode.takeover(int(command["slot"]), str(command["connection_id"]))
-            elif command["command"] == "release_takeover":
-                game.episode.release_takeover(int(command["slot"]), command.get("connection_id"))
+            elif command["command"] == "boot_connection":
+                await game.episode.boot_connection(str(command["connection_id"]))
+            await _send_admin_snapshot(websocket, send_lock)
+
+    async def _send_admin_snapshot(websocket: WebSocket, send_lock: asyncio.Lock) -> None:
+        async with send_lock:
             await websocket.send_json(game.admin_snapshot())
 
     @app.websocket("/player")

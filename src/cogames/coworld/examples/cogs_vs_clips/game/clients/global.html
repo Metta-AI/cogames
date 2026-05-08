@@ -2,28 +2,35 @@
 <title>Cogs vs Clips Global Client</title>
 <style>
   :root {
-    color: #172033;
-    font-family: system-ui, sans-serif;
+    color: #d8dee9;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    font-size: 14px;
+  }
+  * {
+    box-sizing: border-box;
   }
   body {
     margin: 0;
-    background: #f6f7f9;
+    background: #101418;
   }
   header {
-    align-items: center;
-    background: #ffffff;
-    border-bottom: 1px solid #d7dde7;
+    align-items: end;
+    background: #101418;
+    border-bottom: 1px solid #27313b;
     display: flex;
     gap: 16px;
+    justify-content: space-between;
     padding: 12px 18px;
   }
   h1 {
-    font-size: 18px;
+    color: #f5f7fa;
+    font-size: 20px;
+    font-weight: 700;
     line-height: 1.2;
     margin: 0;
   }
   #status {
-    color: #4a5568;
+    color: #9fb0c3;
     font-size: 13px;
   }
   main {
@@ -35,8 +42,10 @@
   }
   #mettascopeWrap {
     background: #05070a;
-    border: 1px solid #1f2937;
+    border: 1px solid #2b3540;
+    border-radius: 6px;
     min-height: 360px;
+    overflow: hidden;
     position: relative;
   }
   #mettascope {
@@ -46,9 +55,9 @@
     width: 100%;
   }
   #fallback {
-    background: #ffffff;
-    border: 1px solid #d7dde7;
+    background: #0b0f14;
     display: grid;
+    height: 100%;
     min-height: 360px;
     place-items: center;
   }
@@ -58,14 +67,16 @@
     width: min(78vh, 720px);
   }
   aside {
-    background: #ffffff;
-    border: 1px solid #d7dde7;
+    background: #161c22;
+    border: 1px solid #2b3540;
+    border-radius: 6px;
     display: flex;
     flex-direction: column;
     min-width: 0;
     padding: 12px;
   }
   h2 {
+    color: #f5f7fa;
     font-size: 14px;
     margin: 0 0 10px;
   }
@@ -77,15 +88,17 @@
     margin: 0 0 12px;
   }
   dt {
-    color: #667085;
+    color: #7d8b9c;
   }
   dd {
     margin: 0;
     overflow-wrap: anywhere;
   }
   pre {
-    background: #f2f4f7;
-    border: 1px solid #d7dde7;
+    background: #0f1419;
+    border: 1px solid #27313b;
+    border-radius: 4px;
+    color: #b7c4d3;
     flex: 1;
     margin: 0;
     min-height: 0;
@@ -146,7 +159,7 @@
   const canvas = document.getElementById('board')
   const ctx = canvas.getContext('2d')
 
-  const agentColors = ['#2563eb', '#dc2626', '#059669', '#7c3aed', '#c2410c', '#0891b2', '#9333ea', '#4d7c0f']
+  const agentColors = ['#2dd4bf', '#ff6b6b', '#78d8a6', '#b48ead', '#ffd166', '#7aa2f7', '#f59e0b', '#a3e635']
   let mapSize = [24, 24]
   let staticObjects = []
   let dynamicObjects = []
@@ -175,9 +188,9 @@
     const height = Number(mapSize[1] || 24)
     const scale = Math.min(canvas.width / width, canvas.height / height)
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = '#f8fafc'
+    ctx.fillStyle = '#0b0f14'
     ctx.fillRect(0, 0, width * scale, height * scale)
-    ctx.strokeStyle = '#e2e8f0'
+    ctx.strokeStyle = '#202a35'
     ctx.lineWidth = 1
     for (let x = 0; x <= width; x += 1) {
       ctx.beginPath()
@@ -199,7 +212,7 @@
       const px = x * scale
       const py = y * scale
       if (object.type_name === 'wall') {
-        ctx.fillStyle = '#334155'
+        ctx.fillStyle = '#4b5563'
         ctx.fillRect(px, py, scale, scale)
         continue
       }
@@ -209,14 +222,14 @@
         ctx.beginPath()
         ctx.arc(px + scale / 2, py + scale / 2, Math.max(4, scale * 0.38), 0, Math.PI * 2)
         ctx.fill()
-        ctx.fillStyle = '#ffffff'
-        ctx.font = `${Math.max(9, scale * 0.42)}px system-ui`
+        ctx.fillStyle = '#050607'
+        ctx.font = `${Math.max(9, scale * 0.42)}px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace`
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
         ctx.fillText(String(agentId + 1), px + scale / 2, py + scale / 2)
         continue
       }
-      ctx.fillStyle = '#d97706'
+      ctx.fillStyle = '#f59e0b'
       ctx.fillRect(px + scale * 0.18, py + scale * 0.18, scale * 0.64, scale * 0.64)
     }
   }

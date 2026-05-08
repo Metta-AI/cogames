@@ -1,61 +1,54 @@
 <!doctype html>
 <title>Cogs vs Clips Player Client</title>
 <style>
-  :root { color: #172033; font-family: system-ui, sans-serif; }
-  body { margin: 0; background: #f6f7f9; }
-  header { align-items: center; background: #ffffff; border-bottom: 1px solid #d7dde7; display: flex; gap: 16px; padding: 12px 18px; }
-  h1 { font-size: 18px; line-height: 1.2; margin: 0; }
-  #status { color: #4a5568; font-size: 13px; }
-  main { display: grid; gap: 14px; grid-template-columns: minmax(360px, 1fr) 340px; padding: 14px; }
-  #obs { background: #ffffff; border: 1px solid #d7dde7; display: grid; gap: 2px; width: min(86vh, 100%); }
-  .cell { align-items: center; aspect-ratio: 1; background: #f8fafc; border: 1px solid #e2e8f0; display: flex; flex-direction: column; font-size: 10px; justify-content: center; line-height: 1.05; min-width: 0; overflow: hidden; padding: 2px; text-align: center; }
-  .center { box-shadow: inset 0 0 0 2px #111827; }
-  .agent { background: #dbeafe; border-color: #2563eb; color: #1d4ed8; font-weight: 700; }
-  .wall { background: #334155; border-color: #1e293b; color: #ffffff; }
-  .object { background: #fef3c7; border-color: #d97706; color: #92400e; }
-  .empty { color: #98a2b3; }
-  aside { background: #ffffff; border: 1px solid #d7dde7; padding: 12px; }
-  h2 { font-size: 14px; margin: 0 0 10px; }
-  #actions { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
-  button { background: #ffffff; border: 1px solid #9aa8bd; border-radius: 6px; color: #172033; min-height: 38px; padding: 7px 8px; }
-  button:active { background: #e8eef8; }
-  pre { background: #f2f4f7; border: 1px solid #d7dde7; margin: 0; max-height: 340px; overflow: auto; padding: 10px; white-space: pre-wrap; }
-  @media (max-width: 820px) {
-    main { grid-template-columns: 1fr; }
-    #obs { width: 100%; }
+  :root {
+    background: #050607;
+    color: #f7fafc;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { background: #050607; }
+  #screen { display: block; height: 100vh; image-rendering: pixelated; width: 100vw; }
+  #hud {
+    background: rgba(5, 6, 7, 0.74);
+    border: 1px solid rgba(216, 222, 233, 0.24);
+    border-radius: 6px;
+    color: #d8dee9;
+    left: 12px;
+    line-height: 1.5;
+    max-width: calc(100vw - 24px);
+    padding: 8px 10px;
+    position: fixed;
+    top: 12px;
+    white-space: nowrap;
+  }
+  #hud .mode { color: #78d8a6; font-weight: 700; text-transform: uppercase; }
+  #hud .mode.human { color: #ffd166; }
+  #hud .muted { color: #8b98a8; }
 </style>
-<header>
-  <h1>Cogs vs Clips</h1>
-  <div id="status">Connecting</div>
-</header>
-<main>
-  <section id="obs"></section>
-  <aside>
-    <h2 id="identity">Player</h2>
-    <button id="takeover" type="button">Take over</button>
-    <button id="release" type="button">Release</button>
-    <div id="actions"></div>
-    <pre id="latest"></pre>
-  </aside>
-</main>
+<canvas id="screen"></canvas>
+<div id="hud">
+  <span id="identity">Connecting</span>
+  <span class="muted" id="details"></span>
+</div>
 <script>
   const websocketUrl = new URL(window.location.href);
   websocketUrl.protocol = websocketUrl.protocol === "https:" ? "wss:" : "ws:";
 
-  const status = document.getElementById("status");
+  const screen = document.getElementById("screen");
+  const context = screen.getContext("2d");
   const identity = document.getElementById("identity");
-  const actions = document.getElementById("actions");
-  const takeover = document.getElementById("takeover");
-  const release = document.getElementById("release");
-  const latest = document.getElementById("latest");
-  const obs = document.getElementById("obs");
+  const details = document.getElementById("details");
   const autoTakeover = new URLSearchParams(window.location.search).get("takeover") === "1";
 
   let socket;
   let config = null;
   let featureNames = new Map();
   let actionNames = [];
+  let cells = new Map();
+  let latestStep = null;
+  let controlState = null;
   let done = false;
   let autoTakeoverSent = false;
 
@@ -63,25 +56,14 @@
     config = message;
     actionNames = message.action_names || [];
     featureNames = new Map((message.observation.features || []).map(feature => [feature.id, feature.name]));
-    identity.textContent = `Player ${message.slot + 1}`;
-    obs.style.gridTemplateColumns = `repeat(${message.observation.width}, minmax(0, 1fr))`;
-    drawCells(new Map());
-    drawActions(actionNames);
-    updateStatus(message.control_state, null);
+    controlState = message.control_state;
+    identity.textContent = `Slot ${message.slot + 1}`;
+    updateHud();
+    draw();
     if (autoTakeover && !autoTakeoverSent) {
       autoTakeoverSent = true;
       requestTakeover();
     }
-  }
-
-  function drawActions(names) {
-    actions.replaceChildren(...names.map((name, index) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = name.replace("change_vibe_", "vibe ");
-      button.onclick = () => sendAction(index);
-      return button;
-    }));
   }
 
   function packedLocation(location) {
@@ -89,69 +71,84 @@
   }
 
   function tokenCells(tokens) {
-    const cells = new Map();
-    const globalFeatures = {};
+    const nextCells = new Map();
     const globalLocation = config.observation.global_location;
     const emptyLocation = config.observation.empty_location;
     for (const token of tokens || []) {
       const location = Number(token[0]);
-      if (location === emptyLocation) continue;
+      if (location === emptyLocation || location === globalLocation) continue;
       const featureId = Number(token[1]);
       const value = Number(token[2]);
       const feature = featureNames.get(featureId) || `feature:${featureId}`;
-      if (location === globalLocation) {
-        globalFeatures[feature] = value;
-        continue;
-      }
       const { row, col } = packedLocation(location);
+      if (row < 0 || col < 0 || row >= config.observation.height || col >= config.observation.width) continue;
       const key = `${row},${col}`;
-      const cell = cells.get(key) || { row, col, tags: [], features: {} };
+      const cell = nextCells.get(key) || { row, col, tags: [], features: {} };
       if (feature === "tag") {
         cell.tags.push(config.observation.tags[value] || `tag:${value}`);
       } else {
         cell.features[feature] = value;
       }
-      cells.set(key, cell);
+      nextCells.set(key, cell);
     }
-    cells.globalFeatures = globalFeatures;
-    return cells;
+    return nextCells;
   }
 
-  function classify(cell) {
-    const tags = new Set(cell.tags || []);
-    if (tags.has("wall")) return "wall";
-    if (tags.has("agent")) return "agent";
-    if (tags.size > 0) return "object";
-    return "empty";
+  function hasTag(cell, name) {
+    return (cell.tags || []).some(tag => tag === name || tag === `type:${name}` || tag.endsWith(`:${name}`));
   }
 
-  function cellLabel(cell) {
-    if (!cell) return "";
-    const tags = (cell.tags || []).filter(tag => !["agent", "wall"].includes(tag));
-    const id = cell.features.agent_id;
-    if (id != null) return `cog ${id + 1}`;
-    if (tags.length) return tags[0].replaceAll("_", " ");
-    const feature = Object.keys(cell.features || {}).find(name => name.startsWith("inv:"));
-    return feature ? `${feature.slice(4)} ${cell.features[feature]}` : "";
+  function cellColor(cell) {
+    if (!cell) return "#0f1419";
+    if (hasTag(cell, "wall")) return "#4b5563";
+    if (hasTag(cell, "agent")) return "#2dd4bf";
+    if ((cell.tags || []).length > 0) return "#f59e0b";
+    return "#9f7aea";
   }
 
-  function drawCells(cells) {
-    const height = config.observation.height;
-    const width = config.observation.width;
-    const centerRow = Math.floor(height / 2);
-    const centerCol = Math.floor(width / 2);
-    const elements = [];
-    for (let row = 0; row < height; row += 1) {
-      for (let col = 0; col < width; col += 1) {
+  function draw() {
+    const pixelRatio = window.devicePixelRatio || 1;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    screen.width = Math.floor(width * pixelRatio);
+    screen.height = Math.floor(height * pixelRatio);
+    screen.style.width = `${width}px`;
+    screen.style.height = `${height}px`;
+    context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    context.fillStyle = "#050607";
+    context.fillRect(0, 0, width, height);
+    if (!config) return;
+
+    const gridWidth = config.observation.width;
+    const gridHeight = config.observation.height;
+    const tile = Math.max(1, Math.floor(Math.min(width / gridWidth, height / gridHeight)));
+    const originX = Math.floor((width - gridWidth * tile) / 2);
+    const originY = Math.floor((height - gridHeight * tile) / 2);
+
+    context.fillStyle = "#0b0f14";
+    context.fillRect(originX, originY, gridWidth * tile, gridHeight * tile);
+    const inset = tile > 3 ? 1 : 0;
+    const tileBody = Math.max(1, tile - inset * 2);
+    for (let row = 0; row < gridHeight; row += 1) {
+      for (let col = 0; col < gridWidth; col += 1) {
         const cell = cells.get(`${row},${col}`);
-        const el = document.createElement("div");
-        el.className = `cell ${cell ? classify(cell) : "empty"}`;
-        if (row === centerRow && col === centerCol) el.classList.add("center");
-        el.textContent = cellLabel(cell);
-        elements.push(el);
+        context.fillStyle = cellColor(cell);
+        context.fillRect(originX + col * tile + inset, originY + row * tile + inset, tileBody, tileBody);
       }
     }
-    obs.replaceChildren(...elements);
+
+    const centerRow = Math.floor(gridHeight / 2);
+    const centerCol = Math.floor(gridWidth / 2);
+    const outlineInset = tile > 6 ? 2 : 0;
+    const outlineBody = Math.max(1, tile - outlineInset * 2);
+    context.strokeStyle = "#ffffff";
+    context.lineWidth = Math.max(2, Math.floor(tile * 0.05));
+    context.strokeRect(
+      originX + centerCol * tile + outlineInset,
+      originY + centerRow * tile + outlineInset,
+      outlineBody,
+      outlineBody,
+    );
   }
 
   function sendAction(index) {
@@ -159,65 +156,84 @@
     socket.send(JSON.stringify({ type: "action", action_index: index }));
   }
 
+  function sendActionName(name) {
+    const index = actionNames.indexOf(name);
+    if (index < 0) return;
+    sendAction(index);
+  }
+
   function requestTakeover() {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify({ type: "takeover" }));
   }
 
-  function updateStatus(controlState, step) {
-    const mode = controlState && controlState.control_mode === "human" ? "Human" : "Policy";
-    status.textContent = step == null ? `${mode} control` : `Step ${step} - ${mode} control`;
+  function releaseTakeover() {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({ type: "release_takeover" }));
+  }
+
+  function updateHud() {
+    const mode = controlState && controlState.control_mode === "human" ? "human" : "policy";
+    const stepText = latestStep == null ? "" : ` step ${latestStep}`;
+    const connectionText = config && config.connection_id ? ` ${config.connection_id}` : "";
+    const modeSpan = document.createElement("span");
+    modeSpan.className = mode === "human" ? "mode human" : "mode";
+    modeSpan.textContent = mode;
+    const meta = document.createElement("span");
+    meta.className = "muted";
+    meta.textContent = `${connectionText}${stepText}`;
+    details.replaceChildren(document.createTextNode(" "), modeSpan, meta);
   }
 
   function handleObservation(message) {
-    const cells = tokenCells(message.observation);
-    drawCells(cells);
-    updateStatus(message.control_state, message.step);
-    latest.textContent = JSON.stringify({
-      slot: message.slot,
-      step: message.step,
-      control_state: message.control_state,
-      global_features: cells.globalFeatures,
-      actions: actionNames,
-    }, null, 2);
+    cells = tokenCells(message.observation);
+    latestStep = message.step;
+    controlState = message.control_state;
+    updateHud();
+    draw();
   }
 
-  takeover.onclick = requestTakeover;
-  release.onclick = () => {
-    if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ type: "release_takeover" }));
-  };
+  window.addEventListener("resize", draw);
+  window.addEventListener("keydown", (event) => {
+    const actionsByKey = {
+      ArrowUp: "move_north",
+      w: "move_north",
+      ArrowDown: "move_south",
+      s: "move_south",
+      ArrowLeft: "move_west",
+      a: "move_west",
+      ArrowRight: "move_east",
+      d: "move_east",
+      " ": "noop",
+    };
+    if (event.key === "Escape") {
+      event.preventDefault();
+      releaseTakeover();
+      return;
+    }
+    const action = actionsByKey[event.key];
+    if (!action) return;
+    event.preventDefault();
+    sendActionName(action);
+  });
 
   socket = new WebSocket(websocketUrl);
-  socket.onopen = () => { status.textContent = "Connected"; };
+  socket.onopen = () => { identity.textContent = "Connected"; };
   socket.onmessage = (event) => {
     const message = JSON.parse(event.data);
     if (message.type === "player_config") configure(message);
     if (message.type === "observation") handleObservation(message);
     if (message.type === "final") {
       done = true;
-      status.textContent = `Done after ${message.step} steps`;
+      latestStep = message.step;
+      identity.textContent = "Done";
+      updateHud();
     }
   };
-  socket.onclose = () => { if (!done) status.textContent = "Disconnected"; };
-
-  window.onkeydown = (event) => {
-    const actionsByKey = {
-      w: "move_north",
-      ArrowUp: "move_north",
-      s: "move_south",
-      ArrowDown: "move_south",
-      a: "move_west",
-      ArrowLeft: "move_west",
-      d: "move_east",
-      ArrowRight: "move_east",
-      " ": "noop",
-    };
-    const action = actionsByKey[event.key];
-    if (!action) return;
-    const index = actionNames.indexOf(action);
-    if (index < 0) return;
-    event.preventDefault();
-    sendAction(index);
+  socket.onclose = (event) => {
+    if (done) return;
+    identity.textContent = event.code === 4000 ? "Booted" : "Disconnected";
+    details.textContent = "";
   };
+  draw();
 </script>

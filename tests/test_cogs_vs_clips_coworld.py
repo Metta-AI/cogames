@@ -39,15 +39,40 @@ def test_cogs_vs_clips_admin_snapshot_exposes_takeover_player_links(tmp_path: Pa
 
     snapshot = game.admin_snapshot()
 
-    assert all("player_client_url" not in slot for slot in game.snapshot()["slots"])
+    assert all("takeover_url" not in slot for slot in game.snapshot()["slots"])
     for slot_index, slot in enumerate(snapshot["slots"]):
-        player_link = urlparse(slot["player_client_url"])
+        player_link = urlparse(slot["takeover_url"])
         assert player_link.path == "/player"
         assert parse_qs(player_link.query) == {
             "slot": [str(slot_index)],
             "token": [game.tokens[slot_index]],
             "takeover": ["1"],
         }
+
+
+def test_cogs_vs_clips_clients_use_slot_admin_and_fullscreen_player() -> None:
+    clients_dir = _cogs_vs_clips_root() / "game" / "clients"
+    admin_html = (clients_dir / "admin.html").read_text()
+    global_html = (clients_dir / "global.html").read_text()
+    player_html = (clients_dir / "player.html").read_text()
+
+    assert "takeover_url" in admin_html
+    assert "boot_connection" in admin_html
+    assert "syncControlValue" in admin_html
+    assert "document.activeElement === control" in admin_html
+    assert "tickMode.onchange" in admin_html
+    assert "slot-summary" in admin_html
+    assert "<th>Control</th>" not in admin_html
+    assert 'command: "takeover"' not in admin_html
+    assert 'command: "release_takeover"' not in admin_html
+    assert "background: #101418" in global_html
+    assert "background: #161c22" in global_html
+    assert "ui-monospace" in global_html
+    assert '<canvas id="screen"></canvas>' in player_html
+    assert 'id="actions"' not in player_html
+    assert "tag === `type:${name}`" in player_html
+    assert "ArrowUp" in player_html
+    assert "Escape" in player_html
 
 
 def test_cogs_vs_clips_global_action_updates_policy_action(tmp_path: Path) -> None:
