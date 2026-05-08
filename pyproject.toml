@@ -69,6 +69,7 @@ cogames = [
   "docs/*.md",
   "coworld/*.json",
   "coworld/*.md",
+  "coworld/runner/*.md",
   "coworld/examples/**/*",
 ]
 metta_alo = ["py.typed"]

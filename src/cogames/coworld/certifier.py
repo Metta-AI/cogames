@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import cast
 from urllib.parse import unquote, urlparse
 
-from cogames.coworld.episode_runner import (
+from cogames.coworld.runner.runner import (
     EpisodeArtifacts,
     PlayerLaunchSpec,
     RunnableLaunchSpec,
@@ -76,7 +76,6 @@ def load_coworld_package(manifest_path: Path) -> CoworldPackage:
 
 
 def validate_certification_references(package: CoworldPackage) -> None:
-    _certification_variant(package)
     _certification_player_specs(package)
 
 
@@ -92,7 +91,7 @@ def validate_image_references(package: CoworldPackage) -> None:
 
 
 def build_game_config(package: CoworldPackage, tokens: list[str]) -> JsonObject:
-    game_config = dict(_certification_variant(package).game_config)
+    game_config = dict(package.manifest.certification.game_config)
     game_config["tokens"] = tokens
     validate_json_schema(game_config, package.config_schema)
     return cast(JsonObject, game_config)
@@ -103,7 +102,7 @@ def build_episode_request(package: CoworldPackage, artifacts: EpisodeArtifacts) 
         key: cast(object, value)
         for key, value in CoworldEpisodeJobSpec(
             manifest=package.manifest,
-            game_config=dict(_certification_variant(package).game_config),
+            game_config=dict(package.manifest.certification.game_config),
             players=_certification_player_specs(package),
         )
         .model_dump(by_alias=True, exclude_defaults=True)
@@ -192,18 +191,8 @@ def _certification_player_specs(package: CoworldPackage) -> list[CoworldPlayerSp
             raise ValueError(f"unknown certification player_id for slot {slot}: {player_id!r}")
         declared_player = declared_players[player_id]
         episode_player = CoworldPlayerSpec.model_validate(declared_player.model_dump())
-        if certification_player.initial_params:
-            episode_player = episode_player.model_copy(update={"initial_params": certification_player.initial_params})
         specs.append(episode_player)
     return specs
-
-
-def _certification_variant(package: CoworldPackage):
-    variants = _manifest_items_by_id(package, "variants")
-    variant_id = package.manifest.certification.variant_id
-    if variant_id not in variants:
-        raise ValueError(f"unknown certification variant_id: {variant_id!r}")
-    return variants[variant_id]
 
 
 def _manifest_items_by_id(package: CoworldPackage, section: str):

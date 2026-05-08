@@ -469,7 +469,7 @@ def _manifest() -> dict[str, object]:
                 "game_config": {"tokens": []},
             }
         ],
-        "certification": {"variant_id": "default", "players": [{"player_id": "unit-test-player"}]},
+        "certification": {"game_config": {"tokens": []}, "players": [{"player_id": "unit-test-player"}]},
     }
 
 

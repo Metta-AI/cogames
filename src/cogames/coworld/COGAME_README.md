@@ -52,8 +52,8 @@ These environment variables put the container in rollout mode. In rollout mode, 
 HTTP `GET /player` must serve a browser client for one player slot. HTTP `GET /global` must serve a browser client for
 live episode viewing. The served clients read the complete URL query string and forward every query param when opening
 their websocket connection on the same route. For example,
-`http://<engine-host>/player?slot=0&token=...&initial_params=...` serves the player client, and that client opens
-`ws://<engine-host>/player?slot=0&token=...&initial_params=...`. The same convention applies to
+`http://<engine-host>/player?slot=0&token=...&role=...` serves the player client, and that client opens
+`ws://<engine-host>/player?slot=0&token=...&role=...`. The same convention applies to
 `http://<engine-host>/global`, whose client opens `ws://<engine-host>/global`.
 
 Games may implement local development admin controls however they want. By convention, `GET /admin` serves the browser
@@ -90,8 +90,9 @@ Coworld certification resolves the Coworld's fixture into one end-to-end smoke e
 
 ## Episode Config
 
-The runner receives an episode request that adheres to `episode_request_schema.json`. It has the game config, player
-runnables and initial params, and output destinations.
+The runner receives an episode request that adheres to `runner/episode_request_schema.json`. It has the game config,
+player runnables, and output destinations. Per-player game metadata belongs in `game_config`. The game must treat
+player-supplied connection metadata as untrusted.
 
 ## Episode Lifecycle
 
@@ -110,8 +111,7 @@ runnables and initial params, and output destinations.
 8. For each player, the runner:
    - decides which policy image corresponds to which slot,
    - starts one container per policy runnable,
-   - supplies `COGAMES_ENGINE_WS_URL=ws://<engine-host>/player?slot=<slot>&token=<token>&...` to the policy container,
-   - appends each player's `initial_params` to that URL as query params.
+   - supplies `COGAMES_ENGINE_WS_URL=ws://<engine-host>/player?slot=<slot>&token=<token>` to the policy container.
 9. The game rejects player connections whose `token` does not match the token for that slot.
 10. Browser player clients may request `GET /player?slot=<slot>&token=<token>&...`; the served client opens the
     `/player` websocket with the same query params.

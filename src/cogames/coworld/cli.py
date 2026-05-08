@@ -7,8 +7,8 @@ import typer
 
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 from cogames.coworld.certifier import certify_coworld
-from cogames.coworld.episode_runner import EpisodeArtifacts, run_coworld_episode
 from cogames.coworld.play import PlaySession, ReplaySession, play_coworld, replay_coworld
+from cogames.coworld.runner.runner import EpisodeArtifacts, run_coworld_episode
 from cogames.coworld.types import CoworldEpisodeJobSpec
 from cogames.coworld.upload import upload_coworld_cmd, upload_policy_cmd
 from softmax.auth import DEFAULT_COGAMES_SERVER

@@ -3,10 +3,10 @@
     "CoworldCertificationFixture": {
       "additionalProperties": false,
       "properties": {
-        "variant_id": {
-          "minLength": 1,
-          "title": "Variant Id",
-          "type": "string"
+        "game_config": {
+          "additionalProperties": true,
+          "title": "Game Config",
+          "type": "object"
         },
         "players": {
           "items": {
@@ -17,7 +17,7 @@
           "type": "array"
         }
       },
-      "required": ["variant_id", "players"],
+      "required": ["game_config", "players"],
       "title": "CoworldCertificationFixture",
       "type": "object"
     },
@@ -28,26 +28,6 @@
           "minLength": 1,
           "title": "Player Id",
           "type": "string"
-        },
-        "initial_params": {
-          "additionalProperties": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              }
-            ]
-          },
-          "title": "Initial Params",
-          "type": "object"
         }
       },
       "required": ["player_id"],
@@ -341,26 +321,6 @@
             "type": "string"
           },
           "title": "Env",
-          "type": "object"
-        },
-        "initial_params": {
-          "additionalProperties": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              },
-              {
-                "type": "boolean"
-              }
-            ]
-          },
-          "title": "Initial Params",
           "type": "object"
         }
       },

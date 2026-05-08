@@ -22,7 +22,8 @@ from cogames.coworld.certifier import (
     load_results,
     resolve_manifest_uri,
 )
-from cogames.coworld.episode_runner import (
+from cogames.coworld.play import ReplaySession, build_play_links, replay_coworld
+from cogames.coworld.runner.runner import (
     REPLAY_LOAD_ENV_VAR,
     REPLAY_SAVE_ENV_VAR,
     EpisodeArtifacts,
@@ -30,7 +31,6 @@ from cogames.coworld.episode_runner import (
     _replay_client_url,
     assert_docker_image_reachable,
 )
-from cogames.coworld.play import ReplaySession, build_play_links, replay_coworld
 from cogames.coworld.types import CoworldEpisodeJobSpec, CoworldManifest
 
 
@@ -77,8 +77,8 @@ def test_load_coworld_package_rejects_invalid_certification_player_entry(tmp_pat
     coworld_manifest_path = _write_package_files(
         tmp_path,
         certification={
-            "variant_id": "default",
-            "players": [{"initial_params": {"difficulty": "easy"}}],
+            "game_config": {"difficulty": "easy"},
+            "players": [{"role": "painter"}],
         },
     )
 
@@ -86,29 +86,16 @@ def test_load_coworld_package_rejects_invalid_certification_player_entry(tmp_pat
         load_coworld_package(coworld_manifest_path)
 
 
-def test_load_coworld_package_rejects_invalid_initial_params(tmp_path: Path) -> None:
+def test_load_coworld_package_rejects_extra_certification_player_fields(tmp_path: Path) -> None:
     coworld_manifest_path = _write_package_files(
         tmp_path,
         certification={
-            "variant_id": "default",
-            "players": [{"player_id": "unit-test-player", "initial_params": {"bad": ["nested"]}}],
+            "game_config": {"difficulty": "easy"},
+            "players": [{"player_id": "unit-test-player", "role": "painter"}],
         },
     )
 
-    with pytest.raises(PydanticValidationError, match="initial_params"):
-        load_coworld_package(coworld_manifest_path)
-
-
-def test_load_coworld_package_rejects_unknown_certification_variant(tmp_path: Path) -> None:
-    coworld_manifest_path = _write_package_files(
-        tmp_path,
-        certification={
-            "variant_id": "missing",
-            "players": [{"player_id": "unit-test-player"}],
-        },
-    )
-
-    with pytest.raises(ValueError, match="unknown certification variant_id"):
+    with pytest.raises(PydanticValidationError, match="Extra inputs are not permitted"):
         load_coworld_package(coworld_manifest_path)
 
 
@@ -116,7 +103,7 @@ def test_load_coworld_package_rejects_unknown_certification_player(tmp_path: Pat
     coworld_manifest_path = _write_package_files(
         tmp_path,
         certification={
-            "variant_id": "default",
+            "game_config": {"difficulty": "easy"},
             "players": [{"player_id": "missing"}],
         },
     )
@@ -211,7 +198,7 @@ def test_build_episode_request_matches_runner_spec_shape(tmp_path: Path) -> None
 def test_episode_request_allows_no_runner_managed_players() -> None:
     episode_request = {
         "manifest": _coworld_manifest(),
-        "game_config": {"difficulty": "easy"},
+        "game_config": {"difficulty": "easy", "players": []},
         "players": [],
     }
 
@@ -222,15 +209,7 @@ def test_episode_request_allows_no_runner_managed_players() -> None:
 def test_build_play_links_point_directly_at_engine_client_routes(tmp_path: Path) -> None:
     package = _write_package(
         tmp_path,
-        certification={
-            "variant_id": "default",
-            "players": [
-                {
-                    "player_id": "unit-test-player",
-                    "initial_params": {"role": "x", "difficulty": 2, "debug": True},
-                }
-            ],
-        },
+        game_config={"difficulty": "easy", "players": [{"role": "x", "difficulty": 2, "debug": True}]},
     )
     artifacts = EpisodeArtifacts.create(tmp_path / "cert")
     episode_request = build_episode_request(package, artifacts)
@@ -245,10 +224,9 @@ def test_build_play_links_point_directly_at_engine_client_routes(tmp_path: Path)
     assert parse_qs(player_link.query) == {
         "slot": ["0"],
         "token": ["token-0"],
-        "role": ["x"],
-        "difficulty": ["2"],
-        "debug": ["True"],
     }
+    game_config = cast(dict[str, object], episode_request["game_config"])
+    assert game_config["players"] == [{"role": "x", "difficulty": 2, "debug": True}]
 
     global_link = urlparse(links.global_)
     assert global_link.scheme == "http"
@@ -357,6 +335,7 @@ def test_paintarena_snapshots_are_independent(tmp_path: Path, monkeypatch: pytes
         json.dumps(
             {
                 "tokens": ["token-0", "token-1"],
+                "player_names": ["Sweep Painter 1", "Sweep Painter 2"],
                 "width": 12,
                 "height": 8,
                 "max_ticks": 100,
@@ -383,6 +362,7 @@ def test_paintarena_snapshots_are_independent(tmp_path: Path, monkeypatch: pytes
     assert first_snapshot["positions"] == [[0, 0], [11, 7]]
     assert first_snapshot["tile_owners"] == [-1 for _ in range(96)]
     assert first_snapshot["scores"] == [0, 0]
+    assert first_snapshot["player_names"] == ["Sweep Painter 1", "Sweep Painter 2"]
     assert second_snapshot["positions"] == [[0, 0], [11, 7]]
     assert second_snapshot["tile_owners"][0] == 0
     assert second_snapshot["tile_owners"][-1] == 1
@@ -526,12 +506,14 @@ def _write_package(
     *,
     config_schema_required: list[str] | None = None,
     certification: dict[str, object] | None = None,
+    game_config: dict[str, object] | None = None,
 ):
     return load_coworld_package(
         _write_package_files(
             tmp_path,
             config_schema_required=config_schema_required or ["tokens"],
             certification=certification,
+            game_config=game_config,
         )
     )
 
@@ -541,6 +523,7 @@ def _write_package_files(
     *,
     config_schema_required: list[str] | None = None,
     certification: dict[str, object] | None = None,
+    game_config: dict[str, object] | None = None,
     write_protocol_docs: bool = True,
 ) -> Path:
     world_dir = tmp_path / "world"
@@ -556,6 +539,7 @@ def _write_package_files(
             _coworld_manifest(
                 config_schema_required=config_schema_required or ["tokens"],
                 certification=certification,
+                game_config=game_config,
             )
         )
     )
@@ -566,10 +550,11 @@ def _coworld_manifest(
     *,
     config_schema_required: list[str] | None = None,
     certification: dict[str, object] | None = None,
+    game_config: dict[str, object] | None = None,
 ) -> dict[str, object]:
     if certification is None:
         certification = {
-            "variant_id": "default",
+            "game_config": game_config or {"difficulty": "easy"},
             "players": [{"player_id": "unit-test-player"}],
         }
     return {
@@ -589,7 +574,7 @@ def _coworld_manifest(
             {
                 "id": "default",
                 "name": "Default",
-                "game_config": {"difficulty": "easy"},
+                "game_config": game_config or {"difficulty": "easy"},
                 "description": "Default test variant.",
             }
         ],
@@ -622,6 +607,7 @@ def _game_manifest(*, config_schema_required: list[str] | None = None) -> dict[s
                     "items": {"type": "string", "minLength": 1},
                 },
                 "difficulty": {"type": "string"},
+                "players": {"type": "array", "items": {"type": "object"}},
             },
         },
         "results_schema": {

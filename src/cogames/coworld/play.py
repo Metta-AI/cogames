@@ -15,7 +15,7 @@ from cogames.coworld.certifier import (
     load_coworld_package,
     load_results,
 )
-from cogames.coworld.episode_runner import (
+from cogames.coworld.runner.runner import (
     CONTAINER_WORKDIR,
     REPLAY_LOAD_ENV_VAR,
     REPLAY_SAVE_ENV_VAR,
@@ -203,9 +203,7 @@ def build_play_links(
 
 
 def _player_query(slot: int, token: str, player: PlayerLaunchSpec) -> str:
-    query = {"slot": slot, "token": token}
-    query.update(player.initial_params)
-    return urlencode(query)
+    return urlencode({"slot": slot, "token": token})
 
 
 def _env_args(env: Mapping[str, str]) -> list[str]:

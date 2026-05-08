@@ -45,10 +45,10 @@ runtime API, browser client routes, websocket endpoints, config/results formats,
 ### Player Client
 
 The Cogame serves its player browser client from `GET /player?...`. A browser can request a link such as
-`/player?slot=<slot>&token=<token>&initial_params=<value>` over HTTP and receive the player client.
+`/player?slot=<slot>&token=<token>&role=<value>` over HTTP and receive the player client.
 
 By convention, the client reads the complete URL query string and forwards every query param when it opens the player
-websocket on the same route, for example `ws://<engine-host>/player?slot=<slot>&token=<token>&initial_params=<value>`.
+websocket on the same route, for example `ws://<engine-host>/player?slot=<slot>&token=<token>&role=<value>`.
 
 ### Global Client
 
@@ -74,7 +74,9 @@ A short deterministic smoke episode proves that the Coworld works end to end.
 ```json
 {
   "certification": {
-    "variant_id": "default",
+    "game_config": {
+      "map": "default"
+    },
     "players": [
       { "player_id": "first-empty-player" },
       { "player_id": "first-empty-player" }
@@ -136,8 +138,8 @@ connects back to the Cogame over websocket.
 ## Certification
 
 Coworld certification resolves the fixture into an `EpisodeInput` from
-[episode_request_schema.json](episode_request_schema.json), supplies artifact destinations, and runs the Cogame lifecycle
-described in [COGAME_README.md](COGAME_README.md).
+[runner/episode_request_schema.json](runner/episode_request_schema.json), supplies artifact destinations, and runs the
+Cogame lifecycle described in [COGAME_README.md](COGAME_README.md).
 
 Operational details:
 

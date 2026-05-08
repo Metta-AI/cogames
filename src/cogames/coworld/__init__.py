@@ -14,14 +14,6 @@ from cogames.coworld.certifier import (
     validate_image_references,
     validate_referenced_files,
 )
-from cogames.coworld.episode_runner import (
-    EpisodeArtifacts,
-    EpisodeRunSpec,
-    PlayerLaunchSpec,
-    assert_docker_image_reachable,
-    run_cogame_episode,
-    run_coworld_episode,
-)
 from cogames.coworld.play import (
     PlayLinks,
     PlayResult,
@@ -30,6 +22,14 @@ from cogames.coworld.play import (
     build_play_links,
     play_coworld,
     replay_coworld,
+)
+from cogames.coworld.runner.runner import (
+    EpisodeArtifacts,
+    EpisodeRunSpec,
+    PlayerLaunchSpec,
+    assert_docker_image_reachable,
+    run_cogame_episode,
+    run_coworld_episode,
 )
 from cogames.coworld.types import CoworldEpisodeJobSpec, CoworldPlayerSpec, CoworldRunnableSpec
 

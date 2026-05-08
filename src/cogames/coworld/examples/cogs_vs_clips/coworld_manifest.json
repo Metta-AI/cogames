@@ -112,7 +112,12 @@
     }
   ],
   "certification": {
-    "variant_id": "cogsguard-smoke",
+    "game_config": {
+      "mission": "cogsguard",
+      "max_steps": 3,
+      "seed": 0,
+      "step_seconds": 0.02
+    },
     "players": [
       {
         "player_id": "starter-policy-player"

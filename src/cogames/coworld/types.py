@@ -6,7 +6,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 SCHEMA_VERSION = "https://json-schema.org/draft/2020-12/schema"
 JsonSchema = dict[str, Any]
-QueryParamValue = str | int | float | bool
 
 
 class CoworldRunnableSpec(BaseModel):
@@ -18,7 +17,7 @@ class CoworldRunnableSpec(BaseModel):
 
 
 class CoworldPlayerSpec(CoworldRunnableSpec):
-    initial_params: dict[str, QueryParamValue] = Field(default_factory=dict)
+    pass
 
 
 class CoworldDeclaredRunnableSpec(CoworldRunnableSpec):
@@ -85,13 +84,12 @@ class CoworldCertificationPlayer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     player_id: str = Field(min_length=1)
-    initial_params: dict[str, QueryParamValue] = Field(default_factory=dict)
 
 
 class CoworldCertificationFixture(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    variant_id: str = Field(min_length=1)
+    game_config: dict[str, Any]
     players: list[CoworldCertificationPlayer] = Field(min_length=1)
 
 
@@ -135,7 +133,7 @@ class CoworldEpisodeJobSpec(BaseModel):
     policy_names: list[str] | None = None
 
     @model_validator(mode="after")
-    def validate_lengths(self) -> "CoworldEpisodeJobSpec":
+    def validate_player_lengths(self) -> "CoworldEpisodeJobSpec":
         if self.policy_names is not None and len(self.policy_names) != len(self.players):
             raise ValueError("policy_names must have one entry per player")
         return self

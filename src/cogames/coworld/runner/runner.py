@@ -11,7 +11,7 @@ import time
 from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Mapping, TypeAlias, cast
+from typing import Mapping, cast
 from urllib.parse import urlencode
 
 import httpx
@@ -21,12 +21,10 @@ from websockets.exceptions import InvalidHandshake, InvalidStatus
 from cogames.coworld.schema_validation import validate_json_schema
 from cogames.coworld.types import CoworldEpisodeJobSpec, CoworldPlayerSpec, CoworldRunnableSpec
 
-PACKAGE_ROOT = Path(__file__).resolve().parent
-REPO_ROOT = Path(__file__).resolve().parents[5]
+REPO_ROOT = Path(__file__).resolve().parents[6]
 CONTAINER_WORKDIR = "/coworld"
 REPLAY_SAVE_ENV_VAR = "COGAME_SAVE_REPLAY_PATH"
 REPLAY_LOAD_ENV_VAR = "COGAME_LOAD_REPLAY_PATH"
-QueryParamValue: TypeAlias = str | int | float | bool
 
 
 @dataclass(frozen=True)
@@ -91,21 +89,6 @@ class RunnableLaunchSpec:
 
 @dataclass(frozen=True)
 class PlayerLaunchSpec(RunnableLaunchSpec):
-    initial_params: Mapping[str, QueryParamValue] = field(default_factory=dict)
-
-    @classmethod
-    def from_episode_player(cls, player: Mapping[str, object]) -> PlayerLaunchSpec:
-        initial_params: Mapping[str, QueryParamValue] = {}
-        if "initial_params" in player:
-            initial_params = cast(Mapping[str, QueryParamValue], player["initial_params"])
-        runnable = RunnableLaunchSpec.from_runnable(player)
-        return cls(
-            image=runnable.image,
-            run=runnable.run,
-            env=runnable.env,
-            initial_params=initial_params,
-        )
-
     @classmethod
     def from_model(cls, player: CoworldPlayerSpec) -> PlayerLaunchSpec:
         runnable = RunnableLaunchSpec.from_model(player)
@@ -113,7 +96,6 @@ class PlayerLaunchSpec(RunnableLaunchSpec):
             image=runnable.image,
             run=runnable.run,
             env=runnable.env,
-            initial_params=player.initial_params,
         )
 
 
@@ -307,9 +289,7 @@ def _replay_client_url(port: int) -> str:
 
 
 def _player_query(slot: int, token: str, player: PlayerLaunchSpec) -> str:
-    query: dict[str, QueryParamValue] = {"slot": slot, "token": token}
-    query.update(player.initial_params)
-    return urlencode(query)
+    return urlencode({"slot": slot, "token": token})
 
 
 def _env_args(env: Mapping[str, str]) -> list[str]:

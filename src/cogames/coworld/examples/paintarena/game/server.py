@@ -14,7 +14,7 @@ CLIENTS_DIR = Path(__file__).parent / "clients"
 REPLAY_MODE = "COGAME_LOAD_REPLAY_PATH" in os.environ
 if REPLAY_MODE:
     REPLAY_DATA = json.loads(Path(os.environ["COGAME_LOAD_REPLAY_PATH"]).read_text())
-    CONFIG = {"tokens": [], "width": 1, "height": 1, "max_ticks": 0, "tick_rate": 1.0}
+    CONFIG = {"tokens": [], "player_names": [], "width": 1, "height": 1, "max_ticks": 0, "tick_rate": 1.0}
     RESULTS_PATH = Path(os.environ["COGAME_LOAD_REPLAY_PATH"])
     REPLAY_PATH = Path(os.environ["COGAME_LOAD_REPLAY_PATH"])
 else:
@@ -24,6 +24,7 @@ else:
     REPLAY_PATH = Path(os.environ["COGAME_SAVE_REPLAY_PATH"])
 
 TOKENS = CONFIG["tokens"]
+PLAYER_NAMES = CONFIG["player_names"]
 WIDTH = CONFIG["width"]
 HEIGHT = CONFIG["height"]
 MAX_TICKS = CONFIG["max_ticks"]
@@ -213,6 +214,7 @@ def _snapshot() -> dict[str, Any]:
         "positions": [position.copy() for position in state.positions],
         "tile_owners": state.tile_owners.copy(),
         "scores": state.scores.copy(),
+        "player_names": PLAYER_NAMES.copy(),
         "tick": state.tick,
         "max_ticks": MAX_TICKS,
         "started": state.started,

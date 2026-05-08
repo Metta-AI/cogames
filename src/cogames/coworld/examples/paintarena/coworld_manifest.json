@@ -14,9 +14,18 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "additionalProperties": false,
-      "required": ["tokens", "width", "height", "max_ticks", "tick_rate"],
+      "required": ["tokens", "player_names", "width", "height", "max_ticks", "tick_rate"],
       "properties": {
         "tokens": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "player_names": {
           "type": "array",
           "minItems": 2,
           "maxItems": 2,
@@ -99,13 +108,20 @@
         "width": 12,
         "height": 8,
         "max_ticks": 100,
-        "tick_rate": 5
+        "tick_rate": 5,
+        "player_names": ["Sweep Painter 1", "Sweep Painter 2"]
       },
       "description": "Short two-player territory painting smoke-test configuration."
     }
   ],
   "certification": {
-    "variant_id": "default",
+    "game_config": {
+      "width": 12,
+      "height": 8,
+      "max_ticks": 100,
+      "tick_rate": 5,
+      "player_names": ["Sweep Painter 1", "Sweep Painter 2"]
+    },
     "players": [
       {
         "player_id": "sweep-painter"
