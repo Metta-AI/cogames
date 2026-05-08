@@ -25,13 +25,21 @@ def read_data(uri: str) -> bytes:
     raise ValueError(f"Unsupported URI for read_data: {uri}")
 
 
-def write_data(uri: str, data: bytes | str, *, content_type: str) -> None:
+def post_data(uri: str, data: bytes | str, *, content_type: str) -> None:
+    _write_data(uri, data, content_type=content_type, http_method="POST")
+
+
+def upload_data(uri: str, data: bytes | str, *, content_type: str) -> None:
+    _write_data(uri, data, content_type=content_type, http_method="PUT")
+
+
+def _write_data(uri: str, data: bytes | str, *, content_type: str, http_method: Literal["POST", "PUT"]) -> None:
     if isinstance(data, str):
         data = data.encode()
 
     parsed = urlparse(uri)
     if parsed.scheme in ("http", "https"):
-        request = Request(uri, data=data, method="PUT")
+        request = Request(uri, data=data, method=http_method)
         request.add_header("Content-Type", content_type)
         with urlopen(request, timeout=60):
             return

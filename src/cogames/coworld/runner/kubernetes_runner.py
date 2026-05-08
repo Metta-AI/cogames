@@ -16,7 +16,7 @@ import httpx
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 
-from cogames.coworld.runner.io import RunnerError, read_data, write_data
+from cogames.coworld.runner.io import RunnerError, read_data, upload_data
 from cogames.coworld.runner.runner import (
     EpisodeArtifacts,
     PlayerLaunchSpec,
@@ -40,7 +40,7 @@ GAME_PORT = 8080
 def init_config_from_env() -> None:
     job = _read_job_spec()
     tokens = generate_tokens(len(job.players))
-    write_data(
+    upload_data(
         os.environ["COGAME_CONFIG_URI"],
         json.dumps(coworld_game_config(job, tokens), indent=2),
         content_type="application/json",
@@ -72,28 +72,28 @@ def _write_error_info(exc: Exception) -> None:
     if error_info_uri is None:
         return
     runner_error = RunnerError(error_type="crash", message=str(exc)[:2000])
-    write_data(error_info_uri, runner_error.model_dump_json(), content_type="application/json")
+    upload_data(error_info_uri, runner_error.model_dump_json(), content_type="application/json")
 
 
 def _upload_outputs(artifacts: EpisodeArtifacts) -> None:
     results_uri = os.environ.get("RESULTS_URI")
     if results_uri is not None:
-        write_data(results_uri, artifacts.results_path.read_bytes(), content_type="application/json")
+        upload_data(results_uri, artifacts.results_path.read_bytes(), content_type="application/json")
 
     replay_uri = os.environ.get("REPLAY_URI")
     if replay_uri is not None and artifacts.replay_path.exists():
-        write_data(replay_uri, _compress_replay(artifacts).read_bytes(), content_type="application/x-compress")
+        upload_data(replay_uri, _compress_replay(artifacts).read_bytes(), content_type="application/x-compress")
 
     debug_uri = os.environ.get("DEBUG_URI")
     if debug_uri is not None:
-        write_data(debug_uri, _zip_logs(artifacts.logs_dir), content_type="application/zip")
+        upload_data(debug_uri, _zip_logs(artifacts.logs_dir), content_type="application/zip")
 
     policy_log_urls = os.environ.get("POLICY_LOG_URLS")
     if policy_log_urls is not None:
         for slot, log_uri in json.loads(policy_log_urls).items():
             log_path = artifacts.policy_log_path(int(slot))
             if log_path.exists():
-                write_data(log_uri, log_path.read_bytes(), content_type="text/plain")
+                upload_data(log_uri, log_path.read_bytes(), content_type="text/plain")
 
 
 def _compress_replay(artifacts: EpisodeArtifacts) -> Path:

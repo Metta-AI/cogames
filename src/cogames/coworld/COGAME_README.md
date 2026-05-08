@@ -37,9 +37,9 @@ contract file; it implements this behavior directly.
 
 The runner supplies:
 
-- `COGAME_CONFIG_URI`: URI to the config JSON file,
-- `COGAME_RESULTS_URI`: URI where the game writes final results,
-- `COGAME_SAVE_REPLAY_URI`: URI where the game writes its replay artifact.
+- `COGAME_CONFIG_URI`: URI from which to GET the config JSON file,
+- `COGAME_RESULTS_URI`: URI to which to POST the final results,
+- `COGAME_SAVE_REPLAY_URI`: URI to which to POST the game's replay artifact.
 
 Games must support `file://` URIs. Hosted runners may provide other writable URI
 schemes for results and replay when the game image supports them.
@@ -74,7 +74,7 @@ no-op actions or another documented disconnected-player behavior until the playe
 
 To view a replay, the runner starts the same Cogame image in replay mode and supplies:
 
-- `COGAME_LOAD_REPLAY_URI`: URI to a replay artifact produced by the game.
+- `COGAME_LOAD_REPLAY_URI`: URI from which to GET a replay artifact produced by the game.
 
 In replay mode, the game container listens on `0.0.0.0:8080` and exposes:
 
@@ -105,11 +105,11 @@ player-supplied connection metadata as untrusted.
 3. The runner writes game config JSON matching the manifest's `config_schema` to a URI, inserting `tokens` with the
    generated token array.
 4. The runner starts the game engine container and supplies:
-   - `COGAME_CONFIG_URI`: URI to the config JSON file,
-   - `COGAME_RESULTS_URI`: URI where the game writes final results,
-   - `COGAME_SAVE_REPLAY_URI`: URI where the game writes its replay artifact.
+   - `COGAME_CONFIG_URI`: URI from which to GET the config JSON file,
+   - `COGAME_RESULTS_URI`: URI to which to POST the final results,
+   - `COGAME_SAVE_REPLAY_URI`: URI to which to POST the game's replay artifact.
 5. The runner records all stdout and stderr from the game engine.
-6. The container boots and listens for HTTP and websocket traffic on `0.0.0.0:8080`.
+6. The container boots, GETs its initial config, and listens for HTTP and websocket traffic on `0.0.0.0:8080`.
 7. The game engine exposes `GET /healthz`, which returns `200` when the container is ready to accept connections.
 8. For each player, the runner:
    - decides which policy image corresponds to which slot,
@@ -123,8 +123,8 @@ player-supplied connection metadata as untrusted.
 12. Global websocket viewers may connect before or during the episode through `/global`.
 13. Players may disconnect and reconnect to the same slot with the same token.
 14. The game engine progresses the game after each player connects.
-15. When the game ends, it writes results to `COGAME_RESULTS_URI` and a replay artifact to `COGAME_SAVE_REPLAY_URI`.
-    The results file is JSON matching `results_schema`.
+15. When the game ends, it POSTs results to `COGAME_RESULTS_URI` and a replay artifact to `COGAME_SAVE_REPLAY_URI`.
+    The results file is JSON matching `results_schema`, and the game engine stops responding to `/healthz` with 200.
 16. The runner uploads results, replay, and logs to the episode config output URIs.
 
 ## Replay Lifecycle

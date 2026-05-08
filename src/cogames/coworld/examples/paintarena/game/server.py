@@ -10,7 +10,7 @@ import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 
-from cogames.coworld.runner.io import read_data, write_data
+from cogames.coworld.runner.io import post_data, read_data
 
 CLIENTS_DIR = Path(__file__).parent / "clients"
 REPLAY_MODE = "COGAME_LOAD_REPLAY_URI" in os.environ
@@ -162,8 +162,8 @@ async def _play_game() -> None:
         await asyncio.sleep(1.0 / state.tick_rate)
 
     results = _results()
-    write_data(RESULTS_URI, json.dumps(results), content_type="application/json")
-    write_data(REPLAY_URI, json.dumps(_replay_payload(results)), content_type="application/json")
+    post_data(RESULTS_URI, json.dumps(results), content_type="application/json")
+    post_data(REPLAY_URI, json.dumps(_replay_payload(results)), content_type="application/json")
 
     state.done = True
     server.should_exit = True
