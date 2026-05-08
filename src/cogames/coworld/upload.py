@@ -20,8 +20,6 @@ from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 from cogames.coworld.certifier import certify_coworld, load_coworld_package, resolve_manifest_uri
 from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
 
-RUNNABLE_LIST_SECTIONS = ("player", "grader", "reporter", "commissioner", "diagnoser", "optimizer")
-
 
 class CoworldUploadResponse(BaseModel):
     id: str
@@ -167,7 +165,7 @@ def upload_coworld(
     certify_coworld(package.manifest_path, timeout_seconds=timeout_seconds)
 
     with CoworldUploadClient.from_login(server_url=server, login_server=login_server) as client:
-        upload_manifest = _manifest_with_softmax_images(
+        upload_manifest = _manifest_with_softmax_image_ids(
             client,
             package.manifest.model_dump(by_alias=True, exclude_none=True),
         )
@@ -219,41 +217,31 @@ def upload_policy_cmd(
     typer.echo(f"Upload complete: {result.name}:v{result.version}")
 
 
-def _manifest_with_softmax_images(client: CoworldUploadClient, manifest: dict[str, object]) -> dict[str, object]:
+def _manifest_with_softmax_image_ids(client: CoworldUploadClient, manifest: dict[str, object]) -> dict[str, object]:
     upload_manifest = copy.deepcopy(manifest)
     replacements = {
-        image: _upload_container_image(client, image).image_uri
-        for image in sorted({runnable["image"] for runnable in _manifest_runnables(upload_manifest)})
+        image: _upload_container_image(client, image).id
+        for image in sorted({runnable["image"] for runnable in _manifest_image_fields(upload_manifest)})
     }
-    for runnable in _manifest_runnables(upload_manifest):
+    for runnable in _manifest_image_fields(upload_manifest):
         runnable["image"] = replacements[runnable["image"]]
     return upload_manifest
 
 
-def _manifest_runnables(manifest: dict[str, object]) -> list[dict[str, Any]]:
-    game = manifest["game"]
-    if not isinstance(game, dict):
-        raise TypeError("Coworld manifest game must be an object")
-    runnable = game["runnable"]
-    if not isinstance(runnable, dict):
-        raise TypeError("Coworld manifest game.runnable must be an object")
-
-    runnables = [runnable]
-    for section in RUNNABLE_LIST_SECTIONS:
-        if section not in manifest:
-            continue
-        items = manifest[section]
-        if not isinstance(items, list):
-            raise TypeError(f"Coworld manifest {section} must be a list")
-        for item in items:
-            if not isinstance(item, dict):
-                raise TypeError(f"Coworld manifest {section} items must be objects")
-            runnables.append(item)
-
-    for item in runnables:
-        if not isinstance(item["image"], str):
-            raise TypeError("Coworld runnable image must be a string")
-    return runnables
+def _manifest_image_fields(value: object) -> list[dict[str, Any]]:
+    fields: list[dict[str, Any]] = []
+    if isinstance(value, list):
+        for item in value:
+            fields.extend(_manifest_image_fields(item))
+    if isinstance(value, dict):
+        image = value.get("image")
+        if image is not None:
+            if not isinstance(image, str):
+                raise TypeError("Coworld runnable image must be a string")
+            fields.append(value)
+        for item in value.values():
+            fields.extend(_manifest_image_fields(item))
+    return fields
 
 
 def _upload_container_image(client: CoworldUploadClient, image: str) -> ContainerImageResponse:
@@ -266,8 +254,6 @@ def _upload_container_image(client: CoworldUploadClient, image: str) -> Containe
     else:
         completed = response.image
 
-    if completed.image_uri is None:
-        raise RuntimeError(f"Softmax image upload did not return an executable image URI for {image}")
     return completed
 
 

@@ -132,9 +132,12 @@ To start a local game for browser play:
 
 ```bash
 uv run cogames coworld play path/to/coworld_manifest.json
+uv run cogames coworld play https://softmax.com/api/v2/coworlds/cow_...
 ```
 
-The command uses the certification fixture for game config and player slots, then prints player and global client links.
+The command downloads URI manifests to a temporary local file, uses the certification fixture for game config and player
+slots, then prints player and global client links. Observatory's public Coworld manifest endpoint returns public image
+URIs for Softmax-managed images once those images have been mirrored to public ECR.
 Each link points directly at the Cogame's HTTP client route. The served client forwards the link's query params when it
 connects back to the Cogame over websocket.
 
@@ -167,7 +170,7 @@ uv run cogames coworld upload-coworld path/to/coworld_manifest.json
 ```
 
 The command validates the manifest, runs certification, uploads every runnable image through Observatory's
-`/v2/container_images/upload` flow, rewrites runnable image references to returned Softmax digest image URIs, and uploads
+`/v2/container_images/upload` flow, rewrites runnable image references to returned Softmax image IDs, and uploads
 the resulting standalone JSON manifest through `/v2/coworlds/upload`.
 
 Upload does not bundle schemas, docs, or other package files. The manifest is the uploaded artifact. Documentation and

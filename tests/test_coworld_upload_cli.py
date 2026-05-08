@@ -28,6 +28,7 @@ def test_upload_coworld_posts_standalone_manifest(
 ) -> None:
     manifest_path = _write_manifest(tmp_path)
     certification_calls: list[tuple[Path, float]] = []
+    image_id = "img_00000000-0000-0000-0000-000000000010"
     softmax_image_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/cogames/user/unit-test-runtime@sha256:digest"
     pushed_images: list[tuple[str, str]] = []
 
@@ -49,7 +50,7 @@ def test_upload_coworld_posts_standalone_manifest(
     ).respond_with_json(
         {
             "image": {
-                "id": "img_00000000-0000-0000-0000-000000000010",
+                "id": image_id,
                 "name": "unit-test-runtime",
                 "version": 1,
                 "client_hash": "sha256:client-hash",
@@ -75,10 +76,10 @@ def test_upload_coworld_posts_standalone_manifest(
         "/v2/container_images/upload/complete",
         method="POST",
         headers={"X-Auth-Token": "token"},
-        json={"id": "img_00000000-0000-0000-0000-000000000010"},
+        json={"id": image_id},
     ).respond_with_json(
         {
-            "id": "img_00000000-0000-0000-0000-000000000010",
+            "id": image_id,
             "name": "unit-test-runtime",
             "version": 1,
             "client_hash": "sha256:client-hash",
@@ -96,7 +97,7 @@ def test_upload_coworld_posts_standalone_manifest(
             "id": "cow_00000000-0000-0000-0000-000000000001",
             "name": "unit-test-game",
             "version": "0.1.0",
-            "manifest": _manifest_with_image(softmax_image_uri),
+            "manifest": _manifest_with_image(image_id),
             "manifest_hash": "sha256:manifest-hash",
             "size_bytes": 1234,
         }
@@ -114,12 +115,12 @@ def test_upload_coworld_posts_standalone_manifest(
     assert result.manifest_hash == "sha256:manifest-hash"
     assert certification_calls == [(manifest_path.resolve(), 60.0)]
     assert pushed_images == [
-        ("unit-test-runtime:latest", "123456789012.dkr.ecr.us-east-1.amazonaws.com/cogames/user/unit-test-runtime:v1")
+        ("unit-test-runtime:latest", "123456789012.dkr.ecr.us-east-1.amazonaws.com/cogames/user/unit-test-runtime:v1"),
     ]
     upload_req = next(req for req, _ in httpserver.log if req.path == "/v2/coworlds/upload")
     uploaded_manifest = upload_req.get_json()["manifest"]
-    assert uploaded_manifest["game"]["runnable"]["image"] == softmax_image_uri
-    assert uploaded_manifest["player"][0]["image"] == softmax_image_uri
+    assert uploaded_manifest["game"]["runnable"]["image"] == image_id
+    assert uploaded_manifest["player"][0]["image"] == image_id
     assert uploaded_manifest["game"]["protocols"]["player"] == "# Player Protocol\n"
     assert uploaded_manifest["game"]["protocols"]["global"] == "# Global Protocol\n"
 
@@ -131,6 +132,7 @@ def test_upload_coworld_command_certifies_before_uploading(
 ) -> None:
     manifest_path = _write_manifest(tmp_path)
     certification_calls: list[tuple[Path, float]] = []
+    image_id = "img_00000000-0000-0000-0000-000000000020"
     softmax_image_uri = "123456789012.dkr.ecr.us-east-1.amazonaws.com/cogames/user/unit-test-runtime@sha256:digest"
 
     monkeypatch.setattr("cogames.coworld.upload.load_current_cogames_token", lambda *, login_server: "token")
@@ -143,7 +145,7 @@ def test_upload_coworld_command_certifies_before_uploading(
     httpserver.expect_request("/v2/container_images/upload", method="POST").respond_with_json(
         {
             "image": {
-                "id": "img_00000000-0000-0000-0000-000000000020",
+                "id": image_id,
                 "name": "unit-test-runtime",
                 "version": 1,
                 "client_hash": "sha256:client-hash",
@@ -159,7 +161,7 @@ def test_upload_coworld_command_certifies_before_uploading(
             "id": "cow_00000000-0000-0000-0000-000000000002",
             "name": "unit-test-game",
             "version": "0.1.0",
-            "manifest": _manifest_with_image(softmax_image_uri),
+            "manifest": _manifest_with_image(image_id),
             "manifest_hash": "sha256:manifest-hash",
             "size_bytes": 1234,
         }

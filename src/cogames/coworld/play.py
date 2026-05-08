@@ -70,7 +70,7 @@ def play_coworld(
     timeout_seconds: float = 60.0,
     on_ready: Callable[[PlaySession], None],
 ) -> PlayResult:
-    package = load_coworld_package(manifest_path)
+    package = load_coworld_package(manifest_path, validate_files=False)
     assert_docker_image_reachable(package.cogame.image, label="Cogame runnable.image")
     artifacts = EpisodeArtifacts.create(workspace, prefix="coworld-play-")
     episode_request = build_episode_request(package, artifacts)
@@ -134,7 +134,7 @@ def replay_coworld(
     timeout_seconds: float = 60.0,
     on_ready: Callable[[ReplaySession], None],
 ) -> ReplaySession:
-    package = load_coworld_package(manifest_path)
+    package = load_coworld_package(manifest_path, validate_files=False)
     assert_docker_image_reachable(package.cogame.image, label="Cogame runnable.image")
     replay_path = replay_path.resolve()
     if not replay_path.is_file():

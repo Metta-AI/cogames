@@ -55,7 +55,7 @@ def resolve_manifest_uri(base_dir: Path, manifest_uri: str) -> Path:
     return (base_dir / manifest_uri).resolve()
 
 
-def load_coworld_package(manifest_path: Path) -> CoworldPackage:
+def load_coworld_package(manifest_path: Path, *, validate_files: bool = True) -> CoworldPackage:
     manifest_path = manifest_path.resolve()
     manifest = load_json_object(manifest_path)
     validate_json_schema(manifest, coworld_manifest_schema())
@@ -74,7 +74,8 @@ def load_coworld_package(manifest_path: Path) -> CoworldPackage:
         ),
     )
     validate_certification_references(package)
-    validate_referenced_files(package)
+    if validate_files:
+        validate_referenced_files(package)
     return package
 
 
