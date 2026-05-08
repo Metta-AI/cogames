@@ -14,7 +14,7 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "additionalProperties": false,
-      "required": ["tokens", "player_names", "width", "height", "max_ticks", "tick_rate"],
+      "required": ["tokens", "players", "width", "height", "max_ticks", "tick_rate"],
       "properties": {
         "tokens": {
           "type": "array",
@@ -25,13 +25,20 @@
             "minLength": 1
           }
         },
-        "player_names": {
+        "players": {
           "type": "array",
           "minItems": 2,
           "maxItems": 2,
           "items": {
-            "type": "string",
-            "minLength": 1
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name"],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
           }
         },
         "width": {
@@ -109,7 +116,7 @@
         "height": 8,
         "max_ticks": 100,
         "tick_rate": 5,
-        "player_names": ["Sweep Painter 1", "Sweep Painter 2"]
+        "players": [{ "name": "Sweep Painter 1" }, { "name": "Sweep Painter 2" }]
       },
       "description": "Short two-player territory painting smoke-test configuration."
     }
@@ -120,7 +127,7 @@
       "height": 8,
       "max_ticks": 100,
       "tick_rate": 5,
-      "player_names": ["Sweep Painter 1", "Sweep Painter 2"]
+      "players": [{ "name": "Sweep Painter 1" }, { "name": "Sweep Painter 2" }]
     },
     "players": [
       {

@@ -335,7 +335,7 @@ def test_paintarena_snapshots_are_independent(tmp_path: Path, monkeypatch: pytes
         json.dumps(
             {
                 "tokens": ["token-0", "token-1"],
-                "player_names": ["Sweep Painter 1", "Sweep Painter 2"],
+                "players": [{"name": "Sweep Painter 1"}, {"name": "Sweep Painter 2"}],
                 "width": 12,
                 "height": 8,
                 "max_ticks": 100,
@@ -363,6 +363,10 @@ def test_paintarena_snapshots_are_independent(tmp_path: Path, monkeypatch: pytes
     assert first_snapshot["tile_owners"] == [-1 for _ in range(96)]
     assert first_snapshot["scores"] == [0, 0]
     assert first_snapshot["player_names"] == ["Sweep Painter 1", "Sweep Painter 2"]
+    assert server_module._replay_payload({"scores": [0.0, 0.0]})["player_names"] == [
+        "Sweep Painter 1",
+        "Sweep Painter 2",
+    ]
     assert second_snapshot["positions"] == [[0, 0], [11, 7]]
     assert second_snapshot["tile_owners"][0] == 0
     assert second_snapshot["tile_owners"][-1] == 1

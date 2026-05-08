@@ -14,7 +14,7 @@ CLIENTS_DIR = Path(__file__).parent / "clients"
 REPLAY_MODE = "COGAME_LOAD_REPLAY_PATH" in os.environ
 if REPLAY_MODE:
     REPLAY_DATA = json.loads(Path(os.environ["COGAME_LOAD_REPLAY_PATH"]).read_text())
-    CONFIG = {"tokens": [], "player_names": [], "width": 1, "height": 1, "max_ticks": 0, "tick_rate": 1.0}
+    CONFIG = {"tokens": [], "players": [], "width": 1, "height": 1, "max_ticks": 0, "tick_rate": 1.0}
     RESULTS_PATH = Path(os.environ["COGAME_LOAD_REPLAY_PATH"])
     REPLAY_PATH = Path(os.environ["COGAME_LOAD_REPLAY_PATH"])
 else:
@@ -24,7 +24,7 @@ else:
     REPLAY_PATH = Path(os.environ["COGAME_SAVE_REPLAY_PATH"])
 
 TOKENS = CONFIG["tokens"]
-PLAYER_NAMES = CONFIG["player_names"]
+PLAYER_NAMES = [player["name"] for player in CONFIG["players"]]
 WIDTH = CONFIG["width"]
 HEIGHT = CONFIG["height"]
 MAX_TICKS = CONFIG["max_ticks"]
@@ -161,7 +161,7 @@ async def _play_game() -> None:
 
     results = _results()
     RESULTS_PATH.write_text(json.dumps(results))
-    REPLAY_PATH.write_text(json.dumps({"config": CONFIG, "frames": state.frames, "results": results}))
+    REPLAY_PATH.write_text(json.dumps(_replay_payload(results)))
 
     state.done = True
     server.should_exit = True
@@ -203,6 +203,15 @@ def _results() -> dict[str, object]:
         "scores": [float(score) for score in state.scores],
         "painted_tiles": state.scores,
         "ticks": state.tick,
+    }
+
+
+def _replay_payload(results: dict[str, object]) -> dict[str, Any]:
+    return {
+        "config": CONFIG,
+        "player_names": PLAYER_NAMES.copy(),
+        "frames": state.frames,
+        "results": results,
     }
 
 
