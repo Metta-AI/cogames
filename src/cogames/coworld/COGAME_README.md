@@ -46,8 +46,8 @@ These environment variables put the container in rollout mode. In rollout mode, 
 - `GET /healthz`
 - `GET /player?slot=0&token=...&...`
 - `WEBSOCKET /player?slot=0&token=...&...`
-- `GET /global`
-- `WEBSOCKET /global`
+- `GET /global` -- serves the global viewer ui, connected to this game, without the need for url args
+- `WEBSOCKET /global` -- used by a global viewer, such as the ui above or a native ui, to connect to the game
 
 HTTP `GET /player` must serve a browser client for one player slot. HTTP `GET /global` must serve a browser client for
 live episode viewing. The served clients read the complete URL query string and forward every query param when opening
