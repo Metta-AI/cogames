@@ -5,7 +5,7 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field
@@ -20,19 +20,31 @@ class RemoteCoworldManifestResponse(BaseModel):
 
 
 @contextmanager
-def materialized_manifest_path(manifest_uri: str) -> Iterator[Path]:
-    parsed = urlparse(manifest_uri)
+def materialized_manifest_path(manifest_uri: str, *, server: str | None = None) -> Iterator[Path]:
+    resolved_uri = _resolve_manifest_uri(manifest_uri, server=server)
+    parsed = urlparse(resolved_uri)
     if parsed.scheme == "file":
         yield Path(unquote(parsed.path)).resolve()
         return
     if parsed.scheme in ("http", "https"):
         with tempfile.TemporaryDirectory(prefix="coworld-manifest-") as temp_dir:
             manifest_path = Path(temp_dir) / "coworld_manifest.json"
-            manifest_path.write_text(json.dumps(_download_manifest(manifest_uri)), encoding="utf-8")
+            manifest_path.write_text(json.dumps(_download_manifest(resolved_uri)), encoding="utf-8")
             yield manifest_path
         return
 
-    yield Path(manifest_uri).resolve()
+    yield Path(resolved_uri).resolve()
+
+
+def _resolve_manifest_uri(manifest_uri: str, *, server: str | None = None) -> str:
+    parsed = urlparse(manifest_uri)
+    if parsed.scheme:
+        return manifest_uri
+    if manifest_uri.startswith("/v2/coworlds/"):
+        if server is None:
+            raise ValueError(f"Backend Coworld manifest URI requires --server: {manifest_uri}")
+        return urljoin(f"{server.rstrip('/')}/", manifest_uri.lstrip("/"))
+    return manifest_uri
 
 
 def _download_manifest(manifest_uri: str) -> JsonObject:

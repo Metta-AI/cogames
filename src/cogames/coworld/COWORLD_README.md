@@ -133,11 +133,14 @@ To start a local game for browser play:
 ```bash
 uv run cogames coworld play path/to/coworld_manifest.json
 uv run cogames coworld play https://softmax.com/api/v2/coworlds/cow_...
+uv run cogames coworld play /v2/coworlds/cow_... --server https://softmax.com/api
 ```
 
-The command downloads URI manifests to a temporary local file, uses the certification fixture for game config and player
-slots, then prints player and global client links. Observatory's public Coworld manifest endpoint returns public image
-URIs for Softmax-managed images once those images have been mirrored to public ECR.
+The `play`, `replay`, and `certify` commands accept local paths, full HTTP(S) manifest URIs, backend
+`/v2/coworlds/cow_...` paths with `--server`. The command downloads URI manifests to a temporary local file, uses the
+certification fixture for game config and player slots, then prints player and global client links.
+Observatory's public Coworld manifest endpoint returns public image URIs for Softmax-managed images once those images
+have been mirrored to public ECR.
 Each link points directly at the Cogame's HTTP client route. The served client forwards the link's query params when it
 connects back to the Cogame over websocket.
 

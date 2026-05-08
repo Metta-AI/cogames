@@ -24,11 +24,13 @@ def main() -> None:
 
 @app.command("certify")
 def certify(
-    manifest_path: Annotated[Path, typer.Argument(help="Path to coworld_manifest.json.")],
+    manifest_uri: Annotated[str, typer.Argument(help="Path, URI, or Coworld ID for coworld_manifest.json.")],
+    server: Annotated[str, typer.Option("--server", help="Observatory API server URL.")] = DEFAULT_SUBMIT_SERVER,
     timeout_seconds: Annotated[float, typer.Option("--timeout-seconds", min=1.0)] = 60.0,
 ) -> None:
-    result = certify_coworld(manifest_path, timeout_seconds=timeout_seconds)
-    typer.echo(f"Certified {manifest_path}")
+    with materialized_manifest_path(manifest_uri, server=server) as manifest_path:
+        result = certify_coworld(manifest_path, timeout_seconds=timeout_seconds)
+    typer.echo(f"Certified {manifest_uri}")
     typer.echo(f"Artifacts: {result.artifacts.workspace}")
     typer.echo(f"Results: {result.artifacts.results_path}")
     typer.echo(f"Replay: {result.artifacts.replay_path}")
@@ -37,10 +39,11 @@ def certify(
 
 @app.command("play")
 def play(
-    manifest_uri: Annotated[str, typer.Argument(help="Path or URI to coworld_manifest.json.")],
+    manifest_uri: Annotated[str, typer.Argument(help="Path, URI, or Coworld ID for coworld_manifest.json.")],
+    server: Annotated[str, typer.Option("--server", help="Observatory API server URL.")] = DEFAULT_SUBMIT_SERVER,
     timeout_seconds: Annotated[float, typer.Option("--timeout-seconds", min=1.0, help="Health check timeout.")] = 60.0,
 ) -> None:
-    with materialized_manifest_path(manifest_uri) as manifest_path:
+    with materialized_manifest_path(manifest_uri, server=server) as manifest_path:
         result = play_coworld(manifest_path, timeout_seconds=timeout_seconds, on_ready=_print_play_session)
     typer.echo(f"Results: {result.session.artifacts.results_path}")
     typer.echo(f"Replay: {result.session.artifacts.replay_path}")
@@ -108,11 +111,12 @@ def run_episode(
 
 @app.command("replay")
 def replay(
-    manifest_uri: Annotated[str, typer.Argument(help="Path or URI to coworld_manifest.json.")],
+    manifest_uri: Annotated[str, typer.Argument(help="Path, URI, or Coworld ID for coworld_manifest.json.")],
     replay_path: Annotated[Path, typer.Argument(help="Path to a replay artifact JSON file.")],
+    server: Annotated[str, typer.Option("--server", help="Observatory API server URL.")] = DEFAULT_SUBMIT_SERVER,
     timeout_seconds: Annotated[float, typer.Option("--timeout-seconds", min=1.0, help="Health check timeout.")] = 60.0,
 ) -> None:
-    with materialized_manifest_path(manifest_uri) as manifest_path:
+    with materialized_manifest_path(manifest_uri, server=server) as manifest_path:
         session = replay_coworld(
             manifest_path,
             replay_path,
