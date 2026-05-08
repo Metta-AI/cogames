@@ -4,7 +4,7 @@ from pathlib import Path
 from pytest import MonkeyPatch
 from pytest_httpserver import HTTPServer
 
-from cogames.coworld.manifest_uri import materialized_manifest_path
+from cogames.coworld.manifest_uri import materialized_manifest_path, materialized_replay_path
 
 COWORLD_ID = "cow_00000000-0000-0000-0000-000000000001"
 COWORLD_PATH = f"/v2/coworlds/{COWORLD_ID}"
@@ -60,3 +60,12 @@ def test_materialized_manifest_path_resolves_bare_coworld_id_against_server(http
 
     with materialized_manifest_path(COWORLD_ID, server=httpserver.url_for("")) as resolved:
         assert json.loads(resolved.read_text()) == manifest
+
+
+def test_materialized_replay_path_downloads_replay_uri(httpserver: HTTPServer) -> None:
+    replay_bytes = b"compressed replay"
+    httpserver.expect_request("/replay.json.z").respond_with_data(replay_bytes)
+
+    with materialized_replay_path(httpserver.url_for("/replay.json.z")) as resolved:
+        assert resolved.name == "replay.json.z"
+        assert resolved.read_bytes() == replay_bytes

@@ -10,7 +10,7 @@ from rich.table import Table
 from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 from cogames.coworld.certifier import certify_coworld
-from cogames.coworld.manifest_uri import materialized_manifest_path
+from cogames.coworld.manifest_uri import materialized_manifest_path, materialized_replay_path
 from cogames.coworld.play import PlaySession, ReplaySession, play_coworld, replay_coworld
 from cogames.coworld.runner.runner import EpisodeArtifacts, run_coworld_episode
 from cogames.coworld.types import CoworldEpisodeJobSpec
@@ -192,17 +192,18 @@ def run_episode(
 @app.command("replay")
 def replay(
     manifest_uri: Annotated[str, typer.Argument(help="Path, URI, or Coworld ID for coworld_manifest.json.")],
-    replay_path: Annotated[Path, typer.Argument(help="Path to a replay artifact JSON file.")],
+    replay_uri: Annotated[str, typer.Argument(help="Path or URI to a replay artifact JSON file.")],
     server: Annotated[str, typer.Option("--server", help="Observatory API server URL.")] = DEFAULT_SUBMIT_SERVER,
     timeout_seconds: Annotated[float, typer.Option("--timeout-seconds", min=1.0, help="Health check timeout.")] = 60.0,
 ) -> None:
     with materialized_manifest_path(manifest_uri, server=server) as manifest_path:
-        session = replay_coworld(
-            manifest_path,
-            replay_path,
-            timeout_seconds=timeout_seconds,
-            on_ready=_print_replay_session,
-        )
+        with materialized_replay_path(replay_uri) as replay_path:
+            session = replay_coworld(
+                manifest_path,
+                replay_path,
+                timeout_seconds=timeout_seconds,
+                on_ready=_print_replay_session,
+            )
     typer.echo(f"Logs: {session.artifacts.logs_dir}")
 
 
