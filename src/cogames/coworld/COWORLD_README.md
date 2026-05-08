@@ -171,5 +171,8 @@ The uploader derives an optional client hash from the local image archive's conf
 re-uploading images Observatory already has, and records ECR's digest as the executable image identity:
 
 ```bash
-docker build -t my-coworld-runtime:latest .
+docker build --platform=linux/amd64 -t my-coworld-runtime:latest .
 ```
+
+Production Coworld jobs run on linux/amd64 Kubernetes nodes. Build local images for `linux/amd64` before uploading,
+especially from Apple Silicon machines.

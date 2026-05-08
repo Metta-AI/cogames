@@ -9,14 +9,16 @@ color.
 From this directory:
 
 ```bash
-docker build -t coworld-paintarena:latest .
+docker build --platform=linux/amd64 -t coworld-paintarena:latest .
 ```
 
 From the Coworld package root (`packages/cogames/src/cogames/coworld`):
 
 ```bash
-docker build -t coworld-paintarena:latest examples/paintarena
+docker build --platform=linux/amd64 -t coworld-paintarena:latest examples/paintarena
 ```
+
+Use `linux/amd64` for images that will be uploaded to Observatory, including when building from Apple Silicon.
 
 ## Play Locally
 
