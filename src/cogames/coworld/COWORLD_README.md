@@ -172,6 +172,15 @@ To certify and upload a Coworld manifest to Observatory:
 uv run cogames coworld upload-coworld path/to/coworld_manifest.json
 ```
 
+To inspect uploaded Coworlds and uploaded runnable images:
+
+```bash
+uv run cogames coworld list
+uv run cogames coworld show cow_...
+uv run cogames coworld images
+uv run cogames coworld images img_...
+```
+
 The command validates the manifest, runs certification, uploads every runnable image through Observatory's
 `/v2/container_images/upload` flow, rewrites runnable image references to returned Softmax image IDs, and uploads
 the resulting standalone JSON manifest through `/v2/coworlds/upload`.

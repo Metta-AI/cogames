@@ -4,14 +4,24 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
+from rich import box
+from rich.table import Table
 
+from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
 from cogames.coworld.certifier import certify_coworld
 from cogames.coworld.manifest_uri import materialized_manifest_path
 from cogames.coworld.play import PlaySession, ReplaySession, play_coworld, replay_coworld
 from cogames.coworld.runner.runner import EpisodeArtifacts, run_coworld_episode
 from cogames.coworld.types import CoworldEpisodeJobSpec
-from cogames.coworld.upload import upload_coworld_cmd, upload_policy_cmd
+from cogames.coworld.upload import (
+    ContainerImageResponse,
+    CoworldListEntry,
+    CoworldUploadClient,
+    CoworldUploadResponse,
+    upload_coworld_cmd,
+    upload_policy_cmd,
+)
 from softmax.auth import DEFAULT_COGAMES_SERVER
 
 app = typer.Typer(no_args_is_help=True, pretty_exceptions_enable=False)
@@ -48,6 +58,76 @@ def play(
     typer.echo(f"Results: {result.session.artifacts.results_path}")
     typer.echo(f"Replay: {result.session.artifacts.replay_path}")
     typer.echo(f"Logs: {result.session.artifacts.logs_dir}")
+
+
+@app.command("list")
+def list_coworlds(
+    server: Annotated[str, typer.Option("--server", help="Observatory API server URL.")] = DEFAULT_SUBMIT_SERVER,
+    login_server: Annotated[
+        str,
+        typer.Option("--login-server", help="Authentication server URL."),
+    ] = DEFAULT_COGAMES_SERVER,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=500, help="Maximum rows to return.")] = 200,
+    offset: Annotated[int, typer.Option("--offset", min=0, help="Rows to skip.")] = 0,
+    json_output: Annotated[bool, typer.Option("--json", help="Print raw JSON.")] = False,
+) -> None:
+    with cli_http_errors("Coworlds"):
+        with CoworldUploadClient.from_login(server_url=server, login_server=login_server) as client:
+            coworlds = client.list_coworlds(limit=limit, offset=offset)
+    if json_output:
+        emit_json([coworld.model_dump(mode="json") for coworld in coworlds])
+        return
+    _print_coworld_table(coworlds)
+
+
+@app.command("show")
+def show_coworld(
+    coworld_id: Annotated[str, typer.Argument(help="Coworld ID to inspect.")],
+    server: Annotated[str, typer.Option("--server", help="Observatory API server URL.")] = DEFAULT_SUBMIT_SERVER,
+    login_server: Annotated[
+        str,
+        typer.Option("--login-server", help="Authentication server URL."),
+    ] = DEFAULT_COGAMES_SERVER,
+    json_output: Annotated[bool, typer.Option("--json", help="Print raw JSON.")] = False,
+) -> None:
+    with cli_http_errors("Coworld"):
+        with CoworldUploadClient.from_login(server_url=server, login_server=login_server) as client:
+            coworld = client.find_coworld(coworld_id)
+    if coworld is None:
+        console.print("[red]Coworld not found[/red]")
+        raise typer.Exit(1)
+    if json_output:
+        emit_json(coworld.model_dump(mode="json"))
+        return
+    _print_coworld_detail(coworld)
+
+
+@app.command("images")
+def images(
+    image_id: Annotated[str | None, typer.Argument(help="Image ID to inspect. Lists images when omitted.")] = None,
+    server: Annotated[str, typer.Option("--server", help="Observatory API server URL.")] = DEFAULT_SUBMIT_SERVER,
+    login_server: Annotated[
+        str,
+        typer.Option("--login-server", help="Authentication server URL."),
+    ] = DEFAULT_COGAMES_SERVER,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=500, help="Maximum rows to return.")] = 200,
+    offset: Annotated[int, typer.Option("--offset", min=0, help="Rows to skip.")] = 0,
+    json_output: Annotated[bool, typer.Option("--json", help="Print raw JSON.")] = False,
+) -> None:
+    with cli_http_errors("Container image"):
+        with CoworldUploadClient.from_login(server_url=server, login_server=login_server) as client:
+            if image_id is None:
+                image_list = client.list_images(limit=limit, offset=offset)
+                if json_output:
+                    emit_json([image.model_dump(mode="json") for image in image_list])
+                    return
+                _print_image_table(image_list)
+                return
+            image = client.get_image(image_id)
+    if json_output:
+        emit_json(image.model_dump(mode="json"))
+        return
+    _print_image_detail(image)
 
 
 @app.command("upload-coworld")
@@ -141,3 +221,56 @@ def _print_replay_session(session: ReplaySession) -> None:
     typer.echo(f"Replay file: {session.replay_path}")
     typer.echo(f"Replay client: {session.link}")
     typer.echo("Waiting for the replay container to exit...")
+
+
+def _print_coworld_table(coworlds: list[CoworldListEntry]) -> None:
+    if not coworlds:
+        console.print("[yellow]No uploaded Coworlds found.[/yellow]")
+        return
+    table = Table(title="Uploaded Coworlds", box=box.SIMPLE_HEAVY, show_lines=False, pad_edge=False)
+    table.add_column("ID")
+    table.add_column("Name")
+    table.add_column("Version")
+    table.add_column("Size")
+    table.add_column("Manifest Hash")
+    for coworld in coworlds:
+        table.add_row(coworld.id, coworld.name, coworld.version, f"{coworld.size_bytes} B", coworld.manifest_hash)
+    console.print(table)
+
+
+def _print_coworld_detail(coworld: CoworldListEntry | CoworldUploadResponse) -> None:
+    console.print(f"[bold]Coworld:[/bold] {coworld.id}")
+    console.print(f"Name: {coworld.name}")
+    console.print(f"Version: {coworld.version}")
+    console.print(f"Manifest hash: {coworld.manifest_hash}")
+    console.print(f"Size: {coworld.size_bytes} bytes")
+
+
+def _print_image_table(images: list[ContainerImageResponse]) -> None:
+    if not images:
+        console.print("[yellow]No uploaded images found.[/yellow]")
+        return
+    table = Table(title="Uploaded Images", box=box.SIMPLE_HEAVY, show_lines=False, pad_edge=False)
+    table.add_column("ID")
+    table.add_column("Name")
+    table.add_column("Version")
+    table.add_column("Status")
+    table.add_column("Public URI")
+    for image in images:
+        table.add_row(image.id, image.name, f"v{image.version}", image.status, image.public_image_uri or "")
+    console.print(table)
+
+
+def _print_image_detail(image: ContainerImageResponse) -> None:
+    console.print(f"[bold]Image:[/bold] {image.id}")
+    console.print(f"Name: {image.name}")
+    console.print(f"Version: v{image.version}")
+    console.print(f"Status: {image.status}")
+    if image.client_hash is not None:
+        console.print(f"Client hash: {image.client_hash}")
+    if image.image_uri is not None:
+        console.print(f"Image URI: {image.image_uri}")
+    if image.image_digest is not None:
+        console.print(f"Image digest: {image.image_digest}")
+    if image.public_image_uri is not None:
+        console.print(f"Public URI: {image.public_image_uri}")

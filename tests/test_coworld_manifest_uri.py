@@ -52,3 +52,11 @@ def test_materialized_manifest_path_resolves_backend_path_against_server(httpser
 
     with materialized_manifest_path(COWORLD_PATH, server=httpserver.url_for("")) as resolved:
         assert json.loads(resolved.read_text()) == manifest
+
+
+def test_materialized_manifest_path_resolves_bare_coworld_id_against_server(httpserver: HTTPServer) -> None:
+    manifest = {"game": {"name": "downloaded"}}
+    httpserver.expect_request(COWORLD_PATH).respond_with_json({"manifest": manifest})
+
+    with materialized_manifest_path(COWORLD_ID, server=httpserver.url_for("")) as resolved:
+        assert json.loads(resolved.read_text()) == manifest

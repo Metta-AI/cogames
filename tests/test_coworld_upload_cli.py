@@ -250,6 +250,222 @@ def test_upload_policy_command_creates_docker_image_policy(
     assert "Upload complete: paintbot:v1" in result.output
 
 
+def test_coworld_list_command_prints_json(httpserver: HTTPServer, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("cogames.coworld.upload.load_current_cogames_token", lambda *, login_server: "token")
+    httpserver.expect_request(
+        "/v2/coworlds",
+        method="GET",
+        headers={"X-Auth-Token": "token"},
+        query_string="limit=50&offset=0",
+    ).respond_with_json(
+        [
+            {
+                "id": "cow_00000000-0000-0000-0000-000000000001",
+                "name": "unit-test-game",
+                "version": "0.1.0",
+                "manifest": _manifest_with_image("img_00000000-0000-0000-0000-000000000010"),
+                "manifest_hash": "sha256:manifest-hash",
+                "size_bytes": 1234,
+                "created_at": "2026-05-08T21:00:00Z",
+            }
+        ]
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "coworld",
+            "list",
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "https://softmax.test/api",
+            "--limit",
+            "50",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)[0]["id"] == "cow_00000000-0000-0000-0000-000000000001"
+
+
+def test_coworld_show_command_prints_json(httpserver: HTTPServer, monkeypatch: pytest.MonkeyPatch) -> None:
+    coworld_id = "cow_00000000-0000-0000-0000-000000000001"
+    monkeypatch.setattr("cogames.coworld.upload.load_current_cogames_token", lambda *, login_server: "token")
+    httpserver.expect_request(
+        "/v2/coworlds",
+        method="GET",
+        headers={"X-Auth-Token": "token"},
+        query_string="limit=200&offset=0",
+    ).respond_with_json(
+        [
+            {
+                "id": coworld_id,
+                "name": "unit-test-game",
+                "version": "0.1.0",
+                "manifest": _manifest_with_image("img_00000000-0000-0000-0000-000000000010"),
+                "manifest_hash": "sha256:manifest-hash",
+                "size_bytes": 1234,
+                "created_at": "2026-05-08T21:00:00Z",
+            }
+        ]
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "coworld",
+            "show",
+            coworld_id,
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "https://softmax.test/api",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["name"] == "unit-test-game"
+
+
+def test_coworld_show_command_pages_until_uploaded_world(
+    httpserver: HTTPServer, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    coworld_id = "cow_00000000-0000-0000-0000-000000000001"
+    monkeypatch.setattr("cogames.coworld.upload.load_current_cogames_token", lambda *, login_server: "token")
+    httpserver.expect_request(
+        "/v2/coworlds",
+        method="GET",
+        headers={"X-Auth-Token": "token"},
+        query_string="limit=200&offset=0",
+    ).respond_with_json(
+        [
+            {
+                "id": f"cow_10000000-0000-0000-0000-00000000{i:04d}",
+                "name": f"other-game-{i}",
+                "version": "0.1.0",
+                "manifest": _manifest_with_image("img_00000000-0000-0000-0000-000000000010"),
+                "manifest_hash": f"sha256:manifest-hash-{i}",
+                "size_bytes": 1234,
+                "created_at": "2026-05-08T21:00:00Z",
+            }
+            for i in range(200)
+        ]
+    )
+    httpserver.expect_request(
+        "/v2/coworlds",
+        method="GET",
+        headers={"X-Auth-Token": "token"},
+        query_string="limit=200&offset=200",
+    ).respond_with_json(
+        [
+            {
+                "id": coworld_id,
+                "name": "unit-test-game",
+                "version": "0.1.0",
+                "manifest": _manifest_with_image("img_00000000-0000-0000-0000-000000000010"),
+                "manifest_hash": "sha256:manifest-hash",
+                "size_bytes": 1234,
+                "created_at": "2026-05-08T21:00:00Z",
+            }
+        ]
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "coworld",
+            "show",
+            coworld_id,
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "https://softmax.test/api",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["name"] == "unit-test-game"
+
+
+def test_coworld_images_command_lists_uploaded_images(httpserver: HTTPServer, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("cogames.coworld.upload.load_current_cogames_token", lambda *, login_server: "token")
+    httpserver.expect_request(
+        "/v2/container_images",
+        method="GET",
+        headers={"X-Auth-Token": "token"},
+        query_string="limit=25&offset=0",
+    ).respond_with_json(
+        [
+            {
+                "id": "img_00000000-0000-0000-0000-000000000010",
+                "name": "unit-test-runtime",
+                "version": 1,
+                "client_hash": "sha256:client-hash",
+                "status": "ready",
+                "public_image_uri": "public.ecr.aws/softmax/unit-test-runtime@sha256:public",
+            }
+        ]
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "coworld",
+            "images",
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "https://softmax.test/api",
+            "--limit",
+            "25",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)[0]["id"] == "img_00000000-0000-0000-0000-000000000010"
+
+
+def test_coworld_images_command_shows_uploaded_image(httpserver: HTTPServer, monkeypatch: pytest.MonkeyPatch) -> None:
+    image_id = "img_00000000-0000-0000-0000-000000000010"
+    monkeypatch.setattr("cogames.coworld.upload.load_current_cogames_token", lambda *, login_server: "token")
+    httpserver.expect_request(
+        f"/v2/container_images/{image_id}",
+        method="GET",
+        headers={"X-Auth-Token": "token"},
+    ).respond_with_json(
+        {
+            "id": image_id,
+            "name": "unit-test-runtime",
+            "version": 1,
+            "client_hash": "sha256:client-hash",
+            "status": "ready",
+            "public_image_uri": "public.ecr.aws/softmax/unit-test-runtime@sha256:public",
+        }
+    )
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "coworld",
+            "images",
+            image_id,
+            "--server",
+            httpserver.url_for(""),
+            "--login-server",
+            "https://softmax.test/api",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["name"] == "unit-test-runtime"
+
+
 def test_local_image_client_hash_uses_docker_archive_content(monkeypatch: pytest.MonkeyPatch) -> None:
     archive = _docker_archive(config=b'{"cmd":["python","game.py"]}', layers=[b"layer-one", b"layer-two"])
 

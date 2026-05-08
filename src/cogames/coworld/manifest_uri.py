@@ -40,6 +40,10 @@ def _resolve_manifest_uri(manifest_uri: str, *, server: str | None = None) -> st
     parsed = urlparse(manifest_uri)
     if parsed.scheme:
         return manifest_uri
+    if manifest_uri.startswith("cow_") and "/" not in manifest_uri:
+        if server is None:
+            raise ValueError(f"Coworld ID requires --server: {manifest_uri}")
+        return urljoin(f"{server.rstrip('/')}/", f"v2/coworlds/{manifest_uri}")
     if manifest_uri.startswith("/v2/coworlds/"):
         if server is None:
             raise ValueError(f"Backend Coworld manifest URI requires --server: {manifest_uri}")

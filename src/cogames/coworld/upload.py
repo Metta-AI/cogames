@@ -9,6 +9,7 @@ import tarfile
 import tempfile
 from base64 import b64encode
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Self
 
@@ -66,6 +67,16 @@ class ContainerImageResponse(BaseModel):
     public_image_uri: str | None = None
 
 
+class CoworldListEntry(BaseModel):
+    id: str
+    name: str
+    version: str
+    manifest: dict[str, Any]
+    manifest_hash: str
+    size_bytes: int
+    created_at: datetime
+
+
 class ImageUploadResponse(BaseModel):
     image: ContainerImageResponse
     pre_signed_info: EcrPushInfo | None = None
@@ -113,6 +124,47 @@ class CoworldUploadClient:
         )
         response.raise_for_status()
         return CoworldUploadResponse.model_validate(response.json())
+
+    def list_coworlds(self, *, limit: int = 200, offset: int = 0) -> list[CoworldListEntry]:
+        response = self._http_client.get(
+            "/v2/coworlds",
+            headers=self._headers(),
+            params={"limit": limit, "offset": offset},
+            timeout=60.0,
+        )
+        response.raise_for_status()
+        return [CoworldListEntry.model_validate(item) for item in response.json()]
+
+    def find_coworld(self, coworld_id: str) -> CoworldListEntry | None:
+        limit = 200
+        offset = 0
+        while True:
+            coworlds = self.list_coworlds(limit=limit, offset=offset)
+            for coworld in coworlds:
+                if coworld.id == coworld_id:
+                    return coworld
+            if len(coworlds) < limit:
+                return None
+            offset += limit
+
+    def list_images(self, *, limit: int = 200, offset: int = 0) -> list[ContainerImageResponse]:
+        response = self._http_client.get(
+            "/v2/container_images",
+            headers=self._headers(),
+            params={"limit": limit, "offset": offset},
+            timeout=60.0,
+        )
+        response.raise_for_status()
+        return [ContainerImageResponse.model_validate(item) for item in response.json()]
+
+    def get_image(self, image_id: str) -> ContainerImageResponse:
+        response = self._http_client.get(
+            f"/v2/container_images/{image_id}",
+            headers=self._headers(),
+            timeout=60.0,
+        )
+        response.raise_for_status()
+        return ContainerImageResponse.model_validate(response.json())
 
     def request_image_upload(self, *, name: str, client_hash: str) -> ImageUploadResponse:
         response = self._http_client.post(
