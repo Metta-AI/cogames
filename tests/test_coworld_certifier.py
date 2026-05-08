@@ -23,8 +23,10 @@ from cogames.coworld.certifier import (
 )
 from cogames.coworld.play import ReplaySession, build_play_links, replay_coworld
 from cogames.coworld.runner.runner import (
+    CONFIG_ENV_VAR,
     REPLAY_LOAD_ENV_VAR,
     REPLAY_SAVE_ENV_VAR,
+    RESULTS_ENV_VAR,
     EpisodeArtifacts,
     _image_command,
     _replay_client_url,
@@ -275,8 +277,8 @@ def test_build_play_links_point_directly_at_engine_client_routes(tmp_path: Path)
 def test_replay_client_url_points_at_engine_replay_route() -> None:
     replay_link = urlparse(_replay_client_url(1234))
 
-    assert REPLAY_SAVE_ENV_VAR == "COGAME_SAVE_REPLAY_PATH"
-    assert REPLAY_LOAD_ENV_VAR == "COGAME_LOAD_REPLAY_PATH"
+    assert REPLAY_SAVE_ENV_VAR == "COGAME_SAVE_REPLAY_URI"
+    assert REPLAY_LOAD_ENV_VAR == "COGAME_LOAD_REPLAY_URI"
     assert replay_link.scheme == "http"
     assert replay_link.netloc == "127.0.0.1:1234"
     assert replay_link.path == "/replay"
@@ -327,7 +329,7 @@ def test_replay_coworld_starts_replay_container_and_reports_link(
     assert session.link == "http://127.0.0.1:1234/replay"
     assert ready_sessions == [session]
     command = popen_commands[0]
-    assert f"{REPLAY_LOAD_ENV_VAR}=/coworld-replay/replay.json" in command
+    assert f"{REPLAY_LOAD_ENV_VAR}=file:///coworld-replay/replay.json" in command
     assert f"{tmp_path}:/coworld-replay:ro" in command
     assert _image_command_slice(command) == [
         "--entrypoint",
@@ -374,10 +376,10 @@ def test_paintarena_snapshots_are_independent(tmp_path: Path, monkeypatch: pytes
             }
         )
     )
-    monkeypatch.setenv("COGAME_CONFIG_PATH", str(config_path))
-    monkeypatch.setenv("COGAME_RESULTS_PATH", str(tmp_path / "results.json"))
-    monkeypatch.setenv("COGAME_SAVE_REPLAY_PATH", str(tmp_path / "replay.json"))
-    monkeypatch.delenv("COGAME_LOAD_REPLAY_PATH", raising=False)
+    monkeypatch.setenv(CONFIG_ENV_VAR, config_path.as_uri())
+    monkeypatch.setenv(RESULTS_ENV_VAR, (tmp_path / "results.json").as_uri())
+    monkeypatch.setenv(REPLAY_SAVE_ENV_VAR, (tmp_path / "replay.json").as_uri())
+    monkeypatch.delenv(REPLAY_LOAD_ENV_VAR, raising=False)
 
     spec = importlib.util.spec_from_file_location("paintarena_server_test", _example_root() / "game" / "server.py")
     assert spec is not None

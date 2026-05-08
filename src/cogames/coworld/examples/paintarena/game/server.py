@@ -10,18 +10,20 @@ import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.responses import HTMLResponse
 
+from cogames.coworld.runner.io import read_data, write_data
+
 CLIENTS_DIR = Path(__file__).parent / "clients"
-REPLAY_MODE = "COGAME_LOAD_REPLAY_PATH" in os.environ
+REPLAY_MODE = "COGAME_LOAD_REPLAY_URI" in os.environ
 if REPLAY_MODE:
-    REPLAY_DATA = json.loads(Path(os.environ["COGAME_LOAD_REPLAY_PATH"]).read_text())
+    REPLAY_DATA = json.loads(read_data(os.environ["COGAME_LOAD_REPLAY_URI"]))
     CONFIG = {"tokens": [], "players": [], "width": 1, "height": 1, "max_ticks": 0, "tick_rate": 1.0}
-    RESULTS_PATH = Path(os.environ["COGAME_LOAD_REPLAY_PATH"])
-    REPLAY_PATH = Path(os.environ["COGAME_LOAD_REPLAY_PATH"])
+    RESULTS_URI = os.environ["COGAME_LOAD_REPLAY_URI"]
+    REPLAY_URI = os.environ["COGAME_LOAD_REPLAY_URI"]
 else:
     REPLAY_DATA = {}
-    CONFIG = json.loads(Path(os.environ["COGAME_CONFIG_PATH"]).read_text())
-    RESULTS_PATH = Path(os.environ["COGAME_RESULTS_PATH"])
-    REPLAY_PATH = Path(os.environ["COGAME_SAVE_REPLAY_PATH"])
+    CONFIG = json.loads(read_data(os.environ["COGAME_CONFIG_URI"]))
+    RESULTS_URI = os.environ["COGAME_RESULTS_URI"]
+    REPLAY_URI = os.environ["COGAME_SAVE_REPLAY_URI"]
 
 TOKENS = CONFIG["tokens"]
 PLAYER_NAMES = [player["name"] for player in CONFIG["players"]]
@@ -160,8 +162,8 @@ async def _play_game() -> None:
         await asyncio.sleep(1.0 / state.tick_rate)
 
     results = _results()
-    RESULTS_PATH.write_text(json.dumps(results))
-    REPLAY_PATH.write_text(json.dumps(_replay_payload(results)))
+    write_data(RESULTS_URI, json.dumps(results), content_type="application/json")
+    write_data(REPLAY_URI, json.dumps(_replay_payload(results)), content_type="application/json")
 
     state.done = True
     server.should_exit = True

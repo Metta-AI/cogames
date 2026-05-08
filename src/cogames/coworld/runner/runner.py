@@ -23,8 +23,10 @@ from cogames.coworld.types import CoworldEpisodeJobSpec, CoworldPlayerSpec, Cowo
 
 REPO_ROOT = Path(__file__).resolve().parents[6]
 CONTAINER_WORKDIR = "/coworld"
-REPLAY_SAVE_ENV_VAR = "COGAME_SAVE_REPLAY_PATH"
-REPLAY_LOAD_ENV_VAR = "COGAME_LOAD_REPLAY_PATH"
+CONFIG_ENV_VAR = "COGAME_CONFIG_URI"
+RESULTS_ENV_VAR = "COGAME_RESULTS_URI"
+REPLAY_SAVE_ENV_VAR = "COGAME_SAVE_REPLAY_URI"
+REPLAY_LOAD_ENV_VAR = "COGAME_LOAD_REPLAY_URI"
 
 
 @dataclass(frozen=True)
@@ -142,10 +144,15 @@ def generate_tokens(player_count: int) -> list[str]:
     return [secrets.token_urlsafe(16) for _ in range(player_count)]
 
 
-def write_coworld_game_config(job: CoworldEpisodeJobSpec, artifacts: EpisodeArtifacts, tokens: list[str]) -> None:
+def coworld_game_config(job: CoworldEpisodeJobSpec, tokens: list[str]) -> dict[str, object]:
     game_config = dict(job.game_config)
     game_config["tokens"] = tokens
     validate_json_schema(game_config, job.config_schema)
+    return game_config
+
+
+def write_coworld_game_config(job: CoworldEpisodeJobSpec, artifacts: EpisodeArtifacts, tokens: list[str]) -> None:
+    game_config = coworld_game_config(job, tokens)
     artifacts.config_path.write_text(json.dumps(game_config, indent=2), encoding="utf-8")
 
 
@@ -179,11 +186,11 @@ def run_cogame_episode(spec: EpisodeRunSpec, *, verify_replay: bool = True) -> N
                     f"127.0.0.1:{port}:8080",
                     *_env_args(spec.cogame.env),
                     "-e",
-                    f"COGAME_CONFIG_PATH={CONTAINER_WORKDIR}/config.json",
+                    f"{CONFIG_ENV_VAR}=file://{CONTAINER_WORKDIR}/config.json",
                     "-e",
-                    f"COGAME_RESULTS_PATH={CONTAINER_WORKDIR}/results.json",
+                    f"{RESULTS_ENV_VAR}=file://{CONTAINER_WORKDIR}/results.json",
                     "-e",
-                    f"{REPLAY_SAVE_ENV_VAR}={CONTAINER_WORKDIR}/replay.json",
+                    f"{REPLAY_SAVE_ENV_VAR}=file://{CONTAINER_WORKDIR}/replay.json",
                     "-v",
                     f"{spec.artifacts.workspace.resolve()}:{CONTAINER_WORKDIR}:rw",
                     *_image_command(spec.cogame),
@@ -250,7 +257,7 @@ def run_cogame_episode(spec: EpisodeRunSpec, *, verify_replay: bool = True) -> N
                     f"127.0.0.1:{replay_port}:8080",
                     *_env_args(spec.cogame.env),
                     "-e",
-                    f"{REPLAY_LOAD_ENV_VAR}={CONTAINER_WORKDIR}/replay.json",
+                    f"{REPLAY_LOAD_ENV_VAR}=file://{CONTAINER_WORKDIR}/replay.json",
                     "-v",
                     f"{spec.artifacts.workspace.resolve()}:{CONTAINER_WORKDIR}:rw",
                     *_image_command(spec.cogame),

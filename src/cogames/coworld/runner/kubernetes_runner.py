@@ -23,8 +23,8 @@ from cogames.coworld.runner.runner import (
     _require_bad_player_rejected,
     _require_global_message,
     _require_http_ok,
+    coworld_game_config,
     generate_tokens,
-    write_coworld_game_config,
 )
 from cogames.coworld.runner.runner import (
     _player_query as _episode_player_query,
@@ -39,9 +39,12 @@ GAME_PORT = 8080
 
 def init_config_from_env() -> None:
     job = _read_job_spec()
-    artifacts = EpisodeArtifacts.create(WORKDIR, prefix="coworld-job-")
     tokens = generate_tokens(len(job.players))
-    write_coworld_game_config(job, artifacts, tokens)
+    write_data(
+        os.environ["COGAME_CONFIG_URI"],
+        json.dumps(coworld_game_config(job, tokens), indent=2),
+        content_type="application/json",
+    )
     STATE_PATH.write_text(json.dumps({"tokens": tokens}), encoding="utf-8")
 
 

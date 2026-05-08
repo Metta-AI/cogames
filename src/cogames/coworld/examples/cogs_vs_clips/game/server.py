@@ -6,7 +6,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import urlencode
+from urllib.parse import unquote, urlencode, urlparse
 
 import numpy as np
 import uvicorn
@@ -15,6 +15,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
+from cogames.coworld.runner.io import read_data
 from mettagrid.config.mettagrid_config import MettaGridConfig
 from mettagrid.map_builder.map_builder import HasSeed
 from mettagrid.runner.live_episode import LiveMettaGridEpisode, TickMode
@@ -242,6 +243,13 @@ def noop_shutdown() -> None:
     pass
 
 
+def _file_uri_path(uri: str) -> Path:
+    parsed = urlparse(uri)
+    if parsed.scheme != "file":
+        raise ValueError(f"cogs_vs_clips artifacts must use file:// URIs: {uri}")
+    return Path(unquote(parsed.path))
+
+
 def create_app(
     config: dict[str, Any],
     results_path: Path,
@@ -397,13 +405,13 @@ def create_replay_app(replay_data: dict[str, Any]) -> FastAPI:
 
 
 def load_app_from_env(request_shutdown: Callable[[], None] = noop_shutdown) -> FastAPI:
-    if "COGAME_LOAD_REPLAY_PATH" in os.environ:
-        replay_data = json.loads(Path(os.environ["COGAME_LOAD_REPLAY_PATH"]).read_text())
+    if "COGAME_LOAD_REPLAY_URI" in os.environ:
+        replay_data = json.loads(read_data(os.environ["COGAME_LOAD_REPLAY_URI"]))
         return create_replay_app(replay_data)
-    config = json.loads(Path(os.environ["COGAME_CONFIG_PATH"]).read_text())
-    results_path = Path(os.environ["COGAME_RESULTS_PATH"])
-    raw_replay_path = os.environ.get("COGAME_SAVE_REPLAY_PATH")
-    replay_path = Path(raw_replay_path) if raw_replay_path else None
+    config = json.loads(read_data(os.environ["COGAME_CONFIG_URI"]))
+    results_path = _file_uri_path(os.environ["COGAME_RESULTS_URI"])
+    raw_replay_uri = os.environ.get("COGAME_SAVE_REPLAY_URI")
+    replay_path = _file_uri_path(raw_replay_uri) if raw_replay_uri else None
     return create_app(config, results_path=results_path, replay_path=replay_path, request_shutdown=request_shutdown)
 
 

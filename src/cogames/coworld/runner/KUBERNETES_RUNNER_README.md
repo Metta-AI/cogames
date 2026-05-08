@@ -20,9 +20,11 @@ The parent Job has:
 - `worker`: runs the Kubernetes coordinator.
 - `coworld-workdir`: an `emptyDir` volume mounted into all parent containers.
 
-The game and worker share files through `COWORLD_WORKDIR`. The worker reaches the
-game locally for health checks and creates a ClusterIP Service so player pods can
-connect back to the game.
+The game receives URI-based artifact environment variables. Today the app
+backend supplies `file://` URIs inside `COWORLD_WORKDIR` so the worker can
+validate results and upload hosted artifacts, but the game contract is URI-based
+rather than path-based. The worker reaches the game locally for health checks and
+creates a ClusterIP Service so player pods can connect back to the game.
 
 ## Commands
 
@@ -91,6 +93,21 @@ The coordinator creates one pod per player:
 - `COGAMES_ENGINE_WS_URL`: points at the parent game's Kubernetes Service.
 
 The player query string includes only the generated slot token and slot index.
+
+## Game Container URIs
+
+The app backend starts the game container with:
+
+```bash
+COGAME_CONFIG_URI=file:///coworld/config.json
+COGAME_RESULTS_URI=file:///coworld/results.json
+COGAME_SAVE_REPLAY_URI=file:///coworld/replay.json
+```
+
+`coworld-init-config` writes `COGAME_CONFIG_URI` before the game starts. The
+game writes results and replay to the supplied URIs. The worker validates
+`COGAME_RESULTS_URI`, compresses the replay, and uploads the hosted output
+artifacts listed below.
 
 ## Optional Inputs
 
