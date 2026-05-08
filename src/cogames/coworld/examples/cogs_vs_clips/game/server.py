@@ -6,6 +6,7 @@ import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
+from urllib.parse import urlencode
 
 import numpy as np
 import uvicorn
@@ -190,6 +191,20 @@ class CogsVsClipsGame:
     def snapshot(self) -> dict[str, Any]:
         return {**self.episode.snapshot(), "global_protocol": GLOBAL_PROTOCOL}
 
+    def admin_snapshot(self) -> dict[str, Any]:
+        snapshot = self.snapshot()
+        snapshot["slots"] = [
+            {
+                **slot_state,
+                "player_client_url": self.player_client_url(int(slot_state["slot"])),
+            }
+            for slot_state in snapshot["slots"]
+        ]
+        return snapshot
+
+    def player_client_url(self, slot: int) -> str:
+        return f"/player?{urlencode({'slot': slot, 'token': self.tokens[slot], 'takeover': 1})}"
+
     def global_status(self) -> dict[str, Any]:
         return {
             "mission": self.mission_name,
@@ -298,7 +313,7 @@ def create_app(
     @app.websocket("/admin")
     async def admin(websocket: WebSocket) -> None:
         await websocket.accept()
-        await websocket.send_json(game.snapshot())
+        await websocket.send_json(game.admin_snapshot())
         async for command in websocket.iter_json():
             if command["command"] == "pause":
                 game.episode.paused = True
@@ -317,7 +332,7 @@ def create_app(
                 game.episode.takeover(int(command["slot"]), str(command["connection_id"]))
             elif command["command"] == "release_takeover":
                 game.episode.release_takeover(int(command["slot"]), command.get("connection_id"))
-            await websocket.send_json(game.snapshot())
+            await websocket.send_json(game.admin_snapshot())
 
     @app.websocket("/player")
     async def player(websocket: WebSocket) -> None:

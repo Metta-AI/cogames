@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 
 def test_cogs_vs_clips_snapshot_exposes_admin_slot_state(tmp_path: Path) -> None:
@@ -19,6 +20,34 @@ def test_cogs_vs_clips_snapshot_exposes_admin_slot_state(tmp_path: Path) -> None
         "tick_mode": "fixed",
         "human_action_timeout_seconds": 5.0,
     }
+
+
+def test_cogs_vs_clips_admin_snapshot_exposes_takeover_player_links(tmp_path: Path) -> None:
+    server_module = _load_cogs_vs_clips_server_module()
+    game = server_module.CogsVsClipsGame(
+        {
+            "mission": "machina_1",
+            "tokens": ["token 0", "token/1"],
+            "max_steps": 3,
+            "seed": 0,
+            "step_seconds": 0.02,
+        },
+        results_path=tmp_path / "results.json",
+        replay_path=None,
+        request_shutdown=lambda: None,
+    )
+
+    snapshot = game.admin_snapshot()
+
+    assert all("player_client_url" not in slot for slot in game.snapshot()["slots"])
+    for slot_index, slot in enumerate(snapshot["slots"]):
+        player_link = urlparse(slot["player_client_url"])
+        assert player_link.path == "/player"
+        assert parse_qs(player_link.query) == {
+            "slot": [str(slot_index)],
+            "token": [game.tokens[slot_index]],
+            "takeover": ["1"],
+        }
 
 
 def test_cogs_vs_clips_global_action_updates_policy_action(tmp_path: Path) -> None:

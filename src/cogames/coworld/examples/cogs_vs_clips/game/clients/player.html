@@ -50,12 +50,14 @@
   const release = document.getElementById("release");
   const latest = document.getElementById("latest");
   const obs = document.getElementById("obs");
+  const autoTakeover = new URLSearchParams(window.location.search).get("takeover") === "1";
 
   let socket;
   let config = null;
   let featureNames = new Map();
   let actionNames = [];
   let done = false;
+  let autoTakeoverSent = false;
 
   function configure(message) {
     config = message;
@@ -66,6 +68,10 @@
     drawCells(new Map());
     drawActions(actionNames);
     updateStatus(message.control_state, null);
+    if (autoTakeover && !autoTakeoverSent) {
+      autoTakeoverSent = true;
+      requestTakeover();
+    }
   }
 
   function drawActions(names) {
@@ -153,6 +159,11 @@
     socket.send(JSON.stringify({ type: "action", action_index: index }));
   }
 
+  function requestTakeover() {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
+    socket.send(JSON.stringify({ type: "takeover" }));
+  }
+
   function updateStatus(controlState, step) {
     const mode = controlState && controlState.control_mode === "human" ? "Human" : "Policy";
     status.textContent = step == null ? `${mode} control` : `Step ${step} - ${mode} control`;
@@ -171,10 +182,7 @@
     }, null, 2);
   }
 
-  takeover.onclick = () => {
-    if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    socket.send(JSON.stringify({ type: "takeover" }));
-  };
+  takeover.onclick = requestTakeover;
   release.onclick = () => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify({ type: "release_takeover" }));

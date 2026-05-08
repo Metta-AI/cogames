@@ -6,7 +6,9 @@
   input, select { vertical-align: middle; }
   #slots { display: grid; gap: 8px; margin: 14px 0; max-width: 960px; }
   .slot { border: 1px solid #ddd; padding: 10px; }
+  .slot-heading { align-items: center; display: flex; gap: 8px; }
   .connection { align-items: center; display: flex; gap: 8px; margin-top: 6px; }
+  .player-client { color: #1d4ed8; }
   pre { background: #f5f5f5; padding: 12px; width: min(960px, 100%); white-space: pre-wrap; }
 </style>
 <h1>Cogs vs Clips Admin</h1>
@@ -34,29 +36,65 @@
 <div id="slots"></div>
 <pre id="latest"></pre>
 <script>
-  const websocketUrl = new URL(window.location.href);
-  websocketUrl.protocol = websocketUrl.protocol === "https:" ? "wss:" : "ws:";
-
   const status = document.getElementById("status");
   const latest = document.getElementById("latest");
   const stepSeconds = document.getElementById("stepSeconds");
   const tickMode = document.getElementById("tickMode");
   const humanTimeout = document.getElementById("humanTimeout");
   const slots = document.getElementById("slots");
-  const socket = new WebSocket(websocketUrl);
+  const url = new URL(window.location.href);
+
+  function defaultAddress(path) {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const host = window.location.host || "localhost:8080";
+    return `${protocol}//${host}${path}`;
+  }
+
+  function websocketAddress(path) {
+    const target = new URL(url.searchParams.get("address") || defaultAddress(path), window.location.href);
+    if (target.protocol === "http:") target.protocol = "ws:";
+    if (target.protocol === "https:") target.protocol = "wss:";
+    target.pathname = path;
+    target.search = "";
+    target.hash = "";
+    return target;
+  }
+
+  function httpAddress(path) {
+    const target = websocketAddress(path);
+    if (target.protocol === "ws:") target.protocol = "http:";
+    if (target.protocol === "wss:") target.protocol = "https:";
+    return target;
+  }
+
+  const adminAddress = websocketAddress("/admin");
+  const socket = new WebSocket(adminAddress);
 
   function send(command) {
     if (socket.readyState !== WebSocket.OPEN) return;
     socket.send(JSON.stringify(command));
   }
 
+  function playerClientUrl(slot) {
+    return new URL(slot.player_client_url, httpAddress("/player")).toString();
+  }
+
   function drawSlots(message) {
     slots.replaceChildren(...(message.slots || []).map((slot) => {
       const section = document.createElement("section");
       section.className = "slot";
+      const heading = document.createElement("div");
+      heading.className = "slot-heading";
       const title = document.createElement("strong");
       title.textContent = `Slot ${slot.slot + 1} - ${slot.control_state.control_mode}`;
-      section.append(title);
+      const playerClient = document.createElement("a");
+      playerClient.className = "player-client";
+      playerClient.href = playerClientUrl(slot);
+      playerClient.target = "_blank";
+      playerClient.rel = "noopener noreferrer";
+      playerClient.textContent = "Control client";
+      heading.append(title, playerClient);
+      section.append(heading);
       for (const connection of slot.connections || []) {
         const row = document.createElement("div");
         row.className = "connection";
@@ -85,7 +123,7 @@
     }));
   }
 
-  socket.onopen = () => { status.textContent = "Connected"; };
+  socket.onopen = () => { status.textContent = `Connected to ${adminAddress.host}`; };
   socket.onmessage = (event) => {
     const message = JSON.parse(event.data);
     latest.textContent = JSON.stringify(message, null, 2);
