@@ -68,6 +68,7 @@ _SHARED_SRCS = ["conftest.py", "_test_support.py"] + glob(
         deps = [
             "//packages/cogames:cogames",
             "@pyenv//:cogsguard",
+            "@pyenv//:kubernetes",
             "@pyenv//:pytest",
             # cogames.train + mettagrid.policy.policy import torch and
             # pufferlib at module load. Both are in the cogames `[train]`

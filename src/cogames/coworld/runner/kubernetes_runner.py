@@ -153,8 +153,14 @@ def _run_kubernetes_episode(
             )
 
         asyncio.run(_require_global_message(f"ws://127.0.0.1:{GAME_PORT}/global", timeout_seconds=timeout_seconds))
-        _wait_for_results(artifacts, core_v1, namespace, pod_name, timeout_seconds=timeout_seconds)
-        _wait_for_player_pods(core_v1, namespace, child_names)
+        _wait_for_results(
+            artifacts,
+            core_v1,
+            namespace,
+            pod_name,
+            timeout_seconds=timeout_seconds,
+            player_pod_names=child_names,
+        )
         _collect_logs(core_v1, namespace, pod_name, child_names, artifacts)
 
         results = json.loads(artifacts.results_path.read_text(encoding="utf-8"))
@@ -266,12 +272,15 @@ def _wait_for_results(
     pod_name: str,
     *,
     timeout_seconds: float,
+    player_pod_names: list[str] | None = None,
 ) -> None:
     deadline = time.monotonic() + timeout_seconds
     while time.monotonic() < deadline:
         if artifacts.results_path.exists():
             return
         _raise_if_game_terminated(core_v1, namespace, pod_name)
+        if player_pod_names:
+            _raise_if_player_pods_failed(core_v1, namespace, player_pod_names)
         time.sleep(0.5)
     raise TimeoutError(f"Timed out waiting for {artifacts.results_path}")
 
@@ -286,19 +295,16 @@ def _raise_if_game_terminated(core_v1, namespace: str, pod_name: str) -> None:
             raise RuntimeError(f"Game container exited with code {exit_code}")
 
 
-def _wait_for_player_pods(core_v1, namespace: str, pod_names: list[str]) -> None:
-    pending = set(pod_names)
-    deadline = time.monotonic() + 60
-    while pending and time.monotonic() < deadline:
-        for pod_name in list(pending):
+def _raise_if_player_pods_failed(core_v1, namespace: str, pod_names: list[str]) -> None:
+    for pod_name in pod_names:
+        try:
             pod = core_v1.read_namespaced_pod(name=pod_name, namespace=namespace)
-            if pod.status.phase == "Succeeded":
-                pending.remove(pod_name)
-            elif pod.status.phase == "Failed":
-                raise RuntimeError(f"Player pod {pod_name} failed")
-        time.sleep(0.5)
-    if pending:
-        raise TimeoutError(f"Timed out waiting for player pods: {sorted(pending)}")
+        except ApiException as exc:
+            if exc.status == 404:
+                continue
+            raise
+        if pod.status.phase == "Failed":
+            raise RuntimeError(f"Player pod {pod_name} failed")
 
 
 def _collect_logs(
