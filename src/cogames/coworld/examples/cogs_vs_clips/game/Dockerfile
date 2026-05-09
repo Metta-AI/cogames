@@ -58,7 +58,10 @@ runner_dir = Path(mettagrid.__file__).parent / "runner"
 shutil.copyfile("/tmp/live_episode.py", runner_dir / "live_episode.py")
 PY
 COPY --from=mettascope-builder /mettascope/dist /app/mettascope
+COPY packages/cogames/src/cogames /app/cogames
+RUN : > /app/cogames/coworld/__init__.py
 COPY packages/cogames/src/cogames/coworld/examples/cogs_vs_clips/game/clients /app/clients
 COPY packages/cogames/src/cogames/coworld/examples/cogs_vs_clips/game/server.py /app/server.py
+ENV PYTHONPATH=/app
 
 CMD ["python", "/app/server.py"]
