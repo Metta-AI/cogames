@@ -18,7 +18,7 @@ From the Coworld package root (`packages/cogames/src/cogames/coworld`):
 docker build --platform=linux/amd64 -t coworld-paintarena:latest examples/paintarena
 ```
 
-Use `linux/amd64` for images that will be uploaded to Observatory, including when building from Apple Silicon.
+Use `linux/amd64` for images that will be uploaded to the CoGames platform, including when building from Apple Silicon.
 
 ## Play Locally
 
