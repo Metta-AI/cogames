@@ -233,7 +233,7 @@ def _create_player_pod(
                 client.V1Container(
                     name="player",
                     image=player.image,
-                    image_pull_policy="Always",
+                    image_pull_policy=os.environ.get("COWORLD_PLAYER_IMAGE_PULL_POLICY", "Always"),
                     command=command,
                     args=args,
                     env=[
