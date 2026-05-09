@@ -1,7 +1,9 @@
+import gzip
 from types import SimpleNamespace
 
 import pytest
 
+from cogames.coworld.runner import kubernetes_runner
 from cogames.coworld.runner.kubernetes_runner import _wait_for_results
 from cogames.coworld.runner.runner import EpisodeArtifacts
 
@@ -47,3 +49,15 @@ def test_wait_for_results_raises_when_player_pod_fails(tmp_path):
             timeout_seconds=0.01,
             player_pod_names=["player-0"],
         )
+
+
+def test_init_replay_from_env_materializes_compressed_replay(monkeypatch, tmp_path):
+    payload = b'{"frames":[{"tick":1}]}'
+    monkeypatch.setenv("COGAME_LOAD_REPLAY_URI", "https://storage.example.com/replay.json.z")
+    monkeypatch.setattr(kubernetes_runner, "WORKDIR", tmp_path)
+    monkeypatch.setattr(kubernetes_runner, "REPLAY_PATH", tmp_path / "replay.json")
+    monkeypatch.setattr(kubernetes_runner, "read_data", lambda _uri: gzip.compress(payload))
+
+    kubernetes_runner.init_replay_from_env()
+
+    assert (tmp_path / "replay.json").read_bytes() == payload
