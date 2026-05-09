@@ -76,6 +76,20 @@ def test_load_coworld_package_allows_public_protocol_doc_links(tmp_path: Path) -
     assert package.protocols.player == "https://example.com/player_protocol_spec.md"
 
 
+def test_load_coworld_package_allows_inlined_protocol_docs(tmp_path: Path) -> None:
+    coworld_manifest_path = _write_package_files(tmp_path, write_protocol_docs=False)
+    manifest = json.loads(coworld_manifest_path.read_text())
+    manifest["game"]["protocols"] = {
+        "player": "# Player Protocol\n\nConnect over /player.",
+        "global": "# Global Protocol\n\nConnect over /global.",
+    }
+    coworld_manifest_path.write_text(json.dumps(manifest))
+
+    package = load_coworld_package(coworld_manifest_path)
+
+    assert package.protocols.player.startswith("# Player Protocol")
+
+
 def test_load_coworld_package_rejects_invalid_certification_player_entry(tmp_path: Path) -> None:
     coworld_manifest_path = _write_package_files(
         tmp_path,

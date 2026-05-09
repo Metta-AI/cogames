@@ -164,10 +164,19 @@ def _referenced_file_paths(package: CoworldPackage) -> list[tuple[str, Path]]:
         ("Cogame protocols.player", package.protocols.player),
         ("Cogame protocols.global", package.protocols.global_),
     ):
-        if urlparse(uri).scheme and urlparse(uri).scheme != "file":
+        if not _is_local_doc_reference(uri):
             continue
         paths.append((label, resolve_manifest_uri(package.manifest_path.parent, uri)))
     return paths
+
+
+def _is_local_doc_reference(value: str) -> bool:
+    parsed = urlparse(value)
+    if parsed.scheme:
+        return parsed.scheme == "file"
+    if "\n" in value or value.startswith("#"):
+        return False
+    return "/" in value or value.startswith(".") or value.endswith((".md", ".markdown", ".txt"))
 
 
 def _image_references(package: CoworldPackage) -> list[tuple[str, str]]:
