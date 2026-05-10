@@ -504,7 +504,8 @@ def test_paintarena_disconnected_player_noops_after_timeout(tmp_path: Path, monk
 
 def test_cogs_vs_clips_coworld_manifest_validates() -> None:
     package = load_coworld_package(_cogs_vs_clips_root() / "coworld_manifest.json")
-    config = build_game_config(package, ["token-0", "token-1"])
+    tokens = [f"token-{index}" for index in range(8)]
+    config = build_game_config(package, tokens)
 
     assert package.manifest.game.name == "cogs_vs_clips"
     assert package.cogame.image == "coworld-cogs-vs-clips-game:latest"
@@ -517,12 +518,14 @@ def test_cogs_vs_clips_coworld_manifest_validates() -> None:
     assert package.manifest.player[0].env == {
         "COGAMES_POLICY_URI": "metta://policy/cogames.policy.starter_agent.StarterPolicy"
     }
+    daily_variant = next(variant for variant in package.manifest.variants if variant.id == "machina-1-daily")
+    assert daily_variant.game_config["max_steps"] == 10000
     assert config == {
         "mission": "cogsguard",
         "max_steps": 3,
         "seed": 0,
         "step_seconds": 0.02,
-        "tokens": ["token-0", "token-1"],
+        "tokens": tokens,
     }
 
 

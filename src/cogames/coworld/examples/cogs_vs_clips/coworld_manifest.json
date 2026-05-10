@@ -2,7 +2,7 @@
   "$schema": "../../coworld_manifest_schema.json",
   "game": {
     "name": "cogs_vs_clips",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "description": "Cogs vs Clips packaged as a Coworld Cogame backed by Cogsguard and MettaGrid.",
     "owner": "cogames@softmax.com",
     "runnable": {
@@ -18,8 +18,8 @@
       "properties": {
         "tokens": {
           "type": "array",
-          "minItems": 2,
-          "maxItems": 2,
+          "minItems": 8,
+          "maxItems": 8,
           "items": {
             "type": "string",
             "minLength": 1
@@ -89,26 +89,15 @@
   ],
   "variants": [
     {
-      "id": "machina-1-smoke",
-      "name": "Machina 1 Smoke",
+      "id": "machina-1-daily",
+      "name": "Machina 1 Daily",
       "game_config": {
         "mission": "machina_1",
-        "max_steps": 3,
+        "max_steps": 10000,
         "seed": 0,
         "step_seconds": 0.02
       },
-      "description": "Short deterministic Cogs vs Clips smoke episode backed by the Cogsguard Machina 1 mission."
-    },
-    {
-      "id": "cogsguard-smoke",
-      "name": "Cogsguard Smoke",
-      "game_config": {
-        "mission": "cogsguard",
-        "max_steps": 3,
-        "seed": 0,
-        "step_seconds": 0.02
-      },
-      "description": "Short deterministic smoke episode using the current Cogsguard mission defaults."
+      "description": "8-agent Cogs vs Clips daily tournament variant backed by the Cogsguard Machina 1 mission."
     }
   ],
   "certification": {
@@ -119,6 +108,24 @@
       "step_seconds": 0.02
     },
     "players": [
+      {
+        "player_id": "starter-policy-player"
+      },
+      {
+        "player_id": "starter-policy-player"
+      },
+      {
+        "player_id": "starter-policy-player"
+      },
+      {
+        "player_id": "starter-policy-player"
+      },
+      {
+        "player_id": "starter-policy-player"
+      },
+      {
+        "player_id": "starter-policy-player"
+      },
       {
         "player_id": "starter-policy-player"
       },
