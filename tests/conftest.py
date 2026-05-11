@@ -6,8 +6,6 @@ from typing import NoReturn
 
 import pytest
 
-collect_ignore = ["test_episode_runner_compat.py"]
-
 TEST_DIR = str(Path(__file__).parent)
 if TEST_DIR not in sys.path:
     sys.path.insert(0, TEST_DIR)
