@@ -36,9 +36,16 @@ There's one ALB game right now: Cogs vs Clips.
 
 ## Step 1: Install CoGames
 
-Install [cogames](https://pypi.org/project/cogames/) as a Python package.
+Install [cogames](https://pypi.org/project/cogames/) as a Python package, along
+with the Cogs vs Clips game (`cogsguard`, installed from git) and the `neural`
+extras needed to run the `starter` policy.
 ```bash
-pip install cogames
+# Use a virtual environment to avoid conflicts with system-managed packages.
+python -m venv .venv
+source .venv/bin/activate
+
+pip install "cogames[neural]"
+pip install "cogsguard @ git+https://github.com/Metta-AI/cogame-cogsguard.git"
 ```
 
 <details><summary>Using uv</summary>
@@ -51,8 +58,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv .venv
 source .venv/bin/activate
 
-# Install cogames
-uv pip install cogames
+# Install cogames, the neural extras, and the cogsguard game
+uv pip install "cogames[neural]"
+uv pip install "cogsguard @ git+https://github.com/Metta-AI/cogame-cogsguard.git"
 ```
 
 </details>
@@ -64,11 +72,12 @@ FROM python:3.12-slim
 
 # Ensure C/C++ compiler is available
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends build-essential && \
+    apt-get install -y --no-install-recommends build-essential git && \
   rm -rf /var/lib/apt/lists/*
 
-# Install cogames
-RUN pip install --no-cache-dir cogames
+# Install cogames, the neural extras, and the cogsguard game
+RUN pip install --no-cache-dir "cogames[neural]" \
+    "cogsguard @ git+https://github.com/Metta-AI/cogame-cogsguard.git"
 ```
 
 </details>
@@ -111,15 +120,17 @@ Command guide:
     ```bash
     cogames create-bundle -p class=cogames.policy.starter_agent.StarterPolicy -o submission.zip
     cogames upload -p ./submission.zip -n "$USER.README-quickstart-starter-policy" --no-submit
-    cogames submit "$USER.README-quickstart-starter-policy" --season beta-teams-small
+    cogames submit "$USER.README-quickstart-starter-policy" --season beta-teams-tiny-fixed
     ```
 
 3. Check your submission status.
 
     ```bash
-    cogames submissions --season beta-teams-small --policy "$USER.README-quickstart-starter-policy"
-    cogames season matches beta-teams-small --limit 5
+    cogames submissions --season beta-teams-tiny-fixed --policy "$USER.README-quickstart-starter-policy"
+    cogames season matches beta-teams-tiny-fixed --limit 5
     ```
+
+    Run `cogames season list` to see other open seasons you can submit to.
 
 # Tutorials
 
