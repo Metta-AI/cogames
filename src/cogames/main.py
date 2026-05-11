@@ -67,6 +67,7 @@ from cogames.cli.submit import (
     create_bundle,
     ensure_docker_daemon_access,
     observatory_home_url,
+    observatory_policy_url,
     upload_policy,
     validate_bundle_docker,
 )
@@ -171,13 +172,17 @@ def _print_async_submission_follow_up(
     season_name: str,
     login_server_url: str,
 ) -> None:
-    observatory_url = observatory_home_url(login_server_url=login_server_url)
+    policy_url = observatory_policy_url(
+        login_server_url=login_server_url,
+        policy_name=policy_name,
+        season_name=season_name,
+    )
     browser_skip_reason = _submit_browser_launch_skip_reason()
     if browser_skip_reason is None:
-        webbrowser.open(observatory_url)
+        webbrowser.open(policy_url)
     else:
         console.print(f"[dim]Browser launch skipped: {browser_skip_reason}[/dim]")
-    console.print(f"[dim]Observatory:[/dim] {observatory_url}")
+    console.print(f"[dim]Policy page:[/dim] {policy_url}")
     console.print("[dim]Evaluation runs asynchronously. Check status with:[/dim]")
     console.print(f"[dim]  cogames submissions --season {season_name} --policy {policy_name}[/dim]")
     console.print(f"[dim]  cogames leaderboard {season_name} --policy {policy_name}[/dim]")
@@ -1953,13 +1958,17 @@ def submit_cmd(
     console.print(f"\n[bold green]Submitted to season '{season_name}'[/bold green]")
     if result.pools:
         console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
-    observatory_url = observatory_home_url(login_server_url=login_server)
+    policy_url = observatory_policy_url(
+        login_server_url=login_server,
+        policy_name=name,
+        season_name=season_name,
+    )
     browser_skip_reason = _submit_browser_launch_skip_reason()
     if browser_skip_reason is None:
-        webbrowser.open(observatory_url)
+        webbrowser.open(policy_url)
     else:
         console.print(f"[dim]Browser launch skipped: {browser_skip_reason}[/dim]")
-    console.print(f"[dim]Observatory:[/dim] {observatory_url}")
+    console.print(f"[dim]Policy page:[/dim] {policy_url}")
     console.print(f"[dim]CLI:[/dim] cogames leaderboard --season {season_name}")
 
 

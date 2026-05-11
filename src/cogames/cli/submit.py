@@ -67,6 +67,33 @@ def observatory_home_url(*, login_server_url: str) -> str:
     )
 
 
+def observatory_policy_url(*, login_server_url: str, policy_name: str, season_name: str) -> str:
+    """Build a URL to the policy's profile page in Observatory."""
+    parsed = urlsplit(login_server_url)
+    hostname = (parsed.hostname or "").removeprefix("api.")
+    if parsed.port is None:
+        netloc = hostname
+    else:
+        netloc = f"{hostname}:{parsed.port}" if hostname else str(parsed.port)
+
+    browser_path = parsed.path.rstrip("/")
+    if "/api/" in browser_path:
+        browser_path = browser_path.split("/api/", 1)[0]
+    else:
+        browser_path = browser_path.removesuffix("/api")
+
+    fragment = f"tab=policies&season={season_name}&policy={policy_name}"
+    return urlunsplit(
+        (
+            parsed.scheme,
+            netloc,
+            f"{browser_path}/observatory/v2",
+            "",
+            fragment,
+        )
+    )
+
+
 def _resolve_path_within_cwd(path_str: str, cwd: Path) -> Path:
     """Resolve a path and return it relative to CWD. Raises if path escapes CWD."""
     raw_path = Path(path_str).expanduser()
