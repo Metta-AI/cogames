@@ -460,7 +460,7 @@ class MyQuickStats(CLIModel):
 
 
 class PlayerCreateRequest(CLIModel):
-    name: Annotated[str, Field(title="Name")]
+    name: Annotated[str, Field(max_length=255, min_length=1, title="Name")]
 
 
 class PlayerCredentialCreateRequest(CLIModel):
@@ -500,7 +500,7 @@ class PlayerLoginResponse(CLIModel):
 
 
 class PlayerRenameRequest(CLIModel):
-    name: Annotated[str, Field(title="Name")]
+    name: Annotated[str, Field(max_length=255, min_length=1, title="Name")]
 
 
 class PolicyCreate(CLIModel):
