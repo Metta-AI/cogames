@@ -92,6 +92,7 @@ class CompleteDockerImagePolicyRequest(CLIModel):
     ]
     run: Annotated[Optional[Run], Field(title="Run")] = None
     env: Annotated[Optional[dict[str, str]], Field(title="Env")] = None
+    policy_secret_env: Annotated[Optional[dict[str, str]], Field(title="Policy Secret Env")] = None
 
 
 class CompletePolicySubmitRequest(CLIModel):
