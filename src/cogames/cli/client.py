@@ -37,7 +37,7 @@ from cogames.cli.generated_models import (
     TeamSummary,
     TeamTournamentProgress,
 )
-from softmax.auth import load_current_cogames_token
+from softmax.auth import fetch_cogames_whoami, load_current_cogames_token
 
 T = TypeVar("T")
 
@@ -70,6 +70,16 @@ class TournamentServerClient:
             console.print("[red]Error:[/red] Not authenticated.")
             console.print("Please run: [cyan]cogames auth login[/cyan]")
             return None
+
+        try:
+            fetch_cogames_whoami(api_server=server_url, token=token)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 401:
+                console.print("[red]Error:[/red] Saved token is expired or invalid.")
+                console.print("Please re-authenticate: [cyan]cogames auth login --force[/cyan]")
+                return None
+        except httpx.HTTPError:
+            pass
 
         return cls(server_url=server_url, token=token, login_server=login_server)
 

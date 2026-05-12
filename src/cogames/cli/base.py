@@ -45,7 +45,11 @@ def cli_http_errors(resource: str) -> Generator[None, None, None]:
     try:
         yield
     except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 404:
+        if exc.response.status_code == 401:
+            console.print("[red]Authentication failed (token expired or invalid).[/red]")
+            console.print("Please re-authenticate: [cyan]cogames auth login --force[/cyan]")
+            raise typer.Exit(1) from exc
+        elif exc.response.status_code == 404:
             console.print(f"[red]{resource} not found[/red]")
         else:
             detail = _extract_detail(exc) or f"status {exc.response.status_code}"

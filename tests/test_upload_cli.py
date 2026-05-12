@@ -95,26 +95,26 @@ def test_upload_command_sends_correct_requests(
     assert "my-test-policy:v1" in result.output
 
     # Verify the requests that were made
-    # 0: /tournament/seasons, 1: /tournament/seasons/{name}, 2: presigned-url,
-    # 3: upload, 4: complete, 5: submit-to-season
-    assert len(httpserver.log) == 6, f"Expected 6 requests, got {len(httpserver.log)}"
+    # 0: /tournament/seasons, 1: /tournament/seasons/{name}, 2: /whoami,
+    # 3: presigned-url, 4: upload, 5: complete, 6: submit-to-season
+    assert len(httpserver.log) == 7, f"Expected 7 requests, got {len(httpserver.log)}"
 
-    presign_req, _ = httpserver.log[2]
+    presign_req, _ = httpserver.log[3]
     assert presign_req.headers.get("X-Auth-Token") == "test-token-12345"
 
-    upload_req, _ = httpserver.log[3]
+    upload_req, _ = httpserver.log[4]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         spec = json.loads(zf.read("policy_spec.json"))
         assert spec["class_path"] == "cogames.policy.starter_agent.StarterPolicy"
 
-    complete_req, _ = httpserver.log[4]
+    complete_req, _ = httpserver.log[5]
     complete_body = complete_req.json
     assert complete_body["upload_id"] == upload_id
     assert complete_body["name"] == "my-test-policy"
     assert "season" not in complete_body
 
-    submit_req, _ = httpserver.log[5]
+    submit_req, _ = httpserver.log[6]
     assert submit_req.path == "/tournament/seasons/test-season/submissions"
     assert submit_req.json == {"policy_version_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"}
 
@@ -193,7 +193,7 @@ def test_upload_with_secret_env_sends_secrets_to_server(
 
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
-    complete_req, _ = httpserver.log[4]
+    complete_req, _ = httpserver.log[5]
     complete_body = complete_req.json
     assert complete_body["policy_secret_env"] == {
         "ANTHROPIC_API_KEY": "sk-ant-test-key",
@@ -320,6 +320,10 @@ def _setup_mock_upload_server(
     upload_id: str = _UPLOAD_ID,
 ) -> None:
     """Configure httpserver with the endpoints needed for upload."""
+    httpserver.expect_request("/whoami", method="GET").respond_with_json(
+        {"user_email": "test@example.com", "subject_type": "user"}
+    )
+
     season_summary = {
         "id": _SEASON_ID,
         "name": "test-season",
@@ -424,8 +428,8 @@ def test_upload_directory_policy(
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
     # Verify the uploaded zip contains all files from the directory
-    assert len(httpserver.log) == 6
-    upload_req, _ = httpserver.log[3]
+    assert len(httpserver.log) == 7
+    upload_req, _ = httpserver.log[4]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         assert "weights.pt" in zf.namelist()
@@ -475,8 +479,8 @@ def test_upload_zip_policy(
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
     # Verify the uploaded zip contains all files
-    assert len(httpserver.log) == 6
-    upload_req, _ = httpserver.log[3]
+    assert len(httpserver.log) == 7
+    upload_req, _ = httpserver.log[4]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         assert "model.safetensors" in zf.namelist()
@@ -539,8 +543,8 @@ def test_upload_zip_policy_with_includes_and_setup_script(
 
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
-    assert len(httpserver.log) == 6
-    upload_req, _ = httpserver.log[3]
+    assert len(httpserver.log) == 7
+    upload_req, _ = httpserver.log[4]
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         names = set(zf.namelist())
         spec = json.loads(zf.read("policy_spec.json"))
@@ -808,15 +812,15 @@ def test_upload_s3_policy(
 
     assert result.exit_code == 0, f"Upload failed:\n{result.output}"
 
-    # Verify: seasons list + season detail + S3 download + 3 upload requests + submit = 7 total
-    assert len(httpserver.log) == 7, f"Expected 7 requests, got {len(httpserver.log)}"
+    # Verify: seasons list + season detail + whoami + S3 download + 3 upload requests + submit = 8 total
+    assert len(httpserver.log) == 8, f"Expected 8 requests, got {len(httpserver.log)}"
 
-    # Third request should be the S3 GetObject (after seasons list + season detail)
-    s3_req, _ = httpserver.log[2]
+    # Third request should be the S3 GetObject (after seasons list + season detail + whoami)
+    s3_req, _ = httpserver.log[3]
     assert s3_req.path == f"/test-bucket/{unique_key}"
 
     # Verify the uploaded zip contains the files from S3
-    upload_req, _ = httpserver.log[4]  # After seasons list/detail, S3 download, presigned URL, then upload
+    upload_req, _ = httpserver.log[5]  # After seasons list/detail, whoami, S3 download, presigned URL, then upload
     with zipfile.ZipFile(io.BytesIO(upload_req.data)) as zf:
         assert "policy_spec.json" in zf.namelist()
         assert "checkpoint.pt" in zf.namelist()
@@ -880,6 +884,10 @@ def _setup_mock_upload_server_with_season(
     upload_id: str = _UPLOAD_ID,
 ) -> None:
     season_summary = seasons[0]
+
+    httpserver.expect_request("/whoami", method="GET").respond_with_json(
+        {"user_email": "test@example.com", "subject_type": "user"}
+    )
 
     httpserver.expect_request(
         "/tournament/seasons",
@@ -971,8 +979,8 @@ def test_upload_resolves_season_and_validates(
     assert captured.get("called") is True
     assert "validate-bundle" in captured["cmd"]
 
-    # seasons list + season detail + presigned-url + s3 upload + complete + submit = 6 requests
-    assert len(httpserver.log) == 6
+    # seasons list + season detail + whoami + presigned-url + s3 upload + complete + submit = 7 requests
+    assert len(httpserver.log) == 7
 
 
 def test_upload_returns_nonzero_when_validation_fails(
@@ -1013,8 +1021,8 @@ def test_upload_returns_nonzero_when_validation_fails(
     assert "Validation failed" in result.output
     assert "invalid season not found" in result.output
 
-    # Only season lookups should happen before validation fails.
-    assert len(httpserver.log) == 2
+    # Season lookups + whoami before validation fails.
+    assert len(httpserver.log) == 3
 
 
 def test_upload_skips_validation_when_no_entry_config(
