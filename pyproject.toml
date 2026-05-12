@@ -14,7 +14,7 @@ classifiers = [
 ]
 dependencies = [
   "mettagrid==0.26.19",
-  "softmax-cli==0.26.7",
+  "softmax-cli==0.26.8",
   "packaging>=24.0.0",
   "pydantic>=2.11.5",
   "pyyaml>=6.0.2",
