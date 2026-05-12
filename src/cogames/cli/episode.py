@@ -33,8 +33,8 @@ def _get_anon_client(server: str) -> TournamentServerClient:
     return TournamentServerClient(server_url=server)
 
 
-def _get_auth_client(login_server: str, server: str) -> TournamentServerClient | None:
-    return TournamentServerClient.from_login(server_url=server, login_server=login_server)
+def _get_auth_client(server: str) -> TournamentServerClient | None:
+    return TournamentServerClient.from_login(server_url=server)
 
 
 def _resolve_episode_id(episode_id_str: str) -> uuid.UUID:

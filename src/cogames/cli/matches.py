@@ -14,7 +14,6 @@ from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import MatchResponse, TournamentServerClient
 from cogames.cli.leaderboard import _format_score, _format_timestamp, parse_policy_identifier, parse_season_ref
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
-from softmax.auth import DEFAULT_COGAMES_SERVER
 
 
 def _help_callback(ctx: typer.Context, value: bool) -> None:
@@ -69,13 +68,6 @@ def matches_cmd(
         help="Download all accessible logs to directory.",
         rich_help_panel="Output",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -99,7 +91,7 @@ def matches_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
+    client = TournamentServerClient.from_login(server_url=server)
     if not client:
         return
 
@@ -393,13 +385,6 @@ def match_artifacts_cmd(
         help="Save artifact to file.",
         rich_help_panel="Output",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -417,7 +402,7 @@ def match_artifacts_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
+    client = TournamentServerClient.from_login(server_url=server)
     if not client:
         return
 

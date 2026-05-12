@@ -17,7 +17,7 @@ from cogames.cli.client import (
 from cogames.cli.generated_models import Phase
 from cogames.cli.leaderboard import _format_score, _format_timestamp
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
-from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
+from softmax.auth import get_login_server, load_current_cogames_token
 
 LeaderboardEntries = list[LeaderboardEntry] | list[ScorePoliciesLeaderboardEntry] | list[TeamSummary]
 LeaderboardType = Literal["policy", "team", "score-policies"]
@@ -29,11 +29,10 @@ LEADERBOARD_TYPE_OPTION = typer.Option(
 )
 
 
-def _get_client(login_server: str, server: str) -> TournamentServerClient:
+def _get_client(server: str) -> TournamentServerClient:
     return TournamentServerClient(
         server_url=server,
-        token=load_current_cogames_token(login_server=login_server),
-        login_server=login_server,
+        token=load_current_cogames_token(login_server=get_login_server()),
     )
 
 
@@ -69,13 +68,6 @@ season_app = typer.Typer(
 
 @season_app.command(name="list", help="List tournament seasons.")
 def season_list(
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -86,7 +78,7 @@ def season_list(
     ),
     json_output: bool = typer.Option(False, "--json", help="Print raw JSON.", rich_help_panel="Output"),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = _get_client(server)
 
     with client:
         seasons = client.get_seasons()
@@ -112,13 +104,6 @@ def season_list(
 @season_app.command(name="show", help="Show details for a season.")
 def season_show(
     season_name: str = typer.Argument(..., metavar="SEASON", help="Season name."),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -129,7 +114,7 @@ def season_show(
     ),
     json_output: bool = typer.Option(False, "--json", help="Print raw JSON.", rich_help_panel="Output"),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = _get_client(server)
 
     with cli_http_errors(f"Season '{season_name}'"), client:
         info = client.get_season(season_name)
@@ -159,13 +144,6 @@ def season_show(
 @season_app.command(name="versions", help="List versions of a season.")
 def season_versions(
     season_name: str = typer.Argument(..., metavar="SEASON", help="Season name."),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -176,7 +154,7 @@ def season_versions(
     ),
     json_output: bool = typer.Option(False, "--json", help="Print raw JSON.", rich_help_panel="Output"),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = _get_client(server)
 
     with client:
         versions = client.get_season_versions(season_name)
@@ -205,13 +183,6 @@ def season_versions(
 @season_app.command(name="stages", help="Show stages for a season.")
 def season_stages(
     season_name: str = typer.Argument(..., metavar="SEASON", help="Season name."),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -222,7 +193,7 @@ def season_stages(
     ),
     json_output: bool = typer.Option(False, "--json", help="Print raw JSON.", rich_help_panel="Output"),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = _get_client(server)
 
     with cli_http_errors(f"Season '{season_name}'"), client:
         stages = client.get_stages(season_name)
@@ -259,13 +230,6 @@ def season_stages(
 @season_app.command(name="progress", help="Show season progress summary.")
 def season_progress(
     season_name: str = typer.Argument(..., metavar="SEASON", help="Season name."),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -276,7 +240,7 @@ def season_progress(
     ),
     json_output: bool = typer.Option(False, "--json", help="Print raw JSON.", rich_help_panel="Output"),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = _get_client(server)
 
     with cli_http_errors(f"Season '{season_name}'"), client:
         progress = client.get_progress(season_name)
@@ -306,13 +270,6 @@ def season_leaderboard(
     season_name: Optional[str] = typer.Argument(None, metavar="SEASON", help="Season name (default: server default)."),
     pool: Optional[str] = typer.Option(None, "--pool", "-p", help="Pool name for stage-specific leaderboard."),
     leaderboard_type: LeaderboardType = LEADERBOARD_TYPE_OPTION,
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -324,7 +281,7 @@ def season_leaderboard(
     json_output: bool = typer.Option(False, "--json", help="Print raw JSON.", rich_help_panel="Output"),
 ) -> None:
     season = season_name or "<default>"
-    client = _get_client(login_server, server)
+    client = _get_client(server)
     if leaderboard_type == "team" and pool is None:
         console.print("[red]Team leaderboard requires --pool <POOL>.[/red]")
         raise typer.Exit(1)
@@ -400,13 +357,6 @@ def season_leaderboard(
 @season_app.command(name="teams", help="Show teams in a season.")
 def season_teams(
     season_name: str = typer.Argument(..., metavar="SEASON", help="Season name."),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -417,7 +367,7 @@ def season_teams(
     ),
     json_output: bool = typer.Option(False, "--json", help="Print raw JSON.", rich_help_panel="Output"),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = _get_client(server)
 
     with cli_http_errors(f"Season '{season_name}'"), client:
         teams = client.get_teams(season_name)
@@ -455,13 +405,6 @@ def season_teams(
 def season_matches(
     season_name: str = typer.Argument(..., metavar="SEASON", help="Season name."),
     limit: int = typer.Option(20, "--limit", "-n", help="Number of matches to show."),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -472,7 +415,7 @@ def season_matches(
     ),
     json_output: bool = typer.Option(False, "--json", help="Print raw JSON.", rich_help_panel="Output"),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = _get_client(server)
 
     with cli_http_errors(f"Season '{season_name}'"), client:
         matches = client.get_season_matches(season_name, limit=limit)
@@ -518,13 +461,6 @@ def season_matches(
 def season_pool_config(
     season_name: str = typer.Argument(..., metavar="SEASON", help="Season name."),
     pool_name: str = typer.Argument(..., metavar="POOL", help="Pool name."),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -535,7 +471,7 @@ def season_pool_config(
     ),
     json_output: bool = typer.Option(False, "--json", help="Print raw JSON.", rich_help_panel="Output"),
 ) -> None:
-    client = _get_client(login_server, server)
+    client = _get_client(server)
 
     with cli_http_errors(f"Pool '{pool_name}' in season '{season_name}'"), client:
         config = client.get_pool_config(season_name, pool_name)

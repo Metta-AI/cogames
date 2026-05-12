@@ -76,7 +76,7 @@ from cogames.display_detect import has_display
 from cogames.optional_deps import require_neural
 from cogames.replays import ReplayPathRequest, launch_replay_path
 from cogames.seed import seed_rollout_rng
-from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
+from softmax.auth import get_login_server, load_current_cogames_token
 
 # Always add current directory to Python path so optional plugins in the repo are discoverable.
 sys.path.insert(0, ".")
@@ -168,9 +168,8 @@ def _validate_policy_module_name_or_exit(path: Path) -> None:
 def _print_async_submission_follow_up(
     policy_name: str,
     season_name: str,
-    login_server_url: str,
 ) -> None:
-    observatory_url = observatory_home_url(login_server_url=login_server_url)
+    observatory_url = observatory_home_url()
     browser_skip_reason = _submit_browser_launch_skip_reason()
     if browser_skip_reason is None:
         webbrowser.open(observatory_url)
@@ -1471,10 +1470,10 @@ def diagnose_cmd(ctx: typer.Context) -> None:
     diagnose_app(prog_name="cogames diagnose", args=list(ctx.args))
 
 
-def _resolve_season(server: str, login_server: str | None = None, season_name: str | None = None) -> SeasonDetail:
-    auth_token = load_current_cogames_token(login_server=login_server) if login_server else None
+def _resolve_season(server: str, season_name: str | None = None) -> SeasonDetail:
+    auth_token = load_current_cogames_token(login_server=get_login_server())
     try:
-        with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
+        with TournamentServerClient(server_url=server, token=auth_token) as client:
             if season_name is None:
                 season_name = client.get_default_season().name
             info = client.get_season(season_name)
@@ -1626,13 +1625,6 @@ def validate_bundle_cmd(
         help="Docker image for container validation.",
         rich_help_panel="Validation",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     _help: bool = typer.Option(
         False,
         "--help",
@@ -1645,14 +1637,14 @@ def validate_bundle_cmd(
 ) -> None:
     ensure_docker_daemon_access()
 
-    season_info = _resolve_season(server, login_server, season)
+    season_info = _resolve_season(server, season)
 
     if image == DEFAULT_EPISODE_RUNNER_IMAGE and season_info.compat_version is not None:
         image = f"ghcr.io/metta-ai/episode-runner:compat-v{season_info.compat_version}"
 
-    auth_token = load_current_cogames_token(login_server=login_server)
+    auth_token = load_current_cogames_token(login_server=get_login_server())
     season_ref = season or season_info.name
-    with TournamentServerClient(server_url=server, token=auth_token, login_server=login_server) as client:
+    with TournamentServerClient(server_url=server, token=auth_token) as client:
         pool_config = _resolve_validation_pool_config(client, season_ref, season_info)
 
     validate_bundle_docker(policy, pool_config.config, image, game_engine=pool_config.game_engine)
@@ -1783,13 +1775,6 @@ def upload_cmd(
         rich_help_panel="Validation",
     ),
     # --- Server ---
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -1813,7 +1798,7 @@ def upload_cmd(
     submitting = not no_submit
     submission_season = season
     if submitting and submission_season is None:
-        submission_season = _resolve_season(server, login_server).name
+        submission_season = _resolve_season(server).name
 
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
@@ -1834,7 +1819,6 @@ def upload_cmd(
         policy=policy,
         name=name,
         include_files=include_files,
-        login_server=login_server,
         server=server,
         dry_run=dry_run,
         skip_validation=skip_validation,
@@ -1855,7 +1839,7 @@ def upload_cmd(
             console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
         if submission_season is None:
             raise AssertionError("submitting upload must resolve a season")
-        _print_async_submission_follow_up(result.name, submission_season, login_server)
+        _print_async_submission_follow_up(result.name, submission_season)
 
 
 @app.command(
@@ -1882,13 +1866,6 @@ def submit_cmd(
         help="Tournament season name.",
         rich_help_panel="Tournament",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -1909,10 +1886,10 @@ def submit_cmd(
 ) -> None:
     import httpx  # noqa: PLC0415
 
-    season_info = _resolve_season(server, login_server, season)
+    season_info = _resolve_season(server, season)
     season_name = season_info.name
 
-    client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
+    client = TournamentServerClient.from_login(server_url=server)
     if not client:
         raise typer.Exit(1)
 
@@ -1951,7 +1928,7 @@ def submit_cmd(
     console.print(f"\n[bold green]Submitted to season '{season_name}'[/bold green]")
     if result.pools:
         console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
-    observatory_url = observatory_home_url(login_server_url=login_server)
+    observatory_url = observatory_home_url()
     browser_skip_reason = _submit_browser_launch_skip_reason()
     if browser_skip_reason is None:
         webbrowser.open(observatory_url)
@@ -2040,13 +2017,6 @@ def ship_cmd(
         help="Docker image for container validation.",
         rich_help_panel="Validation",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -2066,7 +2036,7 @@ def ship_cmd(
 ) -> None:
     _validate_policy_name_or_exit(name)
 
-    season_info = _resolve_season(server, login_server, season)
+    season_info = _resolve_season(server, season)
 
     init_kwargs: dict[str, str] = {}
     if init_kwarg:
@@ -2079,7 +2049,6 @@ def ship_cmd(
         policy=policy,
         name=name,
         include_files=include_files,
-        login_server=login_server,
         server=server,
         dry_run=dry_run,
         skip_validation=skip_validation,
@@ -2097,7 +2066,7 @@ def ship_cmd(
     if result.pools:
         console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
 
-    _print_async_submission_follow_up(result.name, season_info.name, login_server)
+    _print_async_submission_follow_up(result.name, season_info.name)
 
 
 @app.command(

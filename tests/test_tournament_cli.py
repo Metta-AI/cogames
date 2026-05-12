@@ -51,6 +51,7 @@ runner = CliRunner()
 @pytest.fixture(autouse=True)
 def _disable_display_for_cli_tests(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("cogames.main.has_display", lambda: False)
+    monkeypatch.setenv("COGAMES_LOGIN_URL", "http://fake-login-server")
 
 
 def _season_summary(
@@ -177,7 +178,7 @@ def _setup_read_endpoints(httpserver: HTTPServer) -> None:
 def _mock_from_login(httpserver: HTTPServer):
     """Patch from_login to return a client pointing at the test httpserver."""
 
-    def fake_from_login(server_url: str, login_server: str) -> TournamentServerClient:
+    def fake_from_login(server_url: str) -> TournamentServerClient:
         return TournamentServerClient(server_url=server_url, token="fake-token")
 
     return patch.object(TournamentServerClient, "from_login", side_effect=fake_from_login)
@@ -186,7 +187,7 @@ def _mock_from_login(httpserver: HTTPServer):
 def _invoke_with_server(httpserver: HTTPServer, *args: str):
     return runner.invoke(
         app,
-        [*args, "--server", httpserver.url_for(""), "--login-server", "http://fake-login-server"],
+        [*args, "--server", httpserver.url_for("")],
     )
 
 
@@ -395,8 +396,6 @@ class TestJsonOutputStability:
                 "--json",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
             ],
         )
         data = json.loads(result.output)
@@ -447,8 +446,6 @@ class TestJsonOutputStability:
                     "--json",
                     "--server",
                     httpserver.url_for(""),
-                    "--login-server",
-                    "http://fake-login-server",
                 ],
             )
         data = json.loads(result.output)
@@ -476,8 +473,6 @@ class TestJsonOutputStability:
                     "--json",
                     "--server",
                     httpserver.url_for(""),
-                    "--login-server",
-                    "http://fake-login-server",
                 ],
             )
         data = json.loads(result.output)
@@ -625,8 +620,6 @@ class TestAuthBehavior:
                 "submissions",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                "http://nonexistent-login-server",
             ],
         )
         combined = result.output.lower()
@@ -639,8 +632,6 @@ class TestAuthBehavior:
                 "matches",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                "http://nonexistent-login-server",
             ],
         )
         combined = result.output.lower()
@@ -658,8 +649,6 @@ class TestAuthBehavior:
                 "test-policy",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                "http://nonexistent-login-server",
                 "--skip-validation",
             ],
         )
@@ -677,8 +666,6 @@ class TestAuthBehavior:
                 "test-season",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                "http://nonexistent-login-server",
             ],
         )
         combined = result.output.lower()
@@ -713,8 +700,6 @@ class TestAuthBehavior:
                 "submissions",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                "http://nonexistent-login-server",
             ],
         )
         assert "cogames auth login" in result.output.lower()
@@ -738,8 +723,6 @@ class TestAuthBehavior:
                     "--json",
                     "--server",
                     httpserver.url_for(""),
-                    "--login-server",
-                    "http://fake-login-server",
                 ],
             )
 
@@ -776,8 +759,6 @@ class TestPlayerSessions:
                 "--json",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                login_server,
             ],
         )
 
@@ -810,8 +791,6 @@ class TestPlayerSessions:
                 "--json",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                login_server,
             ],
         )
 
@@ -831,6 +810,7 @@ class TestPlayerSessions:
     ) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
         login_server = httpserver.url_for("").rstrip("/")
+        monkeypatch.setenv("COGAMES_LOGIN_URL", login_server)
         _save_user_token(tmp_path, "user-token", login_server)
         _save_token(tmp_path, "player-token", login_server)
         httpserver.expect_request("/whoami", method="GET").respond_with_json(
@@ -845,7 +825,7 @@ class TestPlayerSessions:
             }
         )
 
-        result = runner.invoke(app, ["auth", "player", "logout", "--login-server", login_server])
+        result = runner.invoke(app, ["auth", "player", "logout", "--server", httpserver.url_for("")])
 
         assert result.exit_code == 0
         assert load_token(token_kind=TokenKind.COGAMES, server=login_server) == "user-token"
@@ -873,8 +853,6 @@ class TestPlayerSessions:
                 "--json",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                login_server,
             ],
         )
 
@@ -971,8 +949,6 @@ class TestSeasonLookupAuth:
                 "test-policy",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
                 "--skip-validation",
             ],
         )
@@ -1036,8 +1012,6 @@ class TestSeasonLookupAuth:
                 "test-policy",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
                 "--skip-validation",
             ],
         )
@@ -1088,8 +1062,6 @@ class TestSeasonLookupAuth:
                     "test-season",
                     "--server",
                     httpserver.url_for(""),
-                    "--login-server",
-                    "http://fake-login-server",
                 ],
             )
 
@@ -1117,8 +1089,6 @@ class TestSeasonLookupAuth:
                 "test-season",
                 "--server",
                 httpserver.url_for(""),
-                "--login-server",
-                "http://fake-login-server",
             ],
         )
 
@@ -1168,5 +1138,7 @@ class TestSubmitBrowserLaunch:
         self,
         login_server_url: str,
         expected_base_url: str,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        assert observatory_home_url(login_server_url=login_server_url) == f"{expected_base_url}/observatory/home"
+        monkeypatch.setenv("COGAMES_LOGIN_URL", login_server_url)
+        assert observatory_home_url() == f"{expected_base_url}/observatory/home"

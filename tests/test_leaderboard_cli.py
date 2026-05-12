@@ -87,19 +87,17 @@ class _LeaderboardClientFactory:
     ) -> None:
         self._public_client = public_client
         self._auth_client = auth_client
-        self.public_call: tuple[str, str | None, str | None] | None = None
+        self.public_call: tuple[str, str | None] | None = None
 
     def __call__(
         self,
         server_url: str,
         token: str | None = None,
-        login_server: str | None = None,
     ) -> _PublicLeaderboardClient:
-        self.public_call = (server_url, token, login_server)
+        self.public_call = (server_url, token)
         return self._public_client
 
-    def from_login(self, *, server_url: str, login_server: str) -> _AuthLeaderboardClient:
-        _ = (server_url, login_server)
+    def from_login(self, *, server_url: str) -> _AuthLeaderboardClient:
         return self._auth_client
 
 
@@ -132,19 +130,19 @@ def test_leaderboard_mine_uses_season_policies_for_filtering(monkeypatch: pytest
     client_factory = _LeaderboardClientFactory(public_client=public_client, auth_client=auth_client)
     monkeypatch.setattr(leaderboard, "TournamentServerClient", client_factory)
     monkeypatch.setattr(leaderboard, "load_current_cogames_token", lambda login_server: "test-token")
+    monkeypatch.setattr(leaderboard, "get_login_server", lambda: "https://login.example")
 
     leaderboard.leaderboard_cmd(
         season_arg="test-season",
         season=None,
         policy_filter=None,
         mine=True,
-        login_server="https://login.example",
         server="https://server.example",
         json_output=True,
     )
 
     assert auth_client.called_with == ("test-season", True)
-    assert client_factory.public_call == ("https://server.example", "test-token", "https://login.example")
+    assert client_factory.public_call == ("https://server.example", "test-token")
     payload = json.loads(str(printed[0]))
     assert [entry["policy"]["id"] for entry in payload] == [str(POLICY_ID_1)]
 
@@ -157,17 +155,17 @@ def test_leaderboard_uses_login_token_without_mine_filter(monkeypatch: pytest.Mo
 
     monkeypatch.setattr(leaderboard, "TournamentServerClient", client_factory)
     monkeypatch.setattr(leaderboard, "load_current_cogames_token", lambda login_server: "test-token")
+    monkeypatch.setattr(leaderboard, "get_login_server", lambda: "https://login.example")
 
     leaderboard.leaderboard_cmd(
         season_arg="private-season",
         season=None,
         policy_filter=None,
         mine=False,
-        login_server="https://login.example",
         server="https://server.example",
         json_output=True,
     )
 
-    assert client_factory.public_call == ("https://server.example", "test-token", "https://login.example")
+    assert client_factory.public_call == ("https://server.example", "test-token")
     assert auth_client.called_with is None
     assert printed == [json.dumps([], indent=2)]

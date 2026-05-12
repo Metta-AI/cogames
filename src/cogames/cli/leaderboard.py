@@ -13,7 +13,7 @@ from rich.table import Table
 from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
-from softmax.auth import DEFAULT_COGAMES_SERVER, load_current_cogames_token
+from softmax.auth import get_login_server, load_current_cogames_token
 
 
 def parse_policy_identifier(identifier: str) -> tuple[str, int | None]:
@@ -98,13 +98,6 @@ def submissions_cmd(
         help="Filter by tournament season.",
         rich_help_panel="Filter",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -129,7 +122,7 @@ def submissions_cmd(
         rich_help_panel="Other",
     ),
 ) -> None:
-    client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
+    client = TournamentServerClient.from_login(server_url=server)
     if not client:
         return
 
@@ -264,13 +257,6 @@ def leaderboard_cmd(
         help="Show only your own policies (requires auth).",
         rich_help_panel="Filter",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL",
-        rich_help_panel="Server",
-    ),
     server: str = typer.Option(
         DEFAULT_SUBMIT_SERVER,
         "--server",
@@ -301,15 +287,15 @@ def leaderboard_cmd(
         raise typer.Exit(1)
     effective_season = season_arg or season
 
-    token = load_current_cogames_token(login_server=login_server)
-    with TournamentServerClient(server_url=server, token=token, login_server=login_server) as client:
+    token = load_current_cogames_token(login_server=get_login_server())
+    with TournamentServerClient(server_url=server, token=token) as client:
         resolved_season = effective_season or client.get_default_season().name
         with cli_http_errors(f"Season '{resolved_season}'"):
             entries = client.get_leaderboard(resolved_season)
 
     # Apply --mine filter: keep only entries matching the user's own policy IDs
     if mine:
-        auth_client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
+        auth_client = TournamentServerClient.from_login(server_url=server)
         if not auth_client:
             return
         with cli_http_errors("authenticated policies"), auth_client:

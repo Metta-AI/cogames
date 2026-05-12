@@ -8,8 +8,8 @@ from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import TournamentServerClient
 from softmax.auth import (
     DEFAULT_COGAMES_API_SERVER,
-    DEFAULT_COGAMES_SERVER,
     fetch_cogames_whoami,
+    get_login_server,
     load_cogames_user_token,
     restore_cogames_user_session,
     save_cogames_active_token,
@@ -23,8 +23,8 @@ player_app = typer.Typer(
 )
 
 
-def _load_user_token_or_exit(*, login_server: str) -> str:
-    user_token = load_cogames_user_token(login_server=login_server)
+def _load_user_token_or_exit() -> str:
+    user_token = load_cogames_user_token(login_server=get_login_server())
     if user_token is None:
         console.print("[red]No saved user session found.[/red] Run [cyan]cogames auth login[/cyan] first.")
         raise typer.Exit(1)
@@ -58,18 +58,12 @@ def list_players_cmd(
         metavar="URL",
         help="Tournament API server URL.",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-    ),
     json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """List the players owned by the saved user session."""
-    user_token = _load_user_token_or_exit(login_server=login_server)
+    user_token = _load_user_token_or_exit()
     with cli_http_errors("players"):
-        with TournamentServerClient(server_url=server, token=user_token, login_server=login_server) as client:
+        with TournamentServerClient(server_url=server, token=user_token) as client:
             players = client.list_players()
 
     if json:
@@ -99,22 +93,16 @@ def login_player_cmd(
         metavar="URL",
         help="Tournament API server URL.",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-    ),
     json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Mint a short-lived player session token and make it the active CoGames session."""
-    user_token = _load_user_token_or_exit(login_server=login_server)
+    user_token = _load_user_token_or_exit()
     with cli_http_errors("player"):
-        with TournamentServerClient(server_url=server, token=user_token, login_server=login_server) as client:
+        with TournamentServerClient(server_url=server, token=user_token) as client:
             player_id = _resolve_player(client, player)
             response = client.login_player(player_id)
 
-    save_cogames_active_token(login_server=login_server, token=response.token)
+    save_cogames_active_token(login_server=get_login_server(), token=response.token)
 
     if json:
         emit_json(response.model_dump(mode="json"))
@@ -136,22 +124,15 @@ def logout_player_cmd(
         metavar="URL",
         help="API server URL for /whoami verification.",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-    ),
 ) -> None:
     """Restore the saved user session as the active CoGames session."""
-    user_token = restore_cogames_user_session(login_server=login_server)
+    user_token = restore_cogames_user_session(login_server=get_login_server())
     if user_token is None:
         console.print("[red]No saved user session found.[/red] Run [cyan]cogames auth login[/cyan] first.")
         raise typer.Exit(1)
 
-    api_server = server or (login_server if login_server != DEFAULT_COGAMES_SERVER else None)
     with cli_http_errors("session"):
-        session = fetch_cogames_whoami(api_server=api_server, token=user_token)
+        session = fetch_cogames_whoami(api_server=server, token=user_token)
 
     console.print("[green]Restored user session.[/green]")
     console.print(f"subject_type: {session.subject_type}")
@@ -169,18 +150,12 @@ def create_player_cmd(
         metavar="URL",
         help="Tournament API server URL.",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-    ),
     json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Create a new player."""
-    user_token = _load_user_token_or_exit(login_server=login_server)
+    user_token = _load_user_token_or_exit()
     with cli_http_errors("player"):
-        with TournamentServerClient(server_url=server, token=user_token, login_server=login_server) as client:
+        with TournamentServerClient(server_url=server, token=user_token) as client:
             player = client.create_player(name)
 
     if json:
@@ -212,18 +187,12 @@ def list_credentials_cmd(
         metavar="URL",
         help="Tournament API server URL.",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-    ),
     json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """List credentials for a player."""
-    user_token = _load_user_token_or_exit(login_server=login_server)
+    user_token = _load_user_token_or_exit()
     with cli_http_errors("credentials"):
-        with TournamentServerClient(server_url=server, token=user_token, login_server=login_server) as client:
+        with TournamentServerClient(server_url=server, token=user_token) as client:
             player_id = _resolve_player(client, player)
             credentials = client.list_player_credentials(player_id)
 
@@ -264,18 +233,12 @@ def create_credential_cmd(
         metavar="URL",
         help="Tournament API server URL.",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-    ),
     json: bool = typer.Option(False, "--json", help="Emit machine-readable JSON."),
 ) -> None:
     """Create an API credential for a player. The token is shown only once."""
-    user_token = _load_user_token_or_exit(login_server=login_server)
+    user_token = _load_user_token_or_exit()
     with cli_http_errors("credential"):
-        with TournamentServerClient(server_url=server, token=user_token, login_server=login_server) as client:
+        with TournamentServerClient(server_url=server, token=user_token) as client:
             player_id = _resolve_player(client, player)
             cred = client.create_player_credential(player_id, name, scopes=scope or None)
 
@@ -300,17 +263,11 @@ def revoke_credential_cmd(
         metavar="URL",
         help="Tournament API server URL.",
     ),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL.",
-    ),
 ) -> None:
     """Revoke a player credential."""
-    user_token = _load_user_token_or_exit(login_server=login_server)
+    user_token = _load_user_token_or_exit()
     with cli_http_errors("credential"):
-        with TournamentServerClient(server_url=server, token=user_token, login_server=login_server) as client:
+        with TournamentServerClient(server_url=server, token=user_token) as client:
             player_id = _resolve_player(client, player)
             client.revoke_player_credential(player_id, credential_id)
 

@@ -5,7 +5,6 @@ import importlib
 import typer
 
 from cogames.cli.player import player_app
-from softmax.auth import DEFAULT_COGAMES_SERVER
 
 auth_app = typer.Typer(
     help="CoGames authentication commands",
@@ -24,12 +23,6 @@ def _softmax_cli():
 
 @auth_app.command(name="login")
 def login_cmd(
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL",
-    ),
     no_browser: bool = typer.Option(
         False,
         "--no-browser",
@@ -41,79 +34,84 @@ def login_cmd(
         "-f",
         help="Re-authenticate even if already logged in",
     ),
-) -> None:
-    """Log in to CoGames."""
-    _softmax_cli().login_cmd(login_server=login_server, no_browser=no_browser, force=force)
-
-
-@auth_app.command(name="logout")
-def logout_cmd(
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL",
-    ),
-) -> None:
-    """Log out of CoGames."""
-    _softmax_cli().logout_cmd(login_server=login_server)
-
-
-@auth_app.command(name="get-login-url")
-def get_login_url_cmd(
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL",
-    ),
-) -> None:
-    """Print the CoGames login URL."""
-    _softmax_cli().get_login_url_cmd(login_server=login_server)
-
-
-@auth_app.command(name="status")
-def status_cmd(
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
-        metavar="URL",
-        help="Authentication server URL",
-    ),
     server: str | None = typer.Option(
         None,
         "--server",
         "-s",
         metavar="URL",
-        help="API server URL for /whoami verification.",
+        help="Authentication server URL.",
+    ),
+) -> None:
+    """Log in to CoGames."""
+    _softmax_cli().login_cmd(no_browser=no_browser, force=force, server=server)
+
+
+@auth_app.command(name="logout")
+def logout_cmd(
+    server: str | None = typer.Option(
+        None,
+        "--server",
+        "-s",
+        metavar="URL",
+        help="Authentication server URL.",
+    ),
+) -> None:
+    """Log out of CoGames."""
+    _softmax_cli().logout_cmd(server=server)
+
+
+@auth_app.command(name="get-login-url")
+def get_login_url_cmd(
+    server: str | None = typer.Option(
+        None,
+        "--server",
+        "-s",
+        metavar="URL",
+        help="Authentication server URL.",
+    ),
+) -> None:
+    """Print the CoGames login URL."""
+    _softmax_cli().get_login_url_cmd(server=server)
+
+
+@auth_app.command(name="status")
+def status_cmd(
+    server: str | None = typer.Option(
+        None,
+        "--server",
+        "-s",
+        metavar="URL",
+        help="Authentication server URL.",
     ),
 ) -> None:
     """Show CoGames authentication status."""
-    _softmax_cli().status_cmd(login_server=login_server, server=server)
+    _softmax_cli().status_cmd(server=server)
 
 
 @auth_app.command(name="get-token")
 def get_token_cmd(
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
+    server: str | None = typer.Option(
+        None,
+        "--server",
+        "-s",
         metavar="URL",
-        help="Authentication server URL",
+        help="Authentication server URL.",
     ),
 ) -> None:
     """Print the saved CoGames token."""
-    _softmax_cli().get_token_cmd(login_server=login_server)
+    _softmax_cli().get_token_cmd(server=server)
 
 
 @auth_app.command(name="set-token")
 def set_token_cmd(
     token: str = typer.Argument(help="Bearer token to save"),
-    login_server: str = typer.Option(
-        DEFAULT_COGAMES_SERVER,
-        "--login-server",
+    server: str | None = typer.Option(
+        None,
+        "--server",
+        "-s",
         metavar="URL",
-        help="Authentication server URL",
+        help="Authentication server URL.",
     ),
 ) -> None:
     """Save a CoGames token."""
-    _softmax_cli().set_token_cmd(token=token, login_server=login_server)
+    _softmax_cli().set_token_cmd(token=token, server=server)

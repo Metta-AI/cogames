@@ -225,19 +225,19 @@ def test_get_client_uses_login_token(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(season, "load_current_cogames_token", fake_load_current_cogames_token)
     monkeypatch.setattr(season, "TournamentServerClient", fake_tournament_server_client)
+    monkeypatch.setattr(season, "get_login_server", lambda: "http://login")
 
-    assert season._get_client(login_server="http://login", server="http://server") == "client"
+    assert season._get_client(server="http://server") == "client"
     assert captured == {
         "token_login_server": "http://login",
         "server_url": "http://server",
         "token": "test-token",
-        "login_server": "http://login",
     }
 
 
 def test_season_list_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_list(json_output=True, login_server="x", server="y")
+    season.season_list(json_output=True, server="y")
     output = json.loads(str(printed[0]))
     assert len(output) == 1
     assert output[0]["name"] == "test-season"
@@ -245,14 +245,14 @@ def test_season_list_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPa
 
 def test_season_list_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_list(json_output=False, login_server="x", server="y")
+    season.season_list(json_output=False, server="y")
     rendered = render_output(*printed)
     assert "test-season" in rendered
 
 
 def test_season_show_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_show(season_name="test-season", json_output=True, login_server="x", server="y")
+    season.season_show(season_name="test-season", json_output=True, server="y")
     output = json.loads(str(printed[0]))
     assert output["name"] == "test-season"
     assert output["status"] == "in_progress"
@@ -260,7 +260,7 @@ def test_season_show_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPa
 
 def test_season_show_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_show(season_name="test-season", json_output=False, login_server="x", server="y")
+    season.season_show(season_name="test-season", json_output=False, server="y")
     rendered = render_output(*printed)
     assert "Test Season" in rendered
     assert "in_progress" in rendered
@@ -268,7 +268,7 @@ def test_season_show_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyP
 
 def test_season_versions_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_versions(season_name="test-season", json_output=True, login_server="x", server="y")
+    season.season_versions(season_name="test-season", json_output=True, server="y")
     output = json.loads(str(printed[0]))
     assert len(output) == 1
     assert output[0]["version"] == 1
@@ -276,7 +276,7 @@ def test_season_versions_json(fake_client: _FakeClient, monkeypatch: pytest.Monk
 
 def test_season_stages_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_stages(season_name="test-season", json_output=True, login_server="x", server="y")
+    season.season_stages(season_name="test-season", json_output=True, server="y")
     output = json.loads(str(printed[0]))
     assert len(output) == 2
     assert output[0]["name"] == "stage-1"
@@ -284,7 +284,7 @@ def test_season_stages_json(fake_client: _FakeClient, monkeypatch: pytest.Monkey
 
 def test_season_stages_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_stages(season_name="test-season", json_output=False, login_server="x", server="y")
+    season.season_stages(season_name="test-season", json_output=False, server="y")
     rendered = render_output(*printed)
     assert "stage-1" in rendered
     assert "stage-2" in rendered
@@ -292,7 +292,7 @@ def test_season_stages_table(fake_client: _FakeClient, monkeypatch: pytest.Monke
 
 def test_season_progress_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_progress(season_name="test-season", json_output=True, login_server="x", server="y")
+    season.season_progress(season_name="test-season", json_output=True, server="y")
     output = json.loads(str(printed[0]))
     assert output["phase"] == "policy_eval"
     assert output["started"] is True
@@ -310,7 +310,7 @@ def test_season_progress_400_shows_detail(fake_client: _FakeClient, monkeypatch:
     monkeypatch.setattr(fake_client, "get_progress", _raise_400)
 
     with pytest.raises(typer.Exit):
-        season.season_progress(season_name="test-season", json_output=False, login_server="x", server="y")
+        season.season_progress(season_name="test-season", json_output=False, server="y")
 
     assert any("Progress not available for this season type" in str(p) for p in printed)
 
@@ -322,7 +322,6 @@ def test_season_leaderboard_json(fake_client: _FakeClient, monkeypatch: pytest.M
         pool=None,
         leaderboard_type="policy",
         json_output=True,
-        login_server="x",
         server="y",
     )
     output = json.loads(str(printed[0]))
@@ -337,7 +336,6 @@ def test_season_leaderboard_with_pool_json(fake_client: _FakeClient, monkeypatch
         pool="pool-a",
         leaderboard_type="policy",
         json_output=True,
-        login_server="x",
         server="y",
     )
     output = json.loads(str(printed[0]))
@@ -351,7 +349,6 @@ def test_season_leaderboard_table(fake_client: _FakeClient, monkeypatch: pytest.
         pool=None,
         leaderboard_type="policy",
         json_output=False,
-        login_server="x",
         server="y",
     )
     rendered = render_output(*printed)
@@ -366,7 +363,6 @@ def test_season_leaderboard_team_table(fake_client: _FakeClient, monkeypatch: py
         pool="pool-a",
         leaderboard_type="team",
         json_output=False,
-        login_server="x",
         server="y",
     )
     rendered = render_output(*printed)
@@ -395,7 +391,6 @@ def test_season_leaderboard_400_shows_detail(fake_client: _FakeClient, monkeypat
             pool="stage-1",
             leaderboard_type="score-policies",
             json_output=False,
-            login_server="x",
             server="y",
         )
 
@@ -412,7 +407,6 @@ def test_season_leaderboard_uses_server_default_when_omitted(
         pool=None,
         leaderboard_type="policy",
         json_output=True,
-        login_server="x",
         server="y",
     )
     output = json.loads(str(printed[0]))
@@ -435,7 +429,6 @@ def test_season_leaderboard_score_policies_without_pool(
         pool=None,
         leaderboard_type="score-policies",
         json_output=True,
-        login_server="x",
         server="y",
     )
     output = json.loads(str(printed[0]))
@@ -451,7 +444,6 @@ def test_season_leaderboard_team_requires_pool(fake_client: _FakeClient, monkeyp
             pool=None,
             leaderboard_type="team",
             json_output=False,
-            login_server="x",
             server="y",
         )
     assert any("Team leaderboard requires --pool <POOL>." in str(p) for p in printed)
@@ -459,7 +451,7 @@ def test_season_leaderboard_team_requires_pool(fake_client: _FakeClient, monkeyp
 
 def test_season_teams_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_teams(season_name="test-season", json_output=True, login_server="x", server="y")
+    season.season_teams(season_name="test-season", json_output=True, server="y")
     output = json.loads(str(printed[0]))
     assert len(output) == 1
     assert output[0]["pool_name"] == "pool-a"
@@ -467,7 +459,7 @@ def test_season_teams_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyP
 
 def test_season_teams_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_teams(season_name="test-season", json_output=False, login_server="x", server="y")
+    season.season_teams(season_name="test-season", json_output=False, server="y")
     rendered = render_output(*printed)
     assert "pool-a" in rendered
     assert "policy-a" in rendered
@@ -475,14 +467,14 @@ def test_season_teams_table(fake_client: _FakeClient, monkeypatch: pytest.Monkey
 
 def test_season_matches_json(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_matches(season_name="test-season", limit=20, json_output=True, login_server="x", server="y")
+    season.season_matches(season_name="test-season", limit=20, json_output=True, server="y")
     output = json.loads(str(printed[0]))
     assert len(output) == 1
 
 
 def test_season_matches_table(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     printed = capture_output(monkeypatch, season.console)
-    season.season_matches(season_name="test-season", limit=20, json_output=False, login_server="x", server="y")
+    season.season_matches(season_name="test-season", limit=20, json_output=False, server="y")
     rendered = render_output(*printed)
     assert "pool-a" in rendered
 
@@ -493,7 +485,6 @@ def test_season_pool_config_json(fake_client: _FakeClient, monkeypatch: pytest.M
         season_name="test-season",
         pool_name="pool-a",
         json_output=True,
-        login_server="x",
         server="y",
     )
     output = json.loads(str(printed[0]))
@@ -507,7 +498,6 @@ def test_season_pool_config_table(fake_client: _FakeClient, monkeypatch: pytest.
         season_name="test-season",
         pool_name="pool-a",
         json_output=False,
-        login_server="x",
         server="y",
     )
     rendered = render_output(*printed)
@@ -518,7 +508,7 @@ def test_season_pool_config_table(fake_client: _FakeClient, monkeypatch: pytest.
 def test_season_list_empty(fake_client: _FakeClient, monkeypatch: pytest.MonkeyPatch) -> None:
     fake_client.seasons = []
     printed = capture_output(monkeypatch, season.console)
-    season.season_list(json_output=False, login_server="x", server="y")
+    season.season_list(json_output=False, server="y")
     assert any("No seasons found" in str(p) for p in printed)
 
 

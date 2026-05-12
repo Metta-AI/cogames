@@ -15,7 +15,6 @@ from cogames.cli.base import cli_http_errors, console, emit_json
 from cogames.cli.client import TournamentServerClient
 from cogames.cli.generated_models import AssayRunResponse, AssayStatus, MissionSpec
 from cogames.cli.submit import DEFAULT_SUBMIT_SERVER
-from softmax.auth import DEFAULT_COGAMES_SERVER
 
 assay_app = typer.Typer(
     help="Assay run commands.",
@@ -32,18 +31,11 @@ _SERVER_OPTION = typer.Option(
     help="Tournament server URL.",
     rich_help_panel="Server",
 )
-_LOGIN_SERVER_OPTION = typer.Option(
-    DEFAULT_COGAMES_SERVER,
-    "--login-server",
-    metavar="URL",
-    help="Authentication server URL.",
-    rich_help_panel="Server",
-)
 _JSON_OPTION = typer.Option(False, "--json", help="Print raw JSON.", rich_help_panel="Output")
 
 
-def _get_authed_client(login_server: str, server: str) -> TournamentServerClient:
-    client = TournamentServerClient.from_login(server_url=server, login_server=login_server)
+def _get_authed_client(server: str) -> TournamentServerClient:
+    client = TournamentServerClient.from_login(server_url=server)
     if client is None:
         raise typer.Exit(1)
     return client
@@ -115,11 +107,10 @@ def assay_status(
     policy_or_run_id: str = typer.Argument(
         ..., metavar="POLICY_OR_RUN_ID", help="Assay run UUID, or policy name (name[:version])."
     ),
-    login_server: str = _LOGIN_SERVER_OPTION,
     server: str = _SERVER_OPTION,
     json_output: bool = _JSON_OPTION,
 ) -> None:
-    client = _get_authed_client(login_server, server)
+    client = _get_authed_client(server)
     with cli_http_errors("Assay status"), client:
         try:
             run_id = UUID(policy_or_run_id)
@@ -142,11 +133,10 @@ def assay_status(
 @assay_app.command(name="list", help="List assay runs.")
 def assay_list(
     policy: Optional[str] = typer.Option(None, "--policy", "-p", help="Filter by policy name[:version] or UUID."),
-    login_server: str = _LOGIN_SERVER_OPTION,
     server: str = _SERVER_OPTION,
     json_output: bool = _JSON_OPTION,
 ) -> None:
-    client = _get_authed_client(login_server, server)
+    client = _get_authed_client(server)
     with cli_http_errors("Assay runs"), client:
         policy_version_id: UUID | None = None
         if policy is not None:
@@ -187,11 +177,10 @@ def assay_results(
     policy_or_run_id: str = typer.Argument(
         ..., metavar="POLICY_OR_RUN_ID", help="Assay run UUID, or policy name (name[:version])."
     ),
-    login_server: str = _LOGIN_SERVER_OPTION,
     server: str = _SERVER_OPTION,
     json_output: bool = _JSON_OPTION,
 ) -> None:
-    client = _get_authed_client(login_server, server)
+    client = _get_authed_client(server)
     with cli_http_errors("Assay results"), client:
         try:
             run_id = UUID(policy_or_run_id)
@@ -272,7 +261,6 @@ def assay_submit(
     episodes: int = typer.Option(3, "--episodes", "-e", help="Episodes per mission."),
     max_steps: int = typer.Option(10000, "--max-steps", help="Max steps per episode."),
     watch: bool = typer.Option(False, "--watch", "-w", help="Poll until the run completes."),
-    login_server: str = _LOGIN_SERVER_OPTION,
     server: str = _SERVER_OPTION,
     json_output: bool = _JSON_OPTION,
 ) -> None:
@@ -286,7 +274,7 @@ def assay_submit(
             f"[dim]{len(mission_specs)} mission specs, name={name!r}, compat={compat_version or 'none'}[/dim]"
         )
 
-    client = _get_authed_client(login_server, server)
+    client = _get_authed_client(server)
     with client:
         with cli_http_errors("Policy lookup"):
             policy_version_id = _resolve_policy_version_id(client, policy)

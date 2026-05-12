@@ -61,7 +61,7 @@ def fake_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Create a fake HOME directory with a pre-configured auth token."""
     monkeypatch.setenv("HOME", str(tmp_path))
 
-    save_token(token_kind=TokenKind.COGAMES, token="test-token-12345", server="http://fake-login-server")
+    save_token(token_kind=TokenKind.COGAMES, token="test-token-12345", server="https://softmax.com/api")
 
     return tmp_path
 
@@ -84,8 +84,6 @@ def test_upload_command_sends_correct_requests(
             "my-test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",  # Skip isolated validation to speed up test
         ],
         fake_home,
@@ -142,8 +140,6 @@ def test_upload_bundles_nested_single_file_top_level_module_at_root(
             "nested-amongthem-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",
             "--no-submit",
         ],
@@ -180,8 +176,6 @@ def test_upload_with_secret_env_sends_secrets_to_server(
             "secrets-test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",
             "--secret-env",
             "ANTHROPIC_API_KEY=sk-ant-test-key",
@@ -247,8 +241,6 @@ def test_upload_no_submit_skips_season_lookup(
             "test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",
             "--no-submit",
         ],
@@ -305,8 +297,6 @@ def test_upload_command_fails_without_auth(
             "my-test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",
         ],
         tmp_path,
@@ -418,8 +408,6 @@ def test_upload_directory_policy(
             "test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",
         ],
         fake_home,
@@ -469,8 +457,6 @@ def test_upload_zip_policy(
             "test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",
         ],
         fake_home,
@@ -528,8 +514,6 @@ def test_upload_zip_policy_with_includes_and_setup_script(
             "test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",
             "--include-files",
             "extra/pkg",
@@ -798,8 +782,6 @@ def test_upload_s3_policy(
             "test-s3-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",
         ],
         fake_home,
@@ -970,8 +952,6 @@ def test_upload_resolves_season_and_validates(
             "test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
         ],
     )
 
@@ -1012,8 +992,6 @@ def test_upload_returns_nonzero_when_validation_fails(
             "test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
         ],
     )
 
@@ -1058,8 +1036,6 @@ def test_upload_skips_validation_when_no_entry_config(
             "test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",
         ],
     )
@@ -1507,8 +1483,6 @@ def test_upload_rejects_oversized_at_completion(
             "test-policy",
             "--server",
             httpserver.url_for(""),
-            "--login-server",
-            "http://fake-login-server",
             "--skip-validation",
         ],
         fake_home,
