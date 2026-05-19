@@ -13,8 +13,8 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-  "mettagrid==0.26.19",
-  "softmax-cli==0.26.11",
+  "mettagrid==0.26.21",
+  "softmax-cli==0.26.12",
   "packaging>=24.0.0",
   "pydantic>=2.11.5",
   "pyyaml>=6.0.2",
