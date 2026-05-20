@@ -1811,6 +1811,7 @@ class AssayResultsResponse(CLIModel):
 class DivisionPublic(CLIModel):
     name: Annotated[str, Field(title="Name")]
     level: Annotated[int, Field(title="Level")]
+    type: Annotated[Optional[str], Field(title="Type")] = "competition"
     description: Annotated[Optional[str], Field(title="Description")] = None
     hidden: Annotated[Optional[bool], Field(title="Hidden")] = False
     leaderboard_config: Annotated[Optional[dict[str, Any]], Field(title="Leaderboard Config")] = None
