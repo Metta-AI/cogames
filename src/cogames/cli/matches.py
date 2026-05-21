@@ -338,7 +338,7 @@ def _handle_logs(
         console.print(f"\n[cyan]Downloading logs to {download_dir}...[/cyan]")
 
         for filename in log_files:
-            fname_match = re.match(r"policy_agent_(\d+)\.txt", filename)
+            fname_match = re.match(r"policy_agent_(\d+)\.log", filename)
             if not fname_match:
                 continue
             agent_idx = int(fname_match.group(1))
