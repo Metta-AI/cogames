@@ -21,18 +21,19 @@ py_library(
 py_library(
     name = "cogames",
     srcs = glob(["src/cogames/**/*.py"]),
-    data = glob(
-        [
-            "src/cogames/assets/**/*",
-            "src/cogames/docs/*.md",
-            "src/cogames/games/cogs_vs_clips/docs/*.md",
-            "src/cogames/games/cogs_vs_clips/evals/*.md",
-            "src/cogames/maps/*.map",
-            "src/cogames/maps/**/*.map",
-            "src/cogames/py.typed",
-        ],
-        allow_empty = True,
-    ),
+    # `data` carries only files the *library import surface* opens at
+    # runtime. cogames.* has no such files today — main.py reads the
+    # docs/*.md set, but main.py is only an entry point invoked through
+    # :cogames_bin, never imported from library callers (verified by
+    # grepping every `from cogames...` import in the workspace).
+    #
+    # Previously-listed globs that captured nothing or only main.py-loaded
+    # files have been dropped or moved to :cogames_bin:
+    #   - assets/**/*           : directory does not exist
+    #   - maps/*.map, maps/**/* : directory does not exist
+    #   - games/cogs_vs_clips/docs/*.md, .../evals/*.md : directories don't exist
+    #   - docs/*.md             : moved to :cogames_bin (only main.py loads them)
+    data = ["src/cogames/py.typed"],
     imports = ["src"],  # so `import cogames` resolves
     visibility = ["//visibility:public"],
     deps = [
@@ -62,6 +63,11 @@ py_binary(
     name = "cogames_bin",
     srcs = ["src/cogames/main.py"],
     main = "src/cogames/main.py",
+    # main.py reads docs/*.md via importlib.resources.files("cogames")
+    # for the `cogames docs <name>` commands. These docs are CLI-only —
+    # no library consumer opens them — so they live on the binary's
+    # runfiles tree rather than every dependent test's.
+    data = glob(["src/cogames/docs/*.md"], allow_empty = True),
     imports = ["src"],
     visibility = ["//visibility:public"],
     deps = [
