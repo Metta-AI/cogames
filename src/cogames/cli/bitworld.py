@@ -32,7 +32,6 @@ SKIP_FOLDERS = frozenset(
     {
         "__pycache__",
         "client",
-        "clients",
         "common",
         "dist",
         "docs",

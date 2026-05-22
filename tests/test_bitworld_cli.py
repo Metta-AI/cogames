@@ -35,8 +35,8 @@ def test_discover_games_lists_bitworld_game_folders(tmp_path: Path) -> None:
     _make_bitworld_game(tmp_path, "overworld")
     _make_bitworld_game(tmp_path, "pufferlib")
     _make_bitworld_game(tmp_path, "tools")
-    (tmp_path / "clients").mkdir()
-    (tmp_path / "clients" / "player_client.nim").write_text("", encoding="utf-8")
+    (tmp_path / "client").mkdir()
+    (tmp_path / "client" / "player_client.nim").write_text("", encoding="utf-8")
 
     games = bitworld_cli.discover_games(tmp_path)
 

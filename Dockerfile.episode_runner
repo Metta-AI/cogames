@@ -39,10 +39,10 @@ RUN chmod +x /root/.nimby/nim/bin/* && \
     git clone https://github.com/Metta-AI/BitWorld.git /tmp/bitworld && \
     cd /tmp/bitworld && git checkout ${BITWORLD_REF} && \
     nimble install -y --depsOnly && \
-    mkdir -p /opt/bitworld/among_them /opt/bitworld/clients/data && \
+    mkdir -p /opt/bitworld/among_them /opt/bitworld/client/data && \
     nim c -d:release --threads:on --mm:orc --path:common -o:/opt/bitworld/among_them/among_them among_them/among_them.nim && \
     cp among_them/*.png among_them/*.aseprite among_them/*.json /opt/bitworld/among_them/ && \
-    cp clients/data/*.png /opt/bitworld/clients/data/ && \
+    cp client/data/*.png /opt/bitworld/client/data/ && \
     rm -rf /tmp/bitworld /tmp/mummy /root/.nimble/pkgs2
 
 # Install Python and create the executor venv with cogames[neural]
