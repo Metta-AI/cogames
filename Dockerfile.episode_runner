@@ -29,7 +29,6 @@ ENV PATH="/root/.nimby/nim/bin:$PATH"
 # Build native BitWorld server assets used by mettagrid.runner.bitworld_runner.
 # The Python BitWorld package remains an optional Cogames extra; this image
 # only needs the native server binary and static assets.
-ARG BITWORLD_REF=master
 ARG MUMMY_REF=31ea34f2f6f8aa880ac65bc136373dc06568fcd9
 RUN chmod +x /root/.nimby/nim/bin/* && \
     export PATH="/root/.nimby/nim/bin:$PATH" && \
@@ -37,7 +36,7 @@ RUN chmod +x /root/.nimby/nim/bin/* && \
     cd /tmp/mummy && git checkout ${MUMMY_REF} && \
     nimble install -y && \
     git clone https://github.com/Metta-AI/BitWorld.git /tmp/bitworld && \
-    cd /tmp/bitworld && git checkout ${BITWORLD_REF} && \
+    cd /tmp/bitworld && \
     nimble install -y --depsOnly && \
     mkdir -p /opt/bitworld/among_them /opt/bitworld/client/data && \
     nim c -d:release --threads:on --mm:orc --path:common -o:/opt/bitworld/among_them/among_them among_them/among_them.nim && \
