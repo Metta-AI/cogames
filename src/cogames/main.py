@@ -15,7 +15,6 @@ import keyword
 import logging
 import os
 import sys
-import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, Optional, cast
 
@@ -35,18 +34,8 @@ from rich.table import Table
 from cogames import pickup as pickup_module
 from cogames import play as play_module
 from cogames import verbose
-from cogames.cli.assay import assay_app
-from cogames.cli.auth import auth_app
 from cogames.cli.base import console
 from cogames.cli.bitworld import bitworld_app
-from cogames.cli.client import PoolConfigInfo, SeasonDetail, TournamentServerClient
-from cogames.cli.episode import episode_app
-from cogames.cli.leaderboard import (
-    leaderboard_cmd,
-    parse_policy_identifier,
-    submissions_cmd,
-)
-from cogames.cli.matches import match_artifacts_cmd, matches_cmd
 from cogames.cli.mission import (
     get_mission_name_and_config,
     get_mission_names_and_configs,
@@ -59,15 +48,8 @@ from cogames.cli.policy import (
     policy_arg_example,
     policy_arg_w_proportion_example,
 )
-from cogames.cli.season import season_app
 from cogames.cli.submit import (
-    DEFAULT_EPISODE_RUNNER_IMAGE,
-    DEFAULT_SUBMIT_SERVER,
     create_bundle,
-    ensure_docker_daemon_access,
-    observatory_home_url,
-    upload_policy,
-    validate_bundle_docker,
 )
 from cogames.curricula import make_rotation
 from cogames.device import resolve_training_device
@@ -75,14 +57,12 @@ from cogames.display_detect import has_display
 from cogames.optional_deps import require_neural
 from cogames.replays import ReplayPathRequest, launch_replay_path
 from cogames.seed import seed_rollout_rng
-from softmax.auth import get_api_server, load_current_cogames_token
 
 # Always add current directory to Python path so optional plugins in the repo are discoverable.
 sys.path.insert(0, ".")
 
 
 logger = logging.getLogger("cogames.main")
-POLICY_NAME_MAX_LENGTH = 64
 _REPO_COGAMES_ROOT = Path(__file__).resolve().parents[2]
 _DOC_DESCRIPTIONS: dict[str, str] = {
     "amongthem_policy": "AmongThem policy practice walkthrough",
@@ -99,25 +79,12 @@ _DOC_RESOURCE_PATHS: dict[str, tuple[str, ...]] = {
 }
 
 _POLICY_FREE_COMMANDS = {
-    "auth",
     "bitworld",
     "docs",
     "docsync",
-    "leaderboard",
-    "match-artifacts",
-    "matches",
     "replay",
-    "submissions",
     "version",
 }
-
-
-def _submit_browser_launch_skip_reason() -> str | None:
-    if not has_display():
-        return "no GUI display detected"
-    if not sys.stdin.isatty():
-        return "non-interactive session detected"
-    return None
 
 
 def _read_docs_readme() -> str:
@@ -146,15 +113,6 @@ def _register_policies(ctx: typer.Context) -> None:
     discover_and_register_policies()
 
 
-def _validate_policy_name_or_exit(name: str) -> None:
-    if ":" in name:
-        console.print("[red]Policy name must not contain ':'[/red]")
-        raise typer.Exit(1)
-    if len(name) > POLICY_NAME_MAX_LENGTH:
-        console.print(f"[red]Policy name must be at most {POLICY_NAME_MAX_LENGTH} characters[/red]")
-        raise typer.Exit(1)
-
-
 def _validate_policy_module_name_or_exit(path: Path) -> None:
     module_name = path.stem
     if not module_name.isidentifier() or keyword.iskeyword(module_name):
@@ -163,23 +121,6 @@ def _validate_policy_module_name_or_exit(path: Path) -> None:
             "Use letters, numbers, and underscores, and do not start with a number.[/red]"
         )
         raise typer.Exit(1)
-
-
-def _print_async_submission_follow_up(
-    policy_name: str,
-    season_name: str,
-) -> None:
-    observatory_url = observatory_home_url()
-    browser_skip_reason = _submit_browser_launch_skip_reason()
-    if browser_skip_reason is None:
-        webbrowser.open(observatory_url)
-    else:
-        console.print(f"[dim]Browser launch skipped: {browser_skip_reason}[/dim]")
-    console.print(f"[dim]Observatory:[/dim] {observatory_url}")
-    console.print("[dim]Evaluation runs asynchronously. Check status with:[/dim]")
-    console.print(f"[dim]  cogames submissions --season {season_name} --policy {policy_name}[/dim]")
-    console.print(f"[dim]  cogames leaderboard {season_name} --policy {policy_name}[/dim]")
-    console.print("[dim]To submit the next version, run the same upload command again.[/dim]")
 
 
 app = typer.Typer(
@@ -316,10 +257,6 @@ def cvc_tutorial_cmd(
 
 
 app.add_typer(tutorial_app, name="tutorial", rich_help_panel="Tutorials")
-app.add_typer(auth_app, name="auth", rich_help_panel="Tournament")
-app.add_typer(season_app, name="season", rich_help_panel="Tournament")
-app.add_typer(episode_app, name="episode", rich_help_panel="Tournament")
-app.add_typer(assay_app, name="assay", rich_help_panel="Tournament")
 app.add_typer(bitworld_app, name="bitworld", rich_help_panel="BitWorld")
 
 
@@ -1360,98 +1297,6 @@ def version_cmd() -> None:
 
 
 @app.command(
-    name="policies",
-    help="Show available policy shorthand names.",
-    rich_help_panel="Policies",
-    epilog="""[dim]Usage:[/dim]
-
-  Use these shorthand names with [cyan]--policy[/cyan] or [cyan]-p[/cyan]:
-
-  [cyan]cogames play -m arena -p class=random[/cyan]     Use random policy
-
-  [cyan]cogames play -m arena -p starter[/cyan]          Use starter policy""",
-)
-def policies_cmd() -> None:
-    from mettagrid.policy.policy_registry import get_policy_registry  # noqa: PLC0415
-
-    policy_registry = get_policy_registry()
-    table = Table(show_header=False, box=None, show_lines=False, pad_edge=False)
-    table.add_column("", justify="left", style="bold cyan")
-    table.add_column("", justify="right")
-
-    for policy_name, policy_path in policy_registry.items():
-        table.add_row(policy_name, policy_path)
-    table.add_row("custom", "path.to.your.PolicyClass")
-
-    console.print(table)
-
-
-app.command(
-    name="submissions",
-    help="Show your uploads and tournament submissions.",
-    rich_help_panel="Tournament",
-    epilog="""[dim]Examples:[/dim]
-
-[cyan]cogames submissions[/cyan]                         All your uploads
-
-[cyan]cogames submissions --season beta-cvc[/cyan]           Submissions in a season
-
-[cyan]cogames submissions -p my-policy[/cyan]            Info on a specific policy""",
-    add_help_option=False,
-)(submissions_cmd)
-
-app.command(
-    name="leaderboard",
-    help="Show tournament leaderboard for a season.",
-    rich_help_panel="Tournament",
-    epilog="""[dim]Examples:[/dim]
-
-[cyan]cogames leaderboard beta-cvc[/cyan]                          View rankings (positional season)
-
-[cyan]cogames leaderboard --season beta-cvc[/cyan]                 View rankings (option)
-
-[cyan]cogames leaderboard beta-cvc --policy slanky[/cyan]          Filter by policy name
-
-[cyan]cogames leaderboard beta-cvc --mine[/cyan]                   Show only your policies""",
-    add_help_option=False,
-)(leaderboard_cmd)
-
-app.command(
-    name="matches",
-    help="Show your recent matches and policy logs.",
-    rich_help_panel="Tournament",
-    epilog="""[dim]Examples:[/dim]
-
-[cyan]cogames matches[/cyan]                              List recent matches
-
-[cyan]cogames matches --policy slanky[/cyan]               Filter by policy name
-
-[cyan]cogames matches <match-id>[/cyan]                   Show match details
-
-[cyan]cogames matches <match-id> --logs[/cyan]            Show available logs
-
-[cyan]cogames match-artifacts <match-id> error-info[/cyan]  Show runner error info
-
-[cyan]cogames matches <match-id> -d ./logs[/cyan]         Download logs""",
-    add_help_option=False,
-)(matches_cmd)
-
-app.command(
-    name="match-artifacts",
-    help="Retrieve artifacts for a match (logs, etc.).",
-    rich_help_panel="Tournament",
-    epilog="""[dim]Examples:[/dim]
-
-[cyan]cogames match-artifacts <match-id>[/cyan]                     Get match logs
-
-[cyan]cogames match-artifacts <match-id> error-info[/cyan]          Get runner error info
-
-[cyan]cogames match-artifacts <match-id> logs -o out.txt[/cyan]     Save to file""",
-    add_help_option=False,
-)(match_artifacts_cmd)
-
-
-@app.command(
     name="diagnose",
     help="Run diagnostic evals for a policy checkpoint.",
     rich_help_panel="Evaluate",
@@ -1474,45 +1319,6 @@ def diagnose_cmd(ctx: typer.Context) -> None:
     diagnose_app = typer.Typer(add_help_option=False)
     diagnose_app.command()(diagnose_module.diagnose_cmd)
     diagnose_app(prog_name="cogames diagnose", args=list(ctx.args))
-
-
-def _resolve_season(server: str, season_name: str | None = None) -> SeasonDetail:
-    auth_token = load_current_cogames_token(api_server=server or get_api_server())
-    try:
-        with TournamentServerClient(server_url=server, token=auth_token) as client:
-            if season_name is None:
-                season_name = client.get_default_season().name
-            info = client.get_season(season_name)
-            console.print(f"[dim]Using season: {info.name}[/dim]")
-            return info
-    except Exception as e:
-        console.print(f"[red]Could not fetch season from server:[/red] {e}")
-        console.print("Specify a season explicitly with [cyan]--season[/cyan]")
-        raise typer.Exit(1) from None
-
-
-def _validation_pool_names(season_info: SeasonDetail) -> list[str]:
-    names: list[str] = []
-    if season_info.entry_pool is not None:
-        names.append(season_info.entry_pool)
-    for pool_info in season_info.pools:
-        if pool_info.name not in names:
-            names.append(pool_info.name)
-    return names
-
-
-def _resolve_validation_pool_config(
-    client: TournamentServerClient,
-    season_ref: str,
-    season_info: SeasonDetail,
-) -> PoolConfigInfo:
-    for pool_name in _validation_pool_names(season_info):
-        pool_config = client.get_optional_pool_config(season_ref, pool_name)
-        if pool_config is not None:
-            return pool_config
-
-    console.print(f"[red]No playable config found for season '{season_info.name}'[/red]")
-    raise typer.Exit(1)
 
 
 @app.command(
@@ -1597,482 +1403,12 @@ def create_bundle_cmd(
     console.print(f"[green]Bundle created:[/green] {result_path}")
 
 
-@app.command(
-    name="validate-bundle",
-    help="Validate a policy bundle runs correctly in Docker.",
-    rich_help_panel="Policies",
-    add_help_option=False,
-)
-def validate_bundle_cmd(
-    policy: str = typer.Option(
-        ...,
-        "--policy",
-        "-p",
-        metavar="URI",
-        help="Bundle URI (file://, s3://, or local path to .zip or directory).",
-    ),
-    season: Optional[str] = typer.Option(
-        None,
-        "--season",
-        metavar="SEASON",
-        help="Tournament season (determines which game to validate against).",
-        rich_help_panel="Tournament",
-    ),
-    server: str = typer.Option(
-        DEFAULT_SUBMIT_SERVER,
-        "--server",
-        metavar="URL",
-        help="Tournament server URL (used to resolve default season).",
-        rich_help_panel="Server",
-    ),
-    image: str = typer.Option(
-        DEFAULT_EPISODE_RUNNER_IMAGE,
-        "--image",
-        help="Docker image for container validation.",
-        rich_help_panel="Validation",
-    ),
-    _help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show this message and exit.",
-        is_eager=True,
-        callback=_help_callback,
-        rich_help_panel="Other",
-    ),
-) -> None:
-    ensure_docker_daemon_access()
-
-    season_info = _resolve_season(server, season)
-
-    if image == DEFAULT_EPISODE_RUNNER_IMAGE and season_info.compat_version is not None:
-        image = f"ghcr.io/metta-ai/episode-runner:compat-v{season_info.compat_version}"
-
-    auth_token = load_current_cogames_token(api_server=server or get_api_server())
-    season_ref = season or season_info.name
-    with TournamentServerClient(server_url=server, token=auth_token) as client:
-        pool_config = _resolve_validation_pool_config(client, season_ref, season_info)
-
-    validate_bundle_docker(policy, pool_config.config, image, game_engine=pool_config.game_engine)
-
-    console.print(f"[dim]Validated against pool: {pool_config.pool_name} ({pool_config.game_engine})[/dim]")
-    console.print("[green]Policy validated successfully[/green]")
-    raise typer.Exit(0)
-
-
 def _parse_init_kwarg(value: str) -> tuple[str, str]:
     """Parse a key=value string into a tuple."""
     if "=" not in value:
         raise typer.BadParameter(f"Expected key=value format, got: {value}")
     key, _, val = value.partition("=")
     return key.replace("-", "_"), val
-
-
-def _parse_secret_env(value: str) -> tuple[str, str]:
-    """Parse KEY=VALUE into a tuple for secret environment variables."""
-    if "=" not in value:
-        raise typer.BadParameter(f"Expected KEY=VALUE format, got: {value}")
-    key, _, val = value.partition("=")
-    return key, val
-
-
-@app.command(
-    name="upload",
-    help="Upload a policy to CoGames.",
-    rich_help_panel="Tournament",
-    epilog="""[dim]Examples:[/dim]
-
-[cyan]cogames upload -p ./submission.zip -n my-policy --no-submit[/cyan]
-  Upload a submission bundle without submitting
-
-[cyan]cogames upload -p ./submission.zip -n my-policy --dry-run[/cyan]
-  Validate a submission bundle locally without uploading""",
-    add_help_option=False,
-)
-def upload_cmd(
-    ctx: typer.Context,
-    # --- Upload ---
-    name: str = typer.Option(
-        ...,
-        "--name",
-        "-n",
-        metavar="NAME",
-        help="Name for your uploaded policy.",
-        rich_help_panel="Upload",
-    ),
-    # --- Policy ---
-    policy: str = typer.Option(
-        ...,
-        "--policy",
-        "-p",
-        metavar="POLICY",
-        help=f"Policy specification: {policy_arg_example}.",
-        rich_help_panel="Policy",
-    ),
-    init_kwarg: Optional[list[str]] = typer.Option(  # noqa: B008
-        None,
-        "--init-kwarg",
-        "-k",
-        metavar="KEY=VAL",
-        help="Policy init kwargs (can be repeated).",
-        rich_help_panel="Policy",
-    ),
-    # --- Files ---
-    include_files: Optional[list[str]] = typer.Option(  # noqa: B008
-        None,
-        "--include-files",
-        "-f",
-        metavar="PATH",
-        help="Files or directories to include (can be repeated).",
-        rich_help_panel="Files",
-    ),
-    setup_script: Optional[str] = typer.Option(
-        None,
-        "--setup-script",
-        metavar="PATH",
-        help="Python setup script to run before loading the policy.",
-        rich_help_panel="Files",
-    ),
-    # --- Secrets ---
-    secret_env: Optional[list[str]] = typer.Option(  # noqa: B008
-        None,
-        "--secret-env",
-        metavar="KEY=VALUE",
-        help="Secret environment variable for policy execution (can be repeated). Stored in AWS Secrets Manager.",
-        rich_help_panel="Secrets",
-    ),
-    use_bedrock: bool = typer.Option(
-        False,
-        "--use-bedrock",
-        help="Enable AWS Bedrock access for this policy. Sets USE_BEDROCK=true in policy environment.",
-        rich_help_panel="Secrets",
-    ),
-    # --- Tournament ---
-    season: Optional[str] = typer.Option(
-        None,
-        "--season",
-        metavar="SEASON",
-        help="Tournament season (default: server's default season).",
-        rich_help_panel="Tournament",
-    ),
-    no_submit: bool = typer.Option(
-        False,
-        "--no-submit",
-        help="Upload without submitting to a season.",
-        rich_help_panel="Tournament",
-    ),
-    # --- Validation ---
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        help="Run the Docker smoke test only without uploading.",
-        rich_help_panel="Validation",
-    ),
-    skip_validation: bool = typer.Option(
-        False,
-        "--skip-validation",
-        help="Skip the Docker smoke test.",
-        rich_help_panel="Validation",
-    ),
-    image: str = typer.Option(
-        DEFAULT_EPISODE_RUNNER_IMAGE,
-        "--image",
-        help="Docker image for container validation.",
-        rich_help_panel="Validation",
-    ),
-    # --- Server ---
-    server: str = typer.Option(
-        DEFAULT_SUBMIT_SERVER,
-        "--server",
-        metavar="URL",
-        help="Tournament server URL.",
-        rich_help_panel="Server",
-    ),
-    # --- Help ---
-    _help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show this message and exit.",
-        is_eager=True,
-        callback=_help_callback,
-        rich_help_panel="Other",
-    ),
-) -> None:
-    _validate_policy_name_or_exit(name)
-
-    submitting = not no_submit
-    submission_season = season
-    if submitting and submission_season is None:
-        submission_season = _resolve_season(server).name
-
-    init_kwargs: dict[str, str] = {}
-    if init_kwarg:
-        for kv in init_kwarg:
-            key, val = _parse_init_kwarg(kv)
-            init_kwargs[key] = val
-
-    parsed_secret_env: dict[str, str] = {}
-    if use_bedrock:
-        parsed_secret_env["USE_BEDROCK"] = "true"
-    if secret_env:
-        for kv in secret_env:
-            key, val = _parse_secret_env(kv)
-            parsed_secret_env[key] = val
-
-    result = upload_policy(
-        ctx=ctx,
-        policy=policy,
-        name=name,
-        include_files=include_files,
-        server=server,
-        dry_run=dry_run,
-        skip_validation=skip_validation,
-        init_kwargs=init_kwargs if init_kwargs else None,
-        setup_script=setup_script,
-        validation_season=submission_season,
-        submission_season=submission_season if submitting else None,
-        image=image,
-        secret_env=parsed_secret_env if parsed_secret_env else None,
-    )
-
-    if result:
-        console.print(f"[green]Upload complete: {result.name}:v{result.version}[/green]")
-        if no_submit:
-            console.print(f"\nTo submit to a tournament: cogames submit {result.name}:v{result.version}")
-            return
-        if result.pools:
-            console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
-        if submission_season is None:
-            raise AssertionError("submitting upload must resolve a season")
-        _print_async_submission_follow_up(result.name, submission_season)
-
-
-@app.command(
-    name="submit",
-    help="Submit a policy to a tournament season.",
-    rich_help_panel="Tournament",
-    epilog="""[dim]Examples:[/dim]
-
-[cyan]cogames submit my-policy[/cyan]                                   Submit to default season
-
-[cyan]cogames submit my-policy:v3 --season beta-cvc[/cyan]              Submit specific version to specific season""",
-    add_help_option=False,
-)
-def submit_cmd(
-    policy_name: str = typer.Argument(
-        ...,
-        metavar="POLICY",
-        help="Policy name (e.g., 'my-policy' or 'my-policy:v3' for specific version).",
-    ),
-    season: Optional[str] = typer.Option(
-        None,
-        "--season",
-        metavar="SEASON",
-        help="Tournament season name.",
-        rich_help_panel="Tournament",
-    ),
-    server: str = typer.Option(
-        DEFAULT_SUBMIT_SERVER,
-        "--server",
-        "-s",
-        metavar="URL",
-        help="Tournament server URL.",
-        rich_help_panel="Server",
-    ),
-    _help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show this message and exit.",
-        is_eager=True,
-        callback=_help_callback,
-        rich_help_panel="Other",
-    ),
-) -> None:
-    import httpx  # noqa: PLC0415
-
-    season_info = _resolve_season(server, season)
-    season_name = season_info.name
-
-    client = TournamentServerClient.from_login(server_url=server)
-    if not client:
-        raise typer.Exit(1)
-
-    try:
-        name, version = parse_policy_identifier(policy_name)
-    except ValueError as e:
-        console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
-
-    version_str = f"[dim]:v{version}[/dim]" if version is not None else "[dim] (latest)[/dim]"
-    console.print(f"[bold]Submitting {name}[/bold]{version_str} to season '{season_name}'\n")
-
-    with client:
-        pv = client.lookup_policy_version(name=name, version=version)
-        if pv is None:
-            version_hint = f" v{version}" if version is not None else ""
-            console.print(f"[red]Policy '{name}'{version_hint} not found.[/red]")
-            console.print("\nDid you upload it first? Use: [cyan]cogames upload[/cyan]")
-            raise typer.Exit(1)
-
-        try:
-            result = client.submit_to_season(season_name, pv.id)
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 404:
-                console.print(f"[red]Season '{season_name}' not found[/red]")
-            elif exc.response.status_code == 409:
-                console.print(f"[red]Policy already submitted to season '{season_name}'[/red]")
-            else:
-                console.print(f"[red]Submit failed with status {exc.response.status_code}[/red]")
-                console.print(f"[dim]{exc.response.text}[/dim]")
-            raise typer.Exit(1) from exc
-        except httpx.HTTPError as exc:
-            console.print(f"[red]Submit failed:[/red] {exc}")
-            raise typer.Exit(1) from exc
-
-    console.print(f"\n[bold green]Submitted to season '{season_name}'[/bold green]")
-    if result.pools:
-        console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
-    observatory_url = observatory_home_url()
-    browser_skip_reason = _submit_browser_launch_skip_reason()
-    if browser_skip_reason is None:
-        webbrowser.open(observatory_url)
-    else:
-        console.print(f"[dim]Browser launch skipped: {browser_skip_reason}[/dim]")
-    console.print(f"[dim]Observatory:[/dim] {observatory_url}")
-    console.print(f"[dim]CLI:[/dim] cogames leaderboard --season {season_name}")
-
-
-@app.command(
-    name="ship",
-    help="Bundle, validate, upload, and submit a policy in one command.",
-    rich_help_panel="Tournament",
-    epilog="""[dim]Examples:[/dim]
-
-[cyan]cogames ship -p ./submission.zip -n my-policy --season beta-cvc[/cyan]
-  Ship a prepared submission bundle
-
-[cyan]cogames ship -p ./submission.zip -n my-policy --dry-run[/cyan]
-  Validate a prepared submission bundle locally""",
-    add_help_option=False,
-)
-def ship_cmd(
-    ctx: typer.Context,
-    name: str = typer.Option(
-        ...,
-        "--name",
-        "-n",
-        metavar="NAME",
-        help="Name for your uploaded policy.",
-        rich_help_panel="Upload",
-    ),
-    policy: str = typer.Option(
-        ...,
-        "--policy",
-        "-p",
-        metavar="POLICY",
-        help=f"Policy specification: {policy_arg_example}.",
-        rich_help_panel="Policy",
-    ),
-    init_kwarg: Optional[list[str]] = typer.Option(  # noqa: B008
-        None,
-        "--init-kwarg",
-        "-k",
-        metavar="KEY=VAL",
-        help="Policy init kwargs (can be repeated).",
-        rich_help_panel="Policy",
-    ),
-    include_files: Optional[list[str]] = typer.Option(  # noqa: B008
-        None,
-        "--include-files",
-        "-f",
-        metavar="PATH",
-        help="Files or directories to include (can be repeated).",
-        rich_help_panel="Files",
-    ),
-    setup_script: Optional[str] = typer.Option(
-        None,
-        "--setup-script",
-        metavar="PATH",
-        help="Python setup script to run before loading the policy.",
-        rich_help_panel="Files",
-    ),
-    season: Optional[str] = typer.Option(
-        None,
-        "--season",
-        metavar="SEASON",
-        help="Tournament season (default: server's default season).",
-        rich_help_panel="Tournament",
-    ),
-    dry_run: bool = typer.Option(
-        False,
-        "--dry-run",
-        help="Run the Docker smoke test only without uploading.",
-        rich_help_panel="Validation",
-    ),
-    skip_validation: bool = typer.Option(
-        False,
-        "--skip-validation",
-        help="Skip the Docker smoke test.",
-        rich_help_panel="Validation",
-    ),
-    image: str = typer.Option(
-        DEFAULT_EPISODE_RUNNER_IMAGE,
-        "--image",
-        help="Docker image for container validation.",
-        rich_help_panel="Validation",
-    ),
-    server: str = typer.Option(
-        DEFAULT_SUBMIT_SERVER,
-        "--server",
-        metavar="URL",
-        help="Tournament server URL.",
-        rich_help_panel="Server",
-    ),
-    _help: bool = typer.Option(
-        False,
-        "--help",
-        "-h",
-        help="Show this message and exit.",
-        is_eager=True,
-        callback=_help_callback,
-        rich_help_panel="Other",
-    ),
-) -> None:
-    _validate_policy_name_or_exit(name)
-
-    season_info = _resolve_season(server, season)
-
-    init_kwargs: dict[str, str] = {}
-    if init_kwarg:
-        for kv in init_kwarg:
-            key, val = _parse_init_kwarg(kv)
-            init_kwargs[key] = val
-
-    result = upload_policy(
-        ctx=ctx,
-        policy=policy,
-        name=name,
-        include_files=include_files,
-        server=server,
-        dry_run=dry_run,
-        skip_validation=skip_validation,
-        init_kwargs=init_kwargs if init_kwargs else None,
-        setup_script=setup_script,
-        validation_season=season_info.name,
-        submission_season=season_info.name,
-        image=image,
-    )
-
-    if not result:
-        return
-
-    console.print(f"[green]Shipped: {result.name}:v{result.version}[/green]")
-    if result.pools:
-        console.print(f"[dim]Added to pools: {', '.join(result.pools)}[/dim]")
-
-    _print_async_submission_follow_up(result.name, season_info.name)
 
 
 @app.command(

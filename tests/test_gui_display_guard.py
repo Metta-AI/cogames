@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import uuid
 from pathlib import Path
 from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
-import cogames.cli.episode as episode_module
 import cogames.display_detect as display_detect
 import cogames.main as main_module
 
@@ -164,72 +162,3 @@ def test_replay_delegates_to_replay_viewer_contract(monkeypatch, tmp_path: Path)
 
     assert result.exit_code == 0
     assert launched == [replay_path, 1.0]
-
-
-class _FakeClient:
-    def __init__(self, ep: SimpleNamespace):
-        self._ep = ep
-
-    def __enter__(self) -> _FakeClient:
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> None:
-        return None
-
-    def get_episode(self, _ep_uuid: uuid.UUID) -> SimpleNamespace:
-        return self._ep
-
-
-class _FakeHttpResponse:
-    def __init__(self, content: bytes):
-        self.content = content
-
-    def raise_for_status(self) -> None:
-        return None
-
-
-def test_episode_replay_requires_display_before_launch(monkeypatch) -> None:
-    episode_id = uuid.uuid4()
-    monkeypatch.setattr(episode_module, "has_display", lambda: False)
-    monkeypatch.setattr(
-        episode_module,
-        "_get_anon_client",
-        lambda _server: _FakeClient(SimpleNamespace(id=episode_id, replay_url="https://example.com/replay")),
-    )
-    monkeypatch.setattr(
-        episode_module.httpx,
-        "get",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("should not download replay")),
-    )
-    monkeypatch.setattr(
-        episode_module,
-        "launch_replay_bytes",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("should not launch replay viewer")),
-    )
-
-    result = runner.invoke(main_module.app, ["episode", "replay", str(episode_id)])
-
-    assert result.exit_code == 1
-    assert "This command requires a GUI display" in result.stdout
-
-
-def test_episode_replay_delegates_to_replay_viewer_contract(monkeypatch) -> None:
-    episode_id = uuid.uuid4()
-    launched: list[object] = []
-    monkeypatch.setattr(episode_module, "has_display", lambda: True)
-    monkeypatch.setattr(
-        episode_module,
-        "_get_anon_client",
-        lambda _server: _FakeClient(SimpleNamespace(id=episode_id, replay_url="https://example.com/replay")),
-    )
-    monkeypatch.setattr(episode_module.httpx, "get", lambda *_args, **_kwargs: _FakeHttpResponse(b"BITWORLD\x02\x00"))
-    monkeypatch.setattr(
-        episode_module,
-        "launch_replay_bytes",
-        lambda replay_bytes, *, prefix: launched.append(replay_bytes) or launched.append(prefix) or 0,
-    )
-
-    result = runner.invoke(main_module.app, ["episode", "replay", str(episode_id)])
-
-    assert result.exit_code == 0
-    assert launched == [b"BITWORLD\x02\x00", f"episode-{str(episode_id)[:8]}-"]

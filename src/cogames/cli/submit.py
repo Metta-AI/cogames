@@ -1,70 +1,22 @@
-"""Policy submission command for CoGames."""
+"""Policy bundle creation for CoGames."""
 
 from __future__ import annotations
 
-import copy
-import json
 import os
 import shutil
-import subprocess
-import sys
 import tempfile
-import uuid
 import zipfile
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-from urllib.parse import urlsplit, urlunsplit
 
-import httpx
 import typer
 
 from cogames.cli.base import console
-from cogames.cli.client import TournamentServerClient
 from cogames.cli.policy import PolicySpec, get_policy_spec
 from mettagrid.policy.prepare_policy_spec import extract_submission_archive, find_package_source_root
 from mettagrid.policy.submission import POLICY_SPEC_FILENAME, SubmissionPolicySpec, write_submission_policy_spec
-from mettagrid.runner.types import PureSingleEpisodeResult
 from mettagrid.util.uri_resolvers.schemes import localize_uri, parse_uri
-from softmax.auth import get_api_server
 
-DEFAULT_SUBMIT_SERVER = "https://softmax.com/api"
-DEFAULT_EPISODE_RUNNER_IMAGE = "ghcr.io/metta-ai/episode-runner:latest"
-RESULTS_URL = "https://www.softmax.com/alignmentleague"
 _METTA_POLICY_CLASS_PREFIX = "metta.agent."
-
-
-@dataclass
-class UploadResult:
-    policy_version_id: uuid.UUID
-    name: str
-    version: int
-    pools: list[str] | None = None
-
-
-def observatory_home_url() -> str:
-    parsed = urlsplit(get_api_server())
-    hostname = (parsed.hostname or "").removeprefix("api.")
-    if parsed.port is None:
-        netloc = hostname
-    else:
-        netloc = f"{hostname}:{parsed.port}" if hostname else str(parsed.port)
-
-    browser_path = parsed.path.rstrip("/")
-    if "/api/" in browser_path:
-        browser_path = browser_path.split("/api/", 1)[0]
-    else:
-        browser_path = browser_path.removesuffix("/api")
-
-    return urlunsplit(
-        (
-            parsed.scheme,
-            netloc,
-            f"{browser_path}/observatory/home",
-            "",
-            "",
-        )
-    )
 
 
 def _resolve_path_within_cwd(path_str: str, cwd: Path) -> Path:
@@ -307,7 +259,6 @@ def create_bundle(
                 "\n[dim]Generic pattern:[/dim]\n"
                 "[cyan]cogames create-bundle -p <checkpoint-or-policy> -o submission.zip "
                 "-f <runtime-path> ... --setup-script <setup.py>[/cyan]\n"
-                "[cyan]cogames upload -p ./submission.zip -n <policy-name>[/cyan]"
             )
             if (cwd / "agent/COGAMES_SUBMISSION.md").is_file():
                 console.print("\n[dim]Metta repo guide:[/dim] agent/COGAMES_SUBMISSION.md")
@@ -318,243 +269,3 @@ def create_bundle(
 
     console.print(f"[dim]Bundle size: {output.stat().st_size / 1024:.0f} KB[/dim]")
     return output
-
-
-def _validation_job_spec(
-    policy_uri: str,
-    config_data: dict[str, Any],
-    *,
-    game_engine: str = "mettagrid",
-) -> dict[str, Any]:
-    env_cfg = copy.deepcopy(config_data)
-    env_cfg["game_engine"] = game_engine
-    from mettagrid.config.any_env_config import resolve_env_config_type  # noqa: PLC0415
-
-    env_type = resolve_env_config_type(env_cfg)
-    env_type.set_max_steps(env_cfg, 10)
-    num_agents = env_type.get_num_agents(env_cfg)
-    return {
-        "policy_uris": [policy_uri],
-        "assignments": [0] * num_agents,
-        "env": env_cfg,
-        "seed": 42,
-        "max_action_time_ms": 10000,
-        "game_engine": game_engine,
-    }
-
-
-def _check_results(res: PureSingleEpisodeResult) -> None:
-    console.print(f"[dim]Ran for {res.steps} steps[/dim]")
-    if res.steps <= 0:
-        console.print("[yellow]Warning: Policy ran for no steps[/yellow]")
-        raise typer.Exit(1)
-    action_counts = {k: v for k, v in res.stats["agent"][0].items() if k.startswith("action.")}
-    if not action_counts:
-        return
-    non_noop_actions = sum(v for k, v in action_counts.items() if ".noop." not in k)
-    if non_noop_actions == 0:
-        console.print("[yellow]Warning: Policy took no actions (all no-ops)[/yellow]")
-        raise typer.Exit(1)
-
-
-def ensure_docker_daemon_access() -> None:
-    docker = shutil.which("docker")
-    if docker is None:
-        if sys.platform == "darwin":
-            console.print("[red]Docker not found. Install Docker: https://www.docker.com/get-started/[/red]")
-        else:
-            console.print("[red]Docker not found. Install Docker: https://docs.docker.com/engine/install/[/red]")
-        raise typer.Exit(1)
-
-    try:
-        result = subprocess.run([docker, "info"], capture_output=True, text=True, timeout=15)
-    except subprocess.TimeoutExpired:
-        console.print("[red]Docker daemon timed out. Check daemon health.[/red]")
-        raise typer.Exit(1) from None
-
-    if result.returncode != 0:
-        if sys.platform == "darwin":
-            console.print("[red]Docker daemon is not running. Start Docker Desktop and try again.[/red]")
-        else:
-            console.print("[red]Docker daemon is not running. Start it first:[/red]")
-            console.print("[dim]  sudo systemctl start docker[/dim]")
-        raise typer.Exit(1)
-
-
-def validate_bundle_docker(
-    policy_uri: str,
-    config_data: dict[str, Any],
-    image: str,
-    *,
-    game_engine: str = "mettagrid",
-) -> None:
-    local_path = localize_uri(policy_uri)
-    if local_path is None:
-        raise ValueError(f"Cannot localize policy URI: {policy_uri}")
-
-    if local_path.is_dir():
-        container_policy_uri = "file:///workspace/policy"
-        container_mount_target = "/workspace/policy"
-    else:
-        container_policy_uri = f"file:///workspace/policy/{local_path.name}"
-        container_mount_target = f"/workspace/policy/{local_path.name}"
-
-    job_spec = _validation_job_spec(container_policy_uri, config_data, game_engine=game_engine)
-
-    with tempfile.TemporaryDirectory(prefix="cogames_docker_validate_") as workspace:
-        spec_path = Path(workspace) / "spec.json"
-        results_path = Path(workspace) / "results.json"
-        spec_path.write_text(json.dumps(job_spec))
-
-        cmd = [
-            "docker",
-            "run",
-            "--rm",
-            "--platform",
-            "linux/amd64",
-            "-e",
-            "JOB_SPEC_URI=file:///workspace/io/spec.json",
-            "-e",
-            "RESULTS_URI=file:///workspace/io/results.json",
-            "-v",
-            f"{local_path.resolve()}:{container_mount_target}:ro",
-            "-v",
-            f"{workspace}:/workspace/io:rw",
-            image,
-        ]
-
-        console.print(f"[dim]Pulling latest image ({image})...[/dim]")
-        subprocess.run(["docker", "pull", "--platform", "linux/amd64", image], text=True, timeout=300)
-
-        console.print(f"[dim]Running validation in Docker ({image})...[/dim]")
-        result = subprocess.run(cmd, text=True, timeout=300)
-        if result.returncode != 0:
-            raise RuntimeError(f"Docker validation failed (exit {result.returncode})")
-
-        if not results_path.exists():
-            raise RuntimeError("Docker validation produced no results file")
-
-        res = PureSingleEpisodeResult.model_validate_json(results_path.read_text())
-        _check_results(res)
-
-
-def upload_submission(
-    client: TournamentServerClient,
-    zip_path: Path,
-    submission_name: str,
-    season: str | None = None,
-    secret_env: dict[str, str] | None = None,
-) -> UploadResult | None:
-    """Upload submission to CoGames backend using a presigned S3 URL."""
-    console.print("[bold]Uploading[/bold]")
-
-    presigned = client.get_presigned_upload_url()
-
-    console.print("[dim]Uploading to storage...[/dim]")
-
-    with open(zip_path, "rb") as f:
-        upload_response = httpx.put(
-            presigned.upload_url,
-            content=f,
-            headers={"Content-Type": "application/zip"},
-            timeout=600.0,
-        )
-    upload_response.raise_for_status()
-
-    console.print("[dim]Uploading policy...[/dim]")
-
-    # Server checks actual S3 object size (catches old clients or misreported sizes). Only
-    # the server knows the real size, so this try/except can't be replaced by a client-side check.
-    try:
-        result = client.complete_policy_upload(str(presigned.upload_id), submission_name, secret_env=secret_env)
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code == 413:
-            detail = e.response.json().get("detail", "Policy too large")
-            console.print(f"[red]{detail}[/red]")
-            raise typer.Exit(1) from None
-        raise
-    if season:
-        console.print(f"[dim]Submitting policy to season {season}...[/dim]")
-        result.pools = client.submit_to_season(season, result.id).pools
-    return UploadResult(
-        policy_version_id=result.id,
-        name=result.name,
-        version=result.version,
-        pools=result.pools,
-    )
-
-
-def upload_policy(
-    ctx: typer.Context,
-    policy: str,
-    name: str,
-    include_files: list[str] | None = None,
-    server: str = DEFAULT_SUBMIT_SERVER,
-    init_kwargs: dict[str, str] | None = None,
-    dry_run: bool = False,
-    skip_validation: bool = False,
-    setup_script: str | None = None,
-    validation_season: str | None = None,
-    submission_season: str | None = None,
-    image: str = DEFAULT_EPISODE_RUNNER_IMAGE,
-    secret_env: dict[str, str] | None = None,
-) -> UploadResult | None:
-    if dry_run:
-        console.print("[dim]Dry run mode - no upload[/dim]\n")
-
-    client = TournamentServerClient.from_login(server_url=server)
-    if not client:
-        raise typer.Exit(1)
-
-    with tempfile.TemporaryDirectory(prefix="cogames_bundle_") as tmp_dir:
-        zip_path = Path(tmp_dir) / "bundle.zip"
-
-        create_bundle(
-            ctx=ctx,
-            policy=policy,
-            output=zip_path,
-            include_files=include_files,
-            init_kwargs=init_kwargs,
-            setup_script=setup_script,
-        )
-
-        if not skip_validation:
-            cmd = [
-                sys.executable,
-                "-m",
-                "cogames",
-                "validate-bundle",
-                "--policy",
-                zip_path.as_uri(),
-                "--server",
-                server,
-            ]
-            if validation_season:
-                cmd.extend(["--season", validation_season])
-            if image != DEFAULT_EPISODE_RUNNER_IMAGE:
-                cmd.extend(["--image", image])
-            try:
-                result = subprocess.run(cmd, text=True, timeout=300)
-            except subprocess.TimeoutExpired:
-                console.print("[red]Validation timed out after 5 minutes[/red]")
-                console.print("[dim]Hint: Use --skip-validation to bypass Docker validation[/dim]")
-                raise typer.Exit(1) from None
-            if result.returncode != 0:
-                console.print("[red]Validation failed[/red]")
-                console.print("[dim]Hint: Use --skip-validation to bypass, or --dry-run to debug[/dim]")
-                raise typer.Exit(1)
-            console.print("[green]Validation passed[/green]")
-        else:
-            console.print("[dim]Skipping validation[/dim]")
-
-        if dry_run:
-            console.print("[green]Dry run complete[/green]")
-            return None
-
-        with client:
-            result = upload_submission(client, zip_path, name, season=submission_season, secret_env=secret_env)
-        if not result:
-            console.print("\n[red]Upload failed.[/red]")
-            raise typer.Exit(1)
-
-        return result
