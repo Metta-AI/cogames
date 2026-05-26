@@ -14,7 +14,7 @@ py_library(
     imports = ["src"],  # so `import metta_alo` resolves
     visibility = ["//visibility:public"],
     deps = [
-        "@pyenv//:pydantic",
+        "@pypi//pydantic",
     ],
 )
 
@@ -42,20 +42,20 @@ py_library(
         # Mirrors packages/cogames/pyproject.toml [project.dependencies]
         # (mettagrid + softmax-cli are workspace-internal; the rest are external).
         "@pyenv//:mettagrid",
-        "@pyenv//:packaging",
-        "@pyenv//:pydantic",
-        "@pyenv//:pyyaml",
-        "@pyenv//:questionary",
-        "@pyenv//:typer",
-        "@pyenv//:rich",
-        "@pyenv//:httpx",
-        "@pyenv//:anthropic",
-        "@pyenv//:openai",
-        "@pyenv//:nbstripout",
-        "@pyenv//:nbconvert",
-        "@pyenv//:jupytext",
-        "@pyenv//:ipykernel",
-        "@pyenv//:pytest_httpserver",
+        "@pypi//packaging",
+        "@pypi//pydantic",
+        "@pypi//pyyaml",
+        "@pypi//questionary",
+        "@pypi//typer",
+        "@pypi//rich",
+        "@pypi//httpx",
+        "@pypi//anthropic",
+        "@pypi//openai",
+        "@pypi//nbstripout",
+        "@pypi//nbconvert",
+        "@pypi//jupytext",
+        "@pypi//ipykernel",
+        "@pypi//pytest_httpserver",
     ],
 )
 
