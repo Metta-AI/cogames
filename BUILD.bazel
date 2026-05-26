@@ -76,6 +76,6 @@ py_binary(
         # imported lazily via cogames.game.get_game, so the binary needs
         # cogsguard on its runfiles PYTHONPATH even though cogsguard is an
         # optional extra (cogames[cogsguard]) in pyproject.toml.
-        "@pyenv//:cogsguard",
+        "@pypi//cogsguard",
     ],
 )
