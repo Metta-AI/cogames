@@ -41,7 +41,7 @@ py_library(
         "//packages/softmax-cli:softmax",
         # Mirrors packages/cogames/pyproject.toml [project.dependencies]
         # (mettagrid + softmax-cli are workspace-internal; the rest are external).
-        "@pyenv//:mettagrid",
+        "@mettagrid//python/src/mettagrid:mettagrid",
         "@pypi//packaging",
         "@pypi//pydantic",
         "@pypi//pyyaml",
