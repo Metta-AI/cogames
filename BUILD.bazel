@@ -18,22 +18,34 @@ py_library(
     ],
 )
 
+# Doc bundle for the cogames package. `MISSION.md` at the package root is
+# the canonical source-of-truth; `src/cogames/docs/MISSION.md` is a symlink
+# that points back at it so importlib.resources.files("cogames").joinpath(
+# "docs/MISSION.md") can read it from within the installed package.
+# Tests that invoke the CLI in-process (`cogames docs mission`) and then
+# cross-check the output against the canonical doc need both runfile
+# paths populated. Carried on the library target (rather than only on
+# :cogames_bin) so test_cli::test_docs_mission_command works without a
+# separate dep.
+filegroup(
+    name = "cogames_docs",
+    srcs = ["MISSION.md"] + glob(
+        ["src/cogames/docs/*.md"],
+        allow_empty = True,
+    ),
+    visibility = ["//visibility:public"],
+)
+
 py_library(
     name = "cogames",
     srcs = glob(["src/cogames/**/*.py"]),
-    # `data` carries only files the *library import surface* opens at
-    # runtime. cogames.* has no such files today — main.py reads the
-    # docs/*.md set, but main.py is only an entry point invoked through
-    # :cogames_bin, never imported from library callers (verified by
-    # grepping every `from cogames...` import in the workspace).
-    #
-    # Previously-listed globs that captured nothing or only main.py-loaded
-    # files have been dropped or moved to :cogames_bin:
-    #   - assets/**/*           : directory does not exist
-    #   - maps/*.map, maps/**/* : directory does not exist
-    #   - games/cogs_vs_clips/docs/*.md, .../evals/*.md : directories don't exist
-    #   - docs/*.md             : moved to :cogames_bin (only main.py loads them)
-    data = ["src/cogames/py.typed"],
+    # The docs bundle ships with the library because cogames.main reads
+    # `docs/*.md` via importlib.resources.files("cogames"), and library
+    # consumers (including tests that import cogames and drive the CLI
+    # in-process) need that path populated. The top-level MISSION.md is
+    # included so tests that read the canonical doc directly via a
+    # filesystem path also resolve.
+    data = ["src/cogames/py.typed", ":cogames_docs"],
     imports = ["src"],  # so `import cogames` resolves
     visibility = ["//visibility:public"],
     deps = [
