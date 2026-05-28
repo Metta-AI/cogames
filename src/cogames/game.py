@@ -1,37 +1,21 @@
-"""Game management and discovery for CoGames."""
+"""Re-export shim for game registration with cogames-CLI lazy install.
+
+`CoGame` and `register_game` are re-exported from `mettagrid.cogame.game`,
+so the in-process game registry (`_GAMES`) is shared with anything that
+imports `mettagrid.cogame`. `get_game` here adds the cogames-CLI
+lazy-install behavior on top of the shared registry; this lazy-install
+goes away when the cogames package is deleted in PR 6.
+"""
 
 from __future__ import annotations
 
 import importlib
-from typing import Sequence
 
-from cogames.core import CoGameMission, CoGameMissionVariant
 from cogames.standalone_games import STANDALONE_GAMES
-from cogames.variants import VariantRegistry
+from mettagrid.cogame.game import _GAMES as _GAMES  # share the registry
+from mettagrid.cogame.game import CoGame, register_game
 
-
-class CoGame:
-    """Base class for CoGames. Holds missions and a variant registry."""
-
-    name: str
-    missions: list[CoGameMission]
-    variant_registry: VariantRegistry
-    eval_missions: list[CoGameMission]
-
-    def __init__(
-        self,
-        name: str,
-        missions: Sequence[CoGameMission],
-        variants: Sequence[CoGameMissionVariant],
-        eval_missions: Sequence[CoGameMission] | None = None,
-    ) -> None:
-        self.name = name
-        self.missions = list(missions)
-        self.variant_registry = VariantRegistry(list(variants))
-        self.eval_missions = list(eval_missions) if eval_missions else []
-
-
-_GAMES: dict[str, "CoGame"] = {}
+__all__ = ["CoGame", "get_game", "register_game"]
 
 
 def _import_standalone_game(name: str) -> bool:
@@ -59,14 +43,9 @@ def _ensure_game_loaded(name: str) -> None:
 
 
 def get_game(name: str) -> "CoGame":
-    """Get a registered game by name."""
+    """Get a registered game by name; lazy-imports standalone games."""
     _ensure_game_loaded(name)
     if name not in _GAMES:
         available = sorted({*STANDALONE_GAMES, *_GAMES})
         raise ValueError(f"Unknown game '{name}'. Available: {', '.join(available)}")
     return _GAMES[name]
-
-
-def register_game(game: "CoGame") -> None:
-    """Register a game for CLI resolution."""
-    _GAMES[game.name] = game
