@@ -16,6 +16,10 @@
 # # CoGames: A Game Environment for the Alignment League Benchmark
 
 # %% [markdown]
+# > [!WARNING]
+# > CoGames has been retired in favor of [Coworld](https://github.com/Metta-AI/coworld).
+
+# %% [markdown]
 # <p align="center">
 #   <a href="https://pypi.org/project/cogames/">
 #     <img src="https://img.shields.io/pypi/v/cogames" alt="PyPi version">

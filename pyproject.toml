@@ -4,10 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cogames"
-description = "Multi-agent cooperative games"
+description = "Deprecated CoGames compatibility package"
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 classifiers = [
+  "Development Status :: 7 - Inactive",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
