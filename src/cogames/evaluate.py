@@ -16,7 +16,7 @@ from rich.console import Console
 from rich.table import Table
 
 from metta_alo.scoring import allocate_counts, validate_proportions
-from mettagrid.config.env_config import EnvConfig
+from mettagrid import MettaGridConfig
 from mettagrid.policy.policy import PolicySpec
 from mettagrid.runner.rollout import run_multi_episode_rollout
 from mettagrid.simulator.multi_episode.rollout import MultiEpisodeRolloutResult
@@ -42,7 +42,7 @@ class RawMissionEvaluationResult(BaseModel):
 
 def evaluate(
     console: Console,
-    missions: Sequence[tuple[str, EnvConfig]],
+    missions: Sequence[tuple[str, MettaGridConfig]],
     policy_specs: list[PolicySpec],
     proportions: list[float],
     episodes: int,
@@ -51,7 +51,6 @@ def evaluate(
     device: Optional[str] = None,
     output_format: Optional[Literal["yaml", "json"]] = None,
     save_replay: Optional[str] = None,
-    game_engine: str | None = None,
 ) -> MissionResultsSummary:
     if not missions:
         raise ValueError("At least one mission must be provided for evaluation.")
@@ -90,7 +89,6 @@ def evaluate(
                 create_replay_dir=save_replay is not None,
                 device=device,
                 on_progress=lambda _episode_idx, _result: progress.update(1),
-                game_engine=game_engine,
             )
 
         mission_results.append(rollout)
