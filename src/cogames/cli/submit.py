@@ -260,8 +260,8 @@ def create_bundle(
                 "[cyan]cogames create-bundle -p <checkpoint-or-policy> -o submission.zip "
                 "-f <runtime-path> ... --setup-script <setup.py>[/cyan]\n"
             )
-            if (cwd / "agent/COGAMES_SUBMISSION.md").is_file():
-                console.print("\n[dim]Metta repo guide:[/dim] agent/COGAMES_SUBMISSION.md")
+            if (cwd / "packages/metta-agent/COGAMES_SUBMISSION.md").is_file():
+                console.print("\n[dim]Metta repo guide:[/dim] packages/metta-agent/COGAMES_SUBMISSION.md")
             raise typer.Exit(1)
 
         write_submission_policy_spec(bundle_root / POLICY_SPEC_FILENAME, submission_spec)
