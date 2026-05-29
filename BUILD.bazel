@@ -5,7 +5,7 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 # tree and serve consumers outside the cogames target itself.
 #
 # BUILD targets live above the python source tree to keep wheels clean —
-# see common/BUILD.bazel for the rationale.
+# see packages/metta-common/BUILD.bazel for the rationale.
 
 py_library(
     name = "metta_alo",
