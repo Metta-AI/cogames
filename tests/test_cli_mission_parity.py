@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import cast
 
 import pytest
 from cogsguard.game.clips import AngryClipsVariant, ClipsVariant
@@ -8,6 +9,8 @@ from cogsguard.missions.machina_1 import MachinaOneMission
 from cogsguard.missions.terrain import find_machina_arena
 
 from cogames.cli.mission import find_mission, get_mission, resolve_mission
+from cogames.core import CoGameMissionVariant
+from cogames.game import CoGame
 
 
 def test_get_mission_accepts_reward_variants() -> None:
@@ -31,7 +34,7 @@ def test_get_mission_accepts_angry_clips_variant() -> None:
     )
 
     assert mission is not None
-    clips_v = mission.required_variant(ClipsVariant)
+    clips_v = cast(ClipsVariant, mission.required_variant(cast(type[CoGameMissionVariant], ClipsVariant)))
     assert clips_v.clips is not None
     assert clips_v.clips.angry_target_enemy_hub is True
     assert clips_v.clips.greedy_expand_from_ships is False
@@ -105,7 +108,7 @@ def test_all_listed_sub_missions_resolve_via_cli_lookup() -> None:
 
     for mission in game.missions:
         for sub_name in mission.sub_missions:
-            assert find_mission(game, f"{mission.name}.{sub_name}") is not None
+            assert find_mission(cast(CoGame, game), f"{mission.name}.{sub_name}") is not None
 
 
 def test_get_mission_accepts_talk_variant() -> None:
@@ -121,4 +124,4 @@ def test_resolve_mission_rejects_variants_from_other_games() -> None:
     game = CvCGame()
 
     with pytest.raises(ValueError, match="Unknown variant 'full'"):
-        resolve_mission(game, "machina_1", variants_arg=["full"])
+        resolve_mission(cast(CoGame, game), "machina_1", variants_arg=["full"])

@@ -67,7 +67,7 @@ STANDALONE_GAMES: dict[str, StandaloneGameInstall] = {
         module_name="cogsguard.game.game",
         package_name="cogsguard",
         source=GitSource(
-            git="https://github.com/Metta-AI/cogame-cogsguard.git",
+            git="https://github.com/Metta-AI/coworld-cogs-vs-clips.git",
         ),
     ),
 }

@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from html import escape
 from pathlib import Path
-from typing import Callable, Literal, Optional
+from typing import Callable, Literal, Optional, cast
 
 import typer
 from pydantic import BaseModel
@@ -2530,7 +2530,7 @@ def load_diagnose_missions(mission_set: str) -> list[CoGameMission]:
         from cogames.cli.mission import get_all_missions_list  # noqa: PLC0415
 
         missions_list: list[CoGameMission] = []
-        missions_list.extend(CVC_EVAL_MISSIONS)
+        missions_list.extend(cast(list[CoGameMission], CVC_EVAL_MISSIONS))
         missions_list.extend(_load_eval_missions("cogsguard.evals.integrated_evals"))
         missions_list.extend(_load_eval_missions("cogsguard.evals.spanning_evals"))
         missions_list.extend([mission_cls() for mission_cls in DIAGNOSTIC_EVALS])  # type: ignore[call-arg]
@@ -2543,7 +2543,7 @@ def load_diagnose_missions(mission_set: str) -> list[CoGameMission]:
     if mission_set == "cvc_evals":
         from cogsguard.evals.cvc_evals import CVC_EVAL_MISSIONS  # noqa: PLC0415
 
-        return list(CVC_EVAL_MISSIONS)
+        return cast(list[CoGameMission], list(CVC_EVAL_MISSIONS))
 
     if mission_set == "diagnostic_evals":
         from cogsguard.evals.diagnostic_evals import DIAGNOSTIC_EVALS  # noqa: PLC0415

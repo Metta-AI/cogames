@@ -148,4 +148,4 @@ def test_cogsguard_manifest_matches_package_shape() -> None:
 
     assert standalone_game.package_name == "cogsguard"
     assert standalone_game.module_name == "cogsguard.game.game"
-    assert standalone_game.source.git == "https://github.com/Metta-AI/cogame-cogsguard.git"
+    assert standalone_game.source.git == "https://github.com/Metta-AI/coworld-cogs-vs-clips.git"

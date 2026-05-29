@@ -48,7 +48,7 @@ python -m venv .venv
 source .venv/bin/activate
 
 pip install "cogames[neural]"
-pip install "cogsguard @ git+https://github.com/Metta-AI/cogame-cogsguard.git"
+pip install "cogsguard @ git+https://github.com/Metta-AI/coworld-cogs-vs-clips.git"
 ```
 
 <details><summary>Using uv</summary>
@@ -63,7 +63,7 @@ source .venv/bin/activate
 
 # Install cogames, the neural extras, and the cogsguard game
 uv pip install "cogames[neural]"
-uv pip install "cogsguard @ git+https://github.com/Metta-AI/cogame-cogsguard.git"
+uv pip install "cogsguard @ git+https://github.com/Metta-AI/coworld-cogs-vs-clips.git"
 ```
 
 </details>
@@ -80,7 +80,7 @@ RUN apt-get update && \
 
 # Install cogames, the neural extras, and the cogsguard game
 RUN pip install --no-cache-dir "cogames[neural]" \
-    "cogsguard @ git+https://github.com/Metta-AI/cogame-cogsguard.git"
+    "cogsguard @ git+https://github.com/Metta-AI/coworld-cogs-vs-clips.git"
 ```
 
 </details>
