@@ -40,7 +40,6 @@ dynamic = ["version"]
 diplomacog = ["diplomacog"]
 hungercog = ["hungercog"]
 overcogged = ["overcogged"]
-tribalcog = ["tribalcog"]
 amongcogs = ["amongcogs"]
 werecog = ["werecog"]
 cogsguard = ["cogsguard"]
@@ -83,7 +82,6 @@ softmax-cli = { workspace = true }
 diplomacog = { git = "https://github.com/Metta-AI/cogame-diplomacog.git" }
 hungercog = { git = "https://github.com/Metta-AI/cogame-hungercog.git" }
 overcogged = { git = "https://github.com/Metta-AI/cogame-overcogged.git" }
-tribalcog = { git = "https://github.com/Metta-AI/cogame-tribal.git" }
 amongcogs = { git = "https://github.com/Metta-AI/cogame-amongcogs.git" }
 werecog = { git = "https://github.com/Metta-AI/cogame-werecog.git" }
 cogsguard = { git = "https://github.com/Metta-AI/coworld-cogs-vs-clips.git" }

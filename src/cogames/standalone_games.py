@@ -42,13 +42,6 @@ STANDALONE_GAMES: dict[str, StandaloneGameInstall] = {
             git="https://github.com/Metta-AI/cogame-overcogged.git",
         ),
     ),
-    "tribalcog": StandaloneGameInstall(
-        module_name="tribal_village_env.recipe",
-        package_name="tribalcog",
-        source=GitSource(
-            git="https://github.com/Metta-AI/cogame-tribal.git",
-        ),
-    ),
     "amongcogs": StandaloneGameInstall(
         module_name="amongcogs.game.game",
         package_name="amongcogs",
