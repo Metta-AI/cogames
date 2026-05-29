@@ -1,4 +1,5 @@
-load("@rules_python//python:defs.bzl", "py_binary", "py_library")
+load("@rules_python//python:defs.bzl", "py_binary")
+load("//tools:pyright.bzl", "py_library_typed")
 
 # Local source for cogames + metta_alo. Tests pick up local edits via these
 # targets; the venv's wheel-installed copies are builds of the same source
@@ -7,7 +8,7 @@ load("@rules_python//python:defs.bzl", "py_binary", "py_library")
 # BUILD targets live above the python source tree to keep wheels clean —
 # see packages/metta-common/BUILD.bazel for the rationale.
 
-py_library(
+py_library_typed(
     name = "metta_alo",
     srcs = glob(["src/metta_alo/**/*.py"]),
     data = glob(["src/metta_alo/py.typed"], allow_empty = True),
@@ -15,6 +16,8 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         "@pypi//pydantic",
+        # scoring.py imports mettagrid.simulator.multi_episode.rollout
+        "//packages/mettagrid/python/src/mettagrid:mettagrid",
     ],
 )
 
@@ -36,7 +39,7 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
-py_library(
+py_library_typed(
     name = "cogames",
     srcs = glob(["src/cogames/**/*.py"]),
     # The docs bundle ships with the library because cogames.main reads
@@ -68,6 +71,17 @@ py_library(
         "@pypi//jupytext",
         "@pypi//ipykernel",
         "@pypi//pytest_httpserver",
+    ],
+    # Optional extras (cogames[neural], cogames[cogsguard]) are runtime-
+    # optional in pyproject but always imported statically by main.py,
+    # train.py, policy/*. The venv-based pyright sees them because
+    # `uv sync` installs all extras; bazel needs them spelled out for
+    # the typecheck.
+    typecheck_extra_deps = [
+        "@pypi//cogsguard",
+        "@pypi//einops",
+        "@pypi//torch",
+        "//packages/pufferlib-core:pufferlib",
     ],
 )
 
