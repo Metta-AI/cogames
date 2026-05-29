@@ -18,7 +18,6 @@ from mettagrid.envs.mettagrid_puffer_env import MettaGridPufferEnv
 from mettagrid.perf.harness import (
     compare_multiple,
     print_comparison,
-    print_scorecard_reminder,
     run_performance,
     save_results,
 )
@@ -107,16 +106,6 @@ Examples:
             result["comparisons"] = comparisons
             with open(args.output, "w") as f:
                 json.dump(result, f, indent=2)
-
-    print_scorecard_reminder(
-        stats,
-        config_label=f"env-only (cvc, {args.agents}a, machina_1)",
-        runs_label=f"{args.rounds}x{args.iterations // 1000}K steps",
-        num_rounds=args.rounds,
-        phase=args.phase,
-        baseline_paths=args.baseline,
-        output_path=args.output,
-    )
 
     if stats["cv"] > 0.20:
         print("\nPerformance measurement unstable!")
