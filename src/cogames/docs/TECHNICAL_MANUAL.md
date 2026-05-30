@@ -1,1 +1,0 @@
-../../../TECHNICAL_MANUAL.md

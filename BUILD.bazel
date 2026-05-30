@@ -1,107 +1,12 @@
-load("@rules_python//python:defs.bzl", "py_binary")
-load("//tools:pyright.bzl", "py_library_typed")
+load("@rules_python//python:defs.bzl", "py_library")
 
-# Local source for cogames + metta_alo. Tests pick up local edits via these
-# targets; the venv's wheel-installed copies are builds of the same source
-# tree and serve consumers outside the cogames target itself.
-#
-# BUILD targets live above the python source tree to keep wheels clean —
-# see packages/metta-common/BUILD.bazel for the rationale.
-
-py_library_typed(
-    name = "metta_alo",
-    srcs = glob(["src/metta_alo/**/*.py"]),
-    data = glob(["src/metta_alo/py.typed"], allow_empty = True),
-    imports = ["src"],  # so `import metta_alo` resolves
-    visibility = ["//visibility:public"],
-    deps = [
-        "@pypi//pydantic",
-        # scoring.py imports mettagrid.simulator.multi_episode.rollout
-        "//packages/mettagrid/python/src/mettagrid:mettagrid",
-    ],
-)
-
-# Doc bundle for the cogames package. `MISSION.md` at the package root is
-# the canonical source-of-truth; `src/cogames/docs/MISSION.md` is a symlink
-# that points back at it so importlib.resources.files("cogames").joinpath(
-# "docs/MISSION.md") can read it from within the installed package.
-# Tests that invoke the CLI in-process (`cogames docs mission`) and then
-# cross-check the output against the canonical doc need both runfile
-# paths populated. Carried on the library target (rather than only on
-# :cogames_bin) so test_cli::test_docs_mission_command works without a
-# separate dep.
-filegroup(
-    name = "cogames_docs",
-    srcs = ["MISSION.md"] + glob(
-        ["src/cogames/docs/*.md"],
-        allow_empty = True,
-    ),
-    visibility = ["//visibility:public"],
-)
-
-py_library_typed(
+# Tombstone cogames package. The wheel ships only an `__init__.py` that
+# emits a DeprecationWarning. No imports, no consumers in the workspace —
+# this target exists so `bazel query //packages/cogames/...` resolves and
+# the package can still be built into a wheel by the release workflow.
+py_library(
     name = "cogames",
-    srcs = glob(["src/cogames/**/*.py"]),
-    # The docs bundle ships with the library because cogames.main reads
-    # `docs/*.md` via importlib.resources.files("cogames"), and library
-    # consumers (including tests that import cogames and drive the CLI
-    # in-process) need that path populated. The top-level MISSION.md is
-    # included so tests that read the canonical doc directly via a
-    # filesystem path also resolve.
-    data = ["src/cogames/py.typed", ":cogames_docs"],
-    imports = ["src"],  # so `import cogames` resolves
-    visibility = ["//visibility:public"],
-    deps = [
-        ":metta_alo",
-        "//packages/softmax-cli:softmax",
-        # Mirrors packages/cogames/pyproject.toml [project.dependencies]
-        # (mettagrid + softmax-cli are workspace-internal; the rest are external).
-        "//packages/mettagrid/python/src/mettagrid:mettagrid",
-        "@pypi//packaging",
-        "@pypi//pydantic",
-        "@pypi//pyyaml",
-        "@pypi//questionary",
-        "@pypi//typer",
-        "@pypi//rich",
-        "@pypi//httpx",
-        "@pypi//anthropic",
-        "@pypi//openai",
-        "@pypi//nbstripout",
-        "@pypi//nbconvert",
-        "@pypi//jupytext",
-        "@pypi//ipykernel",
-        "@pypi//pytest_httpserver",
-    ],
-    # Optional extras (cogames[neural], cogames[cogsguard]) are runtime-
-    # optional in pyproject but always imported statically by main.py,
-    # train.py, policy/*. The venv-based pyright sees them because
-    # `uv sync` installs all extras; bazel needs them spelled out for
-    # the typecheck.
-    typecheck_extra_deps = [
-        "@pypi//cogsguard",
-        "@pypi//einops",
-        "@pypi//torch",
-        "//packages/pufferlib-core:pufferlib",
-    ],
-)
-
-py_binary(
-    name = "cogames_bin",
-    srcs = ["src/cogames/main.py"],
-    main = "src/cogames/main.py",
-    # main.py reads docs/*.md via importlib.resources.files("cogames")
-    # for the `cogames docs <name>` commands. These docs are CLI-only —
-    # no library consumer opens them — so they live on the binary's
-    # runfiles tree rather than every dependent test's.
-    data = glob(["src/cogames/docs/*.md"], allow_empty = True),
+    srcs = glob(["src/cogames/*.py"]),
     imports = ["src"],
     visibility = ["//visibility:public"],
-    deps = [
-        ":cogames",
-        # `cogames play` defaults to `--game cogsguard`; the game module is
-        # imported lazily via cogames.game.get_game, so the binary needs
-        # cogsguard on its runfiles PYTHONPATH even though cogsguard is an
-        # optional extra (cogames[cogsguard]) in pyproject.toml.
-        "@pypi//cogsguard",
-    ],
 )

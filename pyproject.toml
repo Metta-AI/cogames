@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cogames"
-description = "Deprecated CoGames compatibility package"
+description = "Tombstone for cogames; retired in favor of coworld."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
 classifiers = [
@@ -13,53 +13,15 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
 ]
-dependencies = [
-  "mettagrid==0.26.21",
-  "softmax-cli==0.26.12",
-  "packaging>=24.0.0",
-  "pydantic>=2.11.5",
-  "pyyaml>=6.0.2",
-  "questionary>=2.0.1",
-  "typer>=0.19.2",
-  "rich>=13.7.0",
-  "questionary>=2.1.0",
-  "httpx>=0.28.1",
-  "anthropic[bedrock]>=0.64.0",
-  "openai>=1.0.0",
-  # For `cogames docsync` command
-  "nbstripout>=0.8.0",
-  "nbconvert>=7.16.0",
-  "jupytext>=1.16.0",
-  "ipykernel>=6.29.5",
-  # Only used by cogames upload tests; could be moved to optional dep group
-  "pytest-httpserver>=1.1.0",
-]
+dependencies = []
 dynamic = ["version"]
-
-[project.optional-dependencies]
-diplomacog = ["diplomacog"]
-hungercog = ["hungercog"]
-overcogged = ["overcogged"]
-amongcogs = ["amongcogs"]
-werecog = ["werecog"]
-cogsguard = ["cogsguard"]
-bitworld = ["bitworld"]
-neural = ["pufferlib-core", "torch", "einops>=0.8.0", "mettagrid[train]"]
-test = ["cogames[neural]", "pytest", "pytest-xdist", "ruff"]
-
-[project.scripts]
-cogames = "cogames.main:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["cogames", "cogames.*", "metta_alo", "metta_alo.*"]
+include = ["cogames"]
 
 [tool.setuptools]
 include-package-data = true
-
-[tool.setuptools.package-data]
-cogames = ["py.typed", "assets/**/*", "docs/*.md"]
-metta_alo = ["py.typed"]
 
 [tool.setuptools_scm]
 tag_regex = "^cogames-v(?P<version>\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)$"
@@ -67,35 +29,7 @@ version_scheme = "no-guess-dev"
 local_scheme = "no-local-version"
 root = "../.."
 fallback_version = "0.0.0"
-# Provide a specific git command to be used in order to find the correct versioning tags
 git_describe_command = ["git", "describe", "--dirty", "--tags", "--long", "--match", "cogames-v*"]
-[tool.pytest.ini_options]
-pythonpath = ["src"]
-
-testpaths = ["tests"]
-[tool.coverage.run]
-source = ["cogames"]
-
-[tool.uv.sources]
-mettagrid = { workspace = true }
-softmax-cli = { workspace = true }
-diplomacog = { git = "https://github.com/Metta-AI/cogame-diplomacog.git" }
-hungercog = { git = "https://github.com/Metta-AI/cogame-hungercog.git" }
-overcogged = { git = "https://github.com/Metta-AI/cogame-overcogged.git" }
-amongcogs = { git = "https://github.com/Metta-AI/cogame-amongcogs.git" }
-werecog = { git = "https://github.com/Metta-AI/cogame-werecog.git" }
-cogsguard = { git = "https://github.com/Metta-AI/coworld-cogs-vs-clips.git" }
-bitworld = { git = "https://github.com/Metta-AI/bitworld.git", subdirectory = "extras" }
 
 [tool.ruff]
 extend = "../../.ruff.toml"
-
-[tool.ruff.lint.per-file-ignores]
-# Ignoring:
-# - E501 Line too long (notebook .py files can have long lines from cell content)
-# - E402 Module level import not at top of file (cells can have imports even when not the first cell)
-# - I001 Import block not sorted (notebook import grouping/order should stay aligned with docsync output)
-"README.py" = ["E501", "E402", "I001"]
-"tutorials/*.py" = ["E501", "E402", "I001"]
-# generated_models.py is auto-generated from openapi.json via datamodel-codegen
-"src/cogames/cli/generated_models.py" = ["E501", "I001"]
