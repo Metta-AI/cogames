@@ -1,4 +1,4 @@
-load("//tools:pytest.bzl", "pytest_test")
+load("//tools:pytest.bzl", "pytest_test_typed")
 
 # Every test file under packages/cogames/tests/ exposed as its own
 # pytest_test. conftest.py + _test_support.py travel with each target so
@@ -47,9 +47,14 @@ _SHARED_SRCS = ["conftest.py", "_test_support.py"] + glob(
 )
 
 [
-    pytest_test(
+    pytest_test_typed(
         name = test_file.removesuffix(".py"),
         srcs = [test_file] + _SHARED_SRCS,
+        # `_test_support.py` is a sibling module imported by some tests;
+        # add the tests/ dir to PYTHONPATH so pyright can resolve it.
+        # (pytest doesn't need this — its rootdir + importlib mode handles
+        # sibling imports — but pyright's resolver does.)
+        imports = ["."],
         args = [
             "--rootdir=packages/cogames/tests",
             "--confcutdir=packages/cogames/tests",
